@@ -2,6 +2,7 @@ package com.kakarote.ai_crm.ai;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.kakarote.ai_crm.ai.tools.ContactTools;
 import com.kakarote.ai_crm.ai.tools.CustomerTools;
 import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
 import com.kakarote.ai_crm.ai.tools.TaskTools;
@@ -46,6 +47,9 @@ public class DynamicChatClientProvider {
 
     @Autowired
     private KnowledgeTools knowledgeTools;
+
+    @Autowired
+    private ContactTools contactTools;
 
     @Autowired
     private ToolCallingManager toolCallingManager;
@@ -143,7 +147,7 @@ public class DynamicChatClientProvider {
 
         // 创建 ChatClient 并注册工具
         return ChatClient.builder(chatModel)
-                .defaultTools(customerTools, taskTools, knowledgeTools)
+                .defaultTools(customerTools, taskTools, knowledgeTools, contactTools)
                 .build();
     }
 
