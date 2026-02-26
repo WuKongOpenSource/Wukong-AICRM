@@ -3,13 +3,21 @@ package com.kakarote.ai_crm.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.CustomerAddBO;
+import com.kakarote.ai_crm.entity.BO.CustomerExportBO;
+import com.kakarote.ai_crm.entity.BO.CustomerImportBO;
 import com.kakarote.ai_crm.entity.BO.CustomerQueryBO;
 import com.kakarote.ai_crm.entity.BO.CustomerTransferBO;
 import com.kakarote.ai_crm.entity.BO.CustomerUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
+import com.kakarote.ai_crm.entity.VO.CustomerImportPreviewVO;
+import com.kakarote.ai_crm.entity.VO.CustomerImportResultVO;
 import com.kakarote.ai_crm.entity.VO.CustomerListVO;
 import com.kakarote.ai_crm.entity.VO.DashboardStatsVO;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 /**
  * 客户服务接口
@@ -65,4 +73,24 @@ public interface ICustomerService extends IService<Customer> {
      * 获取客户统计信息
      */
     DashboardStatsVO getStatistics();
+
+    /**
+     * 导出客户Excel
+     */
+    void exportCustomers(CustomerExportBO exportBO, HttpServletResponse response);
+
+    /**
+     * 下载导入模板
+     */
+    void downloadImportTemplate(HttpServletResponse response);
+
+    /**
+     * 导入预览（解析+验证+检测重复）
+     */
+    CustomerImportPreviewVO importPreview(MultipartFile file);
+
+    /**
+     * 确认导入
+     */
+    CustomerImportResultVO confirmImport(List<CustomerImportBO> rows);
 }

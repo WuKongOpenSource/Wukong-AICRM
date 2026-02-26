@@ -1,11 +1,14 @@
-import { post, get } from '@/utils/request'
+import { post, get, upload } from '@/utils/request'
 import type { PageResult } from '@/types/api'
 import type {
   CustomerListVO,
   CustomerDetailVO,
   CustomerAddBO,
   CustomerUpdateBO,
-  CustomerQueryBO
+  CustomerQueryBO,
+  CustomerImportPreview,
+  CustomerImportRow,
+  CustomerImportResult
 } from '@/types/customer'
 
 /**
@@ -76,4 +79,34 @@ export function transferCustomer(customerIds: string[], newOwnerId: string): Pro
  */
 export function getCustomerStatistics(): Promise<any> {
   return get('/customer/statistics')
+}
+
+/**
+ * Export customers to Excel
+ */
+export function exportCustomers(data: { customerIds?: string[], keyword?: string, stage?: string, level?: string }): Promise<Blob> {
+  return post('/customer/export', data, { responseType: 'blob' })
+}
+
+/**
+ * Download import template
+ */
+export function downloadImportTemplate(): Promise<Blob> {
+  return get('/customer/import/template', { responseType: 'blob' })
+}
+
+/**
+ * Import preview (upload Excel, parse + validate + detect duplicates)
+ */
+export function importCustomerPreview(file: File): Promise<CustomerImportPreview> {
+  const formData = new FormData()
+  formData.append('file', file)
+  return upload('/customer/import/preview', formData)
+}
+
+/**
+ * Confirm import
+ */
+export function confirmCustomerImport(rows: CustomerImportRow[]): Promise<CustomerImportResult> {
+  return post('/customer/import/confirm', rows)
 }

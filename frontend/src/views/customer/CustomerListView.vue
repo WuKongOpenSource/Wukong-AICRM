@@ -69,6 +69,8 @@
       />
       <div v-if="!isMobile" class="flex-1"></div>
       <el-button v-if="!isMobile" :icon="Filter">筛选</el-button>
+      <el-button v-if="!isMobile" :icon="Download" @click="handleExport" :loading="exporting">导出</el-button>
+      <el-button v-if="!isMobile" :icon="Upload" @click="showImportDialog = true">导入</el-button>
       <el-button type="primary" :icon="Plus" @click="showAddDialog = true">
         <span v-if="!isMobile">添加客户</span>
       </el-button>
@@ -428,6 +430,139 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- Import Dialog -->
+    <el-dialog
+      v-model="showImportDialog"
+      title="导入客户"
+      :width="isMobile ? '95%' : '800px'"
+      :fullscreen="isMobile"
+      @close="resetImport"
+    >
+      <!-- Step 1: Upload -->
+      <div v-if="importStep === 1" class="text-center py-6">
+        <el-upload
+          ref="importUploadRef"
+          :auto-upload="false"
+          :limit="1"
+          accept=".xlsx,.xls"
+          :on-change="handleImportFileChange"
+          drag
+        >
+          <el-icon class="text-4xl text-gray-400 mb-2"><Upload /></el-icon>
+          <div class="text-gray-600">将 Excel 文件拖到此处，或<em class="text-primary-500">点击上传</em></div>
+          <template #tip>
+            <div class="text-xs text-gray-400 mt-2">支持 .xlsx / .xls 格式，表头需包含「公司名称」列</div>
+            <div class="mt-2">
+              <el-button type="primary" link size="small" @click.stop="handleDownloadTemplate">
+                <el-icon class="mr-1"><Download /></el-icon>下载导入模板
+              </el-button>
+            </div>
+          </template>
+        </el-upload>
+      </div>
+
+      <!-- Step 2: Preview -->
+      <div v-if="importStep === 2">
+        <!-- Statistics -->
+        <div class="flex gap-4 mb-4 flex-wrap">
+          <el-tag>总计 {{ importPreview!.totalRows }} 行</el-tag>
+          <el-tag type="success">有效 {{ importPreview!.validRows }} 行</el-tag>
+          <el-tag v-if="importPreview!.duplicateRows > 0" type="warning">重复 {{ importPreview!.duplicateRows }} 行</el-tag>
+          <el-tag v-if="importPreview!.errorRows > 0" type="danger">错误 {{ importPreview!.errorRows }} 行</el-tag>
+        </div>
+
+        <!-- Global duplicate handling -->
+        <div v-if="importPreview!.duplicateRows > 0" class="mb-4 p-3 bg-yellow-50 rounded-lg">
+          <span class="text-sm text-yellow-700 mr-3">重复行统一处理：</span>
+          <el-radio-group v-model="globalDuplicateMode" @change="applyGlobalDuplicateMode">
+            <el-radio value="skip">全部跳过</el-radio>
+            <el-radio value="overwrite">全部覆盖</el-radio>
+          </el-radio-group>
+        </div>
+
+        <!-- Data table -->
+        <el-table
+          :data="importPreview!.rows"
+          :max-height="400"
+          size="small"
+          :row-class-name="importRowClassName"
+        >
+          <el-table-column label="行号" prop="rowNum" width="60" />
+          <el-table-column label="公司名称" prop="companyName" min-width="120" />
+          <el-table-column label="行业" prop="industry" width="100" />
+          <el-table-column label="阶段" prop="stage" width="90">
+            <template #default="{ row }">{{ getStageLabel(row.stage) || row.stage }}</template>
+          </el-table-column>
+          <el-table-column label="联系人" prop="contactName" width="90" />
+          <el-table-column label="状态" width="150">
+            <template #default="{ row }">
+              <el-tag v-if="row.errors && row.errors.length > 0" type="danger" size="small">
+                {{ row.errors[0] }}
+              </el-tag>
+              <template v-else-if="row.duplicate">
+                <el-radio-group v-model="row.handleMode" size="small">
+                  <el-radio value="skip">跳过</el-radio>
+                  <el-radio value="overwrite">覆盖</el-radio>
+                </el-radio-group>
+              </template>
+              <el-tag v-else type="success" size="small">正常</el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <!-- Global errors -->
+        <div v-if="importPreview!.errors && importPreview!.errors.length > 0" class="mt-3">
+          <el-alert
+            v-for="(err, idx) in importPreview!.errors"
+            :key="idx"
+            :title="err"
+            type="error"
+            :closable="false"
+            class="mb-1"
+          />
+        </div>
+      </div>
+
+      <!-- Step 3: Result -->
+      <div v-if="importStep === 3" class="text-center py-6">
+        <el-icon class="text-5xl text-green-500 mb-3"><Select /></el-icon>
+        <h3 class="text-lg font-medium mb-4">导入完成</h3>
+        <div class="flex justify-center gap-6 text-sm">
+          <div>新增 <span class="text-primary-600 font-bold text-lg">{{ importResult!.imported }}</span> 条</div>
+          <div>更新 <span class="text-orange-500 font-bold text-lg">{{ importResult!.updated }}</span> 条</div>
+          <div>跳过 <span class="text-gray-500 font-bold text-lg">{{ importResult!.skipped }}</span> 条</div>
+        </div>
+        <div v-if="importResult!.errors && importResult!.errors.length > 0" class="mt-4 text-left">
+          <el-alert
+            v-for="(err, idx) in importResult!.errors"
+            :key="idx"
+            :title="err"
+            type="warning"
+            :closable="false"
+            class="mb-1"
+          />
+        </div>
+      </div>
+
+      <template #footer>
+        <template v-if="importStep === 1">
+          <el-button @click="showImportDialog = false">取消</el-button>
+          <el-button type="primary" :loading="importLoading" :disabled="!importFile" @click="handleImportPreview">
+            解析文件
+          </el-button>
+        </template>
+        <template v-else-if="importStep === 2">
+          <el-button @click="importStep = 1">上一步</el-button>
+          <el-button type="primary" :loading="importLoading" @click="handleImportConfirm">
+            确认导入
+          </el-button>
+        </template>
+        <template v-else>
+          <el-button type="primary" @click="showImportDialog = false">完成</el-button>
+        </template>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -438,6 +573,7 @@ import { useCustomerStore } from '@/stores/customer'
 import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
+import type { UploadInstance, UploadFile } from 'element-plus'
 import {
   Plus,
   Search,
@@ -455,12 +591,14 @@ import {
   Document,
   Edit,
   Loading,
-  Select
+  Select,
+  Download,
+  Upload
 } from '@element-plus/icons-vue'
-import type { CustomerListVO, CustomerAddBO, CustomerStage } from '@/types/customer'
+import type { CustomerListVO, CustomerAddBO, CustomerStage, CustomerImportPreview, CustomerImportRow, CustomerImportResult } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 import { getEnabledFieldsByEntity } from '@/api/customField'
-import { transferCustomer, updateCustomerStage } from '@/api/customer'
+import { transferCustomer, updateCustomerStage, exportCustomers, downloadImportTemplate, importCustomerPreview, confirmCustomerImport } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
 import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
 
@@ -481,6 +619,17 @@ const statistics = ref<any>(null)
 const loadMoreTrigger = ref<HTMLElement>()
 const scrollContainer = ref<HTMLElement>()
 let observer: IntersectionObserver | null = null
+
+// Import/Export state
+const exporting = ref(false)
+const showImportDialog = ref(false)
+const importStep = ref(1)
+const importFile = ref<File | null>(null)
+const importLoading = ref(false)
+const importPreview = ref<CustomerImportPreview | null>(null)
+const importResult = ref<CustomerImportResult | null>(null)
+const globalDuplicateMode = ref('')
+const importUploadRef = ref<UploadInstance>()
 
 // Owner transfer
 const userList = ref<any[]>([])
@@ -871,5 +1020,113 @@ function formatRelativeTime(dateStr: string | undefined): string {
   const days = Math.floor(diff / 24)
   if (days < 30) return `${days}天前`
   return formatDate(dateStr)
+}
+
+// ==================== Import / Export ====================
+
+async function handleDownloadTemplate() {
+  try {
+    const blob = await downloadImportTemplate()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = '客户导入模板.xlsx'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch {
+    // Error handled by interceptor
+  }
+}
+
+async function handleExport() {
+  exporting.value = true
+  try {
+    const blob = await exportCustomers({
+      keyword: customerStore.queryParams.keyword || undefined,
+      stage: customerStore.queryParams.stage || undefined,
+      level: customerStore.queryParams.level || undefined
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const today = new Date().toISOString().slice(0, 10)
+    a.download = `客户数据_${today}.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    exporting.value = false
+  }
+}
+
+function handleImportFileChange(uploadFile: UploadFile) {
+  importFile.value = uploadFile.raw || null
+}
+
+async function handleImportPreview() {
+  if (!importFile.value) return
+  importLoading.value = true
+  try {
+    importPreview.value = await importCustomerPreview(importFile.value)
+    importStep.value = 2
+    // Default duplicate handling to 'skip'
+    if (importPreview.value.rows) {
+      importPreview.value.rows.forEach(row => {
+        if (row.duplicate && !row.handleMode) {
+          row.handleMode = 'skip'
+        }
+      })
+    }
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    importLoading.value = false
+  }
+}
+
+function applyGlobalDuplicateMode(mode: string) {
+  if (!importPreview.value) return
+  importPreview.value.rows.forEach(row => {
+    if (row.duplicate) {
+      row.handleMode = mode as 'skip' | 'overwrite'
+    }
+  })
+}
+
+function importRowClassName({ row }: { row: CustomerImportRow }): string {
+  if (row.errors && row.errors.length > 0) return 'bg-red-50'
+  if (row.duplicate) return 'bg-yellow-50'
+  return ''
+}
+
+async function handleImportConfirm() {
+  if (!importPreview.value) return
+  importLoading.value = true
+  try {
+    importResult.value = await confirmCustomerImport(importPreview.value.rows)
+    importStep.value = 3
+    // Refresh customer list
+    await customerStore.fetchCustomerList(true)
+    try { await customerStore.fetchStatistics(); statistics.value = customerStore.statistics } catch { /* ignore */ }
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    importLoading.value = false
+  }
+}
+
+function resetImport() {
+  importStep.value = 1
+  importFile.value = null
+  importPreview.value = null
+  importResult.value = null
+  globalDuplicateMode.value = ''
+  importUploadRef.value?.clearFiles()
 }
 </script>

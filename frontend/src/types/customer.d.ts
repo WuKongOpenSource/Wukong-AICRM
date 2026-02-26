@@ -152,3 +152,43 @@ export interface CustomerTag {
   tagName: string
   color?: string
 }
+
+// Import/Export types
+export interface CustomerImportRow {
+  rowNum: number
+  companyName: string
+  industry: string
+  stage: string
+  level: string
+  source: string
+  address: string
+  website: string
+  quotation: number | null
+  remark: string
+  contactName: string
+  contactPosition: string
+  contactPhone: string
+  contactEmail: string
+  contactWechat: string
+  customFields: Record<string, any>
+  duplicate: boolean
+  existingCustomerId: string | null
+  handleMode: 'skip' | 'overwrite' | ''
+  errors?: string[]
+}
+
+export interface CustomerImportPreview {
+  totalRows: number
+  validRows: number
+  duplicateRows: number
+  errorRows: number
+  rows: CustomerImportRow[]
+  errors: string[]
+}
+
+export interface CustomerImportResult {
+  imported: number
+  updated: number
+  skipped: number
+  errors: string[]
+}
