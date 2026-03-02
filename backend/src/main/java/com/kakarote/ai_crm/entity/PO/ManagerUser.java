@@ -1,5 +1,7 @@
 package com.kakarote.ai_crm.entity.PO;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -99,5 +101,12 @@ public class ManagerUser implements Serializable {
 	 */
 	@Schema(description = "直属上级ID")
 	private Long parentId;
+
+	/**
+	 * 租户ID
+	 */
+	@TableField(fill = FieldFill.INSERT)
+	@Schema(description = "租户ID")
+	private Long tenantId;
 
 }

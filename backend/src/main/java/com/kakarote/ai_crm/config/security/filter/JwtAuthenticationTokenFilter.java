@@ -2,6 +2,7 @@ package com.kakarote.ai_crm.config.security.filter;
 
 import cn.hutool.core.util.ObjectUtil;
 import com.kakarote.ai_crm.config.security.service.TokenService;
+import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.utils.UserUtil;
 import jakarta.servlet.FilterChain;
@@ -35,7 +36,17 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
             UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(loginUser, null, loginUser.getAuthorities());
             authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+            // 设置租户上下文
+            Long tenantId = loginUser.getUser().getTenantId();
+            if (tenantId != null) {
+                TenantContextHolder.setTenantId(tenantId);
+            }
         }
-        chain.doFilter(request, response);
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            // 请求结束时清除租户上下文，防止线程复用导致数据泄露
+            TenantContextHolder.clear();
+        }
     }
 }

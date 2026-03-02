@@ -1,5 +1,6 @@
 package com.kakarote.ai_crm.ai.context;
 
+import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +32,13 @@ public class AiContextHolder {
     private static final Map<Long, Long> SESSION_USER_MAP = new ConcurrentHashMap<>();
 
     /**
+     * 存储会话ID与租户ID的映射
+     * Key: sessionId
+     * Value: tenantId
+     */
+    private static final Map<Long, Long> SESSION_TENANT_MAP = new ConcurrentHashMap<>();
+
+    /**
      * 当前正在处理的会话ID
      * 通过 Micrometer context-propagation 实现跨线程传递
      */
@@ -50,14 +58,31 @@ public class AiContextHolder {
      * @param userId    用户ID
      */
     public static void setContext(Long sessionId, Long userId) {
+        setContext(sessionId, userId, null);
+    }
+
+    /**
+     * 设置会话上下文（含租户ID）
+     * 在开始 AI 对话时调用
+     *
+     * @param sessionId 会话ID
+     * @param userId    用户ID
+     * @param tenantId  租户ID
+     */
+    public static void setContext(Long sessionId, Long userId, Long tenantId) {
         if (sessionId != null && userId != null) {
             // 存储到 Map 中（线程安全，全局可访问）
             SESSION_USER_MAP.put(sessionId, userId);
             // 同时设置 ThreadLocal（用于跨线程传递，通过 context-propagation）
             CURRENT_SESSION_ID.set(sessionId);
             CURRENT_USER_ID.set(userId);
-            log.debug("设置 AI 上下文: sessionId={}, userId={}, 线程={}",
-                sessionId, userId, Thread.currentThread().getName());
+            // 存储租户ID
+            if (tenantId != null) {
+                SESSION_TENANT_MAP.put(sessionId, tenantId);
+                TenantContextHolder.setTenantId(tenantId);
+            }
+            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}, 线程={}",
+                sessionId, userId, tenantId, Thread.currentThread().getName());
         }
     }
 
@@ -82,7 +107,12 @@ public class AiContextHolder {
         if (userId != null) {
             CURRENT_USER_ID.set(userId);
         }
-        log.trace("恢复 AI 上下文: sessionId={}, userId={}", sessionId, userId);
+        // 从 Map 中恢复 tenantId
+        Long tenantId = SESSION_TENANT_MAP.get(sessionId);
+        if (tenantId != null) {
+            TenantContextHolder.setTenantId(tenantId);
+        }
+        log.trace("恢复 AI 上下文: sessionId={}, userId={}, tenantId={}", sessionId, userId, tenantId);
     }
 
     /**
@@ -146,8 +176,23 @@ public class AiContextHolder {
     public static void clearSession(Long sessionId) {
         if (sessionId != null) {
             SESSION_USER_MAP.remove(sessionId);
+            SESSION_TENANT_MAP.remove(sessionId);
             log.trace("移除会话: sessionId={}", sessionId);
         }
+    }
+
+    /**
+     * 获取当前租户ID（从 SESSION_TENANT_MAP 中通过 sessionId 获取）
+     */
+    public static Long getCurrentTenantId() {
+        Long sessionId = CURRENT_SESSION_ID.get();
+        if (sessionId != null) {
+            Long tenantId = SESSION_TENANT_MAP.get(sessionId);
+            if (tenantId != null) {
+                return tenantId;
+            }
+        }
+        return TenantContextHolder.getTenantId();
     }
 
     /**

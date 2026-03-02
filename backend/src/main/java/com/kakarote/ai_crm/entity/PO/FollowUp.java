@@ -75,4 +75,8 @@ public class FollowUp implements Serializable {
     @TableField(fill = FieldFill.INSERT)
     @Schema(description = "创建时间")
     private Date createTime;
+
+    @TableField(fill = FieldFill.INSERT)
+    @Schema(description = "租户ID")
+    private Long tenantId;
 }

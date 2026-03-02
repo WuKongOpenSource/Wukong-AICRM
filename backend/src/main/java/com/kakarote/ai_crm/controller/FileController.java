@@ -4,6 +4,7 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.kakarote.ai_crm.common.result.Result;
+import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.BO.PresignedUploadBO;
 import com.kakarote.ai_crm.entity.VO.PresignedUploadVO;
 import com.kakarote.ai_crm.service.FileStorageService;
@@ -39,12 +40,17 @@ public class FileController {
     @PostMapping("/presigned-upload")
     @Operation(summary = "获取预签名上传URL", description = "前端直传MinIO时使用，返回预签名URL")
     public Result<PresignedUploadVO> getPresignedUploadUrl(@Valid @RequestBody PresignedUploadBO uploadBO) {
-        // 生成文件存储路径
+        // 生成文件存储路径（租户隔离：{tenantId}/yyyy/MM/dd/UUID.ext）
         String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
         String ext = FileUtil.extName(uploadBO.getFileName());
         String fileName = IdUtil.fastSimpleUUID() + (StrUtil.isNotBlank(ext) ? "." + ext : "");
 
         String prefix = StrUtil.isNotBlank(uploadBO.getPrefix()) ? uploadBO.getPrefix() : datePath;
+        // 加入租户前缀实现文件隔离
+        Long tenantId = TenantContextHolder.getTenantId();
+        if (tenantId != null) {
+            prefix = "t" + tenantId + "/" + prefix;
+        }
         String objectKey = prefix + "/" + fileName;
 
         // 确定签名有效期

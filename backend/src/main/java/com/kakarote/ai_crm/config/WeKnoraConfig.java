@@ -2,6 +2,7 @@ package com.kakarote.ai_crm.config;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.PO.SystemConfig;
 import com.kakarote.ai_crm.mapper.SystemConfigMapper;
 import lombok.Setter;
@@ -120,10 +121,22 @@ public class WeKnoraConfig {
         return config;
     }
 
+    /**
+     * 构建租户级缓存 key
+     */
+    private String buildCacheKey(String key) {
+        Long tenantId = TenantContextHolder.getTenantId();
+        if (tenantId != null) {
+            return CACHE_KEY_PREFIX + tenantId + ":" + key;
+        }
+        return CACHE_KEY_PREFIX + key;
+    }
+
     private String getDbConfigValue(String key) {
         try {
+            String cacheKey = buildCacheKey(key);
             if (redisTemplate != null) {
-                String cachedValue = redisTemplate.opsForValue().get(CACHE_KEY_PREFIX + key);
+                String cachedValue = redisTemplate.opsForValue().get(cacheKey);
                 if (cachedValue != null) {
                     return cachedValue;
                 }
@@ -131,11 +144,12 @@ public class WeKnoraConfig {
             if (systemConfigMapper != null) {
                 LambdaQueryWrapper<SystemConfig> wrapper = new LambdaQueryWrapper<>();
                 wrapper.eq(SystemConfig::getConfigKey, key);
+                // 注意：TenantLineInnerInterceptor 会自动追加 tenant_id 条件
                 SystemConfig config = systemConfigMapper.selectOne(wrapper);
                 if (config != null && StrUtil.isNotBlank(config.getConfigValue())) {
                     if (redisTemplate != null) {
                         try {
-                            redisTemplate.opsForValue().set(CACHE_KEY_PREFIX + key,
+                            redisTemplate.opsForValue().set(cacheKey,
                                     config.getConfigValue(), CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES);
                         } catch (Exception ignored) {}
                     }

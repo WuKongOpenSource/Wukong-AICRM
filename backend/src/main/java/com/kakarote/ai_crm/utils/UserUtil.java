@@ -4,6 +4,7 @@ package com.kakarote.ai_crm.utils;
 import com.kakarote.ai_crm.ai.context.AiContextHolder;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
+import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,6 +65,23 @@ public class UserUtil {
             return (LoginUser) getAuthentication().getPrincipal();
         } catch (Exception e) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR);
+        }
+    }
+
+    /**
+     * 获取当前租户ID
+     * 优先从 TenantContextHolder 获取（用于工具调用线程等场景）
+     */
+    public static Long getTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        if (tenantId != null) {
+            return tenantId;
+        }
+        try {
+            return getLoginUser().getUser().getTenantId();
+        } catch (Exception e) {
+            log.debug("无法获取租户ID: {}", e.getMessage());
+            return null;
         }
     }
 

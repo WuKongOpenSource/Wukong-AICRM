@@ -222,9 +222,10 @@ public class ChatServiceImpl implements IChatService {
         List<ChatSendBO.AttachmentDTO> attachments = sendBO.getAttachments();
 
         Long currentUserId = UserUtil.getUserIdOrNull();
+        Long currentTenantId = UserUtil.getTenantId();
         if (currentUserId != null) {
-            AiContextHolder.setContext(sessionId, currentUserId);
-            log.debug("设置 AI 上下文: sessionId={}, userId={}", sessionId, currentUserId);
+            AiContextHolder.setContext(sessionId, currentUserId, currentTenantId);
+            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}", sessionId, currentUserId, currentTenantId);
         }
 
         Long messageId = saveMessage(sessionId, "user", content);
@@ -304,9 +305,10 @@ public class ChatServiceImpl implements IChatService {
         List<ChatSendBO.AttachmentDTO> attachments = sendBO.getAttachments();
 
         Long currentUserId = UserUtil.getUserIdOrNull();
+        Long currentTenantId = UserUtil.getTenantId();
         if (currentUserId != null) {
-            AiContextHolder.setContext(sessionId, currentUserId);
-            log.debug("设置 AI 上下文: sessionId={}, userId={}", sessionId, currentUserId);
+            AiContextHolder.setContext(sessionId, currentUserId, currentTenantId);
+            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}", sessionId, currentUserId, currentTenantId);
         }
 
         Long messageId = saveMessage(sessionId, "user", content);

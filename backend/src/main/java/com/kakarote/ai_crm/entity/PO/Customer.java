@@ -174,4 +174,8 @@ public class Customer implements Serializable {
     @TableField(fill = FieldFill.INSERT_UPDATE)
     @Schema(description = "修改时间")
     private Date updateTime;
+
+    @TableField(fill = FieldFill.INSERT)
+    @Schema(description = "租户ID")
+    private Long tenantId;
 }

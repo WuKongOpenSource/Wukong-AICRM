@@ -1,6 +1,8 @@
 package com.kakarote.ai_crm.entity.PO;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -33,4 +35,8 @@ public class ManagerDept implements Serializable {
 
     @Schema(description = "创建时间")
     private Date createTime;
+
+    @TableField(fill = FieldFill.INSERT)
+    @Schema(description = "租户ID")
+    private Long tenantId;
 }

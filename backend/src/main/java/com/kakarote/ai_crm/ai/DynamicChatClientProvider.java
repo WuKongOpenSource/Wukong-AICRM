@@ -6,6 +6,7 @@ import com.kakarote.ai_crm.ai.tools.ContactTools;
 import com.kakarote.ai_crm.ai.tools.CustomerTools;
 import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
 import com.kakarote.ai_crm.ai.tools.TaskTools;
+import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.PO.SystemConfig;
 import com.kakarote.ai_crm.mapper.SystemConfigMapper;
 import io.micrometer.observation.ObservationRegistry;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -33,7 +35,11 @@ import java.util.stream.Collectors;
 @Component
 public class DynamicChatClientProvider {
 
-    private volatile ChatClient currentChatClient;
+    /**
+     * 每租户一个 ChatClient，按 tenantId 隔离
+     * tenantId=0 表示默认/全局 ChatClient（用于启动初始化）
+     */
+    private final ConcurrentHashMap<Long, ChatClient> tenantChatClients = new ConcurrentHashMap<>();
     private final Object lock = new Object();
 
     @Autowired
@@ -78,14 +84,19 @@ public class DynamicChatClientProvider {
      * 如果还没初始化，会自动从数据库加载配置创建
      */
     public ChatClient getChatClient() {
-        if (currentChatClient == null) {
+        Long tenantId = TenantContextHolder.getTenantId();
+        long key = tenantId != null ? tenantId : 0L;
+        ChatClient client = tenantChatClients.get(key);
+        if (client == null) {
             synchronized (lock) {
-                if (currentChatClient == null) {
+                client = tenantChatClients.get(key);
+                if (client == null) {
                     refreshChatClient();
+                    client = tenantChatClients.get(key);
                 }
             }
         }
-        return currentChatClient;
+        return client;
     }
 
     /**
@@ -93,9 +104,11 @@ public class DynamicChatClientProvider {
      */
     public void refreshChatClient() {
         synchronized (lock) {
-            log.info("开始刷新 ChatClient...");
+            Long tenantId = TenantContextHolder.getTenantId();
+            long key = tenantId != null ? tenantId : 0L;
+            log.info("开始刷新 ChatClient, tenantId={}...", key);
 
-            // 从数据库加载 AI 配置
+            // 从数据库加载 AI 配置（TenantLineInnerInterceptor 会自动按租户过滤）
             Map<String, String> configs = loadAiConfigsFromDB();
 
             String apiUrl = configs.getOrDefault("ai_api_url", defaultBaseUrl);
@@ -105,17 +118,27 @@ public class DynamicChatClientProvider {
             int maxTokens = parseInt(configs.get("ai_max_tokens"), defaultMaxTokens);
 
             if (StrUtil.isBlank(apiKey)) {
-                log.warn("AI API Key 未配置，ChatClient 将使用默认配置");
+                log.warn("AI API Key 未配置，ChatClient 将使用默认配置, tenantId={}", key);
                 apiKey = defaultApiKey;
             }
 
             if (StrUtil.isBlank(apiKey)) {
-                log.error("AI API Key 未配置且无默认值，ChatClient 将无法正常工作");
+                log.error("AI API Key 未配置且无默认值，ChatClient 将无法正常工作, tenantId={}", key);
             }
 
-            currentChatClient = createChatClient(apiUrl, apiKey, model, temperature, maxTokens);
+            ChatClient client = createChatClient(apiUrl, apiKey, model, temperature, maxTokens);
+            tenantChatClients.put(key, client);
 
-            log.info("ChatClient 刷新完成: baseUrl={}, model={}", apiUrl, model);
+            log.info("ChatClient 刷新完成: tenantId={}, baseUrl={}, model={}", key, apiUrl, model);
+        }
+    }
+
+    /**
+     * 移除指定租户的 ChatClient 缓存（配置变更后调用）
+     */
+    public void evictTenantChatClient(Long tenantId) {
+        if (tenantId != null) {
+            tenantChatClients.remove(tenantId);
         }
     }
 

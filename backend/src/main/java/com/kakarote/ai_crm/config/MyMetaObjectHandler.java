@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.config;
 
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
+import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.utils.UserUtil;
 import org.apache.ibatis.reflection.MetaObject;
 import org.slf4j.Logger;
@@ -32,6 +33,16 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
             }
         } catch (Exception e) {
             log.debug("无法获取当前用户ID进行自动填充: {}", e.getMessage());
+        }
+        // 填充租户ID
+        if (metaObject.hasSetter("tenantId")) {
+            Object tenantId = getFieldValByName("tenantId", metaObject);
+            if (tenantId == null) {
+                Long currentTenantId = TenantContextHolder.getTenantId();
+                if (currentTenantId != null) {
+                    this.strictInsertFill(metaObject, "tenantId", Long.class, currentTenantId);
+                }
+            }
         }
     }
 

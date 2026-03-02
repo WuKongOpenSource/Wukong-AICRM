@@ -3,6 +3,7 @@ package com.kakarote.ai_crm.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
+import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.WeKnoraConfigUpdateBO;
 import com.kakarote.ai_crm.entity.PO.SystemConfig;
@@ -41,6 +42,17 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
     private static final String AI_CONFIG_TYPE = "ai";
     private static final String WEKNORA_CONFIG_TYPE = "weknora";
     private static final long CACHE_EXPIRE_MINUTES = 30;
+
+    /**
+     * 构建租户级缓存 key: system:config:{tenantId}:{configKey}
+     */
+    private String buildCacheKey(String configKey) {
+        Long tenantId = TenantContextHolder.getTenantId();
+        if (tenantId != null) {
+            return CACHE_KEY_PREFIX + tenantId + ":" + configKey;
+        }
+        return CACHE_KEY_PREFIX + configKey;
+    }
 
     @Autowired
     private StringRedisTemplate redisTemplate;
@@ -90,8 +102,8 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
     @Override
     public String getConfigValue(String configKey, String defaultValue) {
-        // 1. 先从 Redis 缓存查询
-        String cacheKey = CACHE_KEY_PREFIX + configKey;
+        // 1. 先从 Redis 缓存查询（租户隔离）
+        String cacheKey = buildCacheKey(configKey);
         String cachedValue = redisTemplate.opsForValue().get(cacheKey);
         if (cachedValue != null) {
             return cachedValue;
@@ -146,8 +158,8 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
             updateById(config);
         }
 
-        // 清除缓存
-        redisTemplate.delete(CACHE_KEY_PREFIX + configKey);
+        // 清除缓存（租户隔离）
+        redisTemplate.delete(buildCacheKey(configKey));
     }
 
     @Override
@@ -421,8 +433,8 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
                 updateById(config);
             }
 
-            // 清除缓存
-            redisTemplate.delete(CACHE_KEY_PREFIX + configKey);
+            // 清除缓存（租户隔离）
+            redisTemplate.delete(buildCacheKey(configKey));
         }
     }
 
