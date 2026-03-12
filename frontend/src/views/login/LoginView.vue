@@ -1,17 +1,18 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-    <div class="w-full max-w-md">
+  <div class="min-h-screen flex items-center justify-center bg-background-light">
+    <div class="w-full max-w-md px-4">
       <!-- Logo and Title -->
-      <div class="text-center mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">AI CRM</h1>
-        <p class="mt-2 text-gray-600">智能客户关系管理系统</p>
+      <div class="text-center mb-10">
+        <div class="inline-flex items-center justify-center size-16 bg-primary rounded-2xl text-white shadow-xl shadow-primary/20 mb-4">
+          <span class="material-symbols-outlined text-4xl">rocket_launch</span>
+        </div>
+        <h1 class="text-2xl font-bold text-slate-900">Nexus AI CRM</h1>
+        <p class="mt-1 text-sm text-slate-500">智能客户关系管理系统</p>
       </div>
 
       <!-- Login Card -->
-      <el-card class="shadow-lg">
-        <template #header>
-          <span class="text-lg font-semibold">登录</span>
-        </template>
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-xl p-8">
+        <h2 class="text-lg font-bold text-slate-900 mb-6">登录</h2>
 
         <el-form
           ref="formRef"
@@ -19,12 +20,12 @@
           :rules="rules"
           label-position="top"
           @submit.prevent="handleLogin"
+          hide-required-asterisk
         >
           <el-form-item label="用户名" prop="username">
             <el-input
               v-model="formData.username"
               placeholder="请输入用户名"
-              :prefix-icon="User"
               size="large"
             />
           </el-form-item>
@@ -34,30 +35,30 @@
               v-model="formData.password"
               type="password"
               placeholder="请输入密码"
-              :prefix-icon="Lock"
               size="large"
               show-password
               @keyup.enter="handleLogin"
             />
           </el-form-item>
 
-          <el-form-item>
-            <el-button
-              type="primary"
-              size="large"
-              class="w-full"
-              :loading="loading"
+          <el-form-item class="mt-2">
+            <button
+              type="button"
+              class="w-full bg-primary text-white py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 flex items-center justify-center gap-2 disabled:opacity-50"
+              :disabled="loading"
               @click="handleLogin"
             >
+              <span v-if="loading" class="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               {{ loading ? '登录中...' : '登录' }}
-            </el-button>
+            </button>
           </el-form-item>
         </el-form>
 
-        <div class="text-center text-sm text-gray-500 mt-4">
-          <p>测试账号: admin / 123456a</p>
+        <div class="text-center text-sm text-slate-500 mt-6 space-y-2">
+          <p>还没有账号？<router-link to="/register" class="text-primary font-medium hover:underline">立即注册</router-link></p>
+          <p class="text-xs text-slate-400">测试账号: admin / 123456a</p>
         </div>
-      </el-card>
+      </div>
     </div>
   </div>
 </template>
@@ -67,7 +68,6 @@ import { ref, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, FormInstance, FormRules } from 'element-plus'
-import { User, Lock } from '@element-plus/icons-vue'
 import { getOidcSessionToken } from '@/api/auth'
 
 const router = useRouter()
@@ -113,7 +113,6 @@ async function handleLogin() {
     if (redirect.includes('/oauth2/authorize')) {
       try {
         const { sessionToken } = await getOidcSessionToken()
-        // 将 session_token 添加到 URL 参数中
         const url = new URL(redirect)
         url.searchParams.set('session_token', sessionToken)
         redirect = url.toString()
@@ -122,7 +121,7 @@ async function handleLogin() {
       }
     }
 
-    // 如果是完整的外部 URL（如 OIDC 授权回调），使用 window.location 跳转
+    // 如果是完整的外部 URL，使用 window.location 跳转
     if (redirect.startsWith('http://') || redirect.startsWith('https://')) {
       window.location.href = redirect
     } else {
@@ -130,15 +129,8 @@ async function handleLogin() {
     }
   } catch (error) {
     console.error('Login error:', error)
-    // Error is already handled in the interceptor
   } finally {
     loading.value = false
   }
 }
 </script>
-
-<style scoped>
-.el-card {
-  border-radius: 12px;
-}
-</style>
