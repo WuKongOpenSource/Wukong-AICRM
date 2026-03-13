@@ -4,7 +4,7 @@ spring:
   application:
     name: manager
   datasource:
-    url: jdbc:postgresql://192.168.1.170:5432/wk_ai_crm
+    url: jdbc:postgresql://192.168.1.170:5432/wk_ai_crm_saas
     username: postgres
     password: postgres123!@#
     driver-class-name: org.postgresql.Driver
