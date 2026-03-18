@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { login as apiLogin, logout as apiLogout, getUserInfo as apiGetUserInfo, updateProfile as apiUpdateProfile, getUserAuth as apiGetUserAuth } from '@/api/auth'
 import { setToken, removeToken, getToken } from '@/utils/request'
 import type { UserInfo, LoginParams } from '@/types/api'
+import { useEnterpriseStore } from './enterprise'
 
 export const useUserStore = defineStore('user', () => {
   // State
@@ -42,6 +43,8 @@ export const useUserStore = defineStore('user', () => {
       userInfo.value = null
       permissions.value = {}
       removeToken()
+      const enterpriseStore = useEnterpriseStore()
+      enterpriseStore.reset()
     }
   }
 

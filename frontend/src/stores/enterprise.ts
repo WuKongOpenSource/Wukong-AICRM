@@ -28,8 +28,15 @@ export const useEnterpriseStore = defineStore('enterprise', () => {
     logoUrl.value = config.logoUrl
   }
 
+  function reset() {
+    name.value = null
+    logo.value = null
+    logoUrl.value = null
+    loaded.value = false
+  }
+
   const displayName = computed(() => name.value || 'Nexus AI')
   const hasLogo = computed(() => !!logoUrl.value)
 
-  return { name, logo, logoUrl, loaded, loadConfig, updateLocal, displayName, hasLogo }
+  return { name, logo, logoUrl, loaded, loadConfig, updateLocal, reset, displayName, hasLogo }
 })
