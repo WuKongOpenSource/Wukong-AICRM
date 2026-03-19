@@ -45,24 +45,29 @@
     <div class="flex flex-col xl:flex-row gap-6 items-start relative">
       <!-- Table Area -->
       <div class="flex-1 min-w-0 w-full space-y-6">
-        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm" v-loading="customerStore.loading">
-          <div class="overflow-x-auto">
+        <div
+          ref="tableCardRef"
+          class="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden"
+          :style="tableCardStyle"
+          v-loading="customerStore.loading"
+        >
+          <div class="flex-1 min-h-0 overflow-auto overscroll-none">
             <table class="w-full text-left border-collapse">
               <thead>
                 <tr class="bg-slate-50 border-b border-slate-200">
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky left-0 z-20 bg-slate-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">公司名称</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">客户级别</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">联系人</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">电话</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">行业</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">商机阶段</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">报价金额</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">最后跟进</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">负责人</th>
-                  <th v-for="field in listCustomFields" :key="field.fieldId" class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky left-0 top-0 z-40 bg-slate-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">公司名称</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">客户级别</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">联系人</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">电话</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">行业</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">商机阶段</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">报价金额</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">最后跟进</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">负责人</th>
+                  <th v-for="field in listCustomFields" :key="field.fieldId" class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky top-0 z-30 bg-slate-50">
                     {{ field.fieldLabel }}
                   </th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap text-right sticky right-0 z-20 bg-slate-50 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]">操作</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap text-right sticky right-0 top-0 z-40 bg-slate-50 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]">操作</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
@@ -195,7 +200,7 @@
           </div>
 
           <!-- Pagination -->
-          <div v-if="customerStore.totalCount > 0" class="px-6 py-4 bg-slate-50/50 flex items-center justify-between border-t border-slate-200">
+          <div v-if="customerStore.totalCount > 0" class="shrink-0 px-6 py-4 bg-slate-50/50 flex items-center justify-between border-t border-slate-200">
             <span class="text-xs text-slate-500">
               共 {{ customerStore.totalCount }} 条客户数据
             </span>
@@ -757,7 +762,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
 import { useResponsive } from '@/composables/useResponsive'
@@ -777,6 +782,8 @@ const router = useRouter()
 const route = useRoute()
 const customerStore = useCustomerStore()
 const { isMobile } = useResponsive()
+const tableCardRef = ref<HTMLElement | null>(null)
+const tableCardMaxHeight = ref<number | null>(null)
 
 // UI only: AI sidebar expand/collapse (persisted)
 const AI_SIDEBAR_STORAGE_KEY = 'wk_ai_crm:customer_ai_sidebar_expanded:v1'
@@ -829,6 +836,31 @@ const aiImagePreview = ref<string | null>(null)
 // AI Follow-up Drawer
 const showAiFollowUpDrawer = ref(false)
 const aiFollowUpCustomer = ref<CustomerListVO | null>(null)
+
+const tableCardStyle = computed(() => {
+  if (!tableCardMaxHeight.value) return {}
+  return { maxHeight: `${tableCardMaxHeight.value}px` }
+})
+
+function updateTableCardMaxHeight() {
+  const tableCardEl = tableCardRef.value
+  if (!tableCardEl) return
+
+  const cardRect = tableCardEl.getBoundingClientRect()
+  const scrollContainer = tableCardEl.closest('main')
+  const viewportBottom = scrollContainer instanceof HTMLElement
+    ? scrollContainer.getBoundingClientRect().bottom
+    : window.innerHeight
+  const nextHeight = Math.floor(viewportBottom - cardRect.top - 24)
+
+  if (nextHeight > 0) {
+    tableCardMaxHeight.value = nextHeight
+  }
+}
+
+function handleTableViewportResize() {
+  updateTableCardMaxHeight()
+}
 
 function handleAiFollowUp(customer: CustomerListVO) {
   aiFollowUpCustomer.value = customer
@@ -976,6 +1008,10 @@ const overdueCount = computed(() => {
 
 onMounted(async () => {
   loadAiSidebarExpanded()
+  await nextTick()
+  updateTableCardMaxHeight()
+  window.addEventListener('resize', handleTableViewportResize)
+
   try {
     const allFields = await getEnabledFieldsByEntity('customer')
     listCustomFields.value = allFields.filter(f => f.isShowInList)
@@ -991,11 +1027,18 @@ onMounted(async () => {
   }
 
   await customerStore.fetchCustomerList(true)
+  await nextTick()
+  updateTableCardMaxHeight()
 
   if (route.query.action === 'create') {
     showAddDialog.value = true
     router.replace({ path: route.path, query: {} })
   }
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleTableViewportResize)
+  if (searchTimer) clearTimeout(searchTimer)
 })
 
 function handleSearch() {

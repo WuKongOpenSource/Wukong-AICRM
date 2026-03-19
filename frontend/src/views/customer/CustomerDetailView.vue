@@ -80,7 +80,10 @@
                 @confirm="handleDeleteCustomer"
               >
                 <template #reference>
-                  <button class="p-2 border border-red-200 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-500 transition-colors" title="删除客户">
+                  <button
+                    class="size-12 flex items-center justify-center rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    title="删除客户"
+                  >
                     <span class="material-symbols-outlined text-lg">delete</span>
                   </button>
                 </template>
