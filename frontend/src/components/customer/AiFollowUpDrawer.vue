@@ -176,20 +176,20 @@
                 <!-- Summary & Time -->
                 <div class="p-4 bg-white border border-slate-200 rounded-xl space-y-4">
                   <div>
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">核心摘要</p>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">核心摘要</p>
                     <p class="text-sm text-slate-700 leading-relaxed">{{ parsedData.summary }}</p>
                   </div>
 
                   <div class="grid grid-cols-2 gap-4 pt-4 border-t border-slate-50">
                     <div>
-                      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">跟进时间</p>
+                      <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">跟进时间</p>
                       <div class="flex items-center gap-1.5 text-slate-700">
                         <span class="material-symbols-outlined text-sm">event</span>
                         <span class="text-xs font-bold">{{ parsedData.followTime }}</span>
                       </div>
                     </div>
                     <div>
-                      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">预计下次联系</p>
+                      <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">预计下次联系</p>
                       <div class="flex items-center gap-1.5 text-primary">
                         <span class="material-symbols-outlined text-sm">event_repeat</span>
                         <span class="text-xs font-bold">{{ parsedData.nextFollowTime || '待定' }}</span>
@@ -200,7 +200,7 @@
 
                 <!-- Key Points -->
                 <div v-if="parsedData.keyPoints && parsedData.keyPoints.length > 0" class="p-4 bg-white border border-slate-200 rounded-xl space-y-3">
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">关键要点</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">关键要点</p>
                   <div class="space-y-2">
                     <div v-for="(point, idx) in parsedData.keyPoints" :key="idx" class="flex items-start gap-2">
                       <span class="material-symbols-outlined text-primary text-sm mt-0.5">check_circle</span>
@@ -211,7 +211,7 @@
 
                 <!-- Auto-generated Todos -->
                 <div v-if="parsedData.todos && parsedData.todos.length > 0" class="p-4 bg-white border border-slate-200 rounded-xl space-y-3">
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">自动生成的待办</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">自动生成的待办</p>
                   <div class="space-y-2">
                     <div v-for="(todo, idx) in parsedData.todos" :key="idx" class="flex items-center gap-3">
                       <input type="checkbox" checked class="rounded text-primary focus:ring-primary" />

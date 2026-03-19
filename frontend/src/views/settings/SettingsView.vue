@@ -358,7 +358,7 @@
                                   </div>
                                   <div>
                                     <p class="text-sm font-bold text-slate-900 hover:text-primary transition-colors">{{ member.realname || member.username }}</p>
-                                    <p class="text-[10px] text-slate-400">{{ member.email || '' }}</p>
+                                    <p class="text-xs text-slate-400">{{ member.email || '' }}</p>
                                   </div>
                                 </div>
                               </td>
@@ -367,7 +367,7 @@
                               </td>
                               <td class="px-6 py-4">
                                 <div class="flex flex-wrap gap-1">
-                                  <span v-for="rn in (member.roleNames || [])" :key="rn" class="px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-[10px] font-bold">{{ rn }}</span>
+                                  <span v-for="rn in (member.roleNames || [])" :key="rn" class="px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-xs font-bold">{{ rn }}</span>
                                   <span v-if="!member.roleNames || member.roleNames.length === 0" class="text-sm text-slate-400">-</span>
                                 </div>
                               </td>
@@ -379,7 +379,7 @@
                               </td>
                               <td class="px-6 py-4">
                                 <span :class="[
-                                  'px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest',
+                                  'px-2 py-1 rounded-full text-xs font-bold uppercase tracking-widest',
                                   member.status === 1 ? 'bg-emerald-50 text-emerald-600' : member.status === 0 ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-400'
                                 ]">
                                   {{ member.status === 1 ? '活跃' : member.status === 0 ? '禁用' : '未激活' }}
@@ -517,7 +517,7 @@
                       <td class="px-6 py-4">
                         <div class="flex items-center gap-2">
                           <span class="font-bold text-slate-900">{{ role.roleName }}</span>
-                          <span v-if="role.realm === 'super_admin'" class="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-md uppercase tracking-wider">系统预设</span>
+                          <span v-if="role.realm === 'super_admin'" class="px-2 py-0.5 bg-slate-100 text-slate-500 text-xs font-bold rounded-md uppercase tracking-wider">系统预设</span>
                         </div>
                       </td>
                       <td class="px-6 py-4 text-slate-500 whitespace-normal min-w-[200px]">
@@ -708,7 +708,7 @@
                     />
                     <div v-else class="text-center">
                       <el-icon :size="24" class="text-slate-400"><Upload /></el-icon>
-                      <p class="text-[10px] text-slate-400 mt-1">上传Logo</p>
+                      <p class="text-xs text-slate-400 mt-1">上传Logo</p>
                     </div>
                   </div>
                   <div class="text-xs text-slate-500">
@@ -1515,7 +1515,7 @@
                   <div>
                     <div class="flex items-center gap-3 mb-2">
                       <h2 class="text-2xl font-bold text-slate-900">{{ roleDrawerRole?.roleName }}</h2>
-                      <span v-if="roleDrawerRole?.realm === 'super_admin'" class="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-md uppercase tracking-wider border border-slate-200">
+                      <span v-if="roleDrawerRole?.realm === 'super_admin'" class="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-md uppercase tracking-wider border border-slate-200">
                         系统预设角色
                       </span>
                     </div>
@@ -1775,15 +1775,15 @@
           <div class="px-8 space-y-6">
             <div class="grid grid-cols-2 gap-4">
               <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">所属部门</p>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">所属部门</p>
                 <p class="text-sm font-bold text-slate-700">{{ detailMember.deptName || '-' }}</p>
               </div>
               <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">登录账号</p>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">登录账号</p>
                 <p class="text-sm font-bold text-slate-700">{{ detailMember.username }}</p>
               </div>
               <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 col-span-2">
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">直属上级</p>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">直属上级</p>
                 <p class="text-sm font-bold text-slate-700">{{ detailMember.parentName || '无' }}</p>
               </div>
             </div>
@@ -1814,7 +1814,7 @@
                   <span class="material-symbols-outlined text-xl leading-none">mail</span>
                 </div>
                 <div class="min-w-0">
-                  <p class="text-[10px] font-bold text-slate-400 uppercase">电子邮箱</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase">电子邮箱</p>
                   <p class="text-sm font-medium text-slate-700 break-words">{{ detailMember.email || '-' }}</p>
                 </div>
               </div>
@@ -1823,7 +1823,7 @@
                   <span class="material-symbols-outlined text-xl leading-none">call</span>
                 </div>
                 <div class="min-w-0">
-                  <p class="text-[10px] font-bold text-slate-400 uppercase">手机号码</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase">手机号码</p>
                   <p class="text-sm font-medium text-slate-700 break-words">{{ detailMember.mobile || '-' }}</p>
                 </div>
               </div>

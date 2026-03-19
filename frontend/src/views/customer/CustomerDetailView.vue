@@ -30,11 +30,11 @@
                 <div class="flex items-center gap-3 flex-wrap">
                   <h2 class="text-xl font-bold text-slate-900 truncate">{{ customer.companyName }}</h2>
                   <span
-                    class="px-2 py-0.5 text-[10px] font-bold rounded uppercase"
+                    class="px-2 py-0.5 text-xs font-bold rounded uppercase"
                     :class="getStageBadgeClass(customer.stage)"
                   >{{ getStageLabel(customer.stage) }}</span>
                   <span v-if="customer.level"
-                    class="px-2 py-0.5 text-[10px] font-bold rounded"
+                    class="px-2 py-0.5 text-xs font-bold rounded"
                     :class="{
                       'bg-emerald-100 text-emerald-700': customer.level === 'A',
                       'bg-blue-100 text-blue-700': customer.level === 'B',
@@ -121,7 +121,7 @@
                       :class="getStepperLabelClass(stage, idx)"
                     >{{ getStepperStageIcon(stage) }}</span>
                     <span
-                      class="text-[10px] font-bold tracking-wider whitespace-nowrap transition-colors"
+                      class="text-xs font-bold tracking-wider whitespace-nowrap transition-colors"
                       :class="getStepperLabelClass(stage, idx)"
                     >{{ getStepperLabel(stage) }}</span>
                   </div>
@@ -145,19 +145,19 @@
               </h3>
               <div class="space-y-5">
                 <div>
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">公司全称</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">公司全称</p>
                   <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.companyName }}</p>
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">所属行业</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">所属行业</p>
                   <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.industry || '-' }}</p>
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">客户来源</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">客户来源</p>
                   <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.source || '-' }}</p>
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">客户级别</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">客户级别</p>
                   <span
                     class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold"
                     :class="{
@@ -168,39 +168,39 @@
                   >{{ customer.level }}级</span>
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">主要联系人</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">主要联系人</p>
                   <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ primaryContact?.name || '-' }}</p>
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">联系电话</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">联系电话</p>
                   <p class="text-sm text-slate-900 font-medium font-mono px-2 py-1 -ml-2 truncate">{{ primaryContact?.phone || '-' }}</p>
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">电子邮箱</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">电子邮箱</p>
                   <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ primaryContact?.email || '-' }}</p>
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">客户地址</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">客户地址</p>
                   <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.address || '-' }}</p>
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">公司网站</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">公司网站</p>
                   <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.website || '-' }}</p>
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">负责人</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">负责人</p>
                   <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.ownerName || '-' }}</p>
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">创建人</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">创建人</p>
                   <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.ownerName || '-' }}</p>
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">创建时间</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">创建时间</p>
                   <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2">{{ formatDate(customer.createTime) }}</p>
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">客户背景</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">客户背景</p>
                   <p class="text-sm text-slate-600 leading-relaxed px-2 py-1 -ml-2">{{ customer.description || '暂无描述' }}</p>
                 </div>
               </div>
@@ -238,7 +238,7 @@
               </h3>
               <div class="space-y-5">
                 <div v-for="field in customFields" :key="field.fieldId">
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{{ field.fieldLabel }}</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{{ field.fieldLabel }}</p>
                   <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2">{{ formatCustomFieldValue(field, customer.customFields?.[field.fieldName]) }}</p>
                 </div>
               </div>
@@ -286,12 +286,12 @@
                       <div>
                         <div class="flex items-center gap-2">
                           <h4 class="font-bold text-slate-900 text-sm leading-none">{{ getFollowUpTypeLabel(item.type) }}</h4>
-                          <span class="text-[10px] font-bold px-1.5 py-0.5 bg-slate-50 text-slate-500 rounded border border-slate-100">{{ item.createUserName }}</span>
+                          <span class="text-xs font-bold px-1.5 py-0.5 bg-slate-50 text-slate-500 rounded border border-slate-100">{{ item.createUserName }}</span>
                         </div>
                       </div>
                     </div>
                     <div class="flex items-center gap-3">
-                      <span class="text-[10px] text-slate-400 uppercase font-bold">{{ formatDateTime(item.followTime || item.createTime) }}</span>
+                      <span class="text-xs text-slate-400 uppercase font-bold">{{ formatDateTime(item.followTime || item.createTime) }}</span>
                       <el-popconfirm title="确定删除这条跟进记录吗？" confirm-button-text="删除" cancel-button-text="取消" @confirm="handleDeleteFollowUp(item.followUpId)">
                         <template #reference>
                           <button class="text-slate-300 hover:text-red-500 transition-colors">
@@ -301,7 +301,7 @@
                       </el-popconfirm>
                     </div>
                   </div>
-                  <div v-if="item.nextFollowTime" class="flex items-center gap-2 mb-3 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg w-fit">
+                  <div v-if="item.nextFollowTime" class="flex items-center gap-2 mb-3 text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg w-fit">
                     <span class="material-symbols-outlined text-xs">event_repeat</span>
                     下次联系: {{ formatDateTime(item.nextFollowTime) }}
                   </div>
@@ -329,7 +329,7 @@
                 <span class="material-symbols-outlined text-primary">hub</span>
                 关联业务模块
               </h3>
-              <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-tighter">3个模块</span>
+              <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-tighter">3个模块</span>
             </div>
 
             <!-- Contacts Module -->
@@ -346,7 +346,7 @@
               </div>
               <div class="p-4 space-y-3">
                 <div v-if="contacts.length === 0" class="py-6 text-center">
-                  <p class="text-[10px] text-slate-400">暂无联系人</p>
+                  <p class="text-xs text-slate-400">暂无联系人</p>
                 </div>
                 <div
                   v-for="contact in contacts"
@@ -361,12 +361,12 @@
                       </div>
                       <div>
                         <h5 class="text-xs font-bold text-slate-900 truncate max-w-[120px]">{{ contact.name }}</h5>
-                        <p class="text-[10px] text-slate-400 truncate max-w-[120px]">{{ contact.position || '联系人' }}</p>
+                        <p class="text-xs text-slate-400 truncate max-w-[120px]">{{ contact.position || '联系人' }}</p>
                       </div>
                     </div>
                     <span v-if="contact.isPrimary" class="px-1.5 py-0.5 bg-primary/10 text-primary text-[8px] font-black rounded uppercase">主要</span>
                   </div>
-                  <div class="flex items-center gap-3 text-[10px] text-slate-500">
+                  <div class="flex items-center gap-3 text-xs text-slate-500">
                     <div v-if="contact.phone" class="flex items-center gap-1">
                       <span class="material-symbols-outlined text-xs">call</span>
                       <span class="font-mono">{{ contact.phone }}</span>
@@ -377,13 +377,13 @@
                     </div>
                   </div>
                   <div class="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-50" @click.stop>
-                    <button class="text-[10px] font-bold text-primary hover:underline" @click="handleEditContact(contact)">编辑</button>
+                    <button class="text-xs font-bold text-primary hover:underline" @click="handleEditContact(contact)">编辑</button>
                     <span class="text-slate-200">|</span>
-                    <button v-if="!contact.isPrimary" class="text-[10px] font-bold text-slate-400 hover:text-primary" @click="handleSetPrimary(contact.contactId)">设为主要</button>
+                    <button v-if="!contact.isPrimary" class="text-xs font-bold text-slate-400 hover:text-primary" @click="handleSetPrimary(contact.contactId)">设为主要</button>
                     <span v-if="!contact.isPrimary" class="text-slate-200">|</span>
                     <el-popconfirm title="确定删除该联系人吗？" confirm-button-text="删除" cancel-button-text="取消" @confirm="handleDeleteContact(contact.contactId)">
                       <template #reference>
-                        <button class="text-[10px] font-bold text-red-400 hover:text-red-500">删除</button>
+                        <button class="text-xs font-bold text-red-400 hover:text-red-500">删除</button>
                       </template>
                     </el-popconfirm>
                   </div>
@@ -410,7 +410,7 @@
                 </h4>
               </div>
               <div class="p-4">
-                <p class="py-6 text-center text-[10px] text-slate-400">暂无关联商机</p>
+                <p class="py-6 text-center text-xs text-slate-400">暂无关联商机</p>
               </div>
             </section> -->
 
@@ -423,7 +423,7 @@
                 </h4>
               </div>
               <div class="p-4">
-                <p class="py-6 text-center text-[10px] text-slate-400">暂无合同记录</p>
+                <p class="py-6 text-center text-xs text-slate-400">暂无合同记录</p>
               </div>
             </section> -->
 
@@ -440,7 +440,7 @@
               </div>
               <div class="p-4 space-y-3">
                 <div v-if="!customer.tasks?.length" class="py-6 text-center">
-                  <p class="text-[10px] text-slate-400">暂无待办任务</p>
+                  <p class="text-xs text-slate-400">暂无待办任务</p>
                 </div>
                 <div
                   v-for="task in customer.tasks?.slice(0, 5)"
@@ -468,7 +468,7 @@
                 </h4>
               </div>
               <div class="p-4">
-                <p class="py-6 text-center text-[10px] text-slate-400">暂无文档</p>
+                <p class="py-6 text-center text-xs text-slate-400">暂无文档</p>
               </div>
             </section>
           </div>
@@ -550,28 +550,28 @@
             <div>
               <h3 class="font-bold text-lg text-slate-900">{{ currentContact.name }}</h3>
               <p v-if="currentContact.position" class="text-sm text-slate-500">{{ currentContact.position }}</p>
-              <span v-if="currentContact.isPrimary" class="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded">主联系人</span>
+              <span v-if="currentContact.isPrimary" class="text-xs font-bold px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded">主联系人</span>
             </div>
           </div>
           <div class="space-y-3">
             <div class="p-3 bg-slate-50 rounded-xl">
-              <p class="text-[10px] text-slate-400 uppercase font-bold mb-1">电话</p>
+              <p class="text-xs text-slate-400 uppercase font-bold mb-1">电话</p>
               <p class="text-sm text-slate-900">{{ currentContact.phone || '-' }}</p>
             </div>
             <div class="p-3 bg-slate-50 rounded-xl">
-              <p class="text-[10px] text-slate-400 uppercase font-bold mb-1">邮箱</p>
+              <p class="text-xs text-slate-400 uppercase font-bold mb-1">邮箱</p>
               <p class="text-sm text-slate-900">{{ currentContact.email || '-' }}</p>
             </div>
             <div class="p-3 bg-slate-50 rounded-xl">
-              <p class="text-[10px] text-slate-400 uppercase font-bold mb-1">微信</p>
+              <p class="text-xs text-slate-400 uppercase font-bold mb-1">微信</p>
               <p class="text-sm text-slate-900">{{ currentContact.wechat || '-' }}</p>
             </div>
             <div class="p-3 bg-slate-50 rounded-xl">
-              <p class="text-[10px] text-slate-400 uppercase font-bold mb-1">备注</p>
+              <p class="text-xs text-slate-400 uppercase font-bold mb-1">备注</p>
               <p class="text-sm text-slate-900">{{ currentContact.notes || '-' }}</p>
             </div>
             <div class="p-3 bg-slate-50 rounded-xl">
-              <p class="text-[10px] text-slate-400 uppercase font-bold mb-1">创建时间</p>
+              <p class="text-xs text-slate-400 uppercase font-bold mb-1">创建时间</p>
               <p class="text-sm text-slate-900">{{ currentContact.createTime ? formatDateTime(currentContact.createTime) : '-' }}</p>
             </div>
           </div>

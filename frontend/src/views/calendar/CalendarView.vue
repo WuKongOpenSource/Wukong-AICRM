@@ -45,7 +45,7 @@
                   <span class="text-sm font-medium" :class="day.isToday ? 'text-primary' : 'text-slate-400'">
                     {{ day.label }}
                   </span>
-                  <span class="text-[10px] text-slate-400">
+                  <span class="text-xs text-slate-400">
                     {{ getLunarText(day.fullDate) }}
                   </span>
                 </div>
@@ -62,7 +62,7 @@
                   class="p-3 rounded-xl border border-primary/20 bg-primary/5 shadow-sm hover:shadow-md hover:bg-primary/10 transition-all cursor-pointer"
                 >
                   <p class="text-xs font-bold text-primary mb-1 truncate">{{ event.title }}</p>
-                  <p class="text-[10px] text-slate-500 truncate">{{ formatTime(event.startTime) }} • {{ event.customerName || '' }}</p>
+                  <p class="text-xs text-slate-500 truncate">{{ formatTime(event.startTime) }} • {{ event.customerName || '' }}</p>
                 </div>
                 <!-- Tasks -->
                 <div
@@ -83,7 +83,7 @@
                     <p class="text-xs font-bold mb-1 truncate" :class="task.status === 'COMPLETED' ? 'text-slate-500 line-through' : 'text-slate-700'">
                       {{ task.title }}
                     </p>
-                    <p class="text-[10px] text-slate-400 truncate">{{ task.customerName || '' }}</p>
+                    <p class="text-xs text-slate-400 truncate">{{ task.customerName || '' }}</p>
                   </div>
                 </div>
               </div>
@@ -118,7 +118,7 @@
                     >
                       {{ cell.isCurrentMonth ? cell.date : '' }}
                     </span>
-                    <span v-if="cell.isCurrentMonth && cell.fullDate" class="text-[10px] text-slate-400 leading-none">
+                    <span v-if="cell.isCurrentMonth && cell.fullDate" class="text-xs text-slate-400 leading-none">
                       {{ getLunarText(cell.fullDate) }}
                     </span>
                   </div>
@@ -128,14 +128,14 @@
                     v-for="event in getEventsForDate(cell.fullDate)"
                     :key="event.scheduleId"
                     @click="selectedEvent = event; selectedTask = null"
-                    class="px-2 py-1 text-[10px] font-medium bg-primary/10 text-primary rounded truncate cursor-pointer hover:bg-primary/20"
+                    class="px-2 py-1 text-xs font-medium bg-primary/10 text-primary rounded truncate cursor-pointer hover:bg-primary/20"
                   >
                     {{ formatTime(event.startTime) }} {{ event.title }}
                   </div>
                   <div
                     v-for="task in getTasksForDate(cell.fullDate)"
                     :key="task.taskId"
-                    class="px-2 py-1 text-[10px] font-medium rounded truncate cursor-pointer flex items-center gap-1 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                    class="px-2 py-1 text-xs font-medium rounded truncate cursor-pointer flex items-center gap-1 bg-slate-50 text-slate-700 hover:bg-slate-100"
                   >
                     <div
                       class="shrink-0 size-3 rounded-sm border flex items-center justify-center transition-colors"
@@ -192,8 +192,8 @@
                         </h4>
                         <div class="flex items-center gap-2 flex-wrap">
                           <span v-if="item.payload.customerName" class="text-xs text-slate-500 font-medium">{{ item.payload.customerName }}</span>
-                          <span v-if="item.payload.typeName" class="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full font-bold">{{ item.payload.typeName }}</span>
-                          <span v-if="item.payload.location" class="text-[10px] px-2 py-0.5 bg-slate-50 text-slate-600 rounded-full font-bold">{{ item.payload.location }}</span>
+                          <span v-if="item.payload.typeName" class="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full font-bold">{{ item.payload.typeName }}</span>
+                          <span v-if="item.payload.location" class="text-xs px-2 py-0.5 bg-slate-50 text-slate-600 rounded-full font-bold">{{ item.payload.location }}</span>
                         </div>
                       </div>
                       <div class="text-right shrink-0">
@@ -225,12 +225,12 @@
                         </h4>
                         <div class="flex items-center gap-2 flex-wrap">
                           <span v-if="item.payload.customerName" class="text-xs text-slate-500">{{ item.payload.customerName }}</span>
-                          <span v-if="item.payload.dueDate" class="text-[10px] px-2 py-0.5 bg-slate-50 text-slate-600 rounded-full font-bold">
+                          <span v-if="item.payload.dueDate" class="text-xs px-2 py-0.5 bg-slate-50 text-slate-600 rounded-full font-bold">
                             截止 {{ formatDueDate(item.payload.dueDate) }}
                           </span>
                           <span
                             v-if="item.payload.priority"
-                            class="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                            class="text-xs px-2 py-0.5 rounded-full font-bold"
                             :class="{
                               'bg-red-50 text-red-500': item.payload.priority === 'HIGH',
                               'bg-amber-50 text-amber-500': item.payload.priority === 'MEDIUM',
@@ -264,7 +264,7 @@
       <div v-if="selectedEvent" class="h-full flex flex-col bg-white shadow-2xl">
         <!-- Header -->
         <div class="flex items-center justify-between p-6 border-b border-slate-100">
-          <span class="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-full uppercase tracking-widest">
+          <span class="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full uppercase tracking-widest">
             日程详情
           </span>
           <div class="flex items-center gap-2">
@@ -321,7 +321,7 @@
                 </div>
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-bold text-slate-900 truncate">{{ selectedEvent.customerName }}</p>
-                  <p v-if="selectedEvent.contactName" class="text-[10px] text-slate-400 truncate">{{ selectedEvent.contactName }}</p>
+                  <p v-if="selectedEvent.contactName" class="text-xs text-slate-400 truncate">{{ selectedEvent.contactName }}</p>
                 </div>
                 <span class="material-symbols-outlined ml-auto text-slate-300">chevron_right</span>
               </div>

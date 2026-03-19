@@ -129,30 +129,30 @@
                     </h3>
                     <span
                       v-if="isOverdue(task)"
-                      class="px-2 py-0.5 bg-red-50 text-red-600 text-[10px] font-bold rounded uppercase animate-pulse shrink-0"
+                      class="px-2 py-0.5 bg-red-50 text-red-600 text-xs font-bold rounded uppercase animate-pulse shrink-0"
                     >
                       已延期
                     </span>
                     <span
                       v-else-if="task.status === 'COMPLETED'"
-                      class="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded uppercase shrink-0"
+                      class="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-xs font-bold rounded uppercase shrink-0"
                     >
                       已完成
                     </span>
                     <span
                       v-else-if="task.status === 'IN_PROGRESS'"
-                      class="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded uppercase shrink-0"
+                      class="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs font-bold rounded uppercase shrink-0"
                     >
                       进行中
                     </span>
                     <span
                       v-else
-                      class="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded uppercase shrink-0"
+                      class="px-2 py-0.5 bg-slate-100 text-slate-500 text-xs font-bold rounded uppercase shrink-0"
                     >
                       待处理
                     </span>
                   </div>
-                  <span v-if="task.dueDate" class="text-[10px] font-bold text-slate-400 uppercase shrink-0 ml-2 hidden md:block">
+                  <span v-if="task.dueDate" class="text-xs font-bold text-slate-400 uppercase shrink-0 ml-2 hidden md:block">
                     {{ formatDate(task.dueDate) }}
                     <span class="text-slate-300 ml-1">({{ getRelativeTime(task.dueDate) }})</span>
                   </span>
@@ -164,13 +164,13 @@
                   <span v-if="task.customerName" class="size-1 rounded-full bg-slate-200"></span>
                   <span
                     v-if="task.generatedByAi"
-                    class="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-blue-50 text-blue-600"
+                    class="text-xs font-bold px-2 py-0.5 rounded uppercase bg-blue-50 text-blue-600"
                   >
                     AI 生成
                   </span>
                   <span
                     v-else
-                    class="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-600"
+                    class="text-xs font-bold px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-600"
                   >
                     手动创建
                   </span>

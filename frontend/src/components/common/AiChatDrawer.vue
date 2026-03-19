@@ -26,7 +26,7 @@
               <h2 class="text-base font-bold text-slate-900">悟空AI 助手</h2>
               <div class="flex items-center gap-1.5">
                 <span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span class="text-[10px] text-slate-500 font-medium">在线服务中</span>
+                <span class="text-xs text-slate-500 font-medium">在线服务中</span>
               </div>
             </div>
           </div>
@@ -140,7 +140,7 @@
                         </template>
                       </div>
                     </div>
-                    <div class="text-[10px] text-slate-400 font-medium">{{ formatTime(message.timestamp) }}</div>
+                    <div class="text-xs text-slate-400 font-medium">{{ formatTime(message.timestamp) }}</div>
                   </div>
                 </div>
 
@@ -177,7 +177,7 @@
                         </template>
                       </div>
                     </div>
-                    <div class="text-[10px] text-slate-400 font-medium text-right">{{ formatTime(message.timestamp) }}</div>
+                    <div class="text-xs text-slate-400 font-medium text-right">{{ formatTime(message.timestamp) }}</div>
                   </div>
                 </div>
               </div>
@@ -250,7 +250,7 @@
                   <span class="material-symbols-outlined text-sm">auto_awesome</span>
                 </div>
                 <span class="text-xs font-bold text-slate-900">悟空AI CRM 助手</span>
-                <span class="text-[10px] text-slate-400">{{ notif.time }}</span>
+                <span class="text-xs text-slate-400">{{ notif.time }}</span>
               </div>
               <div
                 class="p-4 bg-white border rounded-xl transition-all"

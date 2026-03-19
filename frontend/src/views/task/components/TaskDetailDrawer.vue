@@ -13,7 +13,7 @@
     <div v-if="task" class="h-full flex flex-col bg-white shadow-2xl">
       <!-- Header -->
       <div class="flex items-center justify-between p-6 border-b border-slate-100">
-        <span class="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-full uppercase tracking-widest">
+        <span class="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full uppercase tracking-widest">
           任务详情
         </span>
         <div class="flex items-center gap-2">
@@ -45,24 +45,24 @@
 
         <div class="grid grid-cols-2 gap-4 my-8">
           <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">截止时间</p>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">截止时间</p>
             <p :class="['text-xs font-bold', isOverdue(task) ? 'text-red-500' : 'text-slate-700']">
               {{ task.dueDate ? formatDateTime(task.dueDate) : '未设定' }}
             </p>
-            <p v-if="isOverdue(task)" class="text-[10px] text-red-500 font-bold mt-1">(已延期)</p>
+            <p v-if="isOverdue(task)" class="text-xs text-red-500 font-bold mt-1">(已延期)</p>
           </div>
           <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">优先级</p>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">优先级</p>
             <p :class="['text-xs font-bold uppercase', getPriorityColor(task.priority)]">
               {{ getPriorityLabel(task.priority) }}
             </p>
           </div>
           <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">负责人</p>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">负责人</p>
             <p class="text-xs font-bold text-slate-700">{{ task.assignedToName || '未分配' }}</p>
           </div>
           <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">任务状态</p>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">任务状态</p>
             <p class="text-xs font-bold text-primary uppercase">{{ getStatusLabel(task.status) }}</p>
           </div>
         </div>
@@ -81,7 +81,7 @@
               </div>
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-bold text-slate-900 truncate">{{ task.customerName }}</p>
-                <p class="text-[10px] text-slate-400">点击查看客户详情</p>
+                <p class="text-xs text-slate-400">点击查看客户详情</p>
               </div>
               <span class="material-symbols-outlined ml-auto text-slate-300">chevron_right</span>
             </div>
@@ -157,23 +157,23 @@
 
       <div class="grid grid-cols-2 gap-3 mb-6">
         <div class="p-3 bg-slate-50 rounded-xl">
-          <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">截止时间</p>
+          <p class="text-xs font-bold text-slate-400 uppercase mb-1">截止时间</p>
           <p :class="['text-xs font-bold', isOverdue(task) ? 'text-red-500' : 'text-slate-700']">
             {{ task.dueDate ? formatDateTime(task.dueDate) : '未设定' }}
           </p>
         </div>
         <div class="p-3 bg-slate-50 rounded-xl">
-          <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">优先级</p>
+          <p class="text-xs font-bold text-slate-400 uppercase mb-1">优先级</p>
           <p :class="['text-xs font-bold', getPriorityColor(task.priority)]">
             {{ getPriorityLabel(task.priority) }}
           </p>
         </div>
         <div class="p-3 bg-slate-50 rounded-xl">
-          <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">负责人</p>
+          <p class="text-xs font-bold text-slate-400 uppercase mb-1">负责人</p>
           <p class="text-xs font-bold text-slate-700">{{ task.assignedToName || '未分配' }}</p>
         </div>
         <div class="p-3 bg-slate-50 rounded-xl">
-          <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">状态</p>
+          <p class="text-xs font-bold text-slate-400 uppercase mb-1">状态</p>
           <p class="text-xs font-bold text-primary">{{ getStatusLabel(task.status) }}</p>
         </div>
       </div>

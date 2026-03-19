@@ -8,7 +8,7 @@
         :class="field.fieldType === 'textarea' ? 'md:col-span-2' : ''"
         class="space-y-1.5"
       >
-        <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">
+        <label class="text-xs font-bold text-slate-500 uppercase ml-1">
           {{ field.fieldLabel }}
           <span v-if="field.isRequired" class="text-red-400">*</span>
         </label>

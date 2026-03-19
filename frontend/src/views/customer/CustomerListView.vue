@@ -104,7 +104,7 @@
                   <td class="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
                     <div v-if="customer.primaryContactName">
                       <div>{{ customer.primaryContactName }}</div>
-                      <div v-if="customer.primaryContactPosition" class="text-[10px] text-slate-400">{{ customer.primaryContactPosition }}</div>
+                      <div v-if="customer.primaryContactPosition" class="text-xs text-slate-400">{{ customer.primaryContactPosition }}</div>
                     </div>
                     <span v-else class="text-slate-300">-</span>
                   </td>
@@ -143,7 +143,7 @@
                   <!-- Owner -->
                   <td class="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
                     <div class="flex items-center gap-2" @click.stop>
-                      <div class="size-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                      <div class="size-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500">
                         {{ customer.ownerName?.charAt(0) || '?' }}
                       </div>
                       <el-popover trigger="click" :width="220" @show="loadUserList">
@@ -160,7 +160,7 @@
                               :class="{ 'bg-primary/5': String(u.userId) === String(customer.ownerId) }"
                               @click="handleTransfer(customer, u)"
                             >
-                              <div class="size-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold flex-shrink-0">{{ u.realname?.charAt(0) || '?' }}</div>
+                              <div class="size-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">{{ u.realname?.charAt(0) || '?' }}</div>
                               <span class="text-sm truncate">{{ u.realname }}</span>
                               <span v-if="String(u.userId) === String(customer.ownerId)" class="material-symbols-outlined ml-auto text-primary text-sm">check</span>
                             </div>
@@ -250,7 +250,7 @@
         >
           <div class="flex items-center justify-between px-1 mb-2">
             <div class="flex items-center gap-2 min-w-0">
-              <h3 v-if="isAiSidebarExpanded" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">
+              <h3 v-if="isAiSidebarExpanded" class="text-xs font-bold text-slate-400 uppercase tracking-widest truncate">
                 AI 智能洞察预警
               </h3>
               <span v-if="isAiSidebarExpanded" class="size-2 rounded-full bg-primary animate-pulse"></span>
@@ -285,7 +285,7 @@
                 </div>
                 <p class="text-xs text-slate-500 leading-relaxed">发现 {{ negotiationCount }} 位客户近期成交概率显著提升，建议优先跟进。</p>
                 <div class="mt-3 flex items-center justify-between">
-                  <span class="text-[10px] font-bold text-primary bg-primary/5 px-2 py-0.5 rounded">{{ negotiationCount }} 位待处理</span>
+                  <span class="text-xs font-bold text-primary bg-primary/5 px-2 py-0.5 rounded">{{ negotiationCount }} 位待处理</span>
                   <span class="material-symbols-outlined text-slate-300 group-hover:text-primary transition-colors text-sm">arrow_forward</span>
                 </div>
               </div>
@@ -298,7 +298,7 @@
                 </div>
                 <p class="text-xs text-slate-500 leading-relaxed">有 {{ overdueCount }} 个客户超过7天未跟进，建议尽快安排跟进计划。</p>
                 <div class="mt-3 flex items-center justify-between">
-                  <span class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{{ overdueCount }} 个待跟进</span>
+                  <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{{ overdueCount }} 个待跟进</span>
                   <span class="material-symbols-outlined text-slate-300 group-hover:text-indigo-600 transition-colors text-sm">arrow_forward</span>
                 </div>
               </div>
@@ -311,13 +311,13 @@
                 </div>
                 <p class="text-xs text-slate-500 leading-relaxed">当前成交转化率 {{ conversionRate }}%，共 {{ closedCount }} 个客户已成交。</p>
                 <div class="mt-3 flex items-center justify-between">
-                  <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">{{ conversionRate }}% 转化率</span>
+                  <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">{{ conversionRate }}% 转化率</span>
                   <span class="material-symbols-outlined text-slate-300 group-hover:text-emerald-600 transition-colors text-sm">arrow_forward</span>
                 </div>
               </div>
 
               <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
-                <p class="text-[10px] text-slate-400 leading-relaxed text-center italic">
+                <p class="text-xs text-slate-400 leading-relaxed text-center italic">
                   AI 助手正在实时分析您的客户数据，预警信息将在此处即时更新。
                 </p>
               </div>
@@ -327,7 +327,7 @@
           <div v-if="!isAiSidebarExpanded" class="hidden xl:flex flex-col items-center gap-6 pt-4">
             <span class="material-symbols-outlined text-primary/40 text-xl animate-pulse">auto_awesome</span>
             <div class="h-20 w-px bg-slate-200"></div>
-            <span class="[writing-mode:vertical-rl] text-[10px] font-bold text-slate-400 tracking-widest">
+            <span class="[writing-mode:vertical-rl] text-xs font-bold text-slate-400 tracking-widest">
               <span class="[text-combine-upright:all]">AI</span> 智能洞察
             </span>
           </div>

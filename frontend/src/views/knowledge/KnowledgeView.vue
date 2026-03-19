@@ -46,7 +46,7 @@
       <div class="flex-1 min-h-0 overflow-y-auto space-y-1 p-2">
         <p
           v-if="!sidebarCollapsed"
-          class="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-400"
+          class="px-4 py-2 text-xs font-bold uppercase tracking-widest text-slate-400"
         >
           知识分类
         </p>
@@ -69,7 +69,7 @@
         </button>
 
         <div v-if="!sidebarCollapsed" class="px-4 pt-8">
-          <p class="mb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">最近使用</p>
+          <p class="mb-4 text-xs font-bold uppercase tracking-widest text-slate-400">最近使用</p>
           <div class="space-y-4">
             <div
               v-for="doc in knowledgeList.slice(0, 3)"
@@ -278,7 +278,7 @@
                   <span class="material-symbols-outlined text-sm">{{ getTypeIconName(item.type) }}</span>
                 </div>
                 <div class="text-right">
-                  <p class="mb-0.5 text-[10px] text-slate-400">文件大小</p>
+                  <p class="mb-0.5 text-xs text-slate-400">文件大小</p>
                   <p class="text-sm font-bold text-slate-900">{{ formatFileSize(item.fileSize) }}</p>
                 </div>
               </div>
@@ -304,7 +304,7 @@
               <div v-if="item.weKnoraParseStatus" class="mb-3">
                 <span
                   :class="[
-                    'inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold',
+                    'inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-bold',
                     getParseStatusClass(item.weKnoraParseStatus)
                   ]"
                 >
@@ -364,7 +364,7 @@
           >
             <!-- Table Header -->
             <div
-              class="hidden grid-cols-12 gap-4 border-b border-slate-100 bg-slate-50/50 px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 md:grid"
+              class="hidden grid-cols-12 gap-4 border-b border-slate-100 bg-slate-50/50 px-6 py-3 text-xs font-bold uppercase tracking-widest text-slate-400 md:grid"
             >
               <div class="col-span-4">文档名称</div>
               <div class="col-span-1">分类</div>
@@ -398,7 +398,7 @@
               <!-- Category -->
               <div class="md:col-span-1 flex items-center">
                 <span :class="[
-                  'inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold',
+                  'inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold',
                   getTypeTagClass(item.type)
                 ]">
                   {{ getTypeLabel(item.type) }}
@@ -509,7 +509,7 @@
         <div class="space-y-6">
           <!-- Step 1: Category -->
           <section class="space-y-3">
-            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">1. 选择知识分类</p>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">1. 选择知识分类</p>
             <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
               <button
                 v-for="cat in [
@@ -541,7 +541,7 @@
           <!-- Step 2: File -->
           <section class="space-y-3">
             <div class="flex items-center justify-between gap-3">
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">2. 上传文件</p>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">2. 上传文件</p>
               <span v-if="uploading" class="inline-flex items-center gap-2 text-[11px] text-slate-500">
                 <span class="inline-block size-3 rounded-full border-2 border-slate-300 border-t-transparent animate-spin"></span>
                 正在上传...
@@ -585,7 +585,7 @@
                 <template v-else>
                   <span class="material-symbols-outlined text-4xl text-slate-300 mb-3">upload_file</span>
                   <p class="text-xs font-bold text-slate-500">拖拽文件到此处，或点击浏览</p>
-                  <p class="text-[10px] text-slate-300 mt-1">支持 PDF、Word、PPT、Excel（最大 50MB）</p>
+                  <p class="text-xs text-slate-300 mt-1">支持 PDF、Word、PPT、Excel（最大 50MB）</p>
                 </template>
               </div>
             </el-upload>
@@ -593,7 +593,7 @@
 
           <!-- Step 3: Summary -->
           <section class="space-y-3">
-            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">3. 填写摘要（可选）</p>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">3. 填写摘要（可选）</p>
             <el-input
               v-model="uploadForm.summary"
               type="textarea"

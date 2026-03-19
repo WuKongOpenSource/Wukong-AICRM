@@ -12,7 +12,7 @@
         </div>
         <div class="min-w-0">
           <h1 class="text-slate-900 font-bold text-lg leading-tight line-clamp-2">{{ enterpriseStore.displayName }}</h1>
-          <p class="text-slate-500 text-[10px] uppercase tracking-widest">{{ enterpriseStore.displayDescription }}</p>
+          <p class="text-slate-500 text-xs uppercase tracking-widest">{{ enterpriseStore.displayDescription }}</p>
         </div>
       </div>
 
@@ -32,7 +32,7 @@
         </button>
 
         <div v-if="showConfigSection" class="pt-4 pb-2">
-          <p class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">系统配置</p>
+          <p class="px-3 text-xs font-bold text-slate-400 uppercase tracking-wider">系统配置</p>
         </div>
 
         <template v-if="showConfigSection">
@@ -62,7 +62,7 @@
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-xs font-semibold text-slate-900 truncate">{{ userStore.realname || userStore.username }}</p>
-            <p class="text-[10px] text-slate-500 truncate">{{ userStore.userInfo?.deptName || '用户' }}</p>
+            <p class="text-xs text-slate-500 truncate">{{ userStore.userInfo?.deptName || '用户' }}</p>
           </div>
           <span class="material-symbols-outlined text-slate-400 text-sm">unfold_more</span>
         </div>
@@ -113,7 +113,7 @@
             </div>
             <div class="min-w-0">
               <h1 class="text-slate-900 font-bold text-lg leading-tight line-clamp-2">{{ enterpriseStore.displayName }}</h1>
-              <p class="text-slate-500 text-[10px] uppercase tracking-widest">{{ enterpriseStore.displayDescription }}</p>
+              <p class="text-slate-500 text-xs uppercase tracking-widest">{{ enterpriseStore.displayDescription }}</p>
             </div>
           </div>
           <nav class="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
@@ -128,7 +128,7 @@
               <span class="text-sm font-medium">{{ item.label }}</span>
             </button>
             <div v-if="showConfigSection" class="pt-4 pb-2">
-              <p class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">系统配置</p>
+              <p class="px-3 text-xs font-bold text-slate-400 uppercase tracking-wider">系统配置</p>
             </div>
             <template v-if="showConfigSection">
             <button

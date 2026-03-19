@@ -27,7 +27,7 @@
           <span class="material-symbols-outlined" :class="currentView === 'notifications' ? 'fill-1' : ''">notifications</span>
           <div class="flex-1">
             <p class="text-sm font-bold">系统通知</p>
-            <p class="text-[10px] opacity-60">{{ notifications.length }} 条未读消息</p>
+            <p class="text-xs opacity-60">{{ notifications.length }} 条未读消息</p>
           </div>
           <div v-if="currentView !== 'notifications'" class="size-2 rounded-full bg-primary animate-pulse"></div>
         </button>
@@ -126,10 +126,10 @@
       <!-- AI Model Status -->
       <div class="p-4 border-t border-slate-100">
         <div class="p-3 bg-primary/5 rounded-xl border border-primary/10">
-          <p class="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">AI 模型状态</p>
+          <p class="text-xs font-bold text-primary uppercase tracking-wider mb-1">AI 模型状态</p>
           <div class="flex items-center gap-2">
             <div class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-            <span class="text-[10px] font-medium text-slate-600">AI 模型已就绪</span>
+            <span class="text-xs font-medium text-slate-600">AI 模型已就绪</span>
           </div>
         </div>
       </div>
@@ -207,7 +207,7 @@
                         </template>
                       </div>
                     </div>
-                    <div class="text-[10px] text-slate-400 font-medium">{{ formatTime(message.timestamp) }}</div>
+                    <div class="text-xs text-slate-400 font-medium">{{ formatTime(message.timestamp) }}</div>
                   </div>
                 </div>
 
@@ -248,7 +248,7 @@
                         </template>
                       </div>
                     </div>
-                    <div class="text-[10px] text-slate-400 font-medium text-right">{{ formatTime(message.timestamp) }}</div>
+                    <div class="text-xs text-slate-400 font-medium text-right">{{ formatTime(message.timestamp) }}</div>
                   </div>
                 </div>
               </div>
@@ -363,7 +363,7 @@
                   </div>
                   <div>
                     <p class="text-sm font-bold text-slate-900">悟空AI CRM 助手</p>
-                    <p class="text-[10px] text-slate-400 font-medium">系统自动发送</p>
+                    <p class="text-xs text-slate-400 font-medium">系统自动发送</p>
                   </div>
                 </div>
 
@@ -375,7 +375,7 @@
                   <div class="flex gap-5">
                     <div v-if="notif.unread" class="absolute top-6 right-6 flex items-center gap-1.5">
                       <span class="size-2 rounded-full bg-primary"></span>
-                      <span class="text-[10px] font-bold text-primary uppercase tracking-tight">未读</span>
+                      <span class="text-xs font-bold text-primary uppercase tracking-tight">未读</span>
                     </div>
 
                     <div
@@ -394,7 +394,7 @@
                     <div class="flex-1">
                       <div class="flex items-center gap-2 mb-1">
                         <span
-                          class="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-tight"
+                          class="text-xs font-bold px-2 py-0.5 rounded uppercase tracking-tight"
                           :class="{
                             'bg-blue-50 text-blue-600': notif.type === 'info',
                             'bg-amber-50 text-amber-600': notif.type === 'warning',

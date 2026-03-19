@@ -70,7 +70,7 @@
                 </div>
                 <div class="min-w-0">
                   <h3 class="text-base font-bold text-slate-900 truncate">{{ knowledge?.name || '加载中...' }}</h3>
-                  <p class="text-[10px] text-slate-400 font-medium tracking-wide">
+                  <p class="text-xs text-slate-400 font-medium tracking-wide">
                     更新于 {{ formatDate(knowledge?.createTime) }}
                     <span v-if="knowledge?.fileSize" class="ml-2">{{ formatFileSize(knowledge.fileSize) }}</span>
                   </p>
@@ -150,7 +150,7 @@
                 <span class="material-symbols-outlined text-sm">auto_awesome</span>
                 <span class="text-xs font-bold uppercase tracking-widest">AI 智能助手</span>
               </div>
-              <p class="text-[10px] text-slate-400 font-medium">
+              <p class="text-xs text-slate-400 font-medium">
                 {{ loadingAnalysis ? '正在为您分析文档内容...' : (isStreaming ? '正在思考中...' : '分析完成，可向AI提问') }}
               </p>
             </div>
@@ -171,7 +171,7 @@
               <template v-else>
                 <!-- Core Highlights -->
                 <section>
-                  <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">核心提炼</h4>
+                  <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">核心提炼</h4>
                   <div class="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
                     <p class="text-xs text-slate-600 leading-relaxed italic">
                       "{{ analysis?.coreHighlights || knowledge?.summary || '暂无摘要' }}"
@@ -181,7 +181,7 @@
 
                 <!-- Talking Points -->
                 <section v-if="analysis?.talkingPoints?.length">
-                  <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">推荐话术</h4>
+                  <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">推荐话术</h4>
                   <div class="space-y-2">
                     <div
                       v-for="(point, idx) in analysis.talkingPoints"
@@ -195,7 +195,7 @@
 
                 <!-- Related Entities -->
                 <section v-if="analysis?.relatedEntities?.length">
-                  <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">关联商机</h4>
+                  <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">关联商机</h4>
                   <div class="space-y-2">
                     <div
                       v-for="(entity, idx) in analysis.relatedEntities"
@@ -210,7 +210,7 @@
 
                 <!-- Chat History -->
                 <section v-if="chatMessages.length > 0" class="pt-4 border-t border-slate-200">
-                  <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">对话详情</h4>
+                  <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">对话详情</h4>
                   <div class="space-y-3">
                     <div
                       v-for="(msg, idx) in chatMessages"
@@ -266,7 +266,7 @@
               </div>
               <button
                 v-if="chatMessages.length > 0"
-                class="w-full mt-2 text-[10px] text-slate-400 hover:text-primary transition-colors text-center"
+                class="w-full mt-2 text-xs text-slate-400 hover:text-primary transition-colors text-center"
                 @click="chatMessages = []"
               >
                 清空对话历史
