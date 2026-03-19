@@ -5,10 +5,7 @@ import type {
   AiConnectionTestResult,
   EnterpriseConfig,
   EnterpriseConfigUpdateBO,
-  MinioConsoleConfig,
-  WeKnoraConfig,
-  WeKnoraConfigUpdateBO,
-  WeKnoraConnectionTestResult
+  MinioConsoleConfig
 } from '@/types/systemConfig'
 
 /**
@@ -58,29 +55,6 @@ export function getMinioConsoleUrl(): Promise<MinioConsoleConfig> {
  */
 export function getMinioSsoUrl(): Promise<{ enabled: boolean; ssoUrl: string | null }> {
   return get('/systemConfig/minio/ssoUrl')
-}
-
-// ==================== WeKnora 配置接口 ====================
-
-/**
- * 获取 WeKnora 配置
- */
-export function getWeKnoraConfig(): Promise<WeKnoraConfig> {
-  return get('/systemConfig/weknora')
-}
-
-/**
- * 更新 WeKnora 配置
- */
-export function updateWeKnoraConfig(data: WeKnoraConfigUpdateBO): Promise<void> {
-  return post('/systemConfig/weknora/update', data)
-}
-
-/**
- * 测试 WeKnora 连接
- */
-export function testWeKnoraConnection(data: WeKnoraConfigUpdateBO): Promise<WeKnoraConnectionTestResult> {
-  return post('/systemConfig/weknora/test', data)
 }
 
 // ==================== 企业信息配置接口 ====================

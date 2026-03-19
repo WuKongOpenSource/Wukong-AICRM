@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.entity.PO;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -45,6 +46,14 @@ public class CrmTenant implements Serializable {
 
     @Schema(description = "备注")
     private String remark;
+
+    @TableField("weknora_api_key")
+    @Schema(description = "WeKnora 租户 API Key")
+    private String weKnoraApiKey;
+
+    @TableField("weknora_knowledge_base_id")
+    @Schema(description = "WeKnora 知识库ID")
+    private String weKnoraKnowledgeBaseId;
 
     @Schema(description = "创建时间")
     private Date createTime;

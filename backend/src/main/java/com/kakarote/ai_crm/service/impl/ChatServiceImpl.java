@@ -663,8 +663,16 @@ public class ChatServiceImpl implements IChatService {
         }
 
         try {
-            log.debug("RAG 检索开始: query={}", query);
-            List<WeKnoraChunk> chunks = weKnoraClient.searchKnowledge(query);
+            // 获取当前租户的 WeKnora 上下文
+            Long tenantId = AiContextHolder.getCurrentTenantId();
+            if (tenantId == null) {
+                log.warn("RAG 检索跳过: 无法获取当前租户ID");
+                return "";
+            }
+            WeKnoraClient.TenantWeKnoraContext ctx = weKnoraClient.getOrCreateTenantContext(tenantId);
+
+            log.debug("RAG 检索开始: query={}, tenantId={}, kbId={}", query, tenantId, ctx.getKnowledgeBaseId());
+            List<WeKnoraChunk> chunks = weKnoraClient.searchKnowledge(query, ctx.getKnowledgeBaseId(), ctx.getApiKey());
 
             if (chunks.isEmpty()) {
                 log.debug("RAG 检索无结果");

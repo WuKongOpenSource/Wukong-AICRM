@@ -9,6 +9,7 @@ import com.kakarote.ai_crm.entity.PO.*;
 import com.kakarote.ai_crm.mapper.ManageUserMapper;
 import com.kakarote.ai_crm.mapper.ManagerDeptMapper;
 import com.kakarote.ai_crm.service.*;
+import org.springframework.context.annotation.Lazy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -45,6 +46,10 @@ public class RegistrationServiceImpl implements RegistrationService {
 
     @Autowired
     private IManagerUserRoleService userRoleService;
+
+    @Lazy
+    @Autowired
+    private WeKnoraClient weKnoraClient;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -115,6 +120,16 @@ public class RegistrationServiceImpl implements RegistrationService {
             userRoleService.save(userRole);
 
             log.info("租户注册成功: tenantId={}, email={}, companyName={}", newTenantId, registerBO.getEmail(), registerBO.getCompanyName());
+
+            // 9. 初始化 WeKnora 租户（注册 + 创建模型 + 创建知识库）
+            if (weKnoraClient.isEnabled()) {
+                try {
+                    weKnoraClient.getOrCreateTenantContext(newTenantId);
+                    log.info("WeKnora 租户初始化成功: tenantId={}", newTenantId);
+                } catch (Exception e) {
+                    log.warn("WeKnora 租户初始化失败，将在首次使用时重试: tenantId={}, error={}", newTenantId, e.getMessage());
+                }
+            }
         } finally {
             TenantContextHolder.clear();
         }

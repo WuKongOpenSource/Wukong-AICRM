@@ -997,192 +997,6 @@
             </el-card>
           </div>
 
-          <!-- WeKnora Knowledge Service Tab -->
-          <div v-else-if="activeTab === 'weknora'" class="space-y-6">
-            <el-card shadow="never" class="!border-slate-200">
-              <template #header>
-                <div class="flex items-center justify-between">
-                  <span class="font-medium">WeKnora 知识库服务配置</span>
-                  <el-tag v-if="weknoraConfigForm.updateTime" size="small" type="info">
-                    最后更新: {{ formatTime(weknoraConfigForm.updateTime) }}
-                  </el-tag>
-                </div>
-              </template>
-
-              <div v-if="loadingWeknoraConfig" class="text-center py-8">
-                <el-icon class="is-loading"><Loading /></el-icon>
-              </div>
-              <el-form v-else :model="weknoraConfigForm" label-position="top" class="max-w-2xl">
-                <!-- 启用开关 -->
-                <el-form-item label="启用 WeKnora">
-                  <div class="flex items-center gap-4">
-                    <el-switch v-model="weknoraConfigForm.enabled" />
-                    <span class="text-sm text-slate-500">
-                      {{ weknoraConfigForm.enabled ? '已启用 - 文档将同步到知识库' : '已禁用 - 仅使用本地存储' }}
-                    </span>
-                  </div>
-                </el-form-item>
-
-                <!-- API 基础地址 -->
-                <el-form-item label="API 基础地址">
-                  <el-input
-                    v-model="weknoraConfigForm.baseUrl"
-                    placeholder="http://localhost:8080/api/v1"
-                    :disabled="!weknoraConfigForm.enabled"
-                  >
-                    <template #prepend>URL</template>
-                  </el-input>
-                  <div class="text-xs text-slate-400 mt-1">
-                    WeKnora 服务的 API 地址，末尾不要加斜杠
-                  </div>
-                </el-form-item>
-
-                <!-- API Key -->
-                <el-form-item label="API 密钥">
-                  <div class="flex gap-2 w-full">
-                    <el-input
-                      v-model="weknoraConfigForm.apiKey"
-                      :type="showWeknoraApiKey ? 'text' : 'password'"
-                      placeholder="sk-xxxxxx"
-                      class="flex-1"
-                      :disabled="!weknoraConfigForm.enabled"
-                    >
-                      <template #prepend>Key</template>
-                      <template #suffix>
-                        <el-icon
-                          class="cursor-pointer"
-                          @click="showWeknoraApiKey = !showWeknoraApiKey"
-                        >
-                          <View v-if="showWeknoraApiKey" />
-                          <Hide v-else />
-                        </el-icon>
-                      </template>
-                    </el-input>
-                    <el-button
-                      :loading="testingWeknoraConnection"
-                      :disabled="!weknoraConfigForm.enabled"
-                      @click="handleTestWeknoraConnection"
-                    >
-                      <el-icon class="mr-1"><Connection /></el-icon>
-                      测试连接
-                    </el-button>
-                  </div>
-                  <div v-if="weknoraConnectionTestResult" class="mt-2">
-                    <el-alert
-                      :type="weknoraConnectionTestResult.success ? 'success' : 'error'"
-                      :closable="false"
-                      show-icon
-                    >
-                      <template #title>
-                        {{ weknoraConnectionTestResult.success ? '连接成功' : '连接失败' }}
-                        <span class="text-slate-500 ml-2">
-                          ({{ weknoraConnectionTestResult.responseTime }}ms)
-                        </span>
-                      </template>
-                      <template #default>
-                        {{ weknoraConnectionTestResult.message }}
-                      </template>
-                    </el-alert>
-                  </div>
-                </el-form-item>
-
-                <!-- 知识库 ID -->
-                <el-form-item label="默认知识库 ID">
-                  <el-input
-                    v-model="weknoraConfigForm.knowledgeBaseId"
-                    placeholder="请输入知识库 ID"
-                    :disabled="!weknoraConfigForm.enabled"
-                  />
-                  <div class="text-xs text-slate-400 mt-1">
-                    CRM 文档将上传到此知识库，可从 WeKnora 管理界面获取
-                  </div>
-                </el-form-item>
-
-                <!-- 搜索配置 -->
-                <el-divider content-position="left">搜索配置</el-divider>
-
-                <!-- 最大匹配数 -->
-                <el-form-item label="最大匹配结果数">
-                  <el-input-number
-                    v-model="weknoraConfigForm.matchCount"
-                    :min="1"
-                    :max="50"
-                    :disabled="!weknoraConfigForm.enabled"
-                    class="w-full"
-                  />
-                  <div class="text-xs text-slate-400 mt-1">
-                    语义搜索返回的最大文档片段数量
-                  </div>
-                </el-form-item>
-
-                <!-- 向量相似度阈值 -->
-                <el-form-item label="向量相似度阈值">
-                  <div class="flex items-center gap-4 w-full">
-                    <el-slider
-                      v-model="weknoraConfigForm.vectorThreshold"
-                      :min="0"
-                      :max="1"
-                      :step="0.05"
-                      :format-tooltip="(val: number) => val.toFixed(2)"
-                      :disabled="!weknoraConfigForm.enabled"
-                      class="flex-1"
-                    />
-                    <el-input-number
-                      v-model="weknoraConfigForm.vectorThreshold"
-                      :min="0"
-                      :max="1"
-                      :step="0.05"
-                      :precision="2"
-                      :disabled="!weknoraConfigForm.enabled"
-                      class="w-24"
-                    />
-                  </div>
-                  <div class="text-xs text-slate-400 mt-1">
-                    只返回相似度高于此阈值的结果，值越高匹配越精确
-                  </div>
-                </el-form-item>
-
-                <!-- 自动 RAG 开关 -->
-                <el-form-item label="自动 RAG">
-                  <div class="flex items-center gap-4">
-                    <el-switch
-                      v-model="weknoraConfigForm.autoRagEnabled"
-                      :disabled="!weknoraConfigForm.enabled"
-                    />
-                    <span class="text-sm text-slate-500">
-                      {{ weknoraConfigForm.autoRagEnabled ? '启用 - 每次对话自动检索相关文档' : '禁用 - 需手动触发知识库搜索' }}
-                    </span>
-                  </div>
-                </el-form-item>
-
-                <!-- 操作按钮 -->
-                <div class="flex gap-3 pt-4 border-t border-slate-200">
-                  <el-button
-                    type="primary"
-                    :loading="savingWeknoraConfig"
-                    @click="handleSaveWeknoraConfig"
-                  >
-                    <el-icon class="mr-1"><Document /></el-icon>
-                    保存配置
-                  </el-button>
-                  <el-button @click="loadWeknoraConfig">重置</el-button>
-                </div>
-              </el-form>
-            </el-card>
-
-            <!-- 配置说明卡片 -->
-            <el-card shadow="never" class="!border-slate-200">
-              <template #header>
-                <span class="font-medium">配置说明</span>
-              </template>
-              <div class="text-sm text-slate-600 space-y-2">
-                <p><strong>WeKnora:</strong> 基于向量数据库的知识库服务，支持文档语义搜索和 RAG（检索增强生成）</p>
-                <p><strong>自动 RAG:</strong> 启用后，AI 对话时会自动检索知识库中的相关文档，提供更准确的回答</p>
-                <p><strong>相似度阈值:</strong> 用于过滤低相关性的搜索结果，建议设置在 0.5-0.7 之间</p>
-              </div>
-            </el-card>
-          </div>
-
           <!-- Placeholder for other tabs -->
           <div v-else class="text-center py-16 text-slate-400">
             <el-icon :size="48" class="mb-4"><Tools /></el-icon>
@@ -1828,7 +1642,7 @@ import {
 } from '@element-plus/icons-vue'
 import type { AiAgent } from '@/types/common'
 import type { CustomField, EntityType, FieldType, FieldOption } from '@/types/customField'
-import type { AiConfigUpdateBO, AiConnectionTestResult, AiProviderPreset, AiProvider, WeKnoraConfigUpdateBO, WeKnoraConnectionTestResult } from '@/types/systemConfig'
+import type { AiConfigUpdateBO, AiConnectionTestResult, AiProviderPreset, AiProvider } from '@/types/systemConfig'
 import {
   getFieldsByEntity,
   addCustomField,
@@ -1840,7 +1654,7 @@ import {
 import { getLoginUserDetail, updateProfile, changePassword, queryUserList, addUser, updateUserInfo, deleteUsers } from '@/api/auth'
 import { queryDeptTree as fetchDeptTree, addDept, updateDept, deleteDept } from '@/api/dept'
 import type { DeptVO } from '@/types/dept'
-import { getAiConfig, updateAiConfig, testAiConnection, getMinioConsoleUrl, getMinioSsoUrl, getWeKnoraConfig, updateWeKnoraConfig, testWeKnoraConnection, getEnterpriseConfig, updateEnterpriseConfig } from '@/api/systemConfig'
+import { getAiConfig, updateAiConfig, testAiConnection, getMinioConsoleUrl, getMinioSsoUrl, getEnterpriseConfig, updateEnterpriseConfig } from '@/api/systemConfig'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { useEnterpriseStore } from '@/stores/enterprise'
 import type { MinioConsoleConfig } from '@/types/systemConfig'
@@ -1854,7 +1668,7 @@ const { isMobile } = useResponsive()
 
 // Tab state
 const activeTab = ref('team')
-const systemTabs = ['profile', 'enterprise', 'api', 'agent', 'storage', 'weknora', 'customField']
+const systemTabs = ['profile', 'enterprise', 'api', 'agent', 'storage', 'customField']
 const isSystemTab = computed(() => systemTabs.includes(activeTab.value))
 const systemSubTabs = [
   { value: 'profile', label: '个人资料' },
@@ -1862,7 +1676,6 @@ const systemSubTabs = [
   { value: 'api', label: 'AI/API 配置' },
   { value: 'agent', label: '智能体' },
   { value: 'storage', label: '对象存储' },
-  { value: 'weknora', label: '知识库服务' },
   { value: 'customField', label: '自定义字段' }
 ]
 
@@ -1963,25 +1776,6 @@ const loadingMinioConfig = ref(false)
 const minioConfig = reactive<MinioConsoleConfig>({
   enabled: false,
   consoleUrl: ''
-})
-
-// WeKnora Config state
-const showWeknoraApiKey = ref(false)
-const savingWeknoraConfig = ref(false)
-const testingWeknoraConnection = ref(false)
-const loadingWeknoraConfig = ref(false)
-const weknoraConfigLoaded = ref(false)
-const weknoraConnectionTestResult = ref<WeKnoraConnectionTestResult | null>(null)
-
-const weknoraConfigForm = reactive<WeKnoraConfigUpdateBO & { updateTime?: string }>({
-  enabled: false,
-  baseUrl: '',
-  apiKey: '',
-  knowledgeBaseId: '',
-  matchCount: 5,
-  vectorThreshold: 0.5,
-  autoRagEnabled: true,
-  updateTime: undefined
 })
 
 // Team management state
@@ -2864,9 +2658,6 @@ watch(activeTab, async (newTab) => {
   if (newTab === 'storage') {
     await loadMinioConfig()
   }
-  if (newTab === 'weknora' && !weknoraConfigLoaded.value) {
-    await loadWeknoraConfig()
-  }
   if (newTab === 'enterprise' && !enterpriseConfigLoaded.value) {
     await loadEnterpriseConfig()
   }
@@ -2906,82 +2697,6 @@ async function handleOpenMinioConsole() {
   } catch (error) {
     console.error('Failed to get SSO URL:', error)
     ElMessage.error('获取 SSO 登录地址失败')
-  }
-}
-
-// WeKnora methods
-async function loadWeknoraConfig() {
-  loadingWeknoraConfig.value = true
-  try {
-    const config = await getWeKnoraConfig()
-    Object.assign(weknoraConfigForm, {
-      enabled: config.enabled ?? false,
-      baseUrl: config.baseUrl || '',
-      apiKey: '', // API Key 不回显完整值，需要用户重新输入修改
-      knowledgeBaseId: config.knowledgeBaseId || '',
-      matchCount: config.matchCount ?? 5,
-      vectorThreshold: config.vectorThreshold ?? 0.5,
-      autoRagEnabled: config.autoRagEnabled ?? true,
-      updateTime: config.updateTime
-    })
-    weknoraConnectionTestResult.value = null
-    weknoraConfigLoaded.value = true
-  } catch {
-    // Error handled by interceptor
-  } finally {
-    loadingWeknoraConfig.value = false
-  }
-}
-
-async function handleTestWeknoraConnection() {
-  if (!weknoraConfigForm.baseUrl || !weknoraConfigForm.apiKey) {
-    ElMessage.warning('请先填写 API 地址和密钥')
-    return
-  }
-
-  testingWeknoraConnection.value = true
-  weknoraConnectionTestResult.value = null
-
-  try {
-    const result = await testWeKnoraConnection({
-      enabled: weknoraConfigForm.enabled,
-      baseUrl: weknoraConfigForm.baseUrl,
-      apiKey: weknoraConfigForm.apiKey,
-      knowledgeBaseId: weknoraConfigForm.knowledgeBaseId,
-      matchCount: weknoraConfigForm.matchCount,
-      vectorThreshold: weknoraConfigForm.vectorThreshold,
-      autoRagEnabled: weknoraConfigForm.autoRagEnabled
-    })
-    weknoraConnectionTestResult.value = result
-  } catch (error: any) {
-    weknoraConnectionTestResult.value = {
-      success: false,
-      responseTime: 0,
-      message: error.message || '连接测试失败'
-    }
-  } finally {
-    testingWeknoraConnection.value = false
-  }
-}
-
-async function handleSaveWeknoraConfig() {
-  savingWeknoraConfig.value = true
-  try {
-    await updateWeKnoraConfig({
-      enabled: weknoraConfigForm.enabled,
-      baseUrl: weknoraConfigForm.baseUrl,
-      apiKey: weknoraConfigForm.apiKey || undefined,
-      knowledgeBaseId: weknoraConfigForm.knowledgeBaseId,
-      matchCount: weknoraConfigForm.matchCount,
-      vectorThreshold: weknoraConfigForm.vectorThreshold,
-      autoRagEnabled: weknoraConfigForm.autoRagEnabled
-    })
-    ElMessage.success('WeKnora 配置保存成功')
-    await loadWeknoraConfig()
-  } catch {
-    // Error handled by interceptor
-  } finally {
-    savingWeknoraConfig.value = false
   }
 }
 

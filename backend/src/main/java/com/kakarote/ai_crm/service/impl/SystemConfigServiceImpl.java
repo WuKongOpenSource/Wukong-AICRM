@@ -6,13 +6,10 @@ import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
-import com.kakarote.ai_crm.entity.BO.WeKnoraConfigUpdateBO;
 import com.kakarote.ai_crm.entity.PO.SystemConfig;
 import com.kakarote.ai_crm.entity.VO.AiConfigVO;
 import com.kakarote.ai_crm.entity.VO.AiConnectionTestVO;
 import com.kakarote.ai_crm.entity.VO.EnterpriseConfigVO;
-import com.kakarote.ai_crm.entity.VO.WeKnoraConfigVO;
-import com.kakarote.ai_crm.entity.VO.WeKnoraConnectionTestVO;
 import com.kakarote.ai_crm.mapper.SystemConfigMapper;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.ISystemConfigService;
@@ -23,8 +20,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
 import java.util.List;
@@ -43,7 +38,6 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
     private static final String CACHE_KEY_PREFIX = "system:config:";
     private static final String AI_CONFIG_TYPE = "ai";
-    private static final String WEKNORA_CONFIG_TYPE = "weknora";
     private static final String ENTERPRISE_CONFIG_TYPE = "enterprise";
     private static final long CACHE_EXPIRE_MINUTES = 30;
 
@@ -79,28 +73,6 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
     @Value("${spring.ai.openai.chat.options.max-tokens:2048}")
     private Integer defaultMaxTokens;
-
-    // WeKnora 默认配置
-    @Value("${weknora.enabled:false}")
-    private boolean defaultWeKnoraEnabled;
-
-    @Value("${weknora.base-url:http://localhost:8080/api/v1}")
-    private String defaultWeKnoraBaseUrl;
-
-    @Value("${weknora.api-key:}")
-    private String defaultWeKnoraApiKey;
-
-    @Value("${weknora.knowledge-base-id:}")
-    private String defaultWeKnoraKnowledgeBaseId;
-
-    @Value("${weknora.search.match-count:5}")
-    private Integer defaultWeKnoraMatchCount;
-
-    @Value("${weknora.search.vector-threshold:0.5}")
-    private Double defaultWeKnoraVectorThreshold;
-
-    @Value("${weknora.search.auto-rag-enabled:true}")
-    private boolean defaultWeKnoraAutoRagEnabled;
 
     @Override
     public String getConfigValue(String configKey) {
@@ -291,131 +263,6 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         }
     }
 
-    // ==================== WeKnora 配置相关方法 ====================
-
-    @Override
-    public WeKnoraConfigVO getWeKnoraConfig() {
-        Map<String, String> configs = getConfigsByType(WEKNORA_CONFIG_TYPE);
-
-        WeKnoraConfigVO vo = new WeKnoraConfigVO();
-
-        // 检查是否有显式配置
-        boolean hasExplicitConfig = configs.containsKey("weknora_enabled");
-
-        if (hasExplicitConfig) {
-            vo.setEnabled(parseBoolean(configs.get("weknora_enabled"), defaultWeKnoraEnabled));
-            vo.setBaseUrl(configs.getOrDefault("weknora_base_url", defaultWeKnoraBaseUrl));
-            vo.setApiKey(maskApiKey(configs.get("weknora_api_key")));
-            vo.setKnowledgeBaseId(configs.getOrDefault("weknora_knowledge_base_id", defaultWeKnoraKnowledgeBaseId));
-            vo.setMatchCount(parseInt(configs.get("weknora_match_count"), defaultWeKnoraMatchCount));
-            vo.setVectorThreshold(parseDouble(configs.get("weknora_vector_threshold"), defaultWeKnoraVectorThreshold));
-            vo.setAutoRagEnabled(parseBoolean(configs.get("weknora_auto_rag_enabled"), defaultWeKnoraAutoRagEnabled));
-        } else {
-            // 返回 application.yml 默认值
-            vo.setEnabled(defaultWeKnoraEnabled);
-            vo.setBaseUrl(defaultWeKnoraBaseUrl);
-            vo.setApiKey(maskApiKey(defaultWeKnoraApiKey));
-            vo.setKnowledgeBaseId(defaultWeKnoraKnowledgeBaseId);
-            vo.setMatchCount(defaultWeKnoraMatchCount);
-            vo.setVectorThreshold(defaultWeKnoraVectorThreshold);
-            vo.setAutoRagEnabled(defaultWeKnoraAutoRagEnabled);
-        }
-
-        // 获取最后更新时间
-        SystemConfig anyConfig = lambdaQuery()
-                .eq(SystemConfig::getConfigType, WEKNORA_CONFIG_TYPE)
-                .orderByDesc(SystemConfig::getUpdateTime)
-                .last("LIMIT 1")
-                .one();
-        if (anyConfig != null) {
-            vo.setUpdateTime(anyConfig.getUpdateTime());
-        }
-
-        return vo;
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void updateWeKnoraConfig(WeKnoraConfigUpdateBO updateBO) {
-        Map<String, String> configs = new HashMap<>();
-
-        if (updateBO.getEnabled() != null) {
-            configs.put("weknora_enabled", String.valueOf(updateBO.getEnabled()));
-        }
-        if (StrUtil.isNotBlank(updateBO.getBaseUrl())) {
-            configs.put("weknora_base_url", updateBO.getBaseUrl());
-        }
-        if (StrUtil.isNotBlank(updateBO.getApiKey())) {
-            configs.put("weknora_api_key", updateBO.getApiKey());
-        }
-        if (StrUtil.isNotBlank(updateBO.getKnowledgeBaseId())) {
-            configs.put("weknora_knowledge_base_id", updateBO.getKnowledgeBaseId());
-        }
-        if (updateBO.getMatchCount() != null) {
-            configs.put("weknora_match_count", String.valueOf(updateBO.getMatchCount()));
-        }
-        if (updateBO.getVectorThreshold() != null) {
-            configs.put("weknora_vector_threshold", String.valueOf(updateBO.getVectorThreshold()));
-        }
-        if (updateBO.getAutoRagEnabled() != null) {
-            configs.put("weknora_auto_rag_enabled", String.valueOf(updateBO.getAutoRagEnabled()));
-        }
-
-        updateConfigsWithType(configs, WEKNORA_CONFIG_TYPE);
-
-        log.info("WeKnora 配置已更新");
-    }
-
-    @Override
-    public WeKnoraConnectionTestVO testWeKnoraConnection(WeKnoraConfigUpdateBO configBO) {
-        WeKnoraConnectionTestVO result = new WeKnoraConnectionTestVO();
-        long startTime = System.currentTimeMillis();
-
-        try {
-            String baseUrl = configBO.getBaseUrl();
-            String apiKey = configBO.getApiKey();
-
-            if (StrUtil.isBlank(baseUrl) || StrUtil.isBlank(apiKey)) {
-                result.setSuccess(false);
-                result.setMessage("API 地址和 API Key 不能为空");
-                result.setResponseTime(System.currentTimeMillis() - startTime);
-                return result;
-            }
-
-            // 调用 WeKnora 健康检查或获取知识库信息
-            RestTemplate restTemplate = new RestTemplate();
-            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-            headers.set("X-API-Key", apiKey);
-            org.springframework.http.HttpEntity<?> entity = new org.springframework.http.HttpEntity<>(headers);
-
-            // 尝试获取知识库列表
-            String testUrl = baseUrl + "/knowledge-bases";
-            org.springframework.http.ResponseEntity<String> response = restTemplate.exchange(
-                    testUrl,
-                    org.springframework.http.HttpMethod.GET,
-                    entity,
-                    String.class
-            );
-
-            if (response.getStatusCode().is2xxSuccessful()) {
-                result.setSuccess(true);
-                result.setMessage("连接成功");
-                // 可以解析返回值获取知识库数量
-                result.setKnowledgeCount(0);
-            } else {
-                result.setSuccess(false);
-                result.setMessage("连接失败: HTTP " + response.getStatusCode());
-            }
-        } catch (Exception e) {
-            log.error("WeKnora 连接测试失败: {}", e.getMessage(), e);
-            result.setSuccess(false);
-            result.setMessage("连接失败: " + extractErrorMessage(e));
-        }
-
-        result.setResponseTime(System.currentTimeMillis() - startTime);
-        return result;
-    }
-
     /**
      * 更新配置并指定配置类型
      */
@@ -443,13 +290,6 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
             // 清除缓存（租户隔离）
             redisTemplate.delete(buildCacheKey(configKey));
         }
-    }
-
-    private boolean parseBoolean(String value, boolean defaultValue) {
-        if (StrUtil.isBlank(value)) {
-            return defaultValue;
-        }
-        return Boolean.parseBoolean(value);
     }
 
     /**

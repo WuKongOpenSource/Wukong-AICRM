@@ -14,6 +14,7 @@ import com.kakarote.ai_crm.ai.context.AiContextHolder;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
+import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
@@ -109,31 +110,33 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
 
         // Async upload to WeKnora (only for supported file types)
         if (weKnoraClient.isEnabled() && weKnoraSupported) {
-            asyncUploadToWeKnora(knowledge.getKnowledgeId(), relativePath, file.getOriginalFilename());
+            asyncUploadToWeKnora(knowledge.getKnowledgeId(), relativePath, file.getOriginalFilename(), UserUtil.getTenantId());
         }
 
         return knowledge.getKnowledgeId();
     }
 
     /**
-     * 异步上传文件到 WeKnora
+     * 异步上传文件到 WeKnora（传入 tenantId 解决 @Async 线程上下文丢失问题）
      */
     @Async
-    public void asyncUploadToWeKnora(Long knowledgeId, String relativePath, String originalFilename) {
+    public void asyncUploadToWeKnora(Long knowledgeId, String relativePath, String originalFilename, Long tenantId) {
+        TenantContextHolder.setTenantId(tenantId);
         File tempFile = null;
         try {
+            // 获取租户的 WeKnora 上下文（API Key + 知识库 ID，懒创建）
+            WeKnoraClient.TenantWeKnoraContext ctx = weKnoraClient.getOrCreateTenantContext(tenantId);
+
             // 在文件名前加上 knowledgeId 前缀，防止不同用户上传同名文件冲突
             String uniqueFilename = knowledgeId + "_" + originalFilename;
-            log.info("开始上传文件到 WeKnora: knowledgeId={}, file={}", knowledgeId, uniqueFilename);
+            log.info("开始上传文件到 WeKnora: knowledgeId={}, file={}, tenantKbId={}", knowledgeId, uniqueFilename, ctx.getKnowledgeBaseId());
 
             String localPath = fileStorageService.getLocalPath(relativePath);
             String uploadFilePath;
 
             if (localPath != null) {
-                // 本地存储，直接使用本地路径
                 uploadFilePath = localPath;
             } else {
-                // MinIO 存储，需要下载到临时文件
                 tempFile = File.createTempFile("weknora_", "_" + originalFilename);
                 try (InputStream is = fileStorageService.getFileStream(relativePath)) {
                     Files.copy(is, tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
@@ -141,8 +144,8 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
                 uploadFilePath = tempFile.getAbsolutePath();
             }
 
-            // Upload to WeKnora using file path
-            WeKnoraKnowledge result = weKnoraClient.uploadDocument(uploadFilePath, uniqueFilename);
+            // Upload to WeKnora using tenant-specific API Key and knowledge base
+            WeKnoraKnowledge result = weKnoraClient.uploadDocument(uploadFilePath, uniqueFilename, ctx.getKnowledgeBaseId(), ctx.getApiKey());
 
             // Update knowledge record
             Knowledge knowledge = getById(knowledgeId);
@@ -156,22 +159,21 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
                 // 轮询等待 WeKnora 解析完成
                 String currentStatus = result.getParseStatus();
                 if ("pending".equals(currentStatus) || "processing".equals(currentStatus)) {
-                    pollWeKnoraParseStatus(knowledgeId, result.getId());
+                    pollWeKnoraParseStatus(knowledgeId, result.getId(), ctx.getApiKey());
                 }
             }
         } catch (Exception e) {
             log.error("WeKnora 上传失败: knowledgeId={}, error={}", knowledgeId, e.getMessage(), e);
-            // Update status to failed
             Knowledge knowledge = getById(knowledgeId);
             if (knowledge != null) {
                 knowledge.setWeKnoraParseStatus("failed");
                 updateById(knowledge);
             }
         } finally {
-            // 清理临时文件
             if (tempFile != null && tempFile.exists()) {
                 tempFile.delete();
             }
+            TenantContextHolder.clear();
         }
     }
 
@@ -186,12 +188,12 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         // Delete from WeKnora
         if (weKnoraClient.isEnabled() && StrUtil.isNotEmpty(knowledge.getWeKnoraKnowledgeId())) {
             try {
-                weKnoraClient.deleteKnowledge(knowledge.getWeKnoraKnowledgeId());
+                WeKnoraClient.TenantWeKnoraContext ctx = weKnoraClient.getOrCreateTenantContext(UserUtil.getTenantId());
+                weKnoraClient.deleteKnowledge(knowledge.getWeKnoraKnowledgeId(), ctx.getApiKey());
                 log.info("WeKnora 删除成功: weKnoraId={}", knowledge.getWeKnoraKnowledgeId());
             } catch (Exception e) {
                 log.warn("WeKnora 删除失败: weKnoraId={}, error={}",
                     knowledge.getWeKnoraKnowledgeId(), e.getMessage());
-                // Continue with deletion even if WeKnora deletion fails
             }
         }
 
@@ -228,7 +230,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     /**
      * 轮询 WeKnora 解析状态，直到完成或失败
      */
-    private void pollWeKnoraParseStatus(Long knowledgeId, String weKnoraKnowledgeId) {
+    private void pollWeKnoraParseStatus(Long knowledgeId, String weKnoraKnowledgeId, String tenantApiKey) {
         int maxAttempts = 60;
         long intervalMs = 20000; // 20秒
 
@@ -241,7 +243,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
             }
 
             try {
-                WeKnoraKnowledge detail = weKnoraClient.getKnowledgeDetail(weKnoraKnowledgeId);
+                WeKnoraKnowledge detail = weKnoraClient.getKnowledgeDetail(weKnoraKnowledgeId, tenantApiKey);
                 if (detail == null) {
                     log.warn("WeKnora 状态查询返回 null: weKnoraId={}", weKnoraKnowledgeId);
                     continue;
@@ -284,7 +286,8 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         // 删除 WeKnora 中的旧记录（如果存在）
         if (StrUtil.isNotEmpty(knowledge.getWeKnoraKnowledgeId())) {
             try {
-                weKnoraClient.deleteKnowledge(knowledge.getWeKnoraKnowledgeId());
+                WeKnoraClient.TenantWeKnoraContext ctx = weKnoraClient.getOrCreateTenantContext(UserUtil.getTenantId());
+                weKnoraClient.deleteKnowledge(knowledge.getWeKnoraKnowledgeId(), ctx.getApiKey());
                 log.info("WeKnora 旧记录已删除: weKnoraId={}", knowledge.getWeKnoraKnowledgeId());
             } catch (Exception e) {
                 log.warn("删除 WeKnora 旧记录失败: {}", e.getMessage());
@@ -297,7 +300,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         updateById(knowledge);
 
         // 重新异步上传（含轮询）
-        asyncUploadToWeKnora(knowledge.getKnowledgeId(), knowledge.getFilePath(), knowledge.getName());
+        asyncUploadToWeKnora(knowledge.getKnowledgeId(), knowledge.getFilePath(), knowledge.getName(), UserUtil.getTenantId());
     }
 
     @Override

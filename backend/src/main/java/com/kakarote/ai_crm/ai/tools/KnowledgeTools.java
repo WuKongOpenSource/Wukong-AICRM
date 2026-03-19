@@ -1,11 +1,13 @@
 package com.kakarote.ai_crm.ai.tools;
 
+import com.kakarote.ai_crm.ai.context.AiContextHolder;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraChunk;
 import com.kakarote.ai_crm.service.IKnowledgeService;
 import com.kakarote.ai_crm.service.WeKnoraClient;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +19,7 @@ import java.util.List;
 /**
  * 知识库相关 AI Tool - 用于 Spring AI Function Calling
  */
+@Slf4j
 @Component
 public class KnowledgeTools {
 
@@ -137,7 +140,13 @@ public class KnowledgeTools {
         }
 
         try {
-            List<WeKnoraChunk> chunks = weKnoraClient.searchKnowledge(query);
+            // 获取当前租户的 WeKnora 上下文
+            Long tenantId = AiContextHolder.getCurrentTenantId();
+            if (tenantId == null) {
+                return "无法确定当前租户，语义搜索失败。";
+            }
+            WeKnoraClient.TenantWeKnoraContext ctx = weKnoraClient.getOrCreateTenantContext(tenantId);
+            List<WeKnoraChunk> chunks = weKnoraClient.searchKnowledge(query, ctx.getKnowledgeBaseId(), ctx.getApiKey());
 
             if (chunks.isEmpty()) {
                 return "未找到与 \"" + query + "\" 相关的文档内容。您可以尝试使用不同的关键词搜索，或者使用知识库列表功能查看所有文档。";

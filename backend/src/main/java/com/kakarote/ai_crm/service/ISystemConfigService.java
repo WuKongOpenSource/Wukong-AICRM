@@ -3,13 +3,10 @@ package com.kakarote.ai_crm.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
-import com.kakarote.ai_crm.entity.BO.WeKnoraConfigUpdateBO;
 import com.kakarote.ai_crm.entity.PO.SystemConfig;
 import com.kakarote.ai_crm.entity.VO.AiConfigVO;
 import com.kakarote.ai_crm.entity.VO.AiConnectionTestVO;
 import com.kakarote.ai_crm.entity.VO.EnterpriseConfigVO;
-import com.kakarote.ai_crm.entity.VO.WeKnoraConfigVO;
-import com.kakarote.ai_crm.entity.VO.WeKnoraConnectionTestVO;
 
 import java.util.Map;
 
@@ -84,28 +81,6 @@ public interface ISystemConfigService extends IService<SystemConfig> {
      * 清除配置缓存
      */
     void clearConfigCache();
-
-    /**
-     * 获取 WeKnora 配置
-     *
-     * @return WeKnora 配置信息
-     */
-    WeKnoraConfigVO getWeKnoraConfig();
-
-    /**
-     * 更新 WeKnora 配置
-     *
-     * @param updateBO 更新参数
-     */
-    void updateWeKnoraConfig(WeKnoraConfigUpdateBO updateBO);
-
-    /**
-     * 测试 WeKnora 连接
-     *
-     * @param configBO 配置参数
-     * @return 测试结果
-     */
-    WeKnoraConnectionTestVO testWeKnoraConnection(WeKnoraConfigUpdateBO configBO);
 
     /**
      * 获取企业信息配置
