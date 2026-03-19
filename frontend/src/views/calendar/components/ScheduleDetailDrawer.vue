@@ -6,6 +6,7 @@
     :with-header="false"
     :modal="false"
     :lock-scroll="false"
+    body-class="schedule-detail-drawer__body"
     modal-penetrable
     class="schedule-detail-drawer"
   >
@@ -62,7 +63,11 @@
               <span class="material-symbols-outlined text-[18px] text-slate-400">corporate_fare</span>
               <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">关联客户</h3>
             </div>
-            <div class="p-4 bg-white border border-slate-200 rounded-2xl flex items-center gap-3 hover:bg-slate-50 transition-colors">
+            <div
+              class="p-4 bg-white border border-slate-200 rounded-2xl flex items-center gap-3 transition-colors"
+              :class="schedule.customerId ? 'cursor-pointer hover:bg-slate-50' : ''"
+              @click="handleGoToCustomerDetail"
+            >
               <div class="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
                 {{ schedule.customerName.charAt(0) }}
               </div>
@@ -101,6 +106,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { deleteSchedule, type ScheduleVO } from '@/api/schedule'
 
@@ -114,6 +120,7 @@ const emit = defineEmits<{
   (e: 'deleted', scheduleId: string): void
 }>()
 
+const router = useRouter()
 const deleting = ref(false)
 
 const visible = computed({
@@ -131,6 +138,12 @@ function formatDateTime(dateStr: string): string {
   if (!dateStr) return ''
   const d = new Date(dateStr)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+async function handleGoToCustomerDetail() {
+  if (!props.schedule?.customerId) return
+  visible.value = false
+  await router.push(`/customer/${props.schedule.customerId}`)
 }
 
 async function handleDeleteSchedule() {
@@ -153,8 +166,8 @@ async function handleDeleteSchedule() {
 }
 </script>
 
-<style scoped>
-:deep(.schedule-detail-drawer .el-drawer__body) {
+<style>
+.schedule-detail-drawer__body {
   padding: 0 !important;
 }
 </style>

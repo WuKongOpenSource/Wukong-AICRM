@@ -260,10 +260,29 @@
       v-model="showCalendarTaskDetail"
       :task="selectedTask"
       :is-mobile="isMobile"
-      :can-edit="false"
-      :can-delete="false"
-      :can-toggle-complete="true"
-      @toggle-complete="handleToggleTask"
+      :ai-insight="selectedTask ? getAiInsight(selectedTask) : ''"
+      @edit="handleEditFromDetail"
+      @toggle-complete="handleToggleCompleteFromDetail"
+      @delete="handleDeleteFromDetail"
+    />
+
+    <TaskEditDialog
+      v-model="showTaskEditDialog"
+      :is-mobile="isMobile"
+      :editing-task="editingTask"
+      :submitting="submitting"
+      :ai-parsing="aiParsing"
+      v-model:ai-parse-input="aiParseInput"
+      :form-data="formData"
+      v-model:selected-participants="selectedParticipants"
+      :user-options="userOptions"
+      :user-search-loading="userSearchLoading"
+      :customer-options="customerOptions"
+      :customer-search-loading="customerSearchLoading"
+      :search-users="searchUsers"
+      :search-customers="searchCustomers"
+      @ai-parse="handleAiParse"
+      @submit="handleSubmitTask"
     />
 
     <ScheduleFormDialog
@@ -274,14 +293,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
 import { getMySchedules } from '@/api/schedule'
-import { getMyTasks, updateTaskStatus } from '@/api/task'
+import { getMyTasks, updateTaskStatus, aiParseTask, deleteTask, updateTask } from '@/api/task'
+import { queryCustomerList } from '@/api/customer'
+import { queryUserList } from '@/api/auth'
 import type { ScheduleVO } from '@/api/schedule'
-import type { Task } from '@/types/common'
+import type { Task, TaskAddBO, TaskStatus, TaskUpdateBO } from '@/types/common'
 import TaskDetailDrawer from '@/views/task/components/TaskDetailDrawer.vue'
+import TaskEditDialog from '@/views/task/components/TaskEditDialog.vue'
 import ScheduleDetailDrawer from './components/ScheduleDetailDrawer.vue'
 import ScheduleFormDialog from './components/ScheduleFormDialog.vue'
 
@@ -323,6 +345,26 @@ const selectedEvent = ref<ScheduleVO | null>(null)
 const selectedTask = ref<Task | null>(null)
 const schedules = ref<ScheduleVO[]>([])
 const tasks = ref<Task[]>([])
+const showTaskEditDialog = ref(false)
+const editingTask = ref<Task | null>(null)
+const submitting = ref(false)
+const aiParseInput = ref('')
+const aiParsing = ref(false)
+const customerOptions = ref<{ value: string; label: string }[]>([])
+const customerSearchLoading = ref(false)
+const userOptions = ref<{ value: string; label: string }[]>([])
+const userSearchLoading = ref(false)
+const selectedParticipants = ref<string[]>([])
+const formData = reactive<TaskAddBO & { status?: TaskStatus; assignedToName?: string }>({
+  title: '',
+  description: '',
+  priority: 'MEDIUM',
+  dueDate: undefined,
+  status: undefined,
+  taskType: '',
+  customerId: '',
+  assignedToName: ''
+})
 
 const viewModes = [
   { value: 'grid' as const, label: '周' },
@@ -364,6 +406,7 @@ async function loadSchedules() {
 async function loadTasks() {
   try {
     tasks.value = await getMyTasks('all')
+    syncSelectedTask()
   } catch (e) {
     console.error('加载任务失败', e)
   }
@@ -407,7 +450,7 @@ async function handleToggleTask(task: Task) {
   const newStatus = task.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED'
   try {
     await updateTaskStatus(task.taskId, newStatus.toLowerCase())
-    task.status = newStatus
+    await loadTasks()
   } catch (e: any) {
     ElMessage.error('更新任务状态失败')
   }
@@ -418,6 +461,11 @@ function selectTask(task: Task) {
   selectedTask.value = task
 }
 
+function syncSelectedTask() {
+  if (!selectedTask.value) return
+  selectedTask.value = tasks.value.find(task => task.taskId === selectedTask.value?.taskId) || null
+}
+
 function formatDueDate(dueDate: string): string {
   if (!dueDate) return ''
   const d = new Date(dueDate)
@@ -425,6 +473,196 @@ function formatDueDate(dueDate: string): string {
 }
 
 const showAddDialog = ref(false)
+
+async function searchCustomers(query: string) {
+  if (!query) {
+    customerOptions.value = []
+    return
+  }
+  customerSearchLoading.value = true
+  try {
+    const res = await queryCustomerList({ keyword: query, page: 1, limit: 20 })
+    customerOptions.value = (res.list || []).map((customer: any) => ({
+      value: String(customer.customerId),
+      label: customer.companyName
+    }))
+  } catch (e) {
+    console.warn('客户搜索失败:', e)
+    customerOptions.value = []
+  } finally {
+    customerSearchLoading.value = false
+  }
+}
+
+async function searchUsers(query: string) {
+  if (!query) {
+    userOptions.value = []
+    return
+  }
+  userSearchLoading.value = true
+  try {
+    const res = await queryUserList({ search: query })
+    userOptions.value = (res.list || []).map((user: any) => ({
+      value: user.realname || user.username,
+      label: user.realname || user.username
+    }))
+  } catch (e) {
+    console.warn('用户搜索失败:', e)
+    userOptions.value = []
+  } finally {
+    userSearchLoading.value = false
+  }
+}
+
+function handleEdit(task: Task) {
+  editingTask.value = task
+  Object.assign(formData, {
+    title: task.title,
+    description: task.description || '',
+    priority: task.priority,
+    dueDate: task.dueDate ? formatDateTimeLocal(task.dueDate) : undefined,
+    status: task.status,
+    taskType: task.taskType || '',
+    customerId: task.customerId || '',
+    assignedToName: task.assignedToName || ''
+  })
+  if (task.customerId && task.customerName) {
+    customerOptions.value = [{ value: String(task.customerId), label: task.customerName }]
+  }
+  selectedParticipants.value = task.participantNames
+    ? task.participantNames.split(/[,，]\s*/).filter(Boolean)
+    : []
+  userOptions.value = selectedParticipants.value.map(name => ({ value: name, label: name }))
+  showTaskEditDialog.value = true
+}
+
+function handleEditFromDetail(task: Task) {
+  handleEdit(task)
+  if (isMobile.value) selectedTask.value = null
+}
+
+async function handleToggleCompleteFromDetail(task: Task) {
+  await handleToggleTask(task)
+  if (isMobile.value) selectedTask.value = null
+}
+
+async function handleDeleteFromDetail(task: Task) {
+  await handleDeleteTask(task)
+  if (isMobile.value) selectedTask.value = null
+}
+
+async function handleDeleteTask(task: Task) {
+  try {
+    await ElMessageBox.confirm(`确定要删除任务「${task.title}」吗？`, '提示', { type: 'warning' })
+    await deleteTask(task.taskId)
+    if (selectedTask.value?.taskId === task.taskId) {
+      selectedTask.value = null
+    }
+    ElMessage.success('删除成功')
+    await loadTasks()
+  } catch {
+    // Cancelled
+  }
+}
+
+async function handleSubmitTask() {
+  if (!formData.title.trim()) {
+    ElMessage.warning('请输入任务标题')
+    return
+  }
+  if (!formData.dueDate) {
+    ElMessage.warning('请选择截止时间')
+    return
+  }
+  if (!editingTask.value) return
+
+  submitting.value = true
+  try {
+    const submitData: TaskUpdateBO = {
+      taskId: editingTask.value.taskId,
+      title: formData.title,
+      description: formData.description,
+      priority: formData.priority,
+      dueDate: formData.dueDate,
+      taskType: formData.taskType,
+      participantNames: selectedParticipants.value.join(', '),
+      customerId: formData.customerId || undefined,
+      status: formData.status
+    }
+    await updateTask(submitData)
+    ElMessage.success('更新成功')
+    showTaskEditDialog.value = false
+    resetTaskForm()
+    await loadTasks()
+  } finally {
+    submitting.value = false
+  }
+}
+
+function resetTaskForm() {
+  editingTask.value = null
+  aiParseInput.value = ''
+  selectedParticipants.value = []
+  customerOptions.value = []
+  userOptions.value = []
+  Object.assign(formData, {
+    title: '',
+    description: '',
+    priority: 'MEDIUM',
+    dueDate: undefined,
+    status: undefined,
+    taskType: '',
+    customerId: '',
+    assignedToName: ''
+  })
+}
+
+async function handleAiParse() {
+  if (!aiParseInput.value.trim()) return
+  aiParsing.value = true
+  try {
+    const result = await aiParseTask(aiParseInput.value)
+    if (result.title) formData.title = result.title
+    if (result.dueDate) formData.dueDate = result.dueDate
+    if (result.priority) formData.priority = result.priority.toUpperCase() as any
+    if (result.taskType) formData.taskType = result.taskType
+    if (result.customerName) {
+      const res = await queryCustomerList({ keyword: result.customerName, page: 1, limit: 5 })
+      const list = res.list || []
+      if (list.length > 0) {
+        customerOptions.value = list.map((customer: any) => ({
+          value: String(customer.customerId),
+          label: customer.companyName
+        }))
+        formData.customerId = String(list[0].customerId)
+      }
+    }
+    if (result.participantNames) {
+      selectedParticipants.value = result.participantNames.split(/[,，]\s*/).filter(Boolean)
+      userOptions.value = selectedParticipants.value.map(name => ({ value: name, label: name }))
+    }
+    if (result.description) formData.description = result.description
+    if (result.assignedToName) formData.assignedToName = result.assignedToName
+    ElMessage.success('AI 解析完成，请确认并补充信息')
+  } catch {
+    ElMessage.error('AI 解析失败，请手动填写')
+  } finally {
+    aiParsing.value = false
+  }
+}
+
+function formatDateTimeLocal(dateStr: string): string {
+  const d = new Date(dateStr)
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function getAiInsight(task: Task): string {
+  if (task.description) return task.description
+  if (task.priority === 'HIGH') return '此任务优先级较高，建议尽快处理以推进业务进展。'
+  if (task.priority === 'MEDIUM') return '常规跟进任务，按计划执行即可。'
+  return '低优先级任务，可在空闲时间处理。'
+}
 
 // --- Week View ---
 
