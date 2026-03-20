@@ -278,6 +278,7 @@ const showConfigSection = computed(() => configNavItems.value.length > 0)
 const activeMenu = computed(() => {
   const path = route.path
   if (path.startsWith('/customer')) return '/customer'
+  if (path.startsWith('/settings')) return '/settings'
   return path
 })
 

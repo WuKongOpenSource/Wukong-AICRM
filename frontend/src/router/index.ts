@@ -3,6 +3,13 @@ import { getToken } from '@/utils/request'
 import { getOidcSessionToken } from '@/api/auth'
 import { useUserStore } from '@/stores/user'
 
+const settingsComponent = () => import('@/views/settings/SettingsView.vue')
+const settingsMeta = {
+  title: '系统设置',
+  icon: 'settings',
+  permission: ['user', 'role', 'config', 'dept', 'customField']
+}
+
 const routes: RouteRecordRaw[] = [
   {
     path: '/login',
@@ -62,9 +69,29 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'settings',
-        name: 'Settings',
-        component: () => import('@/views/settings/SettingsView.vue'),
-        meta: { title: '系统设置', icon: 'settings', permission: ['user', 'role', 'config', 'dept', 'customField'] }
+        redirect: '/settings/team'
+      },
+      {
+        path: 'settings/team',
+        name: 'SettingsTeam',
+        component: settingsComponent,
+        meta: settingsMeta
+      },
+      {
+        path: 'settings/role',
+        name: 'SettingsRole',
+        component: settingsComponent,
+        meta: settingsMeta
+      },
+      {
+        path: 'settings/system',
+        redirect: '/settings/system/profile'
+      },
+      {
+        path: 'settings/system/:systemTab(profile|enterprise|api|agent|storage|customField)',
+        name: 'SettingsSystem',
+        component: settingsComponent,
+        meta: settingsMeta
       }
     ]
   },
