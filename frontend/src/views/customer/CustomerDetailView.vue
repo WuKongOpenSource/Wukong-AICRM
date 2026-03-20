@@ -109,9 +109,10 @@
                     :class="getStepperSegmentBgClass(stage, idx)"
                     :style="{ clipPath: getStepperClipPath(idx) }"
                   ></div>
-                  <!-- Hover overlay (light blue) -->
+                  <!-- Hover overlay -->
                   <div
-                    class="absolute inset-0 bg-primary/10 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                    class="absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                    :class="getStepperHoverOverlayClass(stage, idx)"
                     :style="{ clipPath: getStepperClipPath(idx) }"
                   ></div>
 
@@ -1085,28 +1086,15 @@ function getStepperClipPath(idx: number): string {
 }
 
 function getStepperSegmentBgClass(stage: string, idx: number): string {
-  const cs = customer.value?.stage
-  if (!cs) return 'bg-slate-100'
-
-  const isCompleted = getStageIndex(cs) > idx && cs !== 'lost'
-  const isCurrent = cs === stage
-
-  // Lost outcome
-  if (stage === 'lost') {
-    if (cs === 'lost') return 'bg-rose-500'
-    return 'bg-slate-100'
+  const state = getStepperVisualState(stage, idx)
+  const classes: Record<string, string> = {
+    completed: 'bg-gradient-to-r from-[#22c55e] to-[#16c458] shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]',
+    current: 'bg-gradient-to-r from-[#113f98] to-[#194fa8] shadow-[0_8px_20px_rgba(17,63,152,0.18)]',
+    closed: 'bg-gradient-to-r from-[#22c55e] to-[#16c458] shadow-[0_8px_20px_rgba(34,197,94,0.16)]',
+    lost: 'bg-gradient-to-r from-[#64748b] to-[#475569] shadow-[0_8px_20px_rgba(71,85,105,0.16)]',
+    pending: 'bg-[#d9d9d9]'
   }
-
-  // Closed outcome (won)
-  if (stage === 'closed') {
-    if (cs === 'closed') return 'bg-emerald-500'
-    return 'bg-slate-100'
-  }
-
-  // Middle stages
-  if (isCurrent) return 'bg-primary'
-  if (isCompleted) return 'bg-primary/20'
-  return 'bg-slate-100'
+  return classes[state]
 }
 
 function getStepperStageIcon(stage: string): string {
@@ -1133,19 +1121,26 @@ function getStepperLabel(stage: string): string {
 }
 
 function getStepperLabelClass(stage: string, idx: number): string {
+  const state = getStepperVisualState(stage, idx)
+  return state === 'pending' ? 'text-slate-600' : 'text-white'
+}
+
+function getStepperHoverOverlayClass(stage: string, idx: number): string {
+  const state = getStepperVisualState(stage, idx)
+  return state === 'pending' ? 'bg-white/35' : 'bg-white/10'
+}
+
+function getStepperVisualState(stage: string, idx: number): 'completed' | 'current' | 'closed' | 'lost' | 'pending' {
   const cs = customer.value?.stage
-  if (!cs) return 'text-slate-400'
+  if (!cs) return 'pending'
 
-  // Lost outcome
-  if (stage === 'lost') return cs === 'lost' ? 'text-white' : 'text-slate-500'
-
-  // Closed outcome (won)
-  if (stage === 'closed') return cs === 'closed' ? 'text-white' : 'text-slate-500'
+  if (stage === 'lost' && cs === 'lost') return 'lost'
+  if (stage === 'closed' && cs === 'closed') return 'closed'
 
   const isCompleted = getStageIndex(cs) > idx && cs !== 'lost'
-  if (cs === stage) return 'text-white'
-  if (isCompleted) return 'text-primary'
-  return 'text-slate-500'
+  if (cs === stage) return 'current'
+  if (isCompleted) return 'completed'
+  return 'pending'
 }
 
 async function handleStageChange(newStage: string) {
