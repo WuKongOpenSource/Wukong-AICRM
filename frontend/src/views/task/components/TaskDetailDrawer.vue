@@ -96,7 +96,7 @@
 
           <section v-if="aiInsight" class="p-6 bg-slate-900 rounded-[2rem] text-white">
             <div class="flex items-center gap-2 mb-4">
-              <span class="material-symbols-outlined text-emerald-400">auto_awesome</span>
+              <WkIcon name="ai" class="text-emerald-400" />
               <h3 class="text-sm font-bold">AI 推荐沟通话术</h3>
             </div>
             <p class="text-xs text-slate-300 leading-relaxed italic">
@@ -200,7 +200,7 @@
 
       <div v-if="aiInsight" class="p-4 bg-slate-900 rounded-2xl text-white">
         <div class="flex items-center gap-2 mb-3">
-          <span class="material-symbols-outlined text-emerald-400 text-sm">auto_awesome</span>
+          <WkIcon name="ai" class="text-emerald-400 text-sm" />
           <h3 class="text-sm font-bold">AI 推荐沟通话术</h3>
         </div>
         <p class="text-xs text-slate-300 leading-relaxed italic">"{{ aiInsight }}"</p>
@@ -310,4 +310,3 @@ function getStatusLabel(s: TaskStatus): string {
   padding: 0 !important;
 }
 </style>
-

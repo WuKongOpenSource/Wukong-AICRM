@@ -22,6 +22,11 @@
   vertical-align: middle;
 }
 
+.wk-icon-ai::before,
+.wk-icon-AI::before {
+  content: '\e6ab';
+}
+
 .wk-icon-stage::before,
 .wk-icon-archery::before {
   content: '\e6a9';

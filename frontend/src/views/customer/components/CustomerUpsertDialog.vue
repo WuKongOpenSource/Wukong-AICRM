@@ -58,7 +58,7 @@
                 <section v-if="!isEdit" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                   <div class="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                      <span class="material-symbols-outlined text-primary text-lg">auto_awesome</span>
+                      <WkIcon name="ai" class="text-primary text-lg" />
                       <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">AI 智能录入</h3>
                     </div>
                     <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">粘贴名片、邮件或简介</span>
@@ -108,7 +108,7 @@
                           解析中...
                         </template>
                         <template v-else>
-                          <span class="material-symbols-outlined text-sm">psychology</span>
+                          <WkIcon name="ai" class="text-sm" />
                           智能提取
                         </template>
                       </button>
@@ -271,7 +271,7 @@
 
                 <div v-else class="bg-white rounded-2xl border border-slate-200 border-dashed p-8 text-center space-y-3 min-h-[300px] flex flex-col items-center justify-center">
                   <div class="size-12 bg-slate-50 rounded-xl flex items-center justify-center mx-auto">
-                    <span class="material-symbols-outlined text-slate-300 text-2xl">psychology</span>
+                    <WkIcon name="ai" class="text-slate-300 text-2xl" />
                   </div>
                   <div>
                     <h4 class="text-xs font-bold text-slate-900">等待 AI 分析</h4>
@@ -522,4 +522,3 @@ async function handleSubmit() {
   }
 }
 </script>
-

@@ -27,7 +27,7 @@
             ? 'bg-primary/10 text-primary'
             : 'text-slate-600 hover:bg-slate-100'"
         >
-          <span class="material-symbols-outlined" :class="{ fill: item.fill && isActive(item.route) }">{{ item.icon }}</span>
+          <WkIcon :name="item.icon" :size="22" class="shrink-0" />
           <span class="text-sm font-medium">{{ item.label }}</span>
         </button>
 
@@ -45,7 +45,7 @@
             ? 'bg-primary/10 text-primary'
             : 'text-slate-600 hover:bg-slate-100'"
         >
-          <span class="material-symbols-outlined">{{ item.icon }}</span>
+          <WkIcon :name="item.icon" :size="22" class="shrink-0" />
           <span class="text-sm font-medium">{{ item.label }}</span>
         </button>
         </template>
@@ -124,7 +124,7 @@
               class="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors"
               :class="isActive(item.route) ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100'"
             >
-              <span class="material-symbols-outlined">{{ item.icon }}</span>
+              <WkIcon :name="item.icon" :size="22" class="shrink-0" />
               <span class="text-sm font-medium">{{ item.label }}</span>
             </button>
             <div v-if="showConfigSection" class="pt-4 pb-2">
@@ -138,7 +138,7 @@
               class="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors"
               :class="isActive(item.route) ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100'"
             >
-              <span class="material-symbols-outlined">{{ item.icon }}</span>
+              <WkIcon :name="item.icon" :size="22" class="shrink-0" />
               <span class="text-sm font-medium">{{ item.label }}</span>
             </button>
             </template>
@@ -214,6 +214,7 @@ import { ElMessageBox } from 'element-plus'
 import FloatingActionButton from '@/components/common/FloatingActionButton.vue'
 import AiChatDrawer from '@/components/common/AiChatDrawer.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
+import type { WkIconName } from '@/components/common/wkIcon'
 import { appEvents, APP_EVENT } from '@/utils/events'
 
 const route = useRoute()
@@ -236,28 +237,39 @@ const drawerVisible = ref(false)
 const showUserMenu = ref(false)
 const { isOpen: chatDrawerOpen } = useChatDrawer()
 
-const allMainNavItems = [
-  { icon: 'auto_awesome', label: 'AI 助手', route: '/chat', fill: false, permission: 'chat' },
-  { icon: 'group', label: '客户管理', route: '/customer', fill: true, permission: 'customer' },
-  { icon: 'task_alt', label: '任务管理', route: '/task', fill: false, permission: 'task' },
-  { icon: 'calendar_today', label: '日程安排', route: '/calendar', fill: false, permission: 'schedule' },
-  { icon: 'menu_book', label: '知识库', route: '/knowledge', fill: false, permission: 'knowledge' },
+type MainNavItem = {
+  icon: WkIconName
+  label: string
+  route: string
+  permission: string
+}
+
+type ConfigNavItem = {
+  icon: WkIconName
+  label: string
+  route: string
+  permission: string[]
+}
+
+const allMainNavItems: MainNavItem[] = [
+  { icon: 'ai', label: 'AI 助手', route: '/chat', permission: 'chat' },
+  { icon: 'customer', label: '客户管理', route: '/customer', permission: 'customer' },
+  { icon: 'task', label: '任务管理', route: '/task', permission: 'task' },
+  { icon: 'meetingRecord', label: '日程安排', route: '/calendar', permission: 'schedule' },
+  { icon: 'knowledge', label: '知识库', route: '/knowledge', permission: 'knowledge' },
 ]
 
-const allConfigNavItems = [
+const allConfigNavItems: ConfigNavItem[] = [
   { icon: 'settings', label: '系统设置', route: '/settings', permission: ['user', 'role', 'config', 'dept', 'customField'] },
 ]
 
 // AI 助手（chat）默认所有人可见
 const mainNavItems = computed(() =>
-  allMainNavItems.filter(item => item.permission === 'chat' || userStore.hasPermission(item.permission as string))
+  allMainNavItems.filter(item => item.permission === 'chat' || userStore.hasPermission(item.permission))
 )
 
 const configNavItems = computed(() =>
-  allConfigNavItems.filter(item => {
-    const perms = item.permission as string[]
-    return perms.some(p => userStore.hasPermission(p))
-  })
+  allConfigNavItems.filter(item => item.permission.some(p => userStore.hasPermission(p)))
 )
 
 const showConfigSection = computed(() => configNavItems.value.length > 0)

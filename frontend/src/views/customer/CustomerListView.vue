@@ -182,7 +182,7 @@
                       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
                       @click="handleAiFollowUp(customer)"
                     >
-                      <span class="material-symbols-outlined text-sm">auto_awesome</span>
+                      <WkIcon name="ai" class="text-sm" />
                       AI 跟进
                     </button>
                   </td>
@@ -280,7 +280,7 @@
               <!-- High Potential Warning -->
               <div class="bg-white border border-slate-200 rounded-xl p-4 relative overflow-hidden group cursor-pointer hover:border-primary/50 hover:shadow-md transition-all">
                 <div class="flex items-center gap-2 mb-2">
-                  <span class="material-symbols-outlined text-primary text-xl">auto_awesome</span>
+                  <WkIcon name="ai" class="text-primary text-xl" />
                   <h3 class="text-sm font-bold text-slate-900">高潜力客户预警</h3>
                 </div>
                 <p class="text-xs text-slate-500 leading-relaxed">发现 {{ negotiationCount }} 位客户近期成交概率显著提升，建议优先跟进。</p>
@@ -325,7 +325,7 @@
           </Transition>
 
           <div v-if="!isAiSidebarExpanded" class="hidden xl:flex flex-col items-center gap-6 pt-4">
-            <span class="material-symbols-outlined text-primary/40 text-xl animate-pulse">auto_awesome</span>
+            <WkIcon name="ai" class="text-primary/40 text-xl animate-pulse" />
             <div class="h-20 w-px bg-slate-200"></div>
             <span class="[writing-mode:vertical-rl] text-xs font-bold text-slate-400 tracking-widest">
               <span class="[text-combine-upright:all]">AI</span> 智能洞察

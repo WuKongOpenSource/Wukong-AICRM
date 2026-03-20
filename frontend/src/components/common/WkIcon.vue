@@ -20,13 +20,19 @@ const props = withDefaults(defineProps<{
   color?: string
   label?: string
 }>(), {
-  size: '1em',
   color: 'currentColor',
   label: undefined,
 })
 
-const iconStyle = computed<CSSProperties>(() => ({
-  fontSize: typeof props.size === 'number' ? `${props.size}px` : props.size,
-  color: props.color,
-}))
+const iconStyle = computed<CSSProperties>(() => {
+  const style: CSSProperties = {
+    color: props.color,
+  }
+
+  if (props.size !== undefined) {
+    style.fontSize = typeof props.size === 'number' ? `${props.size}px` : props.size
+  }
+
+  return style
+})
 </script>

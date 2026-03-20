@@ -185,7 +185,7 @@
 
                 <!-- AI Insight -->
                 <div class="p-3 bg-primary/5 rounded-xl border border-primary/10 flex items-start gap-2">
-                  <span class="material-symbols-outlined text-primary text-sm mt-0.5">psychology</span>
+                  <WkIcon name="ai" class="text-primary text-sm mt-0.5" />
                   <p class="text-xs text-slate-600 leading-relaxed italic">"{{ getAiInsight(task) }}"</p>
                 </div>
 

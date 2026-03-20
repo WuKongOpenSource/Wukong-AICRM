@@ -42,7 +42,7 @@
       <!-- AI Parse Section (Create only) -->
       <div v-if="!editingTask" class="space-y-3">
         <div class="flex items-center gap-2 mb-3">
-          <span class="material-symbols-outlined text-primary text-sm">auto_awesome</span>
+          <WkIcon name="ai" class="text-primary text-sm" />
           <span class="text-xs font-bold text-primary">AI 智能解析 (可选)</span>
         </div>
         <div class="relative">
@@ -58,7 +58,7 @@
             type="button"
           >
             <span v-if="aiParsing" class="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-            <span v-else class="material-symbols-outlined text-sm">auto_awesome</span>
+            <WkIcon v-else name="ai" class="text-sm" />
             {{ aiParsing ? '解析中...' : '一键解析' }}
           </button>
         </div>

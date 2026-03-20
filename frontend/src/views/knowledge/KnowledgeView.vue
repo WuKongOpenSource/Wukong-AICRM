@@ -241,7 +241,7 @@
                 <div
                   class="mb-4 flex size-10 items-center justify-center rounded-xl bg-primary/20 text-primary"
                 >
-                  <span class="material-symbols-outlined text-xl">auto_awesome</span>
+                  <WkIcon name="ai" class="text-xl" />
                 </div>
                 <h4 class="mb-2 text-lg font-bold text-white">AI 话术生成器</h4>
                 <p class="mb-6 text-xs leading-relaxed text-slate-400">
@@ -256,10 +256,11 @@
                 立即开始
               </button>
               <span
-                class="material-symbols-outlined pointer-events-none absolute -bottom-6 -right-6 select-none text-[8rem] text-white/5"
+                class="pointer-events-none absolute -bottom-6 -right-6 select-none"
                 aria-hidden="true"
-                >auto_awesome</span
               >
+                <WkIcon name="ai" class="text-[8rem] text-white/5" />
+              </span>
             </div>
 
             <div
@@ -292,7 +293,7 @@
               <div class="mb-4 flex min-h-[4.5rem] flex-1 flex-col rounded-xl bg-primary/5 p-3">
                 <div class="mb-1.5 flex items-center justify-between">
                   <div class="flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-sm text-primary">auto_awesome</span>
+                    <WkIcon name="ai" class="text-sm text-primary" />
                     <span class="text-xs font-bold text-primary">AI 摘要</span>
                   </div>
                 </div>

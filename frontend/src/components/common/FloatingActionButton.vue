@@ -6,7 +6,7 @@
     @pointerdown="handlePointerDown"
     title="AI 助手"
   >
-    <span class="material-symbols-outlined text-2xl group-hover:rotate-12 transition-transform">auto_awesome</span>
+    <WkIcon name="ai" class="text-2xl group-hover:rotate-12 transition-transform" />
     <!-- Pulse ring -->
     <span class="absolute inset-0 rounded-full bg-primary/20 animate-ping pointer-events-none"></span>
   </button>

@@ -1,4 +1,5 @@
 export const wkIconNames = [
+  'ai',
   'stage',
   'profile',
   'customer',
@@ -15,6 +16,7 @@ export const wkIconNames = [
 export type WkIconName = (typeof wkIconNames)[number]
 
 export const wkIconClassMap = {
+  ai: 'AI',
   stage: 'stage',
   profile: 'profile',
   customer: 'customer',

@@ -147,7 +147,7 @@
             <!-- AI Header -->
             <div class="p-5 border-b border-slate-200 bg-white shrink-0">
               <div class="flex items-center gap-2 text-primary mb-1">
-                <span class="material-symbols-outlined text-sm">auto_awesome</span>
+                <WkIcon name="ai" class="text-sm" />
                 <span class="text-xs font-bold uppercase tracking-widest">AI 智能助手</span>
               </div>
               <p class="text-xs text-slate-400 font-medium">
