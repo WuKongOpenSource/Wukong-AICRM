@@ -7,6 +7,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
 import com.kakarote.ai_crm.ai.context.AiContextHolder;
+import com.kakarote.ai_crm.ai.state.PendingCustomerCreationStore;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.WeKnoraConfig;
@@ -75,6 +76,9 @@ public class ChatServiceImpl implements IChatService {
 
     @Autowired
     private WeKnoraConfig weKnoraConfig;
+
+    @Autowired
+    private PendingCustomerCreationStore pendingCustomerCreationStore;
 
     private static final int MAX_EXTRACTED_TEXT_LENGTH = 3000;
 
@@ -160,7 +164,15 @@ public class ChatServiceImpl implements IChatService {
             today.toString(),
             dayOfWeek,
             weekCalendar
-        );
+        ) + """
+
+        【重复客户确认规则】
+        1. 当你准备创建客户时，先调用 createCustomer，让系统检查是否存在同名客户。
+        2. 如果 createCustomer 返回“已存在同名客户”“待确认”“尚未创建”等信息，你必须明确告诉用户发现了重复客户，并询问是否继续创建；此时绝不能声称已经创建成功。
+        3. 只有当用户明确表示“确认创建”“继续创建”“仍然创建”“是，创建新客户”等同意语义时，才调用 confirmPendingCustomerCreation。
+        4. 如果用户表示“不创建”“取消”“算了”，调用 cancelPendingCustomerCreation。
+        5. 在重复客户尚未确认前，不要把该客户当作已经创建成功，也不要把后续依赖这个新客户的动作当成已完成。
+        """;
     }
 
     private String buildWeekCalendar(LocalDate today) {
@@ -216,6 +228,7 @@ public class ChatServiceImpl implements IChatService {
                 .eq(ChatMessage::getSessionId, sessionId)
         );
         chatSessionMapper.deleteById(sessionId);
+        pendingCustomerCreationStore.clear(sessionId);
         AiContextHolder.clearSession(sessionId);
     }
 

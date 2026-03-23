@@ -275,6 +275,19 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     }
 
     @Override
+    public List<Customer> findCustomersByExactCompanyName(String companyName) {
+        String normalizedCompanyName = StrUtil.trim(companyName);
+        if (StrUtil.isBlank(normalizedCompanyName)) {
+            return Collections.emptyList();
+        }
+        return lambdaQuery()
+            .eq(Customer::getCompanyName, normalizedCompanyName)
+            .eq(Customer::getStatus, 1)
+            .orderByDesc(Customer::getCreateTime)
+            .list();
+    }
+
+    @Override
     public CustomerDetailVO getCustomerDetail(Long customerId) {
         CustomerDetailVO detail = baseMapper.getCustomerById(customerId);
         if (ObjectUtil.isNull(detail)) {

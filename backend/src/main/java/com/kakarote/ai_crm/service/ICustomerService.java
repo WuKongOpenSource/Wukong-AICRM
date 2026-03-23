@@ -47,6 +47,11 @@ public interface ICustomerService extends IService<Customer> {
     BasePage<CustomerListVO> queryPageList(CustomerQueryBO queryBO);
 
     /**
+     * 按公司名称精确查询已存在客户
+     */
+    List<Customer> findCustomersByExactCompanyName(String companyName);
+
+    /**
      * 获取客户详情
      */
     CustomerDetailVO getCustomerDetail(Long customerId);
@@ -77,7 +82,7 @@ public interface ICustomerService extends IService<Customer> {
     DashboardStatsVO getStatistics();
 
     /**
-     * 导出客户Excel
+     * 导出客户 Excel
      */
     void exportCustomers(CustomerExportBO exportBO, HttpServletResponse response);
 
@@ -87,7 +92,7 @@ public interface ICustomerService extends IService<Customer> {
     void downloadImportTemplate(HttpServletResponse response);
 
     /**
-     * 导入预览（解析+验证+检测重复）
+     * 导入预览（解析 + 校验 + 检测重复）
      */
     CustomerImportPreviewVO importPreview(MultipartFile file);
 
@@ -97,7 +102,7 @@ public interface ICustomerService extends IService<Customer> {
     CustomerImportResultVO confirmImport(List<CustomerImportBO> rows);
 
     /**
-     * AI智能录入解析客户信息
+     * AI 智能录入解析客户信息
      */
     CustomerAiParseVO aiParseCustomer(CustomerAiParseBO parseBO);
 }
