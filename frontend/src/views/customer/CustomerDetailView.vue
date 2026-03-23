@@ -21,12 +21,12 @@
 
         <!-- Customer Info Card -->
         <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-4 min-w-0">
+          <div class="flex justify-between">
+            <div class="flex gap-4 min-w-0">
               <div class="size-14 bg-slate-100 rounded-lg flex items-center justify-center border border-slate-200 overflow-hidden shrink-0">
                 <span class="text-2xl font-bold text-slate-400">{{ customer.companyName?.charAt(0) || '?' }}</span>
               </div>
-              <div class="min-w-0 space-y-1">
+              <div class="min-w-0 space-y-2">
                 <div class="flex items-center gap-3 flex-wrap">
                   <h2 class="text-xl font-bold text-slate-900 truncate">{{ customer.companyName }}</h2>
                   <span
@@ -60,6 +60,28 @@
                     </div>
                   </div>
                 </div>
+                <div v-if="customer.tags?.length || canEditCustomerTags" class="flex flex-wrap items-center gap-2">
+                  <span
+                    v-for="tag in customer.tags"
+                    :key="tag.tagId"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 group"
+                  >
+                    {{ tag.tagName }}
+                    <span
+                      v-if="canEditCustomerTags"
+                      class="material-symbols-outlined text-xs text-slate-400 hover:text-red-500 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                      @click="handleRemoveTag(tag)"
+                    >close</span>
+                  </span>
+                  <button
+                    v-if="canEditCustomerTags"
+                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-primary border border-dashed border-primary/30 hover:bg-primary/5 transition-colors"
+                    @click="showAddTagDialog = true"
+                  >
+                    <span class="wk-plus-button-mark" aria-hidden="true">+</span>
+                    <span>添加标签</span>
+                  </button>
+                </div>
               </div>
             </div>
             <div class="flex gap-2 shrink-0">
@@ -86,15 +108,15 @@
 
           <!-- Stage Stepper (inside same card) -->
           <div class="mt-5 pt-4 border-t border-slate-100">
-            <div class="flex items-center gap-2 mb-6">
+            <!-- <div class="flex items-center gap-2 mb-6">
               <span :class="sectionIconBoxClass" :style="getSectionIconStyle('customerStage')">
                 <WkIcon name="stage" :size="15" />
               </span>
               <h3 class="text-sm font-bold text-slate-900">客户阶段</h3>
-            </div>
-            <div class="relative overflow-x-auto">
-              <!-- Chevron segments (fixed width) -->
-              <div class="relative flex h-9 w-max min-w-[1080px] items-stretch">
+            </div> -->
+            <div class="relative overflow-visible">
+              <!-- Chevron segments (wrap layout, no scroll) -->
+              <div class="relative flex flex-wrap items-stretch gap-y-2">
                 <div
                   v-for="(stage, idx) in stageFlow"
                   :key="stage"
@@ -102,7 +124,6 @@
                   @click="handleStageChange(stage)"
                   :title="getStepperLabel(stage)"
                   :style="{
-                    marginLeft: idx === 0 ? '0px' : `-${STEPPER_CHEVRON_SIZE - STEPPER_SEGMENT_GAP}px`,
                     zIndex: customer.stage === stage ? 10 : 5 - idx
                   }"
                 >
@@ -218,34 +239,6 @@
                 </div>
               </div>
             </section>
-
-            <!-- Tags -->
-            <section class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-              <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <span :class="sectionIconBoxClass" :style="getSectionIconStyle('tags')">
-                  <span :class="sectionMaterialIconClass">sell</span>
-                </span>
-                标签
-              </h3>
-              <div class="flex flex-wrap gap-2">
-                <span
-                  v-for="tag in customer.tags"
-                  :key="tag.tagId"
-                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 group"
-                >
-                  {{ tag.tagName }}
-                  <span
-                    class="material-symbols-outlined text-xs text-slate-400 hover:text-red-500 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-                    @click="handleRemoveTag(tag)"
-                  >close</span>
-                </span>
-                <button v-if="canEditCustomerTags" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-primary border border-dashed border-primary/30 hover:bg-primary/5 transition-colors" @click="showAddTagDialog = true">
-                  <span class="wk-plus-button-mark" aria-hidden="true">+</span>
-                  <span>添加标签</span>
-                </button>
-              </div>
-            </section>
-
           </div>
 
           <!-- Center Column: Follow-ups Timeline (col-span-6) -->
@@ -668,7 +661,6 @@ const sectionMaterialIconClass = 'material-symbols-outlined text-[16px] leading-
 const sectionIconBgColors = {
   customerStage: '#0052CC',
   basicInfo: '#5243AA',
-  tags: '#DE350B',
   recentActivity: '#FF991F',
   relatedBusiness: '#00A3BF',
   relatedContacts: '#DE350B',
@@ -1151,7 +1143,6 @@ const stageOptions = [
 const STEPPER_SEGMENT_WIDTH = 180
 const STEPPER_SEGMENT_HEIGHT = 36
 const STEPPER_CHEVRON_SIZE = 12
-const STEPPER_SEGMENT_GAP = 8
 const STEPPER_END_RADIUS = STEPPER_SEGMENT_HEIGHT / 2
 
 function getStageLabelFull(stage: string): string {
