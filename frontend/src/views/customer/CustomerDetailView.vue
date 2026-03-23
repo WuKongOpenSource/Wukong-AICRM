@@ -239,12 +239,12 @@
       </div>
 
       <!-- 3-Column Content -->
-      <div class="flex-1 overflow-auto p-4 md:p-8">
+      <div class="flex-1 overflow-auto px-8 pb-8 pt-6">
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <!-- Left Column: Basic Info (col-span-3) -->
-          <div class="lg:col-span-3 space-y-6">
+          <div class="lg:col-span-3 space-y-4">
             <!-- Basic Info -->
-            <section class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+            <section class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
               <h3 class="text-sm font-bold text-slate-900 mb-6 flex items-center gap-2">
                 <span :class="sectionIconBoxClass" :style="getSectionIconStyle('basicInfo')">
                   <WkIcon name="profile" :size="15" />
@@ -320,7 +320,7 @@
           </div>
 
           <!-- Center Column: Follow-ups Timeline (col-span-6) -->
-          <div v-if="canViewFollowUps" class="lg:col-span-6 space-y-6">
+          <div v-if="canViewFollowUps" class="lg:col-span-6 space-y-4">
             <div class="flex items-center justify-between">
               <h3 class="flex items-center gap-2 text-lg font-bold text-slate-900">
                 <span :class="sectionIconBoxClass" :style="getSectionIconStyle('recentActivity')">
@@ -350,7 +350,7 @@
               <p class="text-xs text-slate-300 mt-1">点击上方按钮添加第一条跟进记录</p>
             </div>
 
-            <div v-else class="space-y-6" v-loading="followUpLoading">
+            <div v-else class="space-y-4" v-loading="followUpLoading">
               <div v-for="item in followUps" :key="item.followUpId" class="relative pl-8 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-slate-200">
                 <div class="absolute left-0 top-1 -translate-x-1/2 size-4 rounded-full bg-white border-2 border-primary"></div>
                 <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
@@ -400,7 +400,7 @@
           </div>
 
           <!-- Right Column: Related Modules (col-span-3) -->
-          <div class="lg:col-span-3 space-y-6">
+          <div class="lg:col-span-3 space-y-4">
             <div class="flex items-center justify-between px-1">
               <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
                 <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedBusiness')">
@@ -412,8 +412,8 @@
             </div>
 
             <!-- Contacts Module -->
-            <section v-if="canViewContacts" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6" v-loading="contactLoading">
-              <div class="mb-6 flex items-center justify-between">
+            <section v-if="canViewContacts" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4" v-loading="contactLoading">
+              <div class="mb-4 flex items-center justify-between">
                 <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedContacts')">
                     <span :class="sectionMaterialIconClass">group</span>
@@ -425,8 +425,8 @@
                   <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">person_add</span>
                 </button>
               </div>
-              <div class="space-y-3">
-                <div v-if="contacts.length === 0" class="py-6 text-center">
+              <div class="space-y-4">
+                <div v-if="contacts.length === 0" class="py-4 text-center">
                   <p class="text-xs text-slate-400">暂无联系人</p>
                 </div>
                 <div
@@ -512,8 +512,8 @@
             </section> -->
 
             <!-- Tasks Module -->
-            <section v-if="canViewTasks" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-              <div class="mb-6 flex items-center justify-between">
+            <section v-if="canViewTasks" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+              <div class="mb-4 flex items-center justify-between">
                 <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span :class="sectionIconBoxClass" :style="getSectionIconStyle('todoTasks')">
                     <WkIcon name="task" :size="15" />
@@ -524,8 +524,8 @@
                   <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">add</span>
                 </button>
               </div>
-              <div class="space-y-3">
-                <div v-if="!customer.tasks?.length" class="py-6 text-center">
+              <div class="space-y-4">
+                <div v-if="!customer.tasks?.length" class="py-4 text-center">
                   <p class="text-xs text-slate-400">暂无待办任务</p>
                 </div>
                 <div
@@ -546,8 +546,8 @@
             </section>
 
             <!-- Documents Module -->
-            <section v-if="canViewKnowledge" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-              <div class="mb-6 flex items-center justify-between">
+            <section v-if="canViewKnowledge" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+              <div class="mb-4 flex items-center justify-between">
                 <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span :class="sectionIconBoxClass" :style="getSectionIconStyle('documentCenter')">
                     <WkIcon name="knowledge" :size="15" />
@@ -556,7 +556,7 @@
                 </h4>
               </div>
               <div>
-                <p class="py-6 text-center text-xs text-slate-400">暂无文档</p>
+                <p class="py-4 text-center text-xs text-slate-400">暂无文档</p>
               </div>
             </section>
           </div>
