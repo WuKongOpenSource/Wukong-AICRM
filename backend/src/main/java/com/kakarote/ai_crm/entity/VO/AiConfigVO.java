@@ -8,7 +8,7 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * AI 配置信息。
+ * AI 配置信息
  */
 @Data
 @Schema(name = "AiConfigVO", description = "AI 配置信息")
@@ -52,6 +52,27 @@ public class AiConfigVO implements Serializable {
 
     @Schema(description = "系统支持的服务商列表")
     private List<ProviderOptionVO> availableProviders;
+
+    @Schema(description = "当前 AI 使用模式：gift/custom")
+    private String mode;
+
+    @Schema(description = "是否已保存租户自定义配置")
+    private Boolean customConfigSaved;
+
+    @Schema(description = "当前模式下 AI 是否可立即使用")
+    private Boolean ready;
+
+    @Schema(description = "注册赠送 token 总量")
+    private Long giftTokenTotal;
+
+    @Schema(description = "注册赠送 token 已使用量")
+    private Long giftTokenUsed;
+
+    @Schema(description = "注册赠送 token 剩余额度")
+    private Long giftTokenRemaining;
+
+    @Schema(description = "赠送 token 是否仍可用")
+    private Boolean giftTokenAvailable;
 
     @Schema(description = "最后更新时间")
     private Date updateTime;

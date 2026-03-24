@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS crm_tenant (
     status      INTEGER NOT NULL DEFAULT 1,  -- 0=禁用, 1=正常, 2=试用
     expire_time TIMESTAMP,                    -- 租户到期时间，NULL=永不过期
     max_users   INTEGER DEFAULT 50,           -- 最大用户数
+    gift_token_total BIGINT DEFAULT 200000,   -- 注册赠送 token 总量
+    gift_token_used  BIGINT DEFAULT 0,        -- 赠送 token 已使用量
     remark      VARCHAR(500),
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -24,7 +26,8 @@ COMMENT ON TABLE crm_tenant IS '租户主表';
 COMMENT ON COLUMN crm_tenant.status IS '状态：0=禁用, 1=正常, 2=试用';
 
 -- 插入默认租户（用于迁移现有数据）
-INSERT INTO crm_tenant (tenant_id, tenant_name, status) VALUES (1, '默认租户', 1)
+INSERT INTO crm_tenant (tenant_id, tenant_name, status, gift_token_total, gift_token_used)
+VALUES (1, '默认租户', 1, 200000, 0)
 ON CONFLICT (tenant_id) DO NOTHING;
 
 -- ============================================================
@@ -136,6 +139,5 @@ CREATE INDEX IF NOT EXISTS idx_manager_role_tenant ON manager_role(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_manager_user_role_tenant ON manager_user_role(tenant_id);
 
 -- system_config 表需要租户级唯一键（同一租户内 config_key 唯一）
--- 先删除原有唯一索引
 DROP INDEX IF EXISTS crm_system_config_config_key_key;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_system_config_tenant_key ON crm_system_config(tenant_id, config_key);

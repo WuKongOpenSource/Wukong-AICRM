@@ -17,6 +17,8 @@ public class AiProviderDescriptor {
     private final String displayName;
     private final String description;
     private final String baseUrl;
+    private final String completionsPath;
+    private final String embeddingsPath;
     private final List<String> recommendedModels;
     private final String modelHint;
     private final String extraHeadersHint;

@@ -141,9 +141,51 @@
         </template>
       </div>
 
-      <!-- AI Model Status -->
+      <!-- AI Quota -->
       <div class="p-4 border-t border-slate-100">
-        <div class="p-3 bg-primary/5 rounded-xl border border-primary/10">
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60">
+          <div class="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <p class="text-xs font-bold uppercase tracking-widest text-slate-400">AI 额度</p>
+              <p class="mt-1 text-sm font-semibold text-slate-900">{{ aiQuotaModeLabel }}</p>
+            </div>
+            <span
+              class="inline-flex rounded-full px-2 py-1 text-[11px] font-bold"
+              :class="aiStatusBadgeClass"
+            >
+              {{ aiStatusBadgeText }}
+            </span>
+          </div>
+
+          <div class="mb-1 flex items-end gap-1">
+            <span class="text-2xl font-bold leading-none text-slate-900">{{ giftTokenRemainingWan }}</span>
+            <span class="pb-0.5 text-xs text-slate-400">/ {{ giftTokenTotalWan }} 万 token</span>
+          </div>
+          <p class="mb-3 text-xs text-slate-500">{{ aiQuotaDescription }}</p>
+
+          <div class="mb-4 h-2 overflow-hidden rounded-full bg-slate-100">
+            <div
+              class="h-full rounded-full transition-all"
+              :class="giftTokenProgressClass"
+              :style="{ width: `${giftTokenProgressPercent}%` }"
+            />
+          </div>
+
+          <div class="mb-4 flex gap-2">
+            <button
+              class="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+              @click="goToAiSettings"
+            >
+              AI 设置
+            </button>
+            <button
+              class="flex-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="!canManageAiConfig"
+              @click="openApiKeySetup"
+            >
+              配置 AI Key
+            </button>
+          </div>
           <p class="text-xs font-bold text-primary uppercase tracking-wider mb-1">AI 模型状态</p>
           <div class="flex items-center gap-2">
             <div
@@ -478,17 +520,19 @@ import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useAgentStore } from '@/stores/agent'
 import { useUserStore } from '@/stores/user'
+import { useRouter } from 'vue-router'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { getAiConfig, updateAiConfig } from '@/api/systemConfig'
 import ApiKeySetupModal from '@/components/common/ApiKeySetupModal.vue'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
-import type { AiConfig, AiConfigUpdateBO } from '@/types/systemConfig'
+import type { AiConfig, AiConfigUpdateBO, AiMode } from '@/types/systemConfig'
 
 const chatStore = useChatStore()
 const agentStore = useAgentStore()
 const userStore = useUserStore()
+const router = useRouter()
 const { isMobile } = useResponsive()
 
 const inputText = ref('')
@@ -585,7 +629,47 @@ const quickActions = [
   { label: '分析本月销售目标', text: '分析本月销售目标的缺口' }
 ]
 
-const hasAiApiKeyConfigured = computed(() => hasApiKeyConfigured(aiConfig.value))
+const currentAiMode = computed<AiMode>(() => aiConfig.value?.mode || 'gift')
+const aiReady = computed(() => Boolean(aiConfig.value?.ready))
+const hasAiApiKeyConfigured = computed(() => aiReady.value)
+const canManageAiConfig = computed(() => userStore.hasPermission('config:ai'))
+const giftTokenTotal = computed(() => aiConfig.value?.giftTokenTotal ?? 0)
+const giftTokenRemaining = computed(() => aiConfig.value?.giftTokenRemaining ?? 0)
+const giftTokenProgressPercent = computed(() => {
+  if (giftTokenTotal.value <= 0) return 0
+  return Math.max(0, Math.min(100, Math.round((giftTokenRemaining.value / giftTokenTotal.value) * 100)))
+})
+const giftTokenRemainingWan = computed(() => formatWanToken(giftTokenRemaining.value))
+const giftTokenTotalWan = computed(() => formatWanToken(giftTokenTotal.value))
+const aiQuotaModeLabel = computed(() => currentAiMode.value === 'gift' ? '默认赠送额度' : '自定义模型')
+const aiStatusBadgeText = computed(() => {
+  if (currentAiMode.value === 'gift') {
+    return giftTokenRemaining.value > 0 ? '赠送中' : '已用完'
+  }
+  return aiReady.value ? '已就绪' : '待配置'
+})
+const aiStatusBadgeClass = computed(() => {
+  if (currentAiMode.value === 'gift') {
+    return giftTokenRemaining.value > 0
+      ? 'bg-emerald-50 text-emerald-600'
+      : 'bg-amber-50 text-amber-600'
+  }
+  return aiReady.value
+    ? 'bg-blue-50 text-blue-600'
+    : 'bg-slate-100 text-slate-500'
+})
+const giftTokenProgressClass = computed(() => {
+  if (giftTokenRemaining.value <= 0) return 'bg-amber-400'
+  return currentAiMode.value === 'gift' ? 'bg-primary' : 'bg-blue-500'
+})
+const aiQuotaDescription = computed(() => {
+  if (currentAiMode.value === 'gift') {
+    return giftTokenRemaining.value > 0
+      ? '未配置自定义模型时，默认使用平台赠送 token。'
+      : '赠送额度已用完，可配置 AI Key 后继续使用。'
+  }
+  return '当前使用租户自定义模型，仍会继续统计 token 用量。'
+})
 const showUserAvatarImage = computed(() => Boolean(userStore.avatar) && !userAvatarLoadFailed.value)
 const userAvatarFallback = computed(() => (userStore.realname || userStore.username || 'U').charAt(0).toUpperCase())
 
@@ -635,12 +719,16 @@ function normalizeAiConfig(config?: Partial<AiConfig> | Partial<AiConfigUpdateBO
     model: config?.model || DEFAULT_CHAT_AI_CONFIG.model,
     temperature: config?.temperature ?? DEFAULT_CHAT_AI_CONFIG.temperature ?? 0.7,
     maxTokens: config?.maxTokens ?? DEFAULT_CHAT_AI_CONFIG.maxTokens ?? 4096,
+    mode: (config as Partial<AiConfig> | null)?.mode || 'gift',
+    customConfigSaved: (config as Partial<AiConfig> | null)?.customConfigSaved ?? false,
+    ready: (config as Partial<AiConfig> | null)?.ready ?? Boolean(config?.apiKey?.trim()),
+    giftTokenTotal: (config as Partial<AiConfig> | null)?.giftTokenTotal ?? 0,
+    giftTokenUsed: (config as Partial<AiConfig> | null)?.giftTokenUsed ?? 0,
+    giftTokenRemaining: (config as Partial<AiConfig> | null)?.giftTokenRemaining ?? 0,
+    giftTokenAvailable: (config as Partial<AiConfig> | null)?.giftTokenAvailable
+      ?? (((config as Partial<AiConfig> | null)?.giftTokenRemaining ?? 0) > 0),
     updateTime: config && 'updateTime' in config ? config.updateTime : undefined
   }
-}
-
-function hasApiKeyConfigured(config?: { apiKey?: string } | null): boolean {
-  return Boolean(config?.apiKey?.trim())
 }
 
 async function loadAiConfig(force = false): Promise<AiConfig | null> {
@@ -662,13 +750,22 @@ async function loadAiConfig(force = false): Promise<AiConfig | null> {
   return aiConfig.value
 }
 
-async function ensureAiApiKeyConfigured(): Promise<boolean> {
-  if (!hasApiKeyConfigured(aiConfig.value)) {
+async function ensureAiAvailable(): Promise<boolean> {
+  if (!aiConfigLoaded.value || !aiConfig.value?.ready) {
     await loadAiConfig(true)
   }
 
-  if (hasApiKeyConfigured(aiConfig.value)) {
+  if (aiConfig.value?.ready) {
     return true
+  }
+
+  if (!canManageAiConfig.value) {
+    if (currentAiMode.value === 'gift' && giftTokenRemaining.value <= 0) {
+      ElMessage.warning('赠送 token 已用完，请联系管理员配置 AI Key 或购买套餐。')
+    } else {
+      ElMessage.warning('当前 AI 服务未就绪，请联系管理员处理。')
+    }
+    return false
   }
 
   resumeSendAfterApiKeySave.value = true
@@ -702,8 +799,7 @@ async function handleSaveApiKey(apiKey: string) {
     }
 
     await updateAiConfig(payload)
-    aiConfig.value = normalizeAiConfig(payload)
-    aiConfigLoaded.value = true
+    await loadAiConfig(true)
     isApiKeyModalOpen.value = false
     apiKeyDraft.value = ''
     ElMessage.success('千问 API Key 保存成功')
@@ -722,11 +818,25 @@ async function handleSaveApiKey(apiKey: string) {
   }
 }
 
+function goToAiSettings() {
+  router.push('/settings/system/api')
+}
+
+function openApiKeySetup() {
+  if (!canManageAiConfig.value) {
+    ElMessage.warning('当前账号没有 AI 配置权限，请联系管理员。')
+    return
+  }
+  resumeSendAfterApiKeySave.value = false
+  apiKeyDraft.value = ''
+  isApiKeyModalOpen.value = true
+}
+
 async function handleSend() {
   const text = inputText.value.trim()
   const hasFiles = selectedFiles.value.length > 0
   if ((!text && !hasFiles) || chatStore.isStreaming || isUploading.value) return
-  if (!(await ensureAiApiKeyConfigured())) return
+  if (!(await ensureAiAvailable())) return
 
   const content = text || '请分析这些文件'
   inputText.value = ''
@@ -823,6 +933,10 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B'
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
+function formatWanToken(value: number): string {
+  return (value / 10000).toFixed(1)
 }
 
 async function handleNewSession() {
@@ -929,5 +1043,10 @@ function formatTime(date: Date): string {
 /* Material Symbols fill variant */
 .fill-1 {
   font-variation-settings: 'FILL' 1;
+}
+
+.border-t.border-slate-100 .rounded-2xl > p.text-xs.font-bold.text-primary.uppercase.tracking-wider.mb-1,
+.border-t.border-slate-100 .rounded-2xl > p.text-xs.font-bold.text-primary.uppercase.tracking-wider.mb-1 + div.flex.items-center.gap-2 {
+  display: none;
 }
 </style>

@@ -25,6 +25,7 @@ import com.kakarote.ai_crm.mapper.ChatSessionMapper;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IChatAttachmentService;
 import com.kakarote.ai_crm.service.IChatService;
+import com.kakarote.ai_crm.service.ICrmTenantService;
 import com.kakarote.ai_crm.service.WeKnoraClient;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -71,6 +72,9 @@ public class ChatServiceImpl implements IChatService {
 
     @Autowired
     private FileStorageService fileStorageService;
+
+    @Autowired
+    private ICrmTenantService tenantService;
 
     @Autowired
     private WeKnoraClient weKnoraClient;
@@ -324,6 +328,22 @@ public class ChatServiceImpl implements IChatService {
         AtomicReference<Integer> totalTokensRef = new AtomicReference<>(0);
         AtomicReference<String> modelNameRef = new AtomicReference<>(null);
 
+        String unavailableTip = resolveAiUnavailableTip(currentTenantId);
+        if (unavailableTip != null) {
+            saveMessage(sessionId, "assistant", unavailableTip);
+            AiContextHolder.clear();
+            return Flux.just(unavailableTip);
+        }
+
+        if (chatClientProvider.isUsingGiftMode()) {
+            String quotaTip = ensureGiftQuotaAvailable(currentTenantId);
+            if (quotaTip != null) {
+                saveMessage(sessionId, "assistant", quotaTip);
+                AiContextHolder.clear();
+                return Flux.just(quotaTip);
+            }
+        }
+
         log.debug("开始 AI 对话，启用工具调用...");
 
         if (!chatClientProvider.isApiKeyConfigured()) {
@@ -380,11 +400,21 @@ public class ChatServiceImpl implements IChatService {
                 return null;
             })
             .doOnComplete(() -> {
+                TokenUsageSnapshot usage = resolveTokenUsage(
+                    promptTokensRef.get(),
+                    completionTokensRef.get(),
+                    totalTokensRef.get(),
+                    enhancedSystemPrompt,
+                    history,
+                    finalContent,
+                    fullResponse.toString()
+                );
                 log.debug("AI 对话完成，响应长度: {}, tokens: prompt={}, completion={}, total={}",
-                    fullResponse.length(), promptTokensRef.get(), completionTokensRef.get(), totalTokensRef.get());
+                    fullResponse.length(), usage.promptTokens(), usage.completionTokens(), usage.totalTokens());
                 saveMessage(sessionId, "assistant", fullResponse.toString(),
-                    promptTokensRef.get(), completionTokensRef.get(),
-                    totalTokensRef.get(), modelNameRef.get());
+                    usage.promptTokens(), usage.completionTokens(),
+                    usage.totalTokens(), modelNameRef.get());
+                consumeGiftTokensIfNecessary(currentTenantId, usage.totalTokens());
                 updateSessionTime(sessionId);
                 AiContextHolder.clear();
             })
@@ -433,6 +463,20 @@ public class ChatServiceImpl implements IChatService {
 
         List<Media> mediaList = buildMediaList(attachments, capabilities);
 
+        String unavailableTip = resolveAiUnavailableTip(currentTenantId);
+        if (unavailableTip != null) {
+            saveMessage(sessionId, "assistant", unavailableTip);
+            return unavailableTip;
+        }
+
+        if (chatClientProvider.isUsingGiftMode()) {
+            String quotaTip = ensureGiftQuotaAvailable(currentTenantId);
+            if (quotaTip != null) {
+                saveMessage(sessionId, "assistant", quotaTip);
+                return quotaTip;
+            }
+        }
+
         try {
             ChatClient chatClient = chatClientProvider.getChatClient();
 
@@ -462,7 +506,19 @@ public class ChatServiceImpl implements IChatService {
                 modelName = chatResponse.getMetadata().getModel();
             }
 
-            saveMessage(sessionId, "assistant", response, promptTokens, completionTokens, totalTokens, modelName);
+            TokenUsageSnapshot usageSnapshot = resolveTokenUsage(
+                promptTokens,
+                completionTokens,
+                totalTokens,
+                enhancedSystemPrompt,
+                history,
+                finalContent,
+                response
+            );
+
+            saveMessage(sessionId, "assistant", response,
+                usageSnapshot.promptTokens(), usageSnapshot.completionTokens(), usageSnapshot.totalTokens(), modelName);
+            consumeGiftTokensIfNecessary(currentTenantId, usageSnapshot.totalTokens());
             updateSessionTime(sessionId);
 
             return response;
@@ -694,6 +750,113 @@ public class ChatServiceImpl implements IChatService {
         }
     }
 
+    private String resolveAiUnavailableTip(Long tenantId) {
+        if (!chatClientProvider.isApiKeyConfigured()) {
+            return "请先在系统设置中配置 AI 服务，或切换到赠送额度模式。";
+        }
+        if (chatClientProvider.isUsingGiftMode() && tenantId == null) {
+            return "当前租户信息缺失，暂时无法使用赠送额度。";
+        }
+        return null;
+    }
+
+    private String ensureGiftQuotaAvailable(Long tenantId) {
+        if (tenantId == null) {
+            return "当前租户信息缺失，暂时无法使用赠送额度。";
+        }
+        if (tenantService.hasAvailableGiftTokens(tenantId)) {
+            return null;
+        }
+        return "赠送 token 已用完，请配置 AI Key 或购买 AI 套餐后继续使用。";
+    }
+
+    private void consumeGiftTokensIfNecessary(Long tenantId, Integer totalTokens) {
+        if (!chatClientProvider.isUsingGiftMode() || tenantId == null || totalTokens == null || totalTokens <= 0) {
+            return;
+        }
+        tenantService.consumeGiftTokens(tenantId, totalTokens.longValue());
+    }
+
+    private TokenUsageSnapshot resolveTokenUsage(Integer promptTokens, Integer completionTokens, Integer totalTokens,
+                                                 String systemPrompt, List<Message> history,
+                                                 String currentContent, String responseContent) {
+        int resolvedPromptTokens = promptTokens != null && promptTokens > 0
+                ? promptTokens
+                : estimatePromptTokens(systemPrompt, history, currentContent);
+        int resolvedCompletionTokens = completionTokens != null && completionTokens > 0
+                ? completionTokens
+                : estimateTokens(responseContent);
+        int resolvedTotalTokens = totalTokens != null && totalTokens > 0
+                ? totalTokens
+                : resolvedPromptTokens + resolvedCompletionTokens;
+
+        if ((totalTokens == null || totalTokens <= 0) && resolvedTotalTokens > 0) {
+            log.debug("模型未返回 usage，使用估算 token: prompt={}, completion={}, total={}",
+                    resolvedPromptTokens, resolvedCompletionTokens, resolvedTotalTokens);
+        }
+
+        return new TokenUsageSnapshot(resolvedPromptTokens, resolvedCompletionTokens, resolvedTotalTokens);
+    }
+
+    private int estimatePromptTokens(String systemPrompt, List<Message> history, String currentContent) {
+        int total = estimateTokens(systemPrompt);
+        if (history != null) {
+            for (Message message : history) {
+                total += estimateTokens(extractMessageContent(message)) + 4;
+            }
+        }
+        total += estimateTokens(currentContent);
+        return total;
+    }
+
+    private String extractMessageContent(Message message) {
+        if (message == null) {
+            return null;
+        }
+        try {
+            Object value = message.getClass().getMethod("getContent").invoke(message);
+            return value != null ? String.valueOf(value) : null;
+        } catch (Exception ignored) {
+        }
+        try {
+            Object value = message.getClass().getMethod("getText").invoke(message);
+            return value != null ? String.valueOf(value) : null;
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    private int estimateTokens(String text) {
+        if (StrUtil.isBlank(text)) {
+            return 0;
+        }
+
+        int cjkChars = 0;
+        int otherChars = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char current = text.charAt(i);
+            if (Character.isWhitespace(current)) {
+                continue;
+            }
+            if (isCjkCharacter(current)) {
+                cjkChars++;
+            } else {
+                otherChars++;
+            }
+        }
+
+        int estimated = cjkChars + (int) Math.ceil(otherChars / 4.0);
+        return Math.max(estimated, 1);
+    }
+
+    private boolean isCjkCharacter(char value) {
+        Character.UnicodeScript script = Character.UnicodeScript.of(value);
+        return script == Character.UnicodeScript.HAN
+                || script == Character.UnicodeScript.HIRAGANA
+                || script == Character.UnicodeScript.KATAKANA
+                || script == Character.UnicodeScript.HANGUL;
+    }
+
     private String buildRagContext(String query) {
         if (!weKnoraClient.isEnabled() || !weKnoraConfig.getSearch().isAutoRagEnabled()) {
             return "";
@@ -736,5 +899,8 @@ public class ChatServiceImpl implements IChatService {
             log.warn("RAG 检索失败: {}", e.getMessage());
             return "";
         }
+    }
+
+    private record TokenUsageSnapshot(int promptTokens, int completionTokens, int totalTokens) {
     }
 }

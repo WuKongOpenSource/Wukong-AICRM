@@ -20,6 +20,14 @@ export function updateAiConfig(data: AiConfigUpdateBO): Promise<void> {
   return post('/systemConfig/ai/update', data)
 }
 
+export function useGiftAiConfig(): Promise<void> {
+  return post('/systemConfig/ai/useGift')
+}
+
+export function useCustomAiConfig(): Promise<void> {
+  return post('/systemConfig/ai/useCustom')
+}
+
 export function testAiConnection(data: AiConfigUpdateBO): Promise<AiConnectionTestResult> {
   return post('/systemConfig/ai/test', data)
 }

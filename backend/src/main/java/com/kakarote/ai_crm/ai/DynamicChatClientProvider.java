@@ -43,6 +43,15 @@ import java.util.stream.Collectors;
 @Component
 public class DynamicChatClientProvider {
 
+    private static final String AI_MODE_KEY = "ai_mode";
+    private static final String AI_PROVIDER_KEY = "ai_provider";
+    private static final String AI_API_URL_KEY = "ai_api_url";
+    private static final String AI_API_KEY_KEY = "ai_api_key";
+    private static final String AI_MODEL_KEY = "ai_model";
+    private static final String AI_TEMPERATURE_KEY = "ai_temperature";
+    private static final String AI_MAX_TOKENS_KEY = "ai_max_tokens";
+    private static final String AI_EXTRA_HEADERS_KEY = "ai_extra_headers";
+
     private final ConcurrentHashMap<Long, ChatClient> tenantChatClients = new ConcurrentHashMap<>();
     private final Object lock = new Object();
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -89,6 +98,15 @@ public class DynamicChatClientProvider {
     @Value("${spring.ai.openai.chat.options.max-tokens:2048}")
     private Integer defaultMaxTokens;
 
+    @Value("${weknora.init-models.chat.base-url:}")
+    private String giftBaseUrl;
+
+    @Value("${weknora.init-models.chat.api-key:}")
+    private String giftApiKey;
+
+    @Value("${weknora.init-models.chat.name:}")
+    private String giftModel;
+
     public ChatClient getChatClient() {
         Long tenantId = TenantContextHolder.getTenantId();
         long key = tenantId != null ? tenantId : 0L;
@@ -112,14 +130,15 @@ public class DynamicChatClientProvider {
             AiRuntimeConfig runtimeConfig = resolveRuntimeConfig(loadAiConfigsFromDB());
 
             if (StrUtil.isBlank(runtimeConfig.apiKey())) {
-                log.warn("AI API Key 未配置，tenantId={}, provider={}", key, runtimeConfig.providerCode());
+                log.warn("AI 运行 Key 未配置，tenantId={}, mode={}", key, runtimeConfig.mode().getCode());
             }
 
             ChatClient client = createChatClient(runtimeConfig);
             tenantChatClients.put(key, client);
 
-            log.info("ChatClient 刷新完成: tenantId={}, provider={}, baseUrl={}, model={}",
-                    key, runtimeConfig.providerCode(), runtimeConfig.apiUrl(), runtimeConfig.model());
+            log.info("ChatClient 刷新完成: tenantId={}, mode={}, provider={}, baseUrl={}, model={}",
+                    key, runtimeConfig.mode().getCode(), runtimeConfig.providerCode(),
+                    runtimeConfig.apiUrl(), runtimeConfig.model());
         }
     }
 
@@ -129,6 +148,14 @@ public class DynamicChatClientProvider {
 
     public AiModelCapabilities getCurrentCapabilities() {
         return resolveRuntimeConfig(loadAiConfigsFromDB()).capabilities();
+    }
+
+    public AiMode getCurrentMode() {
+        return resolveRuntimeConfig(loadAiConfigsFromDB()).mode();
+    }
+
+    public boolean isUsingGiftMode() {
+        return getCurrentMode() == AiMode.GIFT;
     }
 
     public void evictTenantChatClient(Long tenantId) {
@@ -153,6 +180,7 @@ public class DynamicChatClientProvider {
                 .temperature(temperature)
                 .maxTokens(maxTokens)
                 .build();
+        options.setStreamUsage(Boolean.TRUE);
 
         ObservationRegistry obsRegistry = observationRegistry != null
                 ? observationRegistry : ObservationRegistry.NOOP;
@@ -197,9 +225,17 @@ public class DynamicChatClientProvider {
 
     private OpenAiApi buildOpenAiApi(String baseUrl, String apiKey, String extraHeadersJson) {
         String normalizedBaseUrl = normalizeCompatibleBaseUrl(baseUrl);
+        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(null, normalizedBaseUrl);
         OpenAiApi.Builder builder = OpenAiApi.builder()
                 .baseUrl(normalizedBaseUrl)
                 .apiKey(apiKey);
+
+        if (StrUtil.isNotBlank(descriptor.getCompletionsPath())) {
+            builder.completionsPath(descriptor.getCompletionsPath());
+        }
+        if (StrUtil.isNotBlank(descriptor.getEmbeddingsPath())) {
+            builder.embeddingsPath(descriptor.getEmbeddingsPath());
+        }
 
         MultiValueMap<String, String> headers = parseExtraHeaders(extraHeadersJson);
         if (!headers.isEmpty()) {
@@ -232,23 +268,46 @@ public class DynamicChatClientProvider {
     }
 
     private AiRuntimeConfig resolveRuntimeConfig(Map<String, String> configs) {
-        String configuredApiUrl = configs.get("ai_api_url");
-        String resolvedApiUrl = normalizeCompatibleBaseUrl(
-                StrUtil.isNotBlank(configuredApiUrl) ? configuredApiUrl : defaultBaseUrl
-        );
-        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(configs.get("ai_provider"), resolvedApiUrl);
-        String model = StrUtil.isNotBlank(configs.get("ai_model")) ? configs.get("ai_model") : defaultModel;
+        boolean hasCustomConfig = hasSavedCustomConfig(configs);
+        AiMode requestedMode = AiMode.resolve(configs.get(AI_MODE_KEY));
+        if (requestedMode == AiMode.CUSTOM && hasCustomConfig) {
+            String resolvedApiUrl = normalizeCompatibleBaseUrl(configs.get(AI_API_URL_KEY));
+            AiProviderDescriptor descriptor = AiProviderRegistry.resolve(configs.get(AI_PROVIDER_KEY), resolvedApiUrl);
+            String model = configs.get(AI_MODEL_KEY);
+            return new AiRuntimeConfig(
+                    descriptor.getCode(),
+                    resolvedApiUrl,
+                    configs.get(AI_API_KEY_KEY),
+                    model,
+                    parseDouble(configs.get(AI_TEMPERATURE_KEY), defaultTemperature),
+                    parseInt(configs.get(AI_MAX_TOKENS_KEY), defaultMaxTokens),
+                    StrUtil.blankToDefault(configs.get(AI_EXTRA_HEADERS_KEY), null),
+                    descriptor.resolveCapabilities(model),
+                    AiMode.CUSTOM
+            );
+        }
 
+        String resolvedApiUrl = normalizeCompatibleBaseUrl(StrUtil.blankToDefault(giftBaseUrl, defaultBaseUrl));
+        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(null, resolvedApiUrl);
+        String resolvedApiKey = StrUtil.blankToDefault(giftApiKey, defaultApiKey);
+        String resolvedModel = StrUtil.blankToDefault(giftModel, defaultModel);
         return new AiRuntimeConfig(
                 descriptor.getCode(),
                 resolvedApiUrl,
-                StrUtil.isNotBlank(configs.get("ai_api_key")) ? configs.get("ai_api_key") : defaultApiKey,
-                model,
-                parseDouble(configs.get("ai_temperature"), defaultTemperature),
-                parseInt(configs.get("ai_max_tokens"), defaultMaxTokens),
-                StrUtil.blankToDefault(configs.get("ai_extra_headers"), null),
-                descriptor.resolveCapabilities(model)
+                resolvedApiKey,
+                resolvedModel,
+                defaultTemperature,
+                defaultMaxTokens,
+                null,
+                descriptor.resolveCapabilities(resolvedModel),
+                AiMode.GIFT
         );
+    }
+
+    private boolean hasSavedCustomConfig(Map<String, String> configs) {
+        return StrUtil.isNotBlank(configs.get(AI_API_KEY_KEY))
+                && StrUtil.isNotBlank(configs.get(AI_API_URL_KEY))
+                && StrUtil.isNotBlank(configs.get(AI_MODEL_KEY));
     }
 
     private Map<String, String> loadAiConfigsFromDB() {
@@ -320,7 +379,7 @@ public class DynamicChatClientProvider {
         try {
             refreshChatClient();
         } catch (Exception e) {
-            log.warn("初始化 ChatClient 失败（可能配置尚未设置）: {}", e.getMessage());
+            log.warn("初始化 ChatClient 失败（可能配置尚未准备好）: {}", e.getMessage());
         }
     }
 
@@ -332,7 +391,8 @@ public class DynamicChatClientProvider {
             Double temperature,
             Integer maxTokens,
             String extraHeadersJson,
-            AiModelCapabilities capabilities
+            AiModelCapabilities capabilities,
+            AiMode mode
     ) {
     }
 }

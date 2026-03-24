@@ -8,6 +8,8 @@ export type AiProvider =
   | 'zhipu'
   | 'custom'
 
+export type AiMode = 'gift' | 'custom'
+
 export interface AiModelCapabilities {
   supportsStream: boolean
   supportsToolCall: boolean
@@ -41,6 +43,13 @@ export interface AiConfig {
   modelHint?: string
   extraHeadersHint?: string
   availableProviders?: AiProviderPreset[]
+  mode?: AiMode
+  customConfigSaved?: boolean
+  ready?: boolean
+  giftTokenTotal?: number
+  giftTokenUsed?: number
+  giftTokenRemaining?: number
+  giftTokenAvailable?: boolean
   updateTime?: string
 }
 

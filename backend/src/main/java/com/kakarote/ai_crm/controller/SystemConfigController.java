@@ -62,6 +62,22 @@ public class SystemConfigController {
         return Result.ok();
     }
 
+    @PostMapping("/ai/useGift")
+    @Operation(summary = "Use gift AI quota")
+    @RequirePermission("config:ai")
+    public Result<String> useGiftAiConfig() {
+        systemConfigService.useGiftAiConfig();
+        return Result.ok();
+    }
+
+    @PostMapping("/ai/useCustom")
+    @Operation(summary = "Use saved custom AI config")
+    @RequirePermission("config:ai")
+    public Result<String> useCustomAiConfig() {
+        systemConfigService.useCustomAiConfig();
+        return Result.ok();
+    }
+
     @PostMapping("/ai/test")
     @Operation(summary = "Test AI connection")
     @RequirePermission("config:ai")

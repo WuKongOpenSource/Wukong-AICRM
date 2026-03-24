@@ -13,7 +13,7 @@ import java.util.Date;
 
 @Data
 @TableName("crm_tenant")
-@Schema(name = "租户表对象", description = "租户表")
+@Schema(name = "CrmTenant", description = "租户表")
 public class CrmTenant implements Serializable {
 
     @Serial
@@ -29,10 +29,10 @@ public class CrmTenant implements Serializable {
     @Schema(description = "联系人姓名")
     private String contactName;
 
-    @Schema(description = "联系人电话")
+    @Schema(description = "联系电话")
     private String contactPhone;
 
-    @Schema(description = "联系人邮箱")
+    @Schema(description = "联系邮箱")
     private String contactEmail;
 
     @Schema(description = "状态：0=禁用, 1=正常, 2=试用")
@@ -46,6 +46,14 @@ public class CrmTenant implements Serializable {
 
     @Schema(description = "备注")
     private String remark;
+
+    @TableField("gift_token_total")
+    @Schema(description = "注册赠送 token 总量")
+    private Long giftTokenTotal;
+
+    @TableField("gift_token_used")
+    @Schema(description = "赠送 token 已使用量")
+    private Long giftTokenUsed;
 
     @TableField("weknora_api_key")
     @Schema(description = "WeKnora 租户 API Key")

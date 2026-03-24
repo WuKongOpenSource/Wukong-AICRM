@@ -4,6 +4,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kakarote.ai_crm.ai.AiMode;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
 import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
 import com.kakarote.ai_crm.ai.provider.AiProviderDescriptor;
@@ -19,7 +20,9 @@ import com.kakarote.ai_crm.entity.VO.AiConnectionTestVO;
 import com.kakarote.ai_crm.entity.VO.EnterpriseConfigVO;
 import com.kakarote.ai_crm.mapper.SystemConfigMapper;
 import com.kakarote.ai_crm.service.FileStorageService;
+import com.kakarote.ai_crm.service.ICrmTenantService;
 import com.kakarote.ai_crm.service.ISystemConfigService;
+import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +52,15 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
     private static final String ENTERPRISE_CONFIG_TYPE = "enterprise";
     private static final long CACHE_EXPIRE_MINUTES = 30;
 
+    private static final String AI_MODE_KEY = "ai_mode";
+    private static final String AI_PROVIDER_KEY = "ai_provider";
+    private static final String AI_API_URL_KEY = "ai_api_url";
+    private static final String AI_API_KEY_KEY = "ai_api_key";
+    private static final String AI_MODEL_KEY = "ai_model";
+    private static final String AI_TEMPERATURE_KEY = "ai_temperature";
+    private static final String AI_MAX_TOKENS_KEY = "ai_max_tokens";
+    private static final String AI_EXTRA_HEADERS_KEY = "ai_extra_headers";
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
@@ -59,6 +71,9 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
     @Autowired
     private FileStorageService fileStorageService;
+
+    @Autowired
+    private ICrmTenantService tenantService;
 
     @Value("${spring.ai.openai.base-url:https://dashscope.aliyuncs.com/compatible-mode}")
     private String defaultApiUrl;
@@ -74,6 +89,15 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
     @Value("${spring.ai.openai.chat.options.max-tokens:2048}")
     private Integer defaultMaxTokens;
+
+    @Value("${weknora.init-models.chat.base-url:}")
+    private String giftApiUrl;
+
+    @Value("${weknora.init-models.chat.api-key:}")
+    private String giftApiKey;
+
+    @Value("${weknora.init-models.chat.name:}")
+    private String giftModel;
 
     private String buildCacheKey(String configKey) {
         Long tenantId = TenantContextHolder.getTenantId();
@@ -152,12 +176,12 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
     @Override
     public AiConfigVO getAiConfig() {
-        return buildAiConfig(false);
+        return buildAiConfig(false, false);
     }
 
     @Override
     public AiConfigVO getAiConfigDetail() {
-        return buildAiConfig(true);
+        return buildAiConfig(true, true);
     }
 
     @Override
@@ -168,26 +192,43 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         AiModelCapabilities capabilities = validateAiConfig(descriptor, updateBO);
 
         Map<String, String> configs = new HashMap<>();
-        configs.put("ai_provider", descriptor.getCode());
-        configs.put("ai_api_url", normalizedApiUrl);
-        configs.put("ai_api_key", updateBO.getApiKey().trim());
-        configs.put("ai_model", updateBO.getModel().trim());
-
-        if (updateBO.getTemperature() != null) {
-            configs.put("ai_temperature", String.valueOf(updateBO.getTemperature()));
-        }
-        if (updateBO.getMaxTokens() != null) {
-            configs.put("ai_max_tokens", String.valueOf(updateBO.getMaxTokens()));
-        }
-        if (updateBO.getExtraHeadersJson() != null) {
-            configs.put("ai_extra_headers", updateBO.getExtraHeadersJson().trim());
-        }
+        configs.put(AI_MODE_KEY, AiMode.CUSTOM.getCode());
+        configs.put(AI_PROVIDER_KEY, descriptor.getCode());
+        configs.put(AI_API_URL_KEY, normalizedApiUrl);
+        configs.put(AI_API_KEY_KEY, updateBO.getApiKey().trim());
+        configs.put(AI_MODEL_KEY, updateBO.getModel().trim());
+        configs.put(AI_TEMPERATURE_KEY, String.valueOf(
+                updateBO.getTemperature() != null ? updateBO.getTemperature() : defaultTemperature));
+        configs.put(AI_MAX_TOKENS_KEY, String.valueOf(
+                updateBO.getMaxTokens() != null ? updateBO.getMaxTokens() : defaultMaxTokens));
+        configs.put(AI_EXTRA_HEADERS_KEY, StrUtil.nullToEmpty(updateBO.getExtraHeadersJson()).trim());
 
         updateConfigs(configs);
         chatClientProvider.refreshChatClient();
 
-        log.info("AI 配置已更新: provider={}, model={}, supportsToolCall={}, supportsVision={}",
-                descriptor.getCode(), updateBO.getModel(), capabilities.isSupportsToolCall(), capabilities.isSupportsVision());
+        log.info("AI 配置已更新: tenantId={}, mode=custom, provider={}, model={}, supportsToolCall={}, supportsVision={}",
+                UserUtil.getTenantId(), descriptor.getCode(), updateBO.getModel(),
+                capabilities.isSupportsToolCall(), capabilities.isSupportsVision());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void useGiftAiConfig() {
+        updateConfig(AI_MODE_KEY, AiMode.GIFT.getCode());
+        chatClientProvider.refreshChatClient();
+        log.info("AI 模式已切换为赠送额度: tenantId={}", UserUtil.getTenantId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void useCustomAiConfig() {
+        Map<String, String> configs = getConfigsByType(AI_CONFIG_TYPE);
+        if (!hasSavedCustomAiConfig(configs)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前租户还没有保存可用的自定义 AI 配置");
+        }
+        updateConfig(AI_MODE_KEY, AiMode.CUSTOM.getCode());
+        chatClientProvider.refreshChatClient();
+        log.info("AI 模式已切换为自定义模型: tenantId={}", UserUtil.getTenantId());
     }
 
     @Override
@@ -241,31 +282,6 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         }
     }
 
-    @Transactional(rollbackFor = Exception.class)
-    public void updateConfigsWithType(Map<String, String> configs, String configType) {
-        for (Map.Entry<String, String> entry : configs.entrySet()) {
-            String configKey = entry.getKey();
-            String configValue = entry.getValue();
-
-            SystemConfig config = lambdaQuery()
-                    .eq(SystemConfig::getConfigKey, configKey)
-                    .one();
-
-            if (config == null) {
-                config = new SystemConfig();
-                config.setConfigKey(configKey);
-                config.setConfigValue(configValue);
-                config.setConfigType(configType);
-                save(config);
-            } else {
-                config.setConfigValue(configValue);
-                updateById(config);
-            }
-
-            redisTemplate.delete(buildCacheKey(configKey));
-        }
-    }
-
     @Override
     public EnterpriseConfigVO getEnterpriseConfig() {
         Map<String, String> configs = getConfigsByType(ENTERPRISE_CONFIG_TYPE);
@@ -313,55 +329,132 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         }
     }
 
-    private AiConfigVO buildAiConfig(boolean includeSensitiveExtraHeaders) {
-        Map<String, String> configs = getConfigsByType(AI_CONFIG_TYPE);
-        boolean hasExplicitConfig = hasExplicitAiConfig(configs);
+    @Transactional(rollbackFor = Exception.class)
+    public void updateConfigsWithType(Map<String, String> configs, String configType) {
+        for (Map.Entry<String, String> entry : configs.entrySet()) {
+            String configKey = entry.getKey();
+            String configValue = entry.getValue();
 
-        String rawApiUrl = DynamicChatClientProvider.normalizeCompatibleBaseUrl(
-                hasExplicitConfig && StrUtil.isNotBlank(configs.get("ai_api_url"))
-                        ? configs.get("ai_api_url")
-                        : defaultApiUrl
-        );
-        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(configs.get("ai_provider"), rawApiUrl);
-        String providerCode = descriptor.getCode();
-        String apiKey = hasExplicitConfig && StrUtil.isNotBlank(configs.get("ai_api_key"))
-                ? configs.get("ai_api_key")
-                : defaultApiKey;
-        String model = hasExplicitConfig && StrUtil.isNotBlank(configs.get("ai_model"))
-                ? configs.get("ai_model")
-                : defaultModel;
-        String extraHeadersJson = configs.get("ai_extra_headers");
-        AiModelCapabilities capabilities = descriptor.resolveCapabilities(model);
+            SystemConfig config = lambdaQuery()
+                    .eq(SystemConfig::getConfigKey, configKey)
+                    .one();
+
+            if (config == null) {
+                config = new SystemConfig();
+                config.setConfigKey(configKey);
+                config.setConfigValue(configValue);
+                config.setConfigType(configType);
+                save(config);
+            } else {
+                config.setConfigValue(configValue);
+                updateById(config);
+            }
+
+            redisTemplate.delete(buildCacheKey(configKey));
+        }
+    }
+
+    private AiConfigVO buildAiConfig(boolean includeSensitiveExtraHeaders, boolean detailView) {
+        Map<String, String> configs = getConfigsByType(AI_CONFIG_TYPE);
+        boolean customConfigSaved = hasSavedCustomAiConfig(configs);
+        EffectiveAiConfigSnapshot effectiveSnapshot = resolveEffectiveAiSnapshot(configs, customConfigSaved);
+        DisplayAiConfigSnapshot displaySnapshot = detailView
+                ? resolveDetailDisplaySnapshot(configs, customConfigSaved, effectiveSnapshot)
+                : DisplayAiConfigSnapshot.fromEffective(effectiveSnapshot);
+
+        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(displaySnapshot.providerCode(), displaySnapshot.apiUrl());
+        AiModelCapabilities capabilities = descriptor.resolveCapabilities(displaySnapshot.model());
+
+        Long tenantId = UserUtil.getTenantId();
+        long giftTokenTotal = tenantService.getGiftTokenTotal(tenantId);
+        long giftTokenUsed = tenantService.getGiftTokenUsed(tenantId);
+        long giftTokenRemaining = tenantService.getGiftTokenRemaining(tenantId);
 
         AiConfigVO vo = new AiConfigVO();
-        vo.setProvider(providerCode);
+        vo.setProvider(descriptor.getCode());
         vo.setProviderLabel(descriptor.getDisplayName());
-        vo.setApiUrl(rawApiUrl);
-        vo.setApiKey(maskApiKey(apiKey));
-        vo.setModel(model);
-        vo.setTemperature(hasExplicitConfig
-                ? parseDouble(configs.get("ai_temperature"), defaultTemperature)
-                : defaultTemperature);
-        vo.setMaxTokens(hasExplicitConfig
-                ? parseInt(configs.get("ai_max_tokens"), defaultMaxTokens)
-                : defaultMaxTokens);
-        vo.setExtraHeadersConfigured(StrUtil.isNotBlank(extraHeadersJson));
-        vo.setExtraHeadersJson(includeSensitiveExtraHeaders ? StrUtil.blankToDefault(extraHeadersJson, "") : null);
+        vo.setApiUrl(displaySnapshot.apiUrl());
+        vo.setApiKey(maskApiKey(displaySnapshot.apiKey()));
+        vo.setModel(displaySnapshot.model());
+        vo.setTemperature(displaySnapshot.temperature());
+        vo.setMaxTokens(displaySnapshot.maxTokens());
+        vo.setExtraHeadersConfigured(StrUtil.isNotBlank(displaySnapshot.extraHeadersJson()));
+        vo.setExtraHeadersJson(includeSensitiveExtraHeaders ? StrUtil.blankToDefault(displaySnapshot.extraHeadersJson(), "") : null);
         vo.setCapabilities(toCapabilitiesVO(capabilities));
         vo.setModelHint(descriptor.getModelHint());
         vo.setExtraHeadersHint(descriptor.getExtraHeadersHint());
         vo.setAvailableProviders(buildProviderOptions());
+        vo.setMode(effectiveSnapshot.mode().getCode());
+        vo.setCustomConfigSaved(customConfigSaved);
+        vo.setReady(isAiReady(effectiveSnapshot.mode(), effectiveSnapshot.apiKey(), giftTokenRemaining));
+        vo.setGiftTokenTotal(giftTokenTotal);
+        vo.setGiftTokenUsed(giftTokenUsed);
+        vo.setGiftTokenRemaining(giftTokenRemaining);
+        vo.setGiftTokenAvailable(giftTokenRemaining > 0);
+        vo.setUpdateTime(getLatestAiConfigUpdateTime());
+        return vo;
+    }
 
-        SystemConfig anyConfig = lambdaQuery()
-                .eq(SystemConfig::getConfigType, AI_CONFIG_TYPE)
-                .orderByDesc(SystemConfig::getUpdateTime)
-                .last("LIMIT 1")
-                .one();
-        if (anyConfig != null) {
-            vo.setUpdateTime(anyConfig.getUpdateTime());
+    private EffectiveAiConfigSnapshot resolveEffectiveAiSnapshot(Map<String, String> configs, boolean customConfigSaved) {
+        AiMode requestedMode = AiMode.resolve(configs.get(AI_MODE_KEY));
+        if (requestedMode == AiMode.CUSTOM && customConfigSaved) {
+            String apiUrl = DynamicChatClientProvider.normalizeCompatibleBaseUrl(configs.get(AI_API_URL_KEY));
+            String providerCode = AiProviderRegistry.resolve(configs.get(AI_PROVIDER_KEY), apiUrl).getCode();
+            String model = configs.get(AI_MODEL_KEY);
+            return new EffectiveAiConfigSnapshot(
+                    AiMode.CUSTOM,
+                    providerCode,
+                    apiUrl,
+                    configs.get(AI_API_KEY_KEY),
+                    model,
+                    parseDouble(configs.get(AI_TEMPERATURE_KEY), defaultTemperature),
+                    parseInt(configs.get(AI_MAX_TOKENS_KEY), defaultMaxTokens),
+                    StrUtil.blankToDefault(configs.get(AI_EXTRA_HEADERS_KEY), null)
+            );
         }
 
-        return vo;
+        String normalizedDefaultApiUrl = DynamicChatClientProvider.normalizeCompatibleBaseUrl(
+                StrUtil.blankToDefault(giftApiUrl, defaultApiUrl)
+        );
+        String providerCode = AiProviderRegistry.resolve(null, normalizedDefaultApiUrl).getCode();
+        String resolvedGiftApiKey = StrUtil.blankToDefault(giftApiKey, defaultApiKey);
+        String resolvedGiftModel = StrUtil.blankToDefault(giftModel, defaultModel);
+        return new EffectiveAiConfigSnapshot(
+                AiMode.GIFT,
+                providerCode,
+                normalizedDefaultApiUrl,
+                resolvedGiftApiKey,
+                resolvedGiftModel,
+                defaultTemperature,
+                defaultMaxTokens,
+                null
+        );
+    }
+
+    private DisplayAiConfigSnapshot resolveDetailDisplaySnapshot(Map<String, String> configs,
+                                                                 boolean customConfigSaved,
+                                                                 EffectiveAiConfigSnapshot effectiveSnapshot) {
+        if (customConfigSaved) {
+            String apiUrl = DynamicChatClientProvider.normalizeCompatibleBaseUrl(configs.get(AI_API_URL_KEY));
+            String providerCode = AiProviderRegistry.resolve(configs.get(AI_PROVIDER_KEY), apiUrl).getCode();
+            return new DisplayAiConfigSnapshot(
+                    providerCode,
+                    apiUrl,
+                    configs.get(AI_API_KEY_KEY),
+                    configs.get(AI_MODEL_KEY),
+                    parseDouble(configs.get(AI_TEMPERATURE_KEY), defaultTemperature),
+                    parseInt(configs.get(AI_MAX_TOKENS_KEY), defaultMaxTokens),
+                    StrUtil.blankToDefault(configs.get(AI_EXTRA_HEADERS_KEY), null)
+            );
+        }
+        return DisplayAiConfigSnapshot.fromEffective(effectiveSnapshot);
+    }
+
+    private boolean isAiReady(AiMode mode, String apiKey, long giftTokenRemaining) {
+        if (mode == AiMode.GIFT) {
+            return StrUtil.isNotBlank(apiKey) && giftTokenRemaining > 0;
+        }
+        return StrUtil.isNotBlank(apiKey);
     }
 
     private List<AiConfigVO.ProviderOptionVO> buildProviderOptions() {
@@ -441,14 +534,19 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         }
     }
 
-    private boolean hasExplicitAiConfig(Map<String, String> configs) {
-        return configs.containsKey("ai_provider")
-                || configs.containsKey("ai_api_url")
-                || configs.containsKey("ai_api_key")
-                || configs.containsKey("ai_model")
-                || configs.containsKey("ai_temperature")
-                || configs.containsKey("ai_max_tokens")
-                || configs.containsKey("ai_extra_headers");
+    private boolean hasSavedCustomAiConfig(Map<String, String> configs) {
+        return StrUtil.isNotBlank(configs.get(AI_API_KEY_KEY))
+                && StrUtil.isNotBlank(configs.get(AI_API_URL_KEY))
+                && StrUtil.isNotBlank(configs.get(AI_MODEL_KEY));
+    }
+
+    private Date getLatestAiConfigUpdateTime() {
+        SystemConfig anyConfig = lambdaQuery()
+                .eq(SystemConfig::getConfigType, AI_CONFIG_TYPE)
+                .orderByDesc(SystemConfig::getUpdateTime)
+                .last("LIMIT 1")
+                .one();
+        return anyConfig != null ? anyConfig.getUpdateTime() : null;
     }
 
     private String maskApiKey(String apiKey) {
@@ -507,5 +605,41 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
             return message.substring(0, 100) + "...";
         }
         return message;
+    }
+
+    private record EffectiveAiConfigSnapshot(
+            AiMode mode,
+            String providerCode,
+            String apiUrl,
+            String apiKey,
+            String model,
+            Double temperature,
+            Integer maxTokens,
+            String extraHeadersJson
+    ) {
+    }
+
+    private record DisplayAiConfigSnapshot(
+            String providerCode,
+            String apiUrl,
+            String apiKey,
+            String model,
+            Double temperature,
+            Integer maxTokens,
+            String extraHeadersJson
+    ) {
+        private static DisplayAiConfigSnapshot fromEffective(EffectiveAiConfigSnapshot snapshot) {
+            String apiKey = snapshot.mode() == AiMode.CUSTOM ? snapshot.apiKey() : "";
+            String extraHeadersJson = snapshot.mode() == AiMode.CUSTOM ? snapshot.extraHeadersJson() : null;
+            return new DisplayAiConfigSnapshot(
+                    snapshot.providerCode(),
+                    snapshot.apiUrl(),
+                    apiKey,
+                    snapshot.model(),
+                    snapshot.temperature(),
+                    snapshot.maxTokens(),
+                    extraHeadersJson
+            );
+        }
     }
 }

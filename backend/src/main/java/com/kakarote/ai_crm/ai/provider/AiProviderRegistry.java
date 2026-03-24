@@ -21,6 +21,8 @@ public final class AiProviderRegistry {
                 .displayName("OpenAI")
                 .description("OpenAI 官方接口，适合标准 OpenAI 生态接入。")
                 .baseUrl("https://api.openai.com")
+                .completionsPath(null)
+                .embeddingsPath(null)
                 .recommendedModels(List.of("gpt-5.4", "gpt-5.2", "gpt-5-mini", "gpt-5-nano"))
                 .modelHint("填写 OpenAI 官方模型名称，例如 gpt-5.4。")
                 .extraHeadersHint("")
@@ -36,6 +38,8 @@ public final class AiProviderRegistry {
                 .displayName("阿里云百炼 / 通义千问")
                 .description("通过 OpenAI 兼容接口接入通义千问系列模型。")
                 .baseUrl("https://dashscope.aliyuncs.com/compatible-mode")
+                .completionsPath(null)
+                .embeddingsPath(null)
                 .recommendedModels(List.of(
                         "qwen3.5-plus",
                         "qwen3-max-2026-01-23",
@@ -57,6 +61,8 @@ public final class AiProviderRegistry {
                 .displayName("Moonshot AI / Kimi")
                 .description("Kimi 兼容 OpenAI SDK，适合长文本与知识问答场景。")
                 .baseUrl("https://api.moonshot.cn")
+                .completionsPath(null)
+                .embeddingsPath(null)
                 .recommendedModels(List.of(
                         "kimi-k2-thinking-turbo",
                         "kimi-k2-0905-preview",
@@ -77,6 +83,8 @@ public final class AiProviderRegistry {
                 .displayName("火山方舟 / 豆包")
                 .description("火山方舟兼容 OpenAI 协议，通常可填写模型 ID 或 Endpoint ID。")
                 .baseUrl("https://ark.cn-beijing.volces.com/api/v3")
+                .completionsPath("/chat/completions")
+                .embeddingsPath("/embeddings")
                 .recommendedModels(List.of(
                         "doubao-seed-1-8-251228",
                         "doubao-seed-1-8-32k-251228",
@@ -97,6 +105,8 @@ public final class AiProviderRegistry {
                 .displayName("腾讯混元")
                 .description("腾讯混元兼容 OpenAI 协议，图像理解与函数调用模型需按模型能力选择。")
                 .baseUrl("https://api.hunyuan.cloud.tencent.com")
+                .completionsPath(null)
+                .embeddingsPath(null)
                 .recommendedModels(List.of(
                         "hunyuan-t1-latest",
                         "hunyuan-turbos-latest",
@@ -121,6 +131,8 @@ public final class AiProviderRegistry {
                 .displayName("MiniMax")
                 .description("MiniMax 提供 OpenAI 兼容接口，当前主推 MiniMax-M2.7 系列。")
                 .baseUrl("https://api.minimaxi.com")
+                .completionsPath(null)
+                .embeddingsPath(null)
                 .recommendedModels(List.of(
                         "MiniMax-M2.7",
                         "MiniMax-M2.7-highspeed",
@@ -144,6 +156,8 @@ public final class AiProviderRegistry {
                 .displayName("智谱 AI")
                 .description("智谱支持 OpenAI 兼容调用，可选 GLM 文本与视觉模型。")
                 .baseUrl("https://open.bigmodel.cn/api/paas/v4")
+                .completionsPath("/chat/completions")
+                .embeddingsPath("/embeddings")
                 .recommendedModels(List.of("glm-5", "glm-4.6v", "glm-4.5-air", "glm-4.5v"))
                 .modelHint("填写智谱模型名称，例如 glm-5。视觉理解可使用 glm-4.6v 或 glm-4.5v。")
                 .extraHeadersHint("")
@@ -159,6 +173,8 @@ public final class AiProviderRegistry {
                 .displayName("自定义 OpenAI 兼容服务")
                 .description("适用于兼容 OpenAI Chat Completions 的自建或第三方服务。")
                 .baseUrl("")
+                .completionsPath(null)
+                .embeddingsPath(null)
                 .recommendedModels(List.of())
                 .modelHint("填写服务端要求的模型名称。")
                 .extraHeadersHint("{\"X-Your-Header\":\"value\"}")

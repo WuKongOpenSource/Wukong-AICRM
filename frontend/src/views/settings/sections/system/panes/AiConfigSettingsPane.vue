@@ -10,6 +10,44 @@
         </div>
       </template>
 
+      <div class="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p class="text-xs font-bold uppercase tracking-widest text-slate-400">当前模式</p>
+            <div class="mt-2 flex items-center gap-2">
+              <el-tag :type="currentMode === 'gift' ? 'success' : 'primary'">
+                {{ currentMode === 'gift' ? '赠送额度模式' : '自定义模型模式' }}
+              </el-tag>
+              <span class="text-sm text-slate-500">
+                剩余 {{ giftTokenRemainingWan }} / {{ giftTokenTotalWan }} 万 token
+              </span>
+            </div>
+            <p class="mt-2 text-xs text-slate-500">
+              未配置自定义模型时默认消耗赠送额度；切换到自定义模型后仍会继续统计 token 用量。
+            </p>
+          </div>
+
+          <div class="flex gap-2">
+            <el-button
+              :disabled="!canUseGiftMode"
+              :loading="switchingAiMode"
+              @click="handleUseGiftMode"
+            >
+              使用赠送额度
+            </el-button>
+            <el-button
+              type="primary"
+              plain
+              :disabled="!canUseSavedCustomMode"
+              :loading="switchingAiMode"
+              @click="handleUseSavedCustomMode"
+            >
+              启用已保存自定义模型
+            </el-button>
+          </div>
+        </div>
+      </div>
+
       <el-form :model="aiConfigForm" label-position="top" class="max-w-3xl">
         <el-form-item label="AI 服务商">
           <el-select v-model="aiConfigForm.provider" class="w-full" @change="handleProviderChange">
@@ -183,7 +221,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Connection, Document, Hide, View } from '@element-plus/icons-vue'
-import { getAiConfigDetail, testAiConnection, updateAiConfig } from '@/api/systemConfig'
+import { getAiConfigDetail, testAiConnection, updateAiConfig, useCustomAiConfig, useGiftAiConfig } from '@/api/systemConfig'
 import type {
   AiConfig,
   AiConfigUpdateBO,
@@ -197,6 +235,7 @@ import { AI_PROVIDER_PRESETS } from '../constants'
 const showApiKey = ref(false)
 const savingAiConfig = ref(false)
 const testingConnection = ref(false)
+const switchingAiMode = ref(false)
 const connectionTestResult = ref<AiConnectionTestResult | null>(null)
 const providerOptions = ref<AiProviderPreset[]>(AI_PROVIDER_PRESETS)
 const loadedConfig = ref<AiConfig | null>(null)
@@ -216,6 +255,14 @@ const aiConfigForm = reactive<AiConfigUpdateBO & { updateTime?: string }>({
 const currentProviderPreset = computed(() => {
   return providerOptions.value.find((item) => item.value === aiConfigForm.provider) || null
 })
+
+const currentMode = computed(() => loadedConfig.value?.mode || 'gift')
+const giftTokenTotal = computed(() => loadedConfig.value?.giftTokenTotal ?? 0)
+const giftTokenRemaining = computed(() => loadedConfig.value?.giftTokenRemaining ?? 0)
+const giftTokenRemainingWan = computed(() => (giftTokenRemaining.value / 10000).toFixed(1))
+const giftTokenTotalWan = computed(() => (giftTokenTotal.value / 10000).toFixed(1))
+const canUseGiftMode = computed(() => currentMode.value !== 'gift' && giftTokenRemaining.value > 0)
+const canUseSavedCustomMode = computed(() => currentMode.value !== 'custom' && Boolean(loadedConfig.value?.customConfigSaved))
 
 const currentProviderModels = computed(() => currentProviderPreset.value?.models || [])
 
@@ -291,6 +338,32 @@ async function loadAiConfig() {
     connectionTestResult.value = null
   } catch {
     // Error handled by interceptor
+  }
+}
+
+async function handleUseGiftMode() {
+  switchingAiMode.value = true
+  try {
+    await useGiftAiConfig()
+    ElMessage.success('已切换到赠送额度模式')
+    await loadAiConfig()
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    switchingAiMode.value = false
+  }
+}
+
+async function handleUseSavedCustomMode() {
+  switchingAiMode.value = true
+  try {
+    await useCustomAiConfig()
+    ElMessage.success('已启用已保存的自定义模型')
+    await loadAiConfig()
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    switchingAiMode.value = false
   }
 }
 
