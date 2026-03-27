@@ -295,10 +295,10 @@ const open = computed({
   set: (v: boolean) => emit('update:modelValue', v)
 })
 
-async function handleGoToCustomerDetail() {
+function handleGoToCustomerDetail() {
   if (!props.task?.customerId) return
-  open.value = false
-  await router.push(`/customer/${props.task.customerId}`)
+  const href = router.resolve({ path: `/customer/${props.task.customerId}` }).href
+  window.open(href, '_blank', 'noopener,noreferrer')
 }
 
 function formatDateTime(dateStr: string): string {

@@ -176,10 +176,10 @@ function formatEndDateTime(startDateStr: string, endDateStr: string): string {
   return isSameDay ? formatTime(endDateStr) : formatDateTime(endDateStr)
 }
 
-async function handleGoToCustomerDetail() {
+function handleGoToCustomerDetail() {
   if (!props.schedule?.customerId) return
-  visible.value = false
-  await router.push(`/customer/${props.schedule.customerId}`)
+  const href = router.resolve({ path: `/customer/${props.schedule.customerId}` }).href
+  window.open(href, '_blank', 'noopener,noreferrer')
 }
 
 async function handleDeleteSchedule() {
