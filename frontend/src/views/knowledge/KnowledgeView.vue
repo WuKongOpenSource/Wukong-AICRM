@@ -1,8 +1,28 @@
 <template>
-  <div class="flex h-full bg-background-light">
+  <div class="flex h-full min-h-0 bg-slate-50/30 overflow-hidden">
     <!-- Sidebar Navigation (Desktop) -->
-    <aside v-if="!isMobile" class="w-64 bg-white border-r border-slate-100 flex flex-col shrink-0">
-      <div class="p-6 border-b border-slate-50">
+    <aside
+      v-if="!isMobile"
+      :class="[
+        'bg-white border-r border-slate-100 flex flex-col shrink-0 transition-all duration-300 relative',
+        sidebarCollapsed ? 'w-16' : 'w-64'
+      ]"
+    >
+      <button
+        type="button"
+        class="absolute -right-3 top-10 z-10 size-6 flex items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm hover:text-primary"
+        :title="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
+        @click="sidebarCollapsed = !sidebarCollapsed"
+      >
+        <span class="material-symbols-outlined text-sm">{{ sidebarCollapsed ? 'chevron_right' : 'chevron_left' }}</span>
+      </button>
+
+      <div
+        :class="[
+          'border-b border-slate-50',
+          sidebarCollapsed ? 'px-2 py-6' : 'p-6'
+        ]"
+      >
         <el-upload
           ref="uploadRef"
           class="w-full"
@@ -11,39 +31,58 @@
           :http-request="handleUpload"
           accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md"
         >
-          <button class="w-full py-3 bg-primary text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">
+          <button
+            type="button"
+            :class="[
+              'w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-primary text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90',
+              sidebarCollapsed ? 'px-0' : ''
+            ]"
+          >
             <span class="material-symbols-outlined text-sm">upload</span>
-            上传新知识
+            <span v-if="!sidebarCollapsed">上传新知识</span>
           </button>
         </el-upload>
       </div>
-      <div class="flex-1 overflow-y-auto p-4 space-y-1">
-        <p class="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">知识分类</p>
+      <div class="flex-1 min-h-0 overflow-y-auto space-y-1 p-2">
+        <p
+          v-if="!sidebarCollapsed"
+          class="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-400"
+        >
+          知识分类
+        </p>
         <button
           v-for="cat in categories"
           :key="cat.id"
+          type="button"
+          :title="sidebarCollapsed ? cat.label : ''"
           @click="handleCategoryFilter(cat.id)"
           :class="[
-            'w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-all text-left',
-            selectedCategory === cat.id ? 'bg-primary/5 text-primary font-bold' : 'text-slate-500 hover:bg-slate-50'
+            'w-full rounded-xl py-3 transition-all',
+            sidebarCollapsed ? 'flex items-center justify-center px-0' : 'flex items-center gap-3 px-4 text-left',
+            selectedCategory === cat.id
+              ? 'bg-primary/5 font-bold text-primary'
+              : 'text-slate-600 hover:bg-slate-50'
           ]"
         >
-          <span class="material-symbols-outlined text-lg">{{ cat.icon }}</span>
-          <span class="text-sm">{{ cat.label }}</span>
+          <span class="material-symbols-outlined text-lg shrink-0">{{ cat.icon }}</span>
+          <span v-if="!sidebarCollapsed" class="text-sm">{{ cat.label }}</span>
         </button>
 
-        <div class="pt-8 px-4">
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">最近使用</p>
+        <div v-if="!sidebarCollapsed" class="px-4 pt-8">
+          <p class="mb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">最近使用</p>
           <div class="space-y-4">
             <div
               v-for="doc in knowledgeList.slice(0, 3)"
               :key="'recent-' + doc.knowledgeId"
-              class="flex items-center gap-3 group cursor-pointer"
+              class="group flex cursor-pointer items-center gap-3"
+              @click="openDetail(doc)"
             >
-              <div class="size-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+              <div
+                class="flex size-8 items-center justify-center rounded-lg bg-slate-50 text-slate-400 transition-colors group-hover:bg-primary/10 group-hover:text-primary"
+              >
                 <span class="material-symbols-outlined text-sm">history</span>
               </div>
-              <span class="text-xs text-slate-600 truncate group-hover:text-primary transition-colors">{{ doc.name }}</span>
+              <span class="truncate text-xs text-slate-600 transition-colors group-hover:text-primary">{{ doc.name }}</span>
             </div>
           </div>
         </div>
@@ -51,66 +90,67 @@
     </aside>
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col min-w-0">
+    <div class="flex min-w-0 min-h-0 flex-1 flex-col">
       <!-- Search & AI Ask Header -->
-      <div class="p-6 md:p-12 bg-white border-b border-slate-100">
-        <div class="max-w-4xl mx-auto space-y-6 md:space-y-8">
-          <div class="text-center space-y-2">
-            <h2 class="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">语义知识中心</h2>
-            <p class="text-slate-500 text-sm">不再只是搜索文档，直接向 AI 提问获取业务答案。</p>
+      <div class="shrink-0 border-b border-slate-100 bg-white px-6 py-8 md:p-10">
+        <div class="mx-auto flex max-w-5xl flex-col items-center gap-6 md:gap-8">
+          <div class="flex flex-col items-center gap-2 text-center">
+            <h2 class="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">语义知识中心</h2>
+            <p class="text-sm text-slate-500">不再只是搜索文档，直接向 AI 提问获取业务答案。</p>
           </div>
 
-          <!-- AI Search Bar -->
-          <div class="relative">
-            <div class="absolute inset-0 bg-primary/5 blur-2xl rounded-3xl"></div>
-            <div class="relative flex items-center bg-white border border-slate-200 rounded-2xl md:rounded-[2rem] p-1.5 md:p-2 shadow-2xl shadow-slate-200/50 focus-within:border-primary transition-all">
-              <div class="size-10 md:size-12 flex items-center justify-center text-primary shrink-0">
-                <span class="material-symbols-outlined text-2xl md:text-3xl">psychology</span>
+          <div class="relative w-full">
+            <div
+              class="flex items-center rounded-full border border-slate-200 bg-white p-1.5 shadow-sm transition-all focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10"
+            >
+              <div class="flex shrink-0 items-center justify-center pl-4 pr-2 text-slate-400">
+                <span class="material-symbols-outlined text-xl">search</span>
               </div>
               <input
                 v-model="queryParams.keyword"
                 type="text"
-                placeholder="搜索文件名称或关键词..."
-                class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-slate-900 px-2 md:px-4 py-3 md:py-4 text-sm md:text-lg placeholder:text-slate-300"
+                placeholder="检索文档或向 AI 提问..."
+                class="min-w-0 flex-1 border-none bg-transparent px-2 py-3 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0"
                 @keydown.enter="handleSearch"
               />
               <button
-                class="px-4 md:px-8 py-3 md:py-4 bg-primary text-white rounded-xl md:rounded-[1.5rem] font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 text-sm md:text-base shrink-0"
+                type="button"
+                class="shrink-0 rounded-full bg-primary px-6 py-3 text-sm font-bold text-white transition-all hover:bg-primary/90 md:px-8"
                 @click="handleSearch"
               >
                 {{ isMobile ? '搜索' : 'AI 检索' }}
               </button>
             </div>
+
+            <div
+              v-if="!isMobile"
+              class="mt-5 flex flex-wrap items-center justify-center gap-3"
+            >
+              <span class="mr-1 text-xs text-slate-400">热门搜索：</span>
+              <button
+                v-for="tag in hotSearchTags"
+                :key="'hot-' + tag"
+                type="button"
+                class="rounded-full bg-slate-50 px-4 py-1.5 text-xs text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-700"
+                @click="queryParams.keyword = tag"
+              >
+                {{ tag }}
+              </button>
+            </div>
           </div>
 
           <!-- Category Pills (Mobile) -->
-          <div v-if="isMobile" class="flex gap-2 overflow-x-auto">
+          <div v-if="isMobile" class="flex w-full gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button
               v-for="cat in categories"
               :key="'pill-' + cat.id"
+              type="button"
               @click="handleCategoryFilter(cat.id)"
               :class="[
-                'px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all',
+                'shrink-0 rounded-full px-4 py-2 text-xs font-bold whitespace-nowrap transition-all',
                 selectedCategory === cat.id
                   ? 'bg-primary text-white'
-                  : 'bg-slate-50 border border-slate-100 text-slate-500 hover:border-primary hover:text-primary'
-              ]"
-            >
-              {{ cat.label }}
-            </button>
-          </div>
-
-          <!-- Category Pills (Desktop) -->
-          <div v-else class="flex justify-center gap-4">
-            <button
-              v-for="cat in categories.slice(1)"
-              :key="'tag-' + cat.id"
-              @click="handleCategoryFilter(cat.id)"
-              :class="[
-                'px-4 py-2 rounded-xl text-xs font-bold transition-all',
-                selectedCategory === cat.id
-                  ? 'bg-primary/10 border border-primary/20 text-primary'
-                  : 'bg-slate-50 border border-slate-100 text-slate-500 hover:bg-white hover:border-primary hover:text-primary'
+                  : 'border border-slate-100 bg-slate-50 text-slate-500 hover:border-primary hover:text-primary'
               ]"
             >
               {{ cat.label }}
@@ -120,37 +160,41 @@
       </div>
 
       <!-- Content Grid -->
-      <div class="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12">
-        <div class="max-w-6xl mx-auto">
+      <div class="min-h-0 flex-1 overflow-y-auto p-6 md:p-8">
+        <div class="mx-auto max-w-7xl">
           <!-- Section Header -->
-          <div class="flex items-center justify-between mb-6 md:mb-8">
-            <h3 class="text-base md:text-lg font-bold text-slate-900 flex items-center gap-2">
-              <span class="material-symbols-outlined text-primary">auto_stories</span>
-              {{ getCategoryLabel() }}
-              <span class="text-sm font-normal text-slate-400 ml-1">{{ totalCount }} 项结果</span>
-            </h3>
+          <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="flex size-6 items-center justify-center rounded bg-primary/10 text-primary">
+                <span class="material-symbols-outlined text-sm">book</span>
+              </div>
+              <h3 class="text-lg font-bold text-slate-900">{{ getCategoryLabel() }}</h3>
+              <span class="ml-1 text-sm text-slate-400">{{ totalCount }} 项结果</span>
+            </div>
             <div class="flex items-center gap-2">
               <!-- View Mode Toggle -->
-              <div class="flex items-center bg-slate-100 rounded-lg p-0.5">
+              <div class="flex rounded-lg border border-slate-200 bg-slate-50 p-1">
                 <button
+                  type="button"
                   @click="setViewMode('card')"
                   :class="[
-                    'size-8 flex items-center justify-center rounded-md transition-all',
+                    'rounded-md p-1.5 transition-all',
                     viewMode === 'card' ? 'bg-white text-primary shadow-sm' : 'text-slate-400 hover:text-slate-600'
                   ]"
-                  title="卡片视图"
+                  title="网格视图"
                 >
-                  <span class="material-symbols-outlined text-lg">grid_view</span>
+                  <span class="material-symbols-outlined block text-sm">grid_view</span>
                 </button>
                 <button
+                  type="button"
                   @click="setViewMode('list')"
                   :class="[
-                    'size-8 flex items-center justify-center rounded-md transition-all',
+                    'rounded-md p-1.5 transition-all',
                     viewMode === 'list' ? 'bg-white text-primary shadow-sm' : 'text-slate-400 hover:text-slate-600'
                   ]"
                   title="列表视图"
                 >
-                  <span class="material-symbols-outlined text-lg">format_list_bulleted</span>
+                  <span class="material-symbols-outlined block text-sm">list</span>
                 </button>
               </div>
               <!-- Mobile Upload Button -->
@@ -184,69 +228,104 @@
           </div>
 
           <!-- Document Cards Grid -->
-          <div v-else-if="viewMode === 'card'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
+          <div
+            v-else-if="viewMode === 'card'"
+            class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          >
+            <!-- AI 话术生成器（首位） -->
+            <div
+              v-if="knowledgeList.length > 0"
+              class="relative flex min-h-[240px] flex-col overflow-hidden rounded-2xl bg-[#1e293b] p-6 text-white"
+            >
+              <div class="relative z-10 flex flex-1 flex-col">
+                <div
+                  class="mb-4 flex size-10 items-center justify-center rounded-xl bg-primary/20 text-primary"
+                >
+                  <span class="material-symbols-outlined text-xl">auto_awesome</span>
+                </div>
+                <h4 class="mb-2 text-lg font-bold text-white">AI 话术生成器</h4>
+                <p class="mb-6 text-xs leading-relaxed text-slate-400">
+                  自动生成针对性销售话术，用知识库内容辅助获客转化
+                </p>
+              </div>
+              <button
+                type="button"
+                class="relative z-10 w-full rounded-xl bg-primary py-2.5 text-sm font-bold text-white transition-all hover:bg-primary/90"
+                @click="queryParams.keyword = '销售话术'"
+              >
+                立即开始
+              </button>
+              <span
+                class="material-symbols-outlined pointer-events-none absolute -bottom-6 -right-6 select-none text-[8rem] text-white/5"
+                aria-hidden="true"
+                >auto_awesome</span
+              >
+            </div>
+
             <div
               v-for="item in knowledgeList"
               :key="item.knowledgeId"
-              class="bg-white border border-slate-100 rounded-2xl md:rounded-[2rem] p-5 md:p-8 shadow-sm hover:shadow-xl hover:shadow-slate-200/40 transition-all group cursor-pointer"
+              class="group flex cursor-pointer flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md"
               @click="openDetail(item)"
             >
-              <!-- Header: Icon + Usage -->
-              <div class="flex items-start justify-between mb-4 md:mb-6">
-                <div :class="[
-                  'size-12 md:size-14 rounded-xl md:rounded-2xl flex items-center justify-center',
-                  getTypeIconBg(item.type)
-                ]">
-                  <span class="material-symbols-outlined text-2xl md:text-3xl">{{ getTypeIconName(item.type) }}</span>
+              <div class="mb-4 flex items-start justify-between">
+                <div
+                  :class="[
+                    'flex size-8 items-center justify-center rounded-lg',
+                    getTypeIconBg(item.type)
+                  ]"
+                >
+                  <span class="material-symbols-outlined text-sm">{{ getTypeIconName(item.type) }}</span>
                 </div>
                 <div class="text-right">
-                  <p class="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-1">文件大小</p>
-                  <p class="text-sm font-black text-slate-900">{{ formatFileSize(item.fileSize) }}</p>
+                  <p class="mb-0.5 text-[10px] text-slate-400">文件大小</p>
+                  <p class="text-sm font-bold text-slate-900">{{ formatFileSize(item.fileSize) }}</p>
                 </div>
               </div>
 
-              <!-- Title -->
-              <h4 class="text-base md:text-lg font-bold text-slate-900 mb-3 group-hover:text-primary transition-colors leading-tight truncate">
+              <h4
+                class="mb-3 line-clamp-2 text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-primary"
+              >
                 {{ item.name }}
               </h4>
 
-              <!-- AI Summary / Description -->
-              <div class="p-3 md:p-4 bg-slate-50 rounded-xl md:rounded-2xl border border-slate-100 mb-4 md:mb-6">
-                <div class="flex items-center gap-2 mb-2">
-                  <span class="material-symbols-outlined text-primary text-xs">auto_awesome</span>
-                  <span class="text-[10px] font-bold text-primary uppercase">AI 摘要</span>
+              <div class="mb-4 flex min-h-[4.5rem] flex-1 flex-col rounded-xl bg-primary/5 p-3">
+                <div class="mb-1.5 flex items-center justify-between">
+                  <div class="flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-sm text-primary">auto_awesome</span>
+                    <span class="text-xs font-bold text-primary">AI 摘要</span>
+                  </div>
                 </div>
-                <p class="text-xs text-slate-500 leading-relaxed line-clamp-3">
+                <p class="line-clamp-2 text-xs leading-relaxed text-slate-500">
                   {{ item.summary || getTypeLabel(item.type) + ' · ' + (item.customerName || '未关联客户') }}
                 </p>
               </div>
 
-              <!-- Parse Status -->
-              <div v-if="item.weKnoraParseStatus" class="mb-4">
-                <span :class="[
-                  'inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold',
-                  getParseStatusClass(item.weKnoraParseStatus)
-                ]">
-                  <span class="material-symbols-outlined text-xs">{{ getParseStatusIcon(item.weKnoraParseStatus) }}</span>
+              <div v-if="item.weKnoraParseStatus" class="mb-3">
+                <span
+                  :class="[
+                    'inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold',
+                    getParseStatusClass(item.weKnoraParseStatus)
+                  ]"
+                >
+                  <span class="material-symbols-outlined text-xs">{{
+                    getParseStatusIcon(item.weKnoraParseStatus)
+                  }}</span>
                   {{ getParseStatusLabel(item.weKnoraParseStatus) }}
                 </span>
               </div>
 
-              <!-- Footer: Date + Actions -->
-              <div class="flex items-center justify-between pt-3 md:pt-4 border-t border-slate-50">
-                <div class="flex items-center gap-2">
-                  <span class="text-[10px] font-bold text-slate-400 uppercase">{{ formatDate(item.createTime) }}</span>
-                  <span v-if="item.customerName" class="text-[10px] text-slate-300">· {{ item.customerName }}</span>
-                </div>
-                <div class="flex gap-1">
-                  <button
-                    class="px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/5 rounded-lg transition-colors"
-                    @click.stop="handleDownload(item)"
-                  >
-                    下载
-                  </button>
-                  <el-dropdown trigger="click" @click.stop>
-                    <button class="size-8 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all">
+              <div
+                class="mt-auto flex items-center justify-between border-t border-slate-100 pt-4"
+              >
+                <span class="text-xs text-slate-400">{{ formatDate(item.createTime) }}</span>
+                <div class="flex items-center gap-1">
+                  <el-dropdown trigger="click">
+                    <button
+                      type="button"
+                      class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600"
+                      @click.stop
+                    >
                       <span class="material-symbols-outlined text-sm">more_horiz</span>
                     </button>
                     <template #dropdown>
@@ -262,22 +341,31 @@
                           </span>
                         </el-dropdown-item>
                         <el-dropdown-item divided @click="handleDelete(item)">
-                          <span class="text-red-500 flex items-center gap-2">
+                          <span class="flex items-center gap-2 text-red-500">
                             <span class="material-symbols-outlined text-sm">delete</span>删除
                           </span>
                         </el-dropdown-item>
                       </el-dropdown-menu>
                     </template>
                   </el-dropdown>
+                  <span
+                    class="material-symbols-outlined text-sm text-slate-300 transition-colors group-hover:text-primary"
+                    >open_in_new</span
+                  >
                 </div>
               </div>
             </div>
           </div>
 
           <!-- Document List View -->
-          <div v-else class="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+          <div
+            v-else
+            class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+          >
             <!-- Table Header -->
-            <div class="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            <div
+              class="hidden grid-cols-12 gap-4 border-b border-slate-100 bg-slate-50/50 px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 md:grid"
+            >
               <div class="col-span-4">文档名称</div>
               <div class="col-span-1">分类</div>
               <div class="col-span-3">AI 摘要</div>
@@ -289,18 +377,23 @@
             <div
               v-for="item in knowledgeList"
               :key="'list-' + item.knowledgeId"
-              class="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 px-4 md:px-6 py-4 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors cursor-pointer items-center"
+              class="group grid cursor-pointer grid-cols-1 items-center gap-2 border-b border-slate-50 px-4 py-4 transition-colors last:border-0 hover:bg-primary/5 md:grid-cols-12 md:gap-4 md:px-6"
               @click="openDetail(item)"
             >
               <!-- Name -->
-              <div class="md:col-span-4 flex items-center gap-3 min-w-0">
-                <div :class="[
-                  'size-9 rounded-lg flex items-center justify-center shrink-0',
-                  getTypeIconBg(item.type)
-                ]">
+              <div class="flex min-w-0 items-center gap-3 md:col-span-4">
+                <div
+                  :class="[
+                    'flex size-8 shrink-0 items-center justify-center rounded-lg',
+                    getTypeIconBg(item.type)
+                  ]"
+                >
                   <span class="material-symbols-outlined text-lg">{{ getTypeIconName(item.type) }}</span>
                 </div>
-                <span class="text-sm font-semibold text-slate-900 truncate">{{ item.name }}</span>
+                <span
+                  class="truncate text-sm font-bold text-slate-900 transition-colors group-hover:text-primary"
+                  >{{ item.name }}</span
+                >
               </div>
               <!-- Category -->
               <div class="md:col-span-1 flex items-center">
@@ -330,17 +423,19 @@
               <!-- Actions -->
               <div class="md:col-span-2 flex items-center justify-end gap-1">
                 <button
-                  class="px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/5 rounded-lg transition-colors"
+                  type="button"
+                  class="rounded-lg px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/10"
                   @click.stop="openDetail(item)"
                 >
                   阅读
                 </button>
                 <button
-                  class="size-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
-                  @click.stop="handleDownload(item)"
+                  type="button"
+                  class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-primary/10 hover:text-primary"
                   title="下载"
+                  @click.stop="handleDownload(item)"
                 >
-                  <span class="material-symbols-outlined text-sm">link</span>
+                  <span class="material-symbols-outlined text-sm">download</span>
                 </button>
               </div>
             </div>
@@ -435,6 +530,9 @@ import type { Knowledge, KnowledgeQueryBO, KnowledgeType } from '@/types/common'
 import KnowledgeDetailModal from '@/components/knowledge/KnowledgeDetailModal.vue'
 
 const { isMobile } = useResponsive()
+/** 桌面侧栏折叠，仅 UI */
+const sidebarCollapsed = ref(false)
+const hotSearchTags = ['产品知识库', '销售话术', '售后服务', '入职培训', '客户FAQ']
 const viewMode = ref<'card' | 'list'>(
   (localStorage.getItem('knowledge-view-mode') as 'card' | 'list') || 'card'
 )
@@ -589,8 +687,9 @@ function setViewMode(mode: 'card' | 'list') {
 }
 
 function getCategoryLabel(): string {
+  if (selectedCategory.value === 'all') return '全部知识推荐'
   const cat = categories.find(c => c.id === selectedCategory.value)
-  return cat ? cat.label : '全部推荐知识'
+  return cat?.label ?? '推荐知识'
 }
 
 function getTypeIconName(type: string): string {
@@ -687,8 +786,17 @@ function getParseStatusLabel(status?: string): string {
 </script>
 
 <style scoped>
+.line-clamp-2 {
+  display: -webkit-box;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .line-clamp-3 {
   display: -webkit-box;
+  line-clamp: 3;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
