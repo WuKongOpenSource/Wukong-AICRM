@@ -109,10 +109,8 @@ public class CustomerTools {
             sb.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n");
 
             int index = 1;
-            StringBuilder idMapping = new StringBuilder();
-
             for (CustomerListVO customer : page.getList()) {
-                sb.append(String.format("%d. **%s**\n", index++, customer.getCompanyName()));
+                sb.append(String.format("%d. **%s**（客户ID: %d）\n", index++, customer.getCompanyName(), customer.getCustomerId()));
                 sb.append(String.format("   🏷️ %s级客户 · 📊 %s",
                     customer.getLevel(),
                     getStageLabel(customer.getStage())));
@@ -120,18 +118,10 @@ public class CustomerTools {
                     sb.append(String.format(" · 🏢 %s行业", customer.getIndustry()));
                 }
                 sb.append("\n\n");
-
-                // 记录ID映射供AI内部使用
-                if (idMapping.length() > 0) {
-                    idMapping.append(", ");
-                }
-                idMapping.append(customer.getCompanyName()).append("#").append(customer.getCustomerId());
             }
 
             sb.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n");
-            sb.append("💡 如需查看某个客户的详细信息，请告诉我客户名称。\n\n");
-            sb.append("---\n");
-            sb.append("[系统备注] 客户标识: ").append(idMapping.toString());
+            sb.append("💡 如需查看某个客户的详细信息，请告诉我客户名称。");
 
             return sb.toString();
         } catch (Exception e) {
@@ -258,7 +248,7 @@ public class CustomerTools {
 
     @Tool(description = "获取客户详细信息。当用户询问某个客户的具体信息、联系人、跟进记录时调用。可以使用客户ID或公司名称查询。")
     public String getCustomerDetail(
-            @ToolParam(description = "客户标识，可以是客户ID（数字）或公司名称（文本）。优先使用系统备注中的'公司名#ID'格式中的ID") String customerIdentifier) {
+            @ToolParam(description = "客户标识，可以是客户ID（数字）或公司名称（文本）。优先使用客户ID") String customerIdentifier) {
 
         try {
             if (customerIdentifier == null || customerIdentifier.isEmpty() || "null".equalsIgnoreCase(customerIdentifier)) {
@@ -282,7 +272,7 @@ public class CustomerTools {
             CustomerDetailVO detail = customerService.getCustomerDetail(customerId);
 
             StringBuilder sb = new StringBuilder();
-            sb.append(String.format("📋 **客户详情: %s**\n\n", detail.getCompanyName()));
+            sb.append(String.format("📋 **客户详情: %s**（客户ID: %d）\n\n", detail.getCompanyName(), detail.getCustomerId()));
             sb.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n");
             sb.append(String.format("🏷️ **级别**: %s级\n", detail.getLevel()));
             sb.append(String.format("📊 **阶段**: %s\n", getStageLabel(detail.getStage())));
@@ -321,7 +311,6 @@ public class CustomerTools {
             }
 
             sb.append("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-            sb.append("[系统备注] 客户标识: ").append(detail.getCompanyName()).append("#").append(detail.getCustomerId());
 
             return sb.toString();
         } catch (Exception e) {

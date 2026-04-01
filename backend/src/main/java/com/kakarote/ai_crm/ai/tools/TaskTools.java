@@ -1,9 +1,13 @@
 package com.kakarote.ai_crm.ai.tools;
 
+import com.kakarote.ai_crm.entity.BO.CustomerQueryBO;
 import com.kakarote.ai_crm.entity.BO.TaskAddBO;
 import com.kakarote.ai_crm.entity.BO.TaskUpdateBO;
+import com.kakarote.ai_crm.entity.VO.CustomerListVO;
 import com.kakarote.ai_crm.entity.VO.TaskVO;
+import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.ITaskService;
+import com.kakarote.ai_crm.common.BasePage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -22,6 +26,9 @@ public class TaskTools {
 
     @Autowired
     private ITaskService taskService;
+
+    @Autowired
+    private ICustomerService customerService;
 
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
@@ -74,25 +81,24 @@ public class TaskTools {
         }
     }
 
-    @Tool(description = "创建新任务。当用户要创建、新建、添加任务或待办事项时调用。如果用户提到某个客户，请先调用 queryCustomers 获取客户ID。")
+    @Tool(description = "创建新任务。当用户描述需要做但还没做的事情，且没有具体执行时间点时调用。只有截止日期（如'本周完成''周五之前''月底前'）也用此工具，将截止日期设为dueDate。注意：有具体时间点的（如'下午3点''10:00'）应使用createSchedule而非此工具。直接传入客户名称即可，无需先查询ID。")
     public String createTask(
             @ToolParam(description = "任务标题，必填") String title,
             @ToolParam(description = "任务描述", required = false) String description,
-            @ToolParam(description = "关联客户ID（数字）。如果用户提到客户名称，请先调用 queryCustomers 查询获取客户ID后填入", required = false) String customerIdStr,
+            @ToolParam(description = "关联客户名称（公司名）", required = false) String customerName,
             @ToolParam(description = "优先级：high(高)/medium(中)/low(低)，默认medium", required = false) String priority,
             @ToolParam(description = "截止日期，格式：yyyy-MM-dd", required = false) String dueDate) {
 
-        log.info("【Tool调用】createTask 被调用: title={}, customerIdStr={}, priority={}, dueDate={}",
-            title, customerIdStr, priority, dueDate);
+        log.info("【Tool调用】createTask 被调用: title={}, customerName={}, priority={}, dueDate={}",
+            title, customerName, priority, dueDate);
 
         try {
-            // 将 String 转换为 Long，处理 null 和 "null" 字符串
+            // 根据客户名称查找客户ID
             Long customerId = null;
-            if (customerIdStr != null && !customerIdStr.isEmpty() && !"null".equalsIgnoreCase(customerIdStr)) {
-                try {
-                    customerId = Long.parseLong(customerIdStr);
-                } catch (NumberFormatException e) {
-                    // 忽略无效的 customerId
+            if (customerName != null && !customerName.isEmpty() && !"null".equalsIgnoreCase(customerName)) {
+                customerId = findCustomerIdByName(customerName);
+                if (customerId == null) {
+                    log.info("未找到客户「{}」，将不关联客户", customerName);
                 }
             }
 
@@ -245,5 +251,28 @@ public class TaskTools {
             case "low" -> "低";
             default -> priority;
         };
+    }
+
+    private Long findCustomerIdByName(String companyName) {
+        if (companyName == null || companyName.isEmpty()) {
+            return null;
+        }
+        CustomerQueryBO queryBO = new CustomerQueryBO();
+        queryBO.setKeyword(companyName);
+        queryBO.setPage(1);
+        queryBO.setLimit(5);
+
+        BasePage<CustomerListVO> page = customerService.queryPageList(queryBO);
+        if (page.getList().isEmpty()) {
+            return null;
+        }
+
+        for (CustomerListVO customer : page.getList()) {
+            if (companyName.equals(customer.getCompanyName())) {
+                return customer.getCustomerId();
+            }
+        }
+
+        return page.getList().get(0).getCustomerId();
     }
 }

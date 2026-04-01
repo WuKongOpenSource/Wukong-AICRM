@@ -249,7 +249,7 @@
                 <div class="size-7 rounded-lg bg-primary flex items-center justify-center text-white">
                   <span class="material-symbols-outlined text-sm">smart_toy</span>
                 </div>
-                <span class="text-xs font-bold text-slate-900">Nexus AI 助手</span>
+                <span class="text-xs font-bold text-slate-900">悟空AI CRM 助手</span>
                 <span class="text-[10px] text-slate-400">{{ notif.time }}</span>
               </div>
               <div
@@ -335,7 +335,7 @@ const notifications = ref([
   {
     id: 1,
     title: '系统核心引擎升级完成',
-    content: 'Nexus AI 已升级至最新版本。本次更新优化了长文本理解能力。',
+    content: '悟空AI CRM 已升级至最新版本。本次更新优化了长文本理解能力。',
     time: '1小时前',
     type: 'info',
     category: '系统更新',

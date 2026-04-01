@@ -35,7 +35,7 @@ export const useEnterpriseStore = defineStore('enterprise', () => {
     loaded.value = false
   }
 
-  const displayName = computed(() => name.value || 'Nexus AI')
+  const displayName = computed(() => name.value || '悟空AI CRM')
   const hasLogo = computed(() => !!logoUrl.value)
 
   return { name, logo, logoUrl, loaded, loadConfig, updateLocal, reset, displayName, hasLogo }

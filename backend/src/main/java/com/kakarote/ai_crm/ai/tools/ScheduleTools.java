@@ -1,8 +1,15 @@
 package com.kakarote.ai_crm.ai.tools;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.kakarote.ai_crm.entity.BO.CustomerQueryBO;
 import com.kakarote.ai_crm.entity.BO.ScheduleAddBO;
+import com.kakarote.ai_crm.entity.PO.Contact;
+import com.kakarote.ai_crm.entity.VO.CustomerListVO;
 import com.kakarote.ai_crm.entity.VO.ScheduleVO;
+import com.kakarote.ai_crm.service.IContactService;
+import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.IScheduleService;
+import com.kakarote.ai_crm.common.BasePage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -22,22 +29,28 @@ public class ScheduleTools {
     @Autowired
     private IScheduleService scheduleService;
 
+    @Autowired
+    private ICustomerService customerService;
+
+    @Autowired
+    private IContactService contactService;
+
     private final SimpleDateFormat dateTimeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
-    @Tool(description = "创建日程安排。当用户提到有具体时间点的安排时调用（如会议、电话、拜访等有明确开始时间的活动）。重要：调用此工具前，必须先完成所有信息收集——如果用户提到客户名称，先调用 queryCustomers 获取客户ID；如果提到联系人，先调用 queryContacts 获取联系人ID。然后将所有参数一次性传入此工具，只调用一次。用户确认信息后不要再次调用此工具。注意：只有提到具体时间（如10:00、下午3点）才创建日程，只有截止日期没有具体时间的应创建任务。")
+    @Tool(description = "创建日程安排。仅当用户提到具体时间点（如'10:00''下午3点''上午9点半''明天14:00'）时调用。只有截止日期没有具体执行时间的不用此工具，应使用createTask。直接传入客户名称和联系人姓名即可，无需先查询ID。")
     public String createSchedule(
             @ToolParam(description = "日程标题，必填") String title,
             @ToolParam(description = "开始时间，格式：yyyy-MM-dd HH:mm，必填") String startTime,
             @ToolParam(description = "结束时间，格式：yyyy-MM-dd HH:mm", required = false) String endTime,
             @ToolParam(description = "日程类型：meeting(会议)/call(电话)/visit(拜访)，默认meeting", required = false) String type,
-            @ToolParam(description = "关联客户ID（数字）。如果用户提到客户名称，请先调用 queryCustomers 查询获取客户ID", required = false) String customerIdStr,
-            @ToolParam(description = "关联联系人ID（数字）。如果用户提到联系人姓名，请先调用 queryContacts 查询获取联系人ID", required = false) String contactIdStr,
+            @ToolParam(description = "关联客户名称（公司名）", required = false) String customerName,
+            @ToolParam(description = "关联联系人姓名", required = false) String contactName,
             @ToolParam(description = "地点", required = false) String location,
             @ToolParam(description = "描述", required = false) String description) {
 
-        log.info("【Tool调用】createSchedule 被调用: title={}, startTime={}, endTime={}, type={}, customerIdStr={}",
-            title, startTime, endTime, type, customerIdStr);
+        log.info("【Tool调用】createSchedule 被调用: title={}, startTime={}, endTime={}, type={}, customerName={}, contactName={}",
+            title, startTime, endTime, type, customerName, contactName);
 
         try {
             // 解析开始时间
@@ -67,22 +80,23 @@ public class ScheduleTools {
                 }
             }
 
-            // 解析客户ID
-            if (customerIdStr != null && !customerIdStr.isEmpty() && !"null".equalsIgnoreCase(customerIdStr)) {
-                try {
-                    bo.setCustomerId(Long.parseLong(customerIdStr));
-                } catch (NumberFormatException e) {
-                    // 忽略无效的 customerId
+            // 根据客户名称查找客户ID
+            Long customerId = null;
+            if (customerName != null && !customerName.isEmpty() && !"null".equalsIgnoreCase(customerName)) {
+                customerId = findCustomerIdByName(customerName);
+                if (customerId == null) {
+                    log.info("未找到客户「{}」，将不关联客户", customerName);
                 }
+                bo.setCustomerId(customerId);
             }
 
-            // 解析联系人ID
-            if (contactIdStr != null && !contactIdStr.isEmpty() && !"null".equalsIgnoreCase(contactIdStr)) {
-                try {
-                    bo.setContactId(Long.parseLong(contactIdStr));
-                } catch (NumberFormatException e) {
-                    // 忽略无效的 contactId
+            // 根据联系人姓名查找联系人ID
+            if (contactName != null && !contactName.isEmpty() && !"null".equalsIgnoreCase(contactName)) {
+                Long contactId = findContactIdByName(contactName, customerId);
+                if (contactId == null) {
+                    log.info("未找到联系人「{}」，将不关联联系人", contactName);
                 }
+                bo.setContactId(contactId);
             }
 
             Long scheduleId = scheduleService.addSchedule(bo);
@@ -96,6 +110,9 @@ public class ScheduleTools {
             result.append(String.format("\n- 开始时间: %s", startTime));
             if (endTime != null && !endTime.isEmpty() && !"null".equalsIgnoreCase(endTime)) {
                 result.append(String.format("\n- 结束时间: %s", endTime));
+            }
+            if (customerName != null && !customerName.isEmpty() && !"null".equalsIgnoreCase(customerName)) {
+                result.append(String.format("\n- 客户: %s", customerName));
             }
             if (location != null && !location.isEmpty() && !"null".equalsIgnoreCase(location)) {
                 result.append(String.format("\n- 地点: %s", location));
@@ -152,6 +169,61 @@ public class ScheduleTools {
         } catch (Exception e) {
             return "查询日程失败: " + e.getMessage();
         }
+    }
+
+    private Long findCustomerIdByName(String companyName) {
+        if (companyName == null || companyName.isEmpty()) {
+            return null;
+        }
+        CustomerQueryBO queryBO = new CustomerQueryBO();
+        queryBO.setKeyword(companyName);
+        queryBO.setPage(1);
+        queryBO.setLimit(5);
+
+        BasePage<CustomerListVO> page = customerService.queryPageList(queryBO);
+        if (page.getList().isEmpty()) {
+            return null;
+        }
+
+        for (CustomerListVO customer : page.getList()) {
+            if (companyName.equals(customer.getCompanyName())) {
+                return customer.getCustomerId();
+            }
+        }
+
+        return page.getList().get(0).getCustomerId();
+    }
+
+    private Long findContactIdByName(String name, Long customerId) {
+        if (name == null || name.isEmpty()) {
+            return null;
+        }
+
+        // 如果有客户ID，先在该客户下查找
+        if (customerId != null) {
+            LambdaQueryWrapper<Contact> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(Contact::getName, name);
+            wrapper.eq(Contact::getCustomerId, customerId);
+            wrapper.eq(Contact::getStatus, 1);
+            wrapper.last("LIMIT 1");
+            Contact contact = contactService.getOne(wrapper);
+            if (contact != null) {
+                return contact.getContactId();
+            }
+
+            // 模糊查找
+            wrapper = new LambdaQueryWrapper<>();
+            wrapper.like(Contact::getName, name);
+            wrapper.eq(Contact::getCustomerId, customerId);
+            wrapper.eq(Contact::getStatus, 1);
+            wrapper.last("LIMIT 1");
+            contact = contactService.getOne(wrapper);
+            if (contact != null) {
+                return contact.getContactId();
+            }
+        }
+
+        return null;
     }
 
     private String getTypeName(String type) {

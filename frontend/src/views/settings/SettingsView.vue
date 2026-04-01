@@ -337,7 +337,8 @@
                             >
                               <td class="px-6 py-4">
                                 <div class="flex items-center gap-3">
-                                  <div class="size-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-sm" :class="getAvatarColor(member.realname)">
+                                  <img v-if="member.imgUrl" :src="member.imgUrl" class="size-10 rounded-full object-cover shrink-0 shadow-sm" alt="avatar" />
+                                  <div v-else class="size-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-sm" :class="getAvatarColor(member.realname)">
                                     {{ (member.realname || member.username || '?').charAt(0) }}
                                   </div>
                                   <div>

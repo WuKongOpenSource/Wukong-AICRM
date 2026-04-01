@@ -56,7 +56,7 @@
                     </div>
                     <div class="flex items-center gap-1">
                       <span class="text-slate-400">状态:</span>
-                      <span class="text-primary font-bold">{{ getStatusLabel(customer.stage) }}</span>
+                      <span class="text-primary font-bold">{{ getStageLabel(customer.stage) }}</span>
                     </div>
                   </div>
                 </div>
@@ -72,6 +72,19 @@
                 <span class="material-symbols-outlined text-sm">auto_awesome</span>
                 生成 AI 分析报告
               </button>
+              <el-popconfirm
+                title="确定要删除此客户吗？删除后不可恢复。"
+                confirm-button-text="删除"
+                cancel-button-text="取消"
+                confirm-button-type="danger"
+                @confirm="handleDeleteCustomer"
+              >
+                <template #reference>
+                  <button class="p-2 border border-red-200 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-500 transition-colors" title="删除客户">
+                    <span class="material-symbols-outlined text-lg">delete</span>
+                  </button>
+                </template>
+              </el-popconfirm>
             </div>
           </div>
 

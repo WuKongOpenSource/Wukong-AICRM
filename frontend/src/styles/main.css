@@ -107,7 +107,6 @@ html, body, #app {
   transform: translateY(-10px);
 }
 
-/* Element Plus style overrides for Nexus theme */
 .el-input__wrapper {
   border-radius: 0.5rem !important;
   background-color: #f8fafc !important;

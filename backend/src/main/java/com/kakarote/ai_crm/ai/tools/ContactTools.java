@@ -75,14 +75,14 @@ public class ContactTools {
 
             for (int i = 0; i < contacts.size(); i++) {
                 Contact c = contacts.get(i);
-                sb.append(String.format("%d. **%s**", i + 1, c.getName()));
+                sb.append(String.format("%d. **%s**（联系人ID: %d）", i + 1, c.getName(), c.getContactId()));
                 if (c.getPosition() != null) {
                     sb.append("（").append(c.getPosition()).append("）");
                 }
                 sb.append("\n");
                 String custName = customerNames.get(c.getCustomerId());
                 if (custName != null) {
-                    sb.append("   🏢 ").append(custName).append("\n");
+                    sb.append("   🏢 ").append(custName).append("（客户ID: ").append(c.getCustomerId()).append("）\n");
                 }
                 if (c.getPhone() != null) {
                     sb.append("   📞 ").append(c.getPhone()).append("\n");
@@ -97,16 +97,7 @@ public class ContactTools {
             }
 
             sb.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n");
-            sb.append("💡 如需查看某个联系人的详细信息，请告诉我联系人姓名。\n\n");
-
-            // ID映射供AI内部使用
-            sb.append("---\n");
-            sb.append("[系统备注] 联系人标识: ");
-            for (int i = 0; i < contacts.size(); i++) {
-                if (i > 0) sb.append(", ");
-                Contact c = contacts.get(i);
-                sb.append(c.getName()).append("#").append(c.getContactId());
-            }
+            sb.append("💡 如需查看某个联系人的详细信息，请告诉我联系人姓名。");
 
             return sb.toString();
         } catch (Exception e) {
@@ -117,7 +108,7 @@ public class ContactTools {
 
     @Tool(description = "获取联系人详细信息。当用户询问某个联系人的具体信息时调用。可以使用联系人ID或姓名查询。")
     public String getContactDetail(
-            @ToolParam(description = "联系人标识，可以是联系人ID（数字）或姓名（文本）。优先使用系统备注中的'姓名#ID'格式中的ID") String contactIdentifier) {
+            @ToolParam(description = "联系人标识，可以是联系人ID（数字）或姓名（文本）。优先使用联系人ID") String contactIdentifier) {
 
         log.info("【Tool调用】getContactDetail: identifier={}", contactIdentifier);
 
@@ -162,7 +153,7 @@ public class ContactTools {
             }
 
             StringBuilder sb = new StringBuilder();
-            sb.append(String.format("📋 **联系人详情: %s**\n\n", contact.getName()));
+            sb.append(String.format("📋 **联系人详情: %s**（联系人ID: %d）\n\n", contact.getName(), contact.getContactId()));
             sb.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n");
 
             if (contact.getPosition() != null) {
@@ -189,7 +180,6 @@ public class ContactTools {
             }
 
             sb.append("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-            sb.append("[系统备注] 联系人标识: ").append(contact.getName()).append("#").append(contact.getContactId());
 
             return sb.toString();
         } catch (Exception e) {

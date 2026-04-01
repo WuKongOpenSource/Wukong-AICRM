@@ -347,7 +347,7 @@
             <div class="flex items-center justify-between mb-10">
               <div>
                 <h2 class="text-2xl font-bold text-slate-900">系统通知</h2>
-                <p class="text-slate-500 text-sm mt-1">查看来自 Nexus AI 的重要更新和安全提醒</p>
+                <p class="text-slate-500 text-sm mt-1">查看来自 悟空AI CRM 的重要更新和安全提醒</p>
               </div>
               <button class="px-4 py-2 text-sm font-bold text-primary hover:bg-primary/5 rounded-lg transition-all">
                 全部标记为已读
@@ -362,7 +362,7 @@
                     <span class="material-symbols-outlined text-sm">smart_toy</span>
                   </div>
                   <div>
-                    <p class="text-sm font-bold text-slate-900">Nexus AI 助手</p>
+                    <p class="text-sm font-bold text-slate-900">悟空AI CRM 助手</p>
                     <p class="text-[10px] text-slate-400 font-medium">系统自动发送</p>
                   </div>
                 </div>
@@ -472,7 +472,7 @@ const systemNotifications = ref([
   {
     id: 1,
     title: '系统核心引擎升级完成',
-    content: 'Nexus AI 已升级至最新版本。本次更新优化了长文本理解能力，并新增了对多语种会议摘要的支持。',
+    content: '悟空AI CRM 已升级至最新版本。本次更新优化了长文本理解能力，并新增了对多语种会议摘要的支持。',
     time: '1小时前',
     type: 'info',
     category: '系统更新',

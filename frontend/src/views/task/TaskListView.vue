@@ -665,6 +665,8 @@ import { useTaskStore } from '@/stores/task'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { aiParseTask } from '@/api/task'
+import { queryCustomerList } from '@/api/customer'
+import { queryUserList } from '@/api/auth'
 import type { Task, TaskAddBO, TaskStatus } from '@/types/common'
 
 const taskStore = useTaskStore()
@@ -679,6 +681,51 @@ const selectedTask = ref<Task | null>(null)
 const submitting = ref(false)
 const aiParseInput = ref('')
 const aiParsing = ref(false)
+
+// Customer search
+const customerOptions = ref<{ value: string; label: string }[]>([])
+const customerSearchLoading = ref(false)
+
+async function searchCustomers(query: string) {
+  if (!query) {
+    customerOptions.value = []
+    return
+  }
+  customerSearchLoading.value = true
+  try {
+    const res = await queryCustomerList({ keyword: query, page: 1, limit: 20 })
+    customerOptions.value = (res.list || []).map((c: any) => ({
+      value: String(c.customerId),
+      label: c.companyName
+    }))
+  } finally {
+    customerSearchLoading.value = false
+  }
+}
+
+// User search for participants
+const userOptions = ref<{ value: string; label: string }[]>([])
+const userSearchLoading = ref(false)
+
+async function searchUsers(query: string) {
+  if (!query) {
+    userOptions.value = []
+    return
+  }
+  userSearchLoading.value = true
+  try {
+    const res = await queryUserList({ search: query })
+    userOptions.value = (res.list || []).map((u: any) => ({
+      value: u.realname || u.username,
+      label: u.realname || u.username
+    }))
+  } finally {
+    userSearchLoading.value = false
+  }
+}
+
+// Selected participant names as array for el-select multiple
+const selectedParticipants = ref<string[]>([])
 
 const formData = reactive<TaskAddBO & { status?: TaskStatus; customerName?: string; assignedToName?: string }>({
   title: '',
@@ -797,6 +844,10 @@ async function handleDelete(task: Task) {
 async function handleSubmit() {
   if (!formData.title.trim()) {
     ElMessage.warning('请输入任务标题')
+    return
+  }
+  if (!formData.dueDate) {
+    ElMessage.warning('请选择截止时间')
     return
   }
 
