@@ -32,7 +32,7 @@ export function getLoginUserDetail(): Promise<UserInfo> {
 /**
  * Update user profile
  */
-export function updateProfile(data: { realname?: string; mobile?: string }): Promise<void> {
+export function updateProfile(data: { userId: string | number; realname?: string; mobile?: string; email?: string; post?: string; img?: string }): Promise<void> {
   return post('/managerUser/updateUser', data)
 }
 
@@ -97,18 +97,10 @@ export function deleteUsers(userIds: (number | string)[]): Promise<void> {
 }
 
 /**
- * Register
+ * 获取当前用户权限树
  */
-export interface RegisterParams {
-  email: string
-  password: string
-  verificationCode: string
-  companyName: string
-  realname?: string
-}
-
-export function register(params: RegisterParams): Promise<string> {
-  return post<string>('/auth/register', params)
+export function getUserAuth(): Promise<Record<string, any>> {
+  return post<Record<string, any>>('/managerRole/auth')
 }
 
 /**
