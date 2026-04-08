@@ -62,10 +62,10 @@ export function addKnowledgeTag(knowledgeId: string, tagName: string): Promise<v
 }
 
 /**
- * Get knowledge preview content
+ * Get knowledge file content for frontend preview
  */
-export function getKnowledgePreview(id: string): Promise<Blob> {
-  return get(`/knowledge/preview/${id}`, { responseType: 'blob' })
+export function getKnowledgeFileBlob(id: string): Promise<Blob> {
+  return get(`/knowledge/download/${id}`, { responseType: 'blob' })
 }
 
 /**

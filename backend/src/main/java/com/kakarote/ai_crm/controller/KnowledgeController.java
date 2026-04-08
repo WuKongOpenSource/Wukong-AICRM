@@ -1,29 +1,23 @@
 package com.kakarote.ai_crm.controller;
 
-import cn.hutool.core.util.StrUtil;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.auth.RequirePermission;
-import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.Result;
-import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
-import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
-import com.kakarote.ai_crm.service.WeKnoraClient;
-import com.kakarote.ai_crm.utils.UserUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -50,9 +44,6 @@ public class KnowledgeController {
 
     @Autowired
     private FileStorageService fileStorageService;
-
-    @Autowired
-    private WeKnoraClient weKnoraClient;
 
     @PostMapping("/upload")
     @Operation(summary = "Upload knowledge file")
@@ -100,50 +91,26 @@ public class KnowledgeController {
         String encodedFilename = URLEncoder.encode(knowledge.getName(), StandardCharsets.UTF_8)
                 .replace("+", "%20");
 
-        return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encodedFilename)
-                .body(resource);
+        ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.ok()
+                .contentType(resolveMediaType(knowledge))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encodedFilename);
+
+        if (knowledge.getFileSize() != null && knowledge.getFileSize() >= 0) {
+            responseBuilder.contentLength(knowledge.getFileSize());
+        }
+
+        return responseBuilder.body(resource);
     }
 
-    @GetMapping("/preview/{id}")
-    @Operation(summary = "Preview knowledge file")
-    @RequirePermission("knowledge:view")
-    public ResponseEntity<Resource> preview(@PathVariable("id") Long id) {
-        if (!weKnoraClient.isEnabled()) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeKnora preview is not enabled");
+    private MediaType resolveMediaType(KnowledgeVO knowledge) {
+        try {
+            if (knowledge.getMimeType() != null && !knowledge.getMimeType().isBlank()) {
+                return MediaType.parseMediaType(knowledge.getMimeType());
+            }
+        } catch (Exception ignored) {
+            // Fallback to filename-based resolution below.
         }
-
-        Knowledge knowledge = knowledgeService.getById(id);
-        if (knowledge == null) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Knowledge file does not exist");
-        }
-        if (StrUtil.isBlank(knowledge.getWeKnoraKnowledgeId())) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Knowledge file is not synced to WeKnora yet");
-        }
-
-        Long tenantId = UserUtil.getTenantId();
-        WeKnoraClient.TenantWeKnoraContext ctx = weKnoraClient.getOrCreateTenantContext(tenantId);
-        WeKnoraClient.WeKnoraPreviewResult preview = weKnoraClient.getKnowledgePreview(
-                knowledge.getWeKnoraKnowledgeId(),
-                ctx.getApiKey()
-        );
-        if (preview == null || preview.getBody() == null || preview.getBody().length == 0) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Knowledge preview is unavailable");
-        }
-
-        ByteArrayResource resource = new ByteArrayResource(preview.getBody());
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(preview.getContentType() != null ? preview.getContentType() : MediaType.APPLICATION_OCTET_STREAM);
-        headers.setContentLength(preview.getBody().length);
-
-        String encodedFilename = URLEncoder.encode(knowledge.getName(), StandardCharsets.UTF_8)
-                .replace("+", "%20");
-        headers.set(HttpHeaders.CONTENT_DISPOSITION, "inline; filename*=UTF-8''" + encodedFilename);
-
-        return ResponseEntity.ok()
-                .headers(headers)
-                .body(resource);
+        return MediaTypeFactory.getMediaType(knowledge.getName()).orElse(MediaType.APPLICATION_OCTET_STREAM);
     }
 
     @PostMapping("/reparse/{id}")

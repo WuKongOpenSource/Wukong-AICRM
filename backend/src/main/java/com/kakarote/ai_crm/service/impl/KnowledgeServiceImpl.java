@@ -109,6 +109,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         knowledge.setCustomerId(customerId);
         knowledge.setFilePath(relativePath);
         knowledge.setFileSize(file.getSize());
+        knowledge.setMimeType(file.getContentType());
         knowledge.setSummary(summary);
         knowledge.setUploadUserId(UserUtil.getUserId());
 

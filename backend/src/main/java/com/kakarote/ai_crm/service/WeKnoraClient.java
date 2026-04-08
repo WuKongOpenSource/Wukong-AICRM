@@ -105,13 +105,6 @@ public class WeKnoraClient {
         private final boolean completed;
     }
 
-    @Data
-    public static class WeKnoraPreviewResult {
-        private final byte[] body;
-        private final MediaType contentType;
-        private final String contentDisposition;
-    }
-
     /**
      * 获取或创建租户的 WeKnora 上下文（懒初始化）
      * 流程：注册 WeKnora 租户 → 创建 Embedding 模型 → 创建知识库
@@ -862,34 +855,6 @@ public class WeKnoraClient {
             return null;
         } catch (Exception e) {
             log.error("WeKnora 获取知识详情异常: {}", e.getMessage(), e);
-            return null;
-        }
-    }
-
-    public WeKnoraPreviewResult getKnowledgePreview(String weKnoraKnowledgeId, String tenantApiKey) {
-        if (!isEnabled() || StrUtil.isBlank(weKnoraKnowledgeId)) return null;
-
-        String url = config.getBaseUrl() + "/knowledge/" + weKnoraKnowledgeId + "/preview";
-        HttpEntity<?> requestEntity = new HttpEntity<>(createHeaders(tenantApiKey));
-
-        try {
-            ResponseEntity<byte[]> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, byte[].class);
-            if (!response.getStatusCode().is2xxSuccessful()) {
-                log.warn("WeKnora preview returned non-success status: {} - {}", weKnoraKnowledgeId, response.getStatusCode());
-                return null;
-            }
-            byte[] body = response.getBody();
-            if (body == null || body.length == 0) {
-                log.warn("WeKnora preview returned empty body: {}", weKnoraKnowledgeId);
-                return null;
-            }
-            return new WeKnoraPreviewResult(
-                    body,
-                    response.getHeaders().getContentType(),
-                    response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)
-            );
-        } catch (Exception e) {
-            log.error("WeKnora preview request failed: {}", e.getMessage(), e);
             return null;
         }
     }

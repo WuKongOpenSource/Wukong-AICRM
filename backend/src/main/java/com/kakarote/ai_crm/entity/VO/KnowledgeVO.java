@@ -46,6 +46,9 @@ public class KnowledgeVO {
     @Schema(description = "AI摘要")
     private String summary;
 
+    @Schema(description = "鏂囨湰鍐呭")
+    private String contentText;
+
     @Schema(description = "状态")
     private Integer status;
 
