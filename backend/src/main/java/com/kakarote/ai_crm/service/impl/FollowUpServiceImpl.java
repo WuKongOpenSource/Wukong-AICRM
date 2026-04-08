@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -8,9 +9,11 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
+import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
+import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpAddBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpAiParseBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpQueryBO;
@@ -21,24 +24,32 @@ import com.kakarote.ai_crm.entity.VO.FollowUpAiParseVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.FollowUpMapper;
+import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IFollowUpService;
+import com.kakarote.ai_crm.utils.AiMediaUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.tika.Tika;
+import org.springframework.ai.content.Media;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.MimeType;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
 /**
- * 跟进记录服务实现
+ * Follow-up service implementation.
  */
 @Slf4j
 @Service
@@ -51,41 +62,52 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
         DateTimeFormatter.ISO_LOCAL_DATE_TIME
     );
+    private static final int MAX_EXTRACTED_TEXT_LENGTH = 3000;
 
     private static final String AI_PARSE_PROMPT_TEMPLATE = """
-        你是一个专业的 CRM 助手。请分析以下跟进记录，提取关键信息并以 JSON 格式返回。
-        客户名称: %s
-        当前时间: %s
+        You are a professional CRM assistant.
+        Analyze the follow-up note and attachment context below, then return JSON only.
 
-        跟进内容:
+        Customer: %s
+        Current time: %s
+
+        User content:
         %s
 
-        请严格按照以下 JSON 格式返回，不要包含任何其他文字、代码块标记或解释：
+        Attachment context:
+        %s
+
+        Keep summary, keyPoints, and todos in the same language as the user's content.
+        Return strict JSON only with this exact shape:
         {
-          "summary": "简明扼要的摘要，1-2句话",
-          "type": "跟进类型，只能是以下之一: call, meeting, email, visit, other",
-          "followTime": "跟进发生的时间，格式 yyyy-MM-dd HH:mm:ss（如未提及则用当前时间）",
-          "nextFollowTime": "建议的下次跟进时间，格式 yyyy-MM-dd HH:mm:ss（根据内容合理推断，通常3-7天后）",
-          "keyPoints": ["要点1", "要点2"],
-          "todos": ["待办事项1", "待办事项2"]
+          "summary": "short summary in 1-2 sentences",
+          "type": "one of: call, meeting, email, visit, other",
+          "followTime": "yyyy-MM-dd HH:mm:ss",
+          "nextFollowTime": "yyyy-MM-dd HH:mm:ss or empty string",
+          "keyPoints": ["point 1", "point 2"],
+          "todos": ["todo 1", "todo 2"]
         }
         """;
 
     @Autowired
     private CustomerMapper customerMapper;
 
+    @Autowired
+    private FileStorageService fileStorageService;
+
     @Lazy
     @Autowired
     private DynamicChatClientProvider chatClientProvider;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Tika tika = new Tika();
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long addFollowUp(FollowUpAddBO followUpAddBO) {
         Customer customer = customerMapper.selectById(followUpAddBO.getCustomerId());
         if (ObjectUtil.isNull(customer)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在或无权限访问");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Customer does not exist or is not accessible");
         }
 
         FollowUp followUp = BeanUtil.copyProperties(followUpAddBO, FollowUp.class);
@@ -103,10 +125,18 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     public void updateFollowUp(FollowUpUpdateBO followUpUpdateBO) {
         FollowUp followUp = getById(followUpUpdateBO.getFollowUpId());
         if (ObjectUtil.isNull(followUp)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "跟进记录不存在");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Follow-up record does not exist");
         }
 
-        BeanUtil.copyProperties(followUpUpdateBO, followUp, "followUpId", "customerId", "createUserId", "createTime", "tenantId");
+        BeanUtil.copyProperties(
+            followUpUpdateBO,
+            followUp,
+            "followUpId",
+            "customerId",
+            "createUserId",
+            "createTime",
+            "tenantId"
+        );
         updateById(followUp);
         syncCustomerFollowUpSummary(followUp.getCustomerId());
     }
@@ -116,7 +146,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     public void deleteFollowUp(Long followUpId) {
         FollowUp followUp = getById(followUpId);
         if (ObjectUtil.isNull(followUp)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "跟进记录不存在");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Follow-up record does not exist");
         }
         Long customerId = followUp.getCustomerId();
         removeById(followUpId);
@@ -141,21 +171,33 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
 
     @Override
     public FollowUpAiParseVO aiParseFollowUp(FollowUpAiParseBO parseBO) {
-        String customerName = StrUtil.blankToDefault(parseBO.getCustomerName(), "未知客户");
+        String customerName = StrUtil.blankToDefault(parseBO.getCustomerName(), "Unknown customer");
         String now = LocalDateTime.now().format(AI_TIME_FORMATTER);
-        String prompt = String.format(AI_PARSE_PROMPT_TEMPLATE, customerName, now, parseBO.getContent());
+        AiModelCapabilities capabilities = chatClientProvider.getCurrentCapabilities();
+        String attachmentContext = buildAttachmentContext(parseBO.getAttachments(), capabilities);
+        String prompt = String.format(
+            AI_PARSE_PROMPT_TEMPLATE,
+            customerName,
+            now,
+            parseBO.getContent(),
+            StrUtil.blankToDefault(attachmentContext, "No usable attachment content")
+        );
 
         try {
-            String response = chatClientProvider.getChatClient()
-                .prompt()
-                .user(prompt)
-                .call()
-                .content();
+            List<Media> mediaList = buildMediaList(parseBO.getAttachments(), capabilities);
+            var requestSpec = chatClientProvider.getChatClient().prompt();
 
-            log.info("AI 跟进解析原始响应: {}", response);
+            if (CollUtil.isNotEmpty(mediaList)) {
+                requestSpec.user(user -> user.text(prompt).media(mediaList.toArray(new Media[0])));
+            } else {
+                requestSpec.user(prompt);
+            }
+
+            String response = requestSpec.call().content();
+            log.info("AI follow-up parse raw response: {}", response);
             return parseAiResponse(response, parseBO.getContent(), now);
         } catch (Exception e) {
-            log.error("AI 跟进解析失败，返回默认值", e);
+            log.error("AI follow-up parse failed, using fallback result", e);
             return buildFallbackResult(parseBO.getContent(), now);
         }
     }
@@ -170,8 +212,11 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
 
             JsonNode root = objectMapper.readTree(json);
             FollowUpAiParseVO vo = new FollowUpAiParseVO();
-            vo.setSummary(getTextOrDefault(root, "summary",
-                originalContent.length() > 100 ? originalContent.substring(0, 100) + "..." : originalContent));
+            vo.setSummary(getTextOrDefault(
+                root,
+                "summary",
+                originalContent.length() > 100 ? originalContent.substring(0, 100) + "..." : originalContent
+            ));
             vo.setType(getTextOrDefault(root, "type", "other"));
             vo.setFollowTime(normalizeRequiredDateTime(getTextOrDefault(root, "followTime", now), now));
             vo.setNextFollowTime(normalizeOptionalDateTime(getTextOrDefault(root, "nextFollowTime", ""), now));
@@ -190,7 +235,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
 
             return vo;
         } catch (Exception e) {
-            log.warn("AI 响应 JSON 解析失败: {}", e.getMessage());
+            log.warn("AI response JSON parse failed: {}", e.getMessage());
             return buildFallbackResult(originalContent, now);
         }
     }
@@ -216,7 +261,10 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
 
     private String normalizeRequiredDateTime(String value, String fallback) {
         LocalDateTime fallbackTime = parseDateTime(fallback, LocalTime.now());
-        LocalDateTime parsed = parseDateTime(StrUtil.blankToDefault(value, fallback), fallbackTime != null ? fallbackTime.toLocalTime() : LocalTime.now());
+        LocalDateTime parsed = parseDateTime(
+            StrUtil.blankToDefault(value, fallback),
+            fallbackTime != null ? fallbackTime.toLocalTime() : LocalTime.now()
+        );
         if (parsed == null) {
             return fallback;
         }
@@ -246,13 +294,145 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             try {
                 return LocalDateTime.parse(trimmed, formatter);
             } catch (DateTimeParseException ignored) {
-                // try next format
+                // try next formatter
             }
         }
 
         try {
             return LocalDate.parse(trimmed, DATE_ONLY_FORMATTER).atTime(defaultTime);
         } catch (DateTimeParseException ignored) {
+            return null;
+        }
+    }
+
+    private String buildAttachmentContext(List<ChatSendBO.AttachmentDTO> attachments, AiModelCapabilities capabilities) {
+        if (CollUtil.isEmpty(attachments)) {
+            return "";
+        }
+
+        StringBuilder context = new StringBuilder();
+        context.append("[Uploaded attachments]\n");
+
+        for (ChatSendBO.AttachmentDTO att : attachments) {
+            String mimeType = att.getMimeType();
+            String fileName = att.getFileName();
+
+            if (mimeType != null && mimeType.startsWith("image/")) {
+                if (capabilities != null && capabilities.isSupportsVision()) {
+                    context.append(String.format("- Image: %s (available as visual input)\n", fileName));
+                } else {
+                    context.append(String.format("- Image: %s (visual analysis is not supported by the current model)\n", fileName));
+                }
+            } else if (isTextFile(mimeType, fileName)) {
+                String textContent = extractFileText(att.getFilePath());
+                if (StrUtil.isNotBlank(textContent)) {
+                    context.append(String.format("- Text file: %s\n```\n%s\n```\n", fileName, textContent));
+                } else {
+                    context.append(String.format("- Text file: %s (content could not be read)\n", fileName));
+                }
+            } else if (isDocumentFile(mimeType, fileName)) {
+                String textContent = extractDocumentText(att.getFilePath());
+                if (StrUtil.isNotBlank(textContent)) {
+                    context.append(String.format("- Document: %s\n```\n%s\n```\n", fileName, textContent));
+                } else {
+                    context.append(String.format("- Document: %s (text could not be extracted)\n", fileName));
+                }
+            } else {
+                context.append(String.format("- File: %s (type: %s)\n", fileName, mimeType));
+            }
+        }
+
+        return context.toString();
+    }
+
+    private List<Media> buildMediaList(List<ChatSendBO.AttachmentDTO> attachments, AiModelCapabilities capabilities) {
+        if (CollUtil.isEmpty(attachments) || capabilities == null || !capabilities.isSupportsVision()) {
+            return Collections.emptyList();
+        }
+
+        List<Media> mediaList = new ArrayList<>();
+        for (ChatSendBO.AttachmentDTO att : attachments) {
+            if (att.getMimeType() != null && att.getMimeType().startsWith("image/")) {
+                try {
+                    MimeType mimeType = MimeType.valueOf(att.getMimeType());
+                    Media media = AiMediaUtil.buildMedia(fileStorageService, att.getFilePath(), mimeType);
+                    mediaList.add(media);
+                } catch (Exception e) {
+                    log.warn("Failed to build image media for follow-up parse: {}", att.getFileName(), e);
+                }
+            }
+        }
+        return mediaList;
+    }
+
+    private boolean isTextFile(String mimeType, String fileName) {
+        if (mimeType != null && (mimeType.startsWith("text/") || "application/json".equals(mimeType))) {
+            return true;
+        }
+        if (fileName != null) {
+            String lower = fileName.toLowerCase();
+            return lower.endsWith(".txt") || lower.endsWith(".md") || lower.endsWith(".csv")
+                || lower.endsWith(".json") || lower.endsWith(".xml") || lower.endsWith(".yaml")
+                || lower.endsWith(".yml") || lower.endsWith(".log");
+        }
+        return false;
+    }
+
+    private boolean isDocumentFile(String mimeType, String fileName) {
+        if (mimeType != null) {
+            if (mimeType.equals("application/pdf")
+                || mimeType.equals("application/msword")
+                || mimeType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                || mimeType.equals("application/vnd.ms-excel")
+                || mimeType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                || mimeType.equals("application/vnd.ms-powerpoint")
+                || mimeType.equals("application/vnd.openxmlformats-officedocument.presentationml.presentation")) {
+                return true;
+            }
+        }
+        if (fileName != null) {
+            String lower = fileName.toLowerCase();
+            return lower.endsWith(".pdf") || lower.endsWith(".doc") || lower.endsWith(".docx")
+                || lower.endsWith(".xls") || lower.endsWith(".xlsx")
+                || lower.endsWith(".ppt") || lower.endsWith(".pptx");
+        }
+        return false;
+    }
+
+    private String extractFileText(String filePath) {
+        try (InputStream inputStream = fileStorageService.getFileStream(filePath)) {
+            if (inputStream == null) {
+                return null;
+            }
+
+            byte[] bytes = inputStream.readNBytes(MAX_EXTRACTED_TEXT_LENGTH * 3);
+            String text = new String(bytes, StandardCharsets.UTF_8);
+            if (text.length() > MAX_EXTRACTED_TEXT_LENGTH) {
+                text = text.substring(0, MAX_EXTRACTED_TEXT_LENGTH) + "\n...(truncated)";
+            }
+            return text;
+        } catch (Exception e) {
+            log.warn("Failed to read text attachment: {}", filePath, e);
+            return null;
+        }
+    }
+
+    private String extractDocumentText(String filePath) {
+        try (InputStream inputStream = fileStorageService.getFileStream(filePath)) {
+            if (inputStream == null) {
+                return null;
+            }
+
+            String text = tika.parseToString(inputStream);
+            if (StrUtil.isBlank(text)) {
+                return null;
+            }
+            if (text.length() > MAX_EXTRACTED_TEXT_LENGTH) {
+                text = text.substring(0, MAX_EXTRACTED_TEXT_LENGTH) + "\n...(truncated)";
+            }
+            return text.trim();
+        } catch (Exception e) {
+            log.warn("Failed to extract document text: {}", filePath, e);
             return null;
         }
     }

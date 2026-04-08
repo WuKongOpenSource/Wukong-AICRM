@@ -9,9 +9,11 @@ import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.ContactAddBO;
 import com.kakarote.ai_crm.entity.BO.ContactQueryBO;
 import com.kakarote.ai_crm.entity.BO.ContactUpdateBO;
+import com.kakarote.ai_crm.entity.BO.CustomerAiParseBO;
 import com.kakarote.ai_crm.entity.PO.Contact;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.VO.ContactVO;
+import com.kakarote.ai_crm.entity.VO.CustomerAiParseVO;
 import com.kakarote.ai_crm.mapper.ContactMapper;
 import com.kakarote.ai_crm.service.IContactService;
 import com.kakarote.ai_crm.service.ICustomFieldService;
@@ -174,5 +176,10 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
         }
 
         return page;
+    }
+
+    @Override
+    public CustomerAiParseVO aiParseContact(CustomerAiParseBO parseBO) {
+        return customerService.aiParseCustomer(parseBO);
     }
 }

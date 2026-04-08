@@ -179,8 +179,7 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
-import { addContact, updateContact } from '@/api/contact'
-import { aiParseCustomer } from '@/api/customer'
+import { addContact, aiParseContact, updateContact } from '@/api/contact'
 import type { CustomerAiParseVO } from '@/api/customer'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { isRequestErrorHandled } from '@/utils/requestError'
@@ -310,12 +309,17 @@ async function handleAiExtract() {
       imageMimeType = aiImageFile.value.type
     }
 
-    const result = await aiParseCustomer({
+    const result = await aiParseContact({
       content: aiInputText.value.trim() || '请从图片中提取联系人信息',
       imageObjectKey,
       imageMimeType
     })
     aiParseResult.value = result
+
+    if (!hasContactFormFieldFilled(result)) {
+      ElMessage.warning('本次智能解析没有提取到可填充的信息，请确认图片清晰或补充文字后重试')
+      return
+    }
 
     if (result.contactName) formData.name = result.contactName
     if (result.contactPhone) formData.phone = result.contactPhone
@@ -324,6 +328,11 @@ async function handleAiExtract() {
     if (result.remark) formData.notes = result.remark
 
     ElMessage.success('AI 提取完成，信息已自动填充')
+    /*
+      ElMessage.warning('本次智能解析没有提取到可填充的信息，请确认图片清晰或补充文字后重试')
+      return
+    */
+
   } catch (error: unknown) {
     console.error('AI parse contact failed:', error)
     if (!isRequestErrorHandled(error)) {
@@ -333,6 +342,17 @@ async function handleAiExtract() {
   } finally {
     aiParsing.value = false
   }
+}
+
+function hasContactFormFieldFilled(result: CustomerAiParseVO | null): boolean {
+  if (!result) return false
+  return Boolean(
+    result.contactName
+    || result.contactPhone
+    || result.contactEmail
+    || result.contactPosition
+    || result.remark
+  )
 }
 
 function resetForm() {

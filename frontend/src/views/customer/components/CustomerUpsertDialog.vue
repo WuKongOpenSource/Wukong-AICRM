@@ -538,6 +538,11 @@ async function handleAiExtract() {
     })
     aiParseResult.value = result
 
+    if (!hasCustomerFieldFilled(result)) {
+      ElMessage.warning('本次智能解析没有提取到可填充的信息，请确认图片清晰或补充文字后重试')
+      return
+    }
+
     if (result.companyName) {
       formData.companyName = result.companyName
       customerFieldValues.value.companyName = result.companyName
@@ -576,6 +581,21 @@ async function handleAiExtract() {
   } finally {
     aiParsing.value = false
   }
+}
+
+function hasCustomerFieldFilled(result: CustomerAiParseVO | null): boolean {
+  if (!result) return false
+  return Boolean(
+    result.companyName
+    || result.industry
+    || result.level
+    || result.stage
+    || result.source
+    || result.remark
+    || result.contactName
+    || result.contactPhone
+    || result.contactEmail
+  )
 }
 
 async function handleSubmit() {

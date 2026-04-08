@@ -22,6 +22,7 @@ import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
 import com.kakarote.ai_crm.mapper.ChatMessageMapper;
 import com.kakarote.ai_crm.mapper.ChatSessionMapper;
 import com.kakarote.ai_crm.service.*;
+import com.kakarote.ai_crm.utils.AiMediaUtil;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
@@ -38,7 +39,6 @@ import org.springframework.util.MimeType;
 import reactor.core.publisher.Flux;
 
 import java.io.InputStream;
-import java.net.URI;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.TextStyle;
@@ -612,12 +612,8 @@ public class ChatServiceImpl implements IChatService {
         for (ChatSendBO.AttachmentDTO att : attachments) {
             if (att.getMimeType() != null && att.getMimeType().startsWith("image/")) {
                 try {
-                    String imageUrl = fileStorageService.getUrl(att.getFilePath());
                     MimeType mimeType = MimeType.valueOf(att.getMimeType());
-                    Media media = Media.builder()
-                            .mimeType(mimeType)
-                            .data(URI.create(imageUrl).toURL())
-                            .build();
+                    Media media = AiMediaUtil.buildMedia(fileStorageService, att.getFilePath(), mimeType);
                     mediaList.add(media);
                     log.debug("添加图片媒体: {}", att.getFileName());
                 } catch (Exception e) {

@@ -26,6 +26,7 @@ import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.ICustomFieldService;
 import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
+import com.kakarote.ai_crm.utils.AiMediaUtil;
 import com.kakarote.ai_crm.utils.UserUtil;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
@@ -42,7 +43,6 @@ import org.springframework.util.MimeType;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
-import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -1746,14 +1746,14 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             String response;
 
             if (StrUtil.isNotEmpty(parseBO.getImageObjectKey())) {
+                if (!chatClientProvider.getCurrentCapabilities().isSupportsVision()) {
+                    throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                            "当前 AI 模型不支持图片识别，请在系统设置中切换到支持视觉输入的模型后重试");
+                }
                 // Multimodal: text + image
-                String imageUrl = fileStorageService.getUrl(parseBO.getImageObjectKey());
                 String mimeTypeStr = StrUtil.blankToDefault(parseBO.getImageMimeType(), "image/png");
                 MimeType mimeType = MimeType.valueOf(mimeTypeStr);
-                Media media = Media.builder()
-                        .mimeType(mimeType)
-                        .data(URI.create(imageUrl).toURL())
-                        .build();
+                Media media = AiMediaUtil.buildMedia(fileStorageService, parseBO.getImageObjectKey(), mimeType);
 
                 response = chatClientProvider.getChatClient()
                         .prompt()
@@ -1770,10 +1770,18 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             }
 
             log.info("AI 客户录入解析原始响应: {}", response);
-            return parseCustomerAiResponse(response);
+            CustomerAiParseVO result = parseCustomerAiResponse(response);
+            if (isEmptyCustomerAiParseResult(result)) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR,
+                        "AI 未提取到可填充的信息，请确认图片清晰或补充文字描述后重试");
+            }
+            return result;
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
             log.error("AI 客户录入解析失败", e);
-            return buildFallbackCustomerResult();
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR,
+                    "AI 提取失败，请检查图片格式、模型配置后重试");
         }
     }
 
@@ -2414,5 +2422,27 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         vo.setTags(List.of());
         vo.setKeyPoints(List.of());
         return vo;
+    }
+
+    private boolean isEmptyCustomerAiParseResult(CustomerAiParseVO result) {
+        if (result == null) {
+            return true;
+        }
+        return StrUtil.isAllBlank(
+                result.getCompanyName(),
+                result.getIndustry(),
+                result.getLevel(),
+                result.getStage(),
+                result.getSource(),
+                result.getRemark(),
+                result.getContactName(),
+                result.getContactPhone(),
+                result.getContactEmail(),
+                result.getContactPosition(),
+                result.getSummary(),
+                result.getNextStep()
+        ) && (result.getScore() == null || result.getScore() <= 0)
+                && (result.getTags() == null || result.getTags().isEmpty())
+                && (result.getKeyPoints() == null || result.getKeyPoints().isEmpty());
     }
 }

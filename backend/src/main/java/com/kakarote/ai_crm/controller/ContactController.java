@@ -6,7 +6,9 @@ import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.ContactAddBO;
 import com.kakarote.ai_crm.entity.BO.ContactQueryBO;
 import com.kakarote.ai_crm.entity.BO.ContactUpdateBO;
+import com.kakarote.ai_crm.entity.BO.CustomerAiParseBO;
 import com.kakarote.ai_crm.entity.VO.ContactVO;
+import com.kakarote.ai_crm.entity.VO.CustomerAiParseVO;
 import com.kakarote.ai_crm.service.IContactService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -73,5 +75,12 @@ public class ContactController {
     public Result<String> setPrimary(@PathVariable("id") Long id) {
         contactService.setPrimary(id);
         return Result.ok();
+    }
+
+    @PostMapping("/ai-parse")
+    @Operation(summary = "AI 鏅鸿兘褰曞叆瑙ｆ瀽鑱旂郴浜轰俊鎭?")
+    @RequirePermission("contact:create")
+    public Result<CustomerAiParseVO> aiParse(@Valid @RequestBody CustomerAiParseBO parseBO) {
+        return Result.ok(contactService.aiParseContact(parseBO));
     }
 }

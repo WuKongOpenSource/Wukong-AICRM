@@ -1,6 +1,7 @@
 import { post } from '@/utils/request'
 import type { FollowUp, FollowUpAddBO, FollowUpQueryBO, FollowUpUpdateBO } from '@/types/customer'
 import type { PageResult } from '@/types/api'
+import type { ChatAttachmentDTO } from '@/types/common'
 
 /**
  * Add follow-up record
@@ -44,6 +45,7 @@ export interface AiFollowUpParseBO {
   content: string
   customerName?: string
   customerId?: string
+  attachments?: ChatAttachmentDTO[]
 }
 
 export interface AiFollowUpParseVO {

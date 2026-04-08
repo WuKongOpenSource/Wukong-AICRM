@@ -1,6 +1,7 @@
 import { post } from '@/utils/request'
 import type { Contact, ContactAddBO, ContactQueryBO } from '@/types/customer'
 import type { PageResult } from '@/types/api'
+import type { CustomerAiParseBO, CustomerAiParseVO } from '@/api/customer'
 
 /**
  * Add contact
@@ -42,4 +43,8 @@ export function setPrimaryContact(id: string): Promise<void> {
  */
 export function queryContactPageList(query: ContactQueryBO): Promise<PageResult<Contact>> {
   return post('/contact/queryPageList', query)
+}
+
+export function aiParseContact(data: CustomerAiParseBO): Promise<CustomerAiParseVO> {
+  return post('/contact/ai-parse', data)
 }
