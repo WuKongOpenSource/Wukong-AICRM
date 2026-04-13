@@ -190,6 +190,9 @@
             <el-tag :type="currentCapabilities.supportsVision ? 'success' : 'info'">
               {{ currentCapabilities.supportsVision ? '支持视觉输入' : '文本模型' }}
             </el-tag>
+            <el-tag :type="currentCapabilities.supportsAudioTranscription ? 'success' : 'info'">
+              {{ currentCapabilities.supportsAudioTranscription ? 'Speech-to-text' : 'No speech-to-text' }}
+            </el-tag>
           </div>
           <div class="mt-1 text-xs text-slate-400">
             能力展示优先使用当前已保存模型的后端判定；修改模型后，最终以“测试连接”和“保存配置”的校验结果为准。
@@ -597,6 +600,7 @@ function inferCapabilities(provider: AiProvider | undefined, model: string | und
   let supportsStream = currentProviderPreset.value?.supportsStream ?? true
   let supportsToolCall = currentProviderPreset.value?.supportsToolCall ?? true
   let supportsVision = currentProviderPreset.value?.supportsVision ?? false
+  const supportsAudioTranscription = currentProviderPreset.value?.supportsAudioTranscription ?? false
 
   if (normalizedProvider === 'hunyuan') {
     supportsToolCall = normalizedModel.includes('functioncall')
@@ -616,7 +620,8 @@ function inferCapabilities(provider: AiProvider | undefined, model: string | und
   return {
     supportsStream,
     supportsToolCall,
-    supportsVision
+    supportsVision,
+    supportsAudioTranscription
   }
 }
 </script>

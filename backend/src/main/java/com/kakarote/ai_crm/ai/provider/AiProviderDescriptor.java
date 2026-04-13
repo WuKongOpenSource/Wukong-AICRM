@@ -43,6 +43,7 @@ public class AiProviderDescriptor {
                 .supportsStream(true)
                 .supportsToolCall(true)
                 .supportsVision(false)
+                .supportsAudioTranscription(false)
                 .build();
 
         boolean supportsToolCall = defaults.isSupportsToolCall();
@@ -65,6 +66,7 @@ public class AiProviderDescriptor {
                 .supportsStream(defaults.isSupportsStream())
                 .supportsToolCall(supportsToolCall)
                 .supportsVision(supportsVision)
+                .supportsAudioTranscription(defaults.isSupportsAudioTranscription())
                 .build();
     }
 

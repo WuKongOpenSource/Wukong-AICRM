@@ -2,7 +2,9 @@ package com.kakarote.ai_crm.controller;
 
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.auth.RequirePermission;
+import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.Result;
+import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAiSearchBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
@@ -11,9 +13,11 @@ import com.kakarote.ai_crm.entity.VO.KnowledgeAiSearchVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
+import com.kakarote.ai_crm.utils.DocToHtmlConverter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
@@ -36,6 +40,7 @@ import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
+@Slf4j
 @RestController
 @RequestMapping("/knowledge")
 @Tag(name = "Knowledge")
@@ -120,6 +125,27 @@ public class KnowledgeController {
             // Fallback to filename-based resolution below.
         }
         return MediaTypeFactory.getMediaType(knowledge.getName()).orElse(MediaType.APPLICATION_OCTET_STREAM);
+    }
+
+    @GetMapping("/preview-html/{id}")
+    @Operation(summary = "Preview .doc file as HTML")
+    @RequirePermission("knowledge:view")
+    public Result<String> previewHtml(@PathVariable("id") Long id) {
+        KnowledgeVO knowledge = knowledgeService.getKnowledgeDetail(id);
+        String name = knowledge.getName();
+        String nameLower = (name != null ? name.toLowerCase() : "");
+        if (!nameLower.endsWith(".doc") || nameLower.endsWith(".docx")) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "该文件不是 .doc 格式");
+        }
+        try (InputStream inputStream = fileStorageService.getFileStream(knowledge.getFilePath())) {
+            String html = DocToHtmlConverter.convertToHtml(inputStream);
+            return Result.ok(html);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to convert .doc to HTML, knowledgeId={}", id, e);
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "文档转换失败，请下载后查看");
+        }
     }
 
     @PostMapping("/reparse/{id}")

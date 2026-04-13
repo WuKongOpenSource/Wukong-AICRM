@@ -515,6 +515,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
                     option.setSupportsStream(capabilities.isSupportsStream());
                     option.setSupportsToolCall(capabilities.isSupportsToolCall());
                     option.setSupportsVision(capabilities.isSupportsVision());
+                    option.setSupportsAudioTranscription(capabilities.isSupportsAudioTranscription());
 
                     SavedProviderConfigSnapshot savedConfig = savedProviderConfigs.get(descriptor.getCode());
                     option.setConfigured(savedConfig != null);
@@ -540,6 +541,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         vo.setSupportsStream(capabilities.isSupportsStream());
         vo.setSupportsToolCall(capabilities.isSupportsToolCall());
         vo.setSupportsVision(capabilities.isSupportsVision());
+        vo.setSupportsAudioTranscription(capabilities.isSupportsAudioTranscription());
         return vo;
     }
 

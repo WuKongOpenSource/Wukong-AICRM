@@ -153,6 +153,19 @@ public class DynamicChatClientProvider {
         return resolveRuntimeConfig(loadAiConfigsFromDB()).capabilities();
     }
 
+    public AiRuntimeConfigSnapshot getCurrentRuntimeConfigSnapshot() {
+        AiRuntimeConfig runtimeConfig = resolveRuntimeConfig(loadAiConfigsFromDB());
+        return new AiRuntimeConfigSnapshot(
+                runtimeConfig.providerCode(),
+                runtimeConfig.apiUrl(),
+                runtimeConfig.apiKey(),
+                runtimeConfig.model(),
+                runtimeConfig.extraHeadersJson(),
+                runtimeConfig.capabilities(),
+                runtimeConfig.mode()
+        );
+    }
+
     public AiMode getCurrentMode() {
         return resolveRuntimeConfig(loadAiConfigsFromDB()).mode();
     }
@@ -467,6 +480,7 @@ public class DynamicChatClientProvider {
                 .supportsStream(true)
                 .supportsToolCall(true)
                 .supportsVision(false)
+                .supportsAudioTranscription(false)
                 .build();
     }
 
@@ -506,6 +520,17 @@ public class DynamicChatClientProvider {
             String model,
             Double temperature,
             Integer maxTokens,
+            String extraHeadersJson,
+            AiModelCapabilities capabilities,
+            AiMode mode
+    ) {
+    }
+
+    public record AiRuntimeConfigSnapshot(
+            String providerCode,
+            String apiUrl,
+            String apiKey,
+            String model,
             String extraHeadersJson,
             AiModelCapabilities capabilities,
             AiMode mode

@@ -26,7 +26,7 @@ public final class AiProviderRegistry {
                 .recommendedModels(List.of("gpt-5.4", "gpt-5.2", "gpt-5-mini", "gpt-5-nano"))
                 .modelHint("填写 OpenAI 官方模型名称，例如 gpt-5.4。")
                 .extraHeadersHint("")
-                .defaultCapabilities(defaultCapabilities())
+                .defaultCapabilities(defaultCapabilities(true))
                 .apiUrlKeywords(List.of("api.openai.com"))
                 .toolCallEnabledKeywords(List.of())
                 .toolCallDisabledKeywords(List.of())
@@ -49,7 +49,7 @@ public final class AiProviderRegistry {
                 ))
                 .modelHint("填写通义千问模型名称，例如 qwen3.5-plus。")
                 .extraHeadersHint("")
-                .defaultCapabilities(defaultCapabilities())
+                .defaultCapabilities(defaultCapabilities(true))
                 .apiUrlKeywords(List.of("dashscope.aliyuncs.com"))
                 .toolCallEnabledKeywords(List.of())
                 .toolCallDisabledKeywords(List.of())
@@ -136,6 +136,7 @@ public final class AiProviderRegistry {
                         .supportsStream(true)
                         .supportsToolCall(false)
                         .supportsVision(false)
+                        .supportsAudioTranscription(false)
                         .build())
                 .apiUrlKeywords(List.of("api.hunyuan.cloud.tencent.com", "hunyuan.cloud.tencent.com"))
                 .toolCallEnabledKeywords(List.of("functioncall"))
@@ -239,10 +240,15 @@ public final class AiProviderRegistry {
     }
 
     private static AiModelCapabilities defaultCapabilities() {
+        return defaultCapabilities(false);
+    }
+
+    private static AiModelCapabilities defaultCapabilities(boolean supportsAudioTranscription) {
         return AiModelCapabilities.builder()
                 .supportsStream(true)
                 .supportsToolCall(true)
                 .supportsVision(false)
+                .supportsAudioTranscription(supportsAudioTranscription)
                 .build();
     }
 }

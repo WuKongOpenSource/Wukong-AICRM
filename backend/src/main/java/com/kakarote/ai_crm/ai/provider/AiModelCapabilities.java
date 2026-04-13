@@ -28,4 +28,6 @@ public class AiModelCapabilities {
      * 是否支持视觉输入。
      */
     private boolean supportsVision;
+
+    private boolean supportsAudioTranscription;
 }

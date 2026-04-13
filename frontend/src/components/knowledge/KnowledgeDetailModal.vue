@@ -142,6 +142,18 @@
                 />
               </div>
 
+              <div
+                v-else-if="showDocHtmlPreview"
+                class="doc-html-preview-shell h-full overflow-auto bg-white"
+              >
+                <iframe
+                  ref="docIframeRef"
+                  sandbox="allow-same-origin"
+                  class="h-full w-full border-0"
+                  title="Document preview"
+                />
+              </div>
+
               <div v-else class="h-full overflow-y-auto p-6">
                 <div
                   v-if="previewNotice || previewFailed"
@@ -355,17 +367,19 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import DOMPurify from 'dompurify'
 import { useResponsive } from '@/composables/useResponsive'
 import {
   aiAnalyzeKnowledge,
   askKnowledgeQuestion,
   downloadKnowledge,
   getKnowledgeDetail,
-  getKnowledgeFileBlob
+  getKnowledgeFileBlob,
+  getKnowledgePreviewHtml
 } from '@/api/knowledge'
 import type { Knowledge, KnowledgeAiAnalyzeVO } from '@/types/common'
 
-type PreviewKind = 'docx' | 'excel' | 'pdf' | 'pptx' | 'text' | 'unsupported' | 'none'
+type PreviewKind = 'doc' | 'docx' | 'excel' | 'pdf' | 'pptx' | 'text' | 'unsupported' | 'none'
 
 const VueOfficeDocx = defineAsyncComponent(async () => {
   await import('@vue-office/docx/lib/index.css')
@@ -421,6 +435,8 @@ const chatMessages = ref<Array<{ role: string; content: string; isStreaming?: bo
 const chatInput = ref('')
 const isStreaming = ref(false)
 const scrollContainerRef = ref<HTMLElement | null>(null)
+const docHtmlContent = ref('')
+const docIframeRef = ref<HTMLIFrameElement | null>(null)
 
 const activePreviewComponent = computed(() => {
   switch (previewKind.value) {
@@ -443,6 +459,10 @@ const showPdfPreview = computed(() => {
 
 const showOfficePreview = computed(() => {
   return Boolean(activePreviewComponent.value && previewSource.value && !previewFailed.value)
+})
+
+const showDocHtmlPreview = computed(() => {
+  return previewKind.value === 'doc' && Boolean(docHtmlContent.value) && !previewFailed.value
 })
 
 const displayedText = computed(() => {
@@ -469,6 +489,7 @@ function resetPreviewState() {
   previewNotice.value = ''
   previewText.value = ''
   previewFailed.value = false
+  docHtmlContent.value = ''
 }
 
 function close() {
@@ -518,7 +539,10 @@ function resolvePreviewKind(filename?: string, mimeType?: string): PreviewKind {
   ) {
     return 'text'
   }
-  if (['doc', 'ppt'].includes(extension)) {
+  if (extension === 'doc') {
+    return 'doc'
+  }
+  if (extension === 'ppt') {
     return 'unsupported'
   }
   return 'unsupported'
@@ -540,7 +564,7 @@ async function tryReadJsonBlob(blob: Blob): Promise<{ msg?: string } | null> {
 
 function getUnsupportedNotice(filename?: string): string {
   const extension = getFileExtension(filename)
-  if (['doc', 'ppt'].includes(extension)) {
+  if (extension === 'ppt') {
     return '当前旧版 Office 格式暂不支持纯前端预览，请下载后查看。'
   }
   if (extension === 'xls') {
@@ -583,6 +607,43 @@ watch(
   { immediate: true }
 )
 
+watch(
+  [showDocHtmlPreview, docHtmlContent],
+  ([show, html]) => {
+    if (show && html) {
+      nextTick(() => {
+        const iframe = docIframeRef.value
+        if (!iframe) return
+        const sanitized = DOMPurify.sanitize(html, {
+          WHOLE_DOCUMENT: true,
+          ADD_TAGS: ['style', 'link'],
+          ADD_ATTR: ['style', 'class', 'color', 'face', 'size'],
+          ALLOW_DATA_ATTR: false
+        })
+        const doc = iframe.contentDocument
+        if (doc) {
+          doc.open()
+          doc.write(sanitized)
+          doc.close()
+          const baseStyle = doc.createElement('style')
+          baseStyle.textContent =
+            'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; ' +
+            'padding: 24px 32px; line-height: 1.6; max-width: 100%; overflow-wrap: break-word; }' +
+            'img { max-width: 100%; height: auto; }' +
+            'table { border-collapse: collapse; width: 100%; margin: 1em 0; }' +
+            'td, th { border: 1px solid #e2e8f0; padding: 6px 10px; }'
+          if (doc.head) {
+            doc.head.insertBefore(baseStyle, doc.head.firstChild)
+          } else {
+            doc.documentElement?.prepend(baseStyle)
+          }
+        }
+      })
+    }
+  },
+  { immediate: true }
+)
+
 async function loadDocument(id: string) {
   loadingDetail.value = true
   loadingAnalysis.value = false
@@ -600,6 +661,17 @@ async function loadDocument(id: string) {
     if (kind === 'unsupported') {
       previewFailed.value = true
       previewNotice.value = getUnsupportedNotice(detail.name)
+      return
+    }
+
+    if (kind === 'doc') {
+      try {
+        const html = await getKnowledgePreviewHtml(id)
+        docHtmlContent.value = html
+      } catch {
+        previewFailed.value = true
+        previewNotice.value = '文档转换失败，已显示可读取的文本内容。'
+      }
       return
     }
 
@@ -843,5 +915,9 @@ function getTypeIconColor(type?: string): string {
 .pdf-preview-shell {
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+}
+
+.doc-html-preview-shell {
+  overscroll-behavior: contain;
 }
 </style>

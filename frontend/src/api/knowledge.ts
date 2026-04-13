@@ -75,6 +75,13 @@ export function getKnowledgeFileBlob(id: string): Promise<Blob> {
 }
 
 /**
+ * Get .doc file converted to HTML for preview
+ */
+export function getKnowledgePreviewHtml(id: string): Promise<string> {
+  return get(`/knowledge/preview-html/${id}`)
+}
+
+/**
  * AI analyze knowledge document
  */
 export function aiAnalyzeKnowledge(id: string): Promise<KnowledgeAiAnalyzeVO> {

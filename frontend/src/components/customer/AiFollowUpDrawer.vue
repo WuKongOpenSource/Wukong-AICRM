@@ -31,10 +31,10 @@
           <div v-if="step === 1" class="space-y-6">
             <section class="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-center">
               <div class="mx-auto mb-4 flex size-20 items-center justify-center rounded-full"
-                :class="isRecording ? 'bg-red-100 text-red-500' : 'bg-primary/10 text-primary'"
+                :class="isRecording ? 'bg-red-100 text-red-500' : isTranscribing ? 'bg-amber-100 text-amber-500' : 'bg-primary/10 text-primary'"
               >
                 <span class="material-symbols-outlined text-4xl">
-                  {{ isRecording ? 'mic' : 'graphic_eq' }}
+                  {{ isRecording ? 'mic' : isTranscribing ? 'hourglass_top' : 'graphic_eq' }}
                 </span>
               </div>
 
@@ -48,8 +48,9 @@
               <button
                 type="button"
                 class="mt-4 inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-bold text-white transition"
-                :class="isRecording ? 'bg-red-500 hover:bg-red-600' : 'bg-primary hover:bg-primary/90'"
-                @click="isRecording ? handleStopRecording() : handleStartRecording()"
+                :class="isRecording ? 'bg-red-500 hover:bg-red-600' : isTranscribing ? 'bg-amber-500' : 'bg-primary hover:bg-primary/90'"
+                :disabled="isTranscribing"
+                @click="isRecording ? handleStopAudioRecording() : handleStartAudioRecording()"
               >
                 {{ isRecording ? '停止语音录入' : '开始语音录入' }}
               </button>
@@ -107,7 +108,7 @@
               <button
                 type="button"
                 class="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                :disabled="isProcessing || (!textInput.trim() && attachments.length === 0)"
+                :disabled="isProcessing || isTranscribing || (!textInput.trim() && attachments.length === 0)"
                 @click="handleSubmitText"
               >
                 <span v-if="isProcessing" class="material-symbols-outlined animate-spin text-base">sync</span>
@@ -226,8 +227,9 @@
 <script setup lang="ts">
 import { onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { aiParseFollowUp, addFollowUp } from '@/api/followup'
+import { aiParseFollowUp, addFollowUp, transcribeFollowUpAudio } from '@/api/followup'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
+import { getAiConfig } from '@/api/systemConfig'
 import type { AiFollowUpParseVO } from '@/api/followup'
 import type { Customer } from '@/types/customer'
 import type { ChatAttachmentDTO } from '@/types/common'
@@ -256,38 +258,6 @@ interface ParsedFollowUpForm {
   nextFollowTime: string
 }
 
-interface SpeechRecognitionAlternativeLike {
-  transcript: string
-}
-
-interface SpeechRecognitionResultLike {
-  length: number
-  [index: number]: SpeechRecognitionAlternativeLike
-}
-
-interface SpeechRecognitionEventLike {
-  results: ArrayLike<SpeechRecognitionResultLike>
-}
-
-interface SpeechRecognitionErrorEventLike {
-  error: string
-}
-
-interface SpeechRecognitionLike {
-  lang: string
-  interimResults: boolean
-  continuous: boolean
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null
-  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null
-  onend: (() => void) | null
-  start: () => void
-  stop: () => void
-  abort: () => void
-}
-
-interface SpeechRecognitionConstructorLike {
-  new (): SpeechRecognitionLike
-}
 
 const FOLLOW_UP_TYPES = new Set(['call', 'meeting', 'email', 'visit', 'other'])
 const SUPPORTED_ATTACHMENT_EXTENSIONS = new Set(['txt', 'md', 'csv', 'pdf', 'doc', 'docx', 'xls', 'xlsx'])
@@ -295,6 +265,7 @@ const SUPPORTED_ATTACHMENT_EXTENSIONS = new Set(['txt', 'md', 'csv', 'pdf', 'doc
 const step = ref(1)
 const textInput = ref('')
 const isRecording = ref(false)
+const isTranscribing = ref(false)
 const isProcessing = ref(false)
 const saving = ref(false)
 const recordingDuration = ref(0)
@@ -307,8 +278,12 @@ const parsedForm = reactive<ParsedFollowUpForm>({
   nextFollowTime: ''
 })
 
-let speechRecognition: SpeechRecognitionLike | null = null
-let speechRecognitionStoppedManually = false
+let mediaRecorder: MediaRecorder | null = null
+let mediaStream: MediaStream | null = null
+let recordedChunks: Blob[] = []
+let recordedMimeType = ''
+let skipNextTranscription = false
+let transcriptionToken = 0
 let speechInputBase = ''
 let recordingTimer: ReturnType<typeof setInterval> | null = null
 
@@ -326,23 +301,19 @@ onBeforeUnmount(() => {
 })
 
 function resetDrawerState() {
+  transcriptionToken += 1
   step.value = 1
   textInput.value = ''
   parsedData.value = null
   clearAttachments()
   resetParsedForm()
   isRecording.value = false
+  isTranscribing.value = false
   isProcessing.value = false
   saving.value = false
   recordingDuration.value = 0
-  speechRecognitionStoppedManually = true
-  speechRecognition?.abort()
-  speechRecognition = null
-
-  if (recordingTimer) {
-    clearInterval(recordingTimer)
-    recordingTimer = null
-  }
+  stopRecordingTimer()
+  abortRecording()
 }
 
 function resetParsedForm() {
@@ -359,6 +330,31 @@ function clearAttachments() {
     }
   })
   attachments.value = []
+}
+
+function stopRecordingTimer() {
+  if (recordingTimer) {
+    clearInterval(recordingTimer)
+    recordingTimer = null
+  }
+}
+
+function releaseMediaStream() {
+  mediaStream?.getTracks().forEach(track => track.stop())
+  mediaStream = null
+}
+
+function abortRecording() {
+  skipNextTranscription = true
+
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop()
+  }
+
+  mediaRecorder = null
+  releaseMediaStream()
+  recordedChunks = []
+  recordedMimeType = ''
 }
 
 function normalizeFollowUpType(type?: string): string {
@@ -438,91 +434,176 @@ function applyParsedResult(result: AiFollowUpParseVO, originalContent: string) {
 
 function handleClose() {
   if (isRecording.value) {
-    handleStopRecording()
+    abortRecording()
   }
+  transcriptionToken += 1
+  isTranscribing.value = false
   emit('update:modelValue', false)
 }
 
-async function handleStartRecording() {
-  const speechWindow = window as Window & {
-    SpeechRecognition?: SpeechRecognitionConstructorLike
-    webkitSpeechRecognition?: SpeechRecognitionConstructorLike
-  }
-  const recognitionCtor = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition
+async function ensureAudioTranscriptionSupported(): Promise<boolean> {
+  try {
+    const aiConfig = await getAiConfig()
+    if (aiConfig.capabilities?.supportsAudioTranscription) {
+      return true
+    }
 
-  if (!recognitionCtor) {
-    ElMessage.warning('当前浏览器不支持语音识别，请改用文字输入')
+    ElMessage.warning('当前模型不支持语音识别，请配置支持的模型')
+    return false
+  } catch (err: unknown) {
+    console.error('Load AI config failed:', err)
+    if (!isRequestErrorHandled(err)) {
+      ElMessage.warning('暂时无法获取语音识别能力，请稍后再试')
+    }
+    return false
+  }
+}
+
+function resolveRecordingMimeType(): string {
+  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
+
+  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
+    return ''
+  }
+
+  return candidates.find(type => MediaRecorder.isTypeSupported(type)) || ''
+}
+
+function resolveAudioExtension(mimeType: string): string {
+  if (mimeType.includes('mp4')) return 'm4a'
+  if (mimeType.includes('mpeg')) return 'mp3'
+  if (mimeType.includes('wav')) return 'wav'
+  return 'webm'
+}
+
+function buildRecordedAudioFile(): File | null {
+  if (recordedChunks.length === 0) {
+    return null
+  }
+
+  const mimeType = recordedMimeType || recordedChunks[0]?.type || 'audio/webm'
+  const blob = new Blob(recordedChunks, { type: mimeType })
+  return new File([blob], `followup-recording.${resolveAudioExtension(mimeType)}`, {
+    type: mimeType
+  })
+}
+
+async function transcribeRecordedAudio(file: File | null) {
+  if (!file) {
+    ElMessage.warning('未采集到有效录音，请重试')
+    return
+  }
+
+  const currentToken = ++transcriptionToken
+  isTranscribing.value = true
+
+  try {
+    const transcript = (await transcribeFollowUpAudio(file)).trim()
+    if (currentToken !== transcriptionToken || !props.modelValue) {
+      return
+    }
+
+    if (!transcript) {
+      ElMessage.warning('未识别到有效语音内容，请重试')
+      return
+    }
+
+    textInput.value = speechInputBase
+      ? `${speechInputBase}\n${transcript}`
+      : transcript
+    ElMessage.success('语音已转成文字，可继续编辑后提交')
+  } catch (err: unknown) {
+    console.error('Audio transcription failed:', err)
+    if (!isRequestErrorHandled(err)) {
+      ElMessage.warning('语音识别失败，请稍后重试')
+    }
+  } finally {
+    if (currentToken === transcriptionToken) {
+      isTranscribing.value = false
+    }
+  }
+}
+
+async function handleRecordedAudioStop() {
+  const shouldSkip = skipNextTranscription
+  skipNextTranscription = false
+  stopRecordingTimer()
+  isRecording.value = false
+
+  const file = shouldSkip ? null : buildRecordedAudioFile()
+  mediaRecorder = null
+  releaseMediaStream()
+  recordedChunks = []
+  recordedMimeType = ''
+
+  if (shouldSkip) {
+    return
+  }
+
+  await transcribeRecordedAudio(file)
+}
+
+async function handleStartAudioRecording() {
+  if (isRecording.value || isTranscribing.value) return
+  if (!(await ensureAudioTranscriptionSupported())) return
+
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+    ElMessage.warning('当前浏览器不支持录音，请改用文字输入')
     return
   }
 
   try {
-    speechRecognitionStoppedManually = false
     speechInputBase = textInput.value.trim()
+    skipNextTranscription = false
+    recordedChunks = []
 
-    speechRecognition = new recognitionCtor()
-    speechRecognition.lang = 'zh-CN'
-    speechRecognition.interimResults = true
-    speechRecognition.continuous = true
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    const mimeType = resolveRecordingMimeType()
+    mediaRecorder = mimeType
+      ? new MediaRecorder(mediaStream, { mimeType })
+      : new MediaRecorder(mediaStream)
+    recordedMimeType = mediaRecorder.mimeType || mimeType || 'audio/webm'
 
-    speechRecognition.onresult = (event) => {
-      const transcript = Array.from(event.results)
-        .map(result => result[0]?.transcript || '')
-        .join('')
-        .trim()
-
-      if (!transcript) return
-
-      textInput.value = speechInputBase
-        ? `${speechInputBase}\n${transcript}`
-        : transcript
-    }
-
-    speechRecognition.onerror = (event) => {
-      if (event.error === 'not-allowed') {
-        ElMessage.warning('未获得麦克风权限，请检查浏览器授权设置')
-      } else if (event.error !== 'aborted') {
-        ElMessage.warning('语音识别失败，请重试')
-      }
-      console.error('Speech recognition error:', event)
-    }
-
-    speechRecognition.onend = () => {
-      isRecording.value = false
-      speechRecognition = null
-
-      if (recordingTimer) {
-        clearInterval(recordingTimer)
-        recordingTimer = null
-      }
-
-      if (!speechRecognitionStoppedManually && textInput.value.trim()) {
-        ElMessage.success('语音已转成文字，可继续编辑后提交')
+    mediaRecorder.ondataavailable = (event: BlobEvent) => {
+      if (event.data && event.data.size > 0) {
+        recordedChunks.push(event.data)
       }
     }
+    mediaRecorder.onstop = () => {
+      void handleRecordedAudioStop()
+    }
+    mediaRecorder.onerror = (event: Event) => {
+      console.error('MediaRecorder error:', event)
+      ElMessage.warning('录音失败，请检查麦克风权限后重试')
+    }
 
-    speechRecognition.start()
+    mediaRecorder.start()
     isRecording.value = true
     recordingDuration.value = 0
+    stopRecordingTimer()
     recordingTimer = setInterval(() => {
       recordingDuration.value += 1
     }, 1000)
-  } catch {
-    ElMessage.warning('无法启动语音识别，请检查浏览器和麦克风权限')
+  } catch (err) {
+    console.error('Start recording failed:', err)
+    abortRecording()
+    ElMessage.warning('无法启动录音，请检查浏览器和麦克风权限')
   }
 }
 
-function handleStopRecording() {
-  if (speechRecognition) {
-    speechRecognitionStoppedManually = true
-    speechRecognition.stop()
+function handleStopAudioRecording() {
+  if (!mediaRecorder) {
+    return
+  }
+
+  skipNextTranscription = false
+
+  if (mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop()
   }
 
   isRecording.value = false
-
-  if (recordingTimer) {
-    clearInterval(recordingTimer)
-    recordingTimer = null
-  }
+  stopRecordingTimer()
 }
 
 function formatDuration(seconds: number): string {

@@ -9,6 +9,7 @@ import com.kakarote.ai_crm.entity.BO.FollowUpQueryBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpUpdateBO;
 import com.kakarote.ai_crm.entity.VO.FollowUpAiParseVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpVO;
+import com.kakarote.ai_crm.service.AiAudioTranscriptionService;
 import com.kakarote.ai_crm.service.IFollowUpService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -16,6 +17,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -29,6 +31,9 @@ public class FollowUpController {
 
     @Autowired
     private IFollowUpService followUpService;
+
+    @Autowired
+    private AiAudioTranscriptionService aiAudioTranscriptionService;
 
     @PostMapping("/add")
     @Operation(summary = "添加跟进记录")
@@ -74,5 +79,11 @@ public class FollowUpController {
     @RequirePermission("followup:create")
     public Result<FollowUpAiParseVO> aiParse(@Valid @RequestBody FollowUpAiParseBO parseBO) {
         return Result.ok(followUpService.aiParseFollowUp(parseBO));
+    }
+    @PostMapping("/ai-transcribe")
+    @Operation(summary = "AI audio transcription")
+    @RequirePermission("followup:create")
+    public Result<String> aiTranscribe(@RequestPart("file") MultipartFile file) {
+        return Result.ok(aiAudioTranscriptionService.transcribe(file));
     }
 }

@@ -1,4 +1,4 @@
-import { post } from '@/utils/request'
+import { post, upload } from '@/utils/request'
 import type { FollowUp, FollowUpAddBO, FollowUpQueryBO, FollowUpUpdateBO } from '@/types/customer'
 import type { PageResult } from '@/types/api'
 import type { ChatAttachmentDTO } from '@/types/common'
@@ -59,4 +59,10 @@ export interface AiFollowUpParseVO {
 
 export function aiParseFollowUp(data: AiFollowUpParseBO): Promise<AiFollowUpParseVO> {
   return post('/followup/ai-parse', data)
+}
+
+export function transcribeFollowUpAudio(file: File): Promise<string> {
+  const formData = new FormData()
+  formData.append('file', file)
+  return upload('/followup/ai-transcribe', formData)
 }
