@@ -35,10 +35,10 @@
               <div class="min-w-0 space-y-2">
                 <div class="flex items-center gap-3 flex-wrap">
                   <h2 class="text-xl font-bold text-slate-900 truncate">{{ customer.companyName }}</h2>
-                  <span
+                  <!-- <span
                     class="px-2 py-0.5 text-xs font-bold rounded uppercase"
                     :class="getStageBadgeClass(customer.stage)"
-                  >{{ getStageLabel(customer.stage) }}</span>
+                  >{{ getStageLabel(customer.stage) }}</span> -->
                   <span v-if="customer.level"
                     class="px-2 py-0.5 text-xs font-bold rounded"
                     :class="{

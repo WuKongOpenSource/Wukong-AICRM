@@ -141,7 +141,7 @@
                   <el-date-picker
                     v-model="parsedForm.followTime"
                     type="datetime"
-                    class="w-full"
+                    style="width: 100%;"
                     placeholder="选择跟进时间"
                     value-format="YYYY-MM-DD HH:mm:ss"
                   />
