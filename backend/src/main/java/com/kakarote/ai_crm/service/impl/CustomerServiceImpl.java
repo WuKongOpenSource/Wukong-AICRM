@@ -270,7 +270,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         Customer customer = BeanUtil.copyProperties(customerAddBO, Customer.class);
         customer.setOwnerId(currentUserId);
         customer.setWebsite(customerLogoService.normalizeWebsite(customer.getWebsite()));
-        customer.setLogo(null);
+        customer.setLogo("");
         customer.setStatus(1);
         customer.setAiAnalysisStatus(AI_ANALYSIS_STATUS_PENDING);
         customer.setAiAnalysisRequestedAt(analysisRequestedAt);
@@ -322,14 +322,13 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (ObjectUtil.isNull(customer)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在");
         }
-        String previousWebsite = customerLogoService.normalizeWebsite(customer.getWebsite());
+        boolean websiteChanged = !Objects.equals(customerUpdateBO.getWebsite(), customer.getWebsite());
         String previousLogo = customer.getLogo();
         BeanUtil.copyProperties(customerUpdateBO, customer, "customerId", "createUserId", "createTime", "customFields");
-        String normalizedWebsite = customerLogoService.normalizeWebsite(customer.getWebsite());
-        boolean websiteChanged = !Objects.equals(previousWebsite, normalizedWebsite);
+        String normalizedWebsite = customerLogoService.normalizeWebsite(customerUpdateBO.getWebsite());
         customer.setWebsite(normalizedWebsite);
         if (websiteChanged) {
-            customer.setLogo(null);
+            customer.setLogo("");
         }
         customer.setAiAnalysisStatus(AI_ANALYSIS_STATUS_PENDING);
         customer.setAiAnalysisRequestedAt(analysisRequestedAt);

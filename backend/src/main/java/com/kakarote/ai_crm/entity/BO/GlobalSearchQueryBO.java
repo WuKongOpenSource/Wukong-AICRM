@@ -55,6 +55,12 @@ public class GlobalSearchQueryBO extends PageEntity {
     private Boolean scheduleEnabled;
 
     @Schema(hidden = true)
+    private Boolean scheduleAllData;
+
+    @Schema(hidden = true)
+    private List<Long> scheduleUserIds;
+
+    @Schema(hidden = true)
     private Boolean knowledgeEnabled;
 
     @Schema(hidden = true)

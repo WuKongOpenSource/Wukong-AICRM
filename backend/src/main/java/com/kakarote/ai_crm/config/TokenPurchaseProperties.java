@@ -65,25 +65,18 @@ public class TokenPurchaseProperties {
 
     @Data
     public static class Wechat {
+        private static final String DEFAULT_KEY_PATH = "src/main/resources/cert";
+
         private boolean enabled;
         private String gateway = "https://api.mch.weixin.qq.com";
         private String appId;
         private String merchantId;
         private String merchantSerialNo;
+        private String keyPath = DEFAULT_KEY_PATH;
         private String privateKey;
-        private String platformCertificate;
+        private String privateKeyPath;
         private String apiV3Key;
         private String notifyUrl;
-
-        public boolean isReady() {
-            return enabled
-                    && StrUtil.isNotBlank(appId)
-                    && StrUtil.isNotBlank(merchantId)
-                    && StrUtil.isNotBlank(merchantSerialNo)
-                    && StrUtil.isNotBlank(privateKey)
-                    && StrUtil.isNotBlank(platformCertificate)
-                    && StrUtil.isNotBlank(apiV3Key);
-        }
     }
 
     @Data
@@ -93,7 +86,9 @@ public class TokenPurchaseProperties {
         private String appId;
         private String privateKey;
         private String alipayPublicKey;
+        private String sellerId;
         private String notifyUrl;
+        private Integer qrcodeWidth = 200;
 
         public boolean isReady() {
             return enabled

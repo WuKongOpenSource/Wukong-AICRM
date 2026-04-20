@@ -8,6 +8,7 @@ import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.redis.Redis;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
+import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.RegisterBO;
 import com.kakarote.ai_crm.entity.BO.ResetPasswordBO;
 import com.kakarote.ai_crm.entity.PO.CrmTenant;
@@ -20,6 +21,7 @@ import com.kakarote.ai_crm.service.ICrmTenantService;
 import com.kakarote.ai_crm.service.ICustomFieldService;
 import com.kakarote.ai_crm.service.IManagerRoleService;
 import com.kakarote.ai_crm.service.IManagerUserRoleService;
+import com.kakarote.ai_crm.service.ISystemConfigService;
 import com.kakarote.ai_crm.service.ManageUserService;
 import com.kakarote.ai_crm.service.RegistrationService;
 import com.kakarote.ai_crm.service.WeKnoraClient;
@@ -65,6 +67,9 @@ public class RegistrationServiceImpl implements RegistrationService {
     @Autowired
     private ICustomFieldService customFieldService;
 
+    @Autowired
+    private ISystemConfigService systemConfigService;
+
     @Lazy
     @Autowired
     private WeKnoraClient weKnoraClient;
@@ -104,6 +109,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         try {
             customFieldService.initializeSystemFields("customer");
             customFieldService.initializeSystemFields("contact");
+            initializeEnterpriseConfig(companyName);
 
             ManagerDept dept = new ManagerDept();
             dept.setDeptName(companyName);
@@ -258,5 +264,15 @@ public class RegistrationServiceImpl implements RegistrationService {
     private String normalizeText(String value) {
         String normalized = StrUtil.trim(value);
         return StrUtil.isBlank(normalized) ? null : normalized;
+    }
+
+    private void initializeEnterpriseConfig(String companyName) {
+        if (StrUtil.isBlank(companyName)) {
+            return;
+        }
+
+        EnterpriseConfigUpdateBO enterpriseConfig = new EnterpriseConfigUpdateBO();
+        enterpriseConfig.setName(companyName);
+        systemConfigService.updateEnterpriseConfig(enterpriseConfig);
     }
 }

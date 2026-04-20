@@ -17,7 +17,7 @@ public interface ITokenPurchaseService {
 
     List<TokenPurchaseOrderVO> listRecentOrders(int limit);
 
-    String handleWechatNotify(String timestamp, String nonce, String signature, String serial, String body);
+    String handleWechatNotify(String body);
 
     String handleAlipayNotify(Map<String, String> params);
 }

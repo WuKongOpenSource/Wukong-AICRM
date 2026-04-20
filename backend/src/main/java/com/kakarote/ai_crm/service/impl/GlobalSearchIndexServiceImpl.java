@@ -432,7 +432,11 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
     }
 
     private void applyScheduleScope(GlobalSearchQueryBO queryBO) {
-        queryBO.setScheduleEnabled(permissionService.hasPermission("schedule:view"));
+        boolean enabled = permissionService.hasPermission("schedule:view");
+        DataPermissionContext context = enabled ? dataPermissionService.createContextByPermission("schedule:view") : DataPermissionContext.none();
+        queryBO.setScheduleEnabled(enabled);
+        queryBO.setScheduleAllData(enabled && context.isAllData());
+        queryBO.setScheduleUserIds(enabled && context.getUserIds() != null ? context.getUserIds() : Collections.emptyList());
     }
 
     private boolean hasAnyEnabledModule(GlobalSearchQueryBO queryBO) {

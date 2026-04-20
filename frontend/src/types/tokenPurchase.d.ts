@@ -37,6 +37,8 @@ export interface TokenPurchaseOrder {
   paymentChannel: PaymentChannel
   paymentChannelLabel: string
   status: TokenPurchaseOrderStatus
+  paymentMode?: 'qrcode' | 'page' | null
+  paymentFormHtml?: string | null
   qrCodeContent?: string | null
   qrCodeImage?: string | null
   expireTime?: string

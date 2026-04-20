@@ -55,7 +55,16 @@ public class DataPermissionServiceImpl implements DataPermissionService {
 
     @Override
     public DataPermissionContext createContext(String module) {
-        DataPermissionContext cached = DataPermissionHolder.get(module);
+        return createContextInternal(module, false);
+    }
+
+    @Override
+    public DataPermissionContext createContextByPermission(String permission) {
+        return createContextInternal(permission, true);
+    }
+
+    private DataPermissionContext createContextInternal(String scopeKey, boolean exactPermission) {
+        DataPermissionContext cached = DataPermissionHolder.get(scopeKey);
         if (cached != null) {
             return cached;
         }
@@ -63,31 +72,33 @@ public class DataPermissionServiceImpl implements DataPermissionService {
         Long currentUserId = UserUtil.getUserId();
         if (currentUserId == null) {
             DataPermissionContext context = DataPermissionContext.none();
-            DataPermissionHolder.put(module, context);
+            DataPermissionHolder.put(scopeKey, context);
             return context;
         }
         if (isSuperAdmin(currentUserId)) {
             DataPermissionContext context = DataPermissionContext.all();
-            DataPermissionHolder.put(module, context);
+            DataPermissionHolder.put(scopeKey, context);
             return context;
         }
 
-        List<Integer> dataScopes = managerRoleMenuMapper.queryDataScopesByUserIdAndModule(currentUserId, module);
+        List<Integer> dataScopes = exactPermission
+                ? managerRoleMenuMapper.queryDataScopesByUserIdAndPermission(currentUserId, scopeKey)
+                : managerRoleMenuMapper.queryDataScopesByUserIdAndModule(currentUserId, scopeKey);
         if (dataScopes == null || dataScopes.isEmpty()) {
             DataPermissionContext context = DataPermissionContext.none();
-            DataPermissionHolder.put(module, context);
+            DataPermissionHolder.put(scopeKey, context);
             return context;
         }
         if (dataScopes.contains(SCOPE_ALL)) {
             DataPermissionContext context = DataPermissionContext.all();
-            DataPermissionHolder.put(module, context);
+            DataPermissionHolder.put(scopeKey, context);
             return context;
         }
 
         ManagerUser currentUser = manageUserMapper.getUserId(currentUserId);
         if (currentUser == null) {
             DataPermissionContext context = DataPermissionContext.none();
-            DataPermissionHolder.put(module, context);
+            DataPermissionHolder.put(scopeKey, context);
             return context;
         }
 
@@ -114,7 +125,7 @@ public class DataPermissionServiceImpl implements DataPermissionService {
         DataPermissionContext context = allowedUserIds.isEmpty()
                 ? DataPermissionContext.none()
                 : DataPermissionContext.users(allowedUserIds);
-        DataPermissionHolder.put(module, context);
+        DataPermissionHolder.put(scopeKey, context);
         return context;
     }
 
@@ -128,8 +139,24 @@ public class DataPermissionServiceImpl implements DataPermissionService {
     }
 
     @Override
+    public boolean hasUserDataAccessByPermission(String permission, Long targetUserId) {
+        if (targetUserId == null) {
+            return false;
+        }
+        DataPermissionContext context = createContextByPermission(permission);
+        return context.isAllData() || (context.getUserIds() != null && context.getUserIds().contains(targetUserId));
+    }
+
+    @Override
     public void assertUserDataAccess(String module, Long targetUserId) {
         if (!hasUserDataAccess(module, targetUserId)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_AUTH);
+        }
+    }
+
+    @Override
+    public void assertUserDataAccessByPermission(String permission, Long targetUserId) {
+        if (!hasUserDataAccessByPermission(permission, targetUserId)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_AUTH);
         }
     }

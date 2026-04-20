@@ -151,7 +151,7 @@ public class CustomerLogoService {
         if (customer == null || !Objects.equals(customer.getStatus(), 1)) {
             return;
         }
-        if (StrUtil.isNotBlank(customer.getLogo())) {
+        if (StrUtil.isNotEmpty(customer.getLogo())) {
             return;
         }
 

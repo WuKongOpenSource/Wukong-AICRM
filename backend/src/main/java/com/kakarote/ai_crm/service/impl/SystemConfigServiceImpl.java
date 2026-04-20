@@ -14,6 +14,7 @@ import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
+import com.kakarote.ai_crm.entity.PO.CrmTenant;
 import com.kakarote.ai_crm.entity.PO.SystemConfig;
 import com.kakarote.ai_crm.entity.VO.AiConfigVO;
 import com.kakarote.ai_crm.entity.VO.AiConnectionTestVO;
@@ -61,6 +62,9 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
     private static final String AI_MAX_TOKENS_KEY = "ai_max_tokens";
     private static final String AI_EXTRA_HEADERS_KEY = "ai_extra_headers";
     private static final String AI_PROVIDER_CONFIGS_KEY = "ai_provider_configs";
+    private static final String ENTERPRISE_NAME_KEY = "enterprise_name";
+    private static final String ENTERPRISE_LOGO_KEY = "enterprise_logo";
+    private static final String ENTERPRISE_DESCRIPTION_KEY = "enterprise_description";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -327,10 +331,12 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         Map<String, String> configs = getConfigsByType(ENTERPRISE_CONFIG_TYPE);
 
         EnterpriseConfigVO vo = new EnterpriseConfigVO();
-        vo.setName(configs.getOrDefault("enterprise_name", null));
-        vo.setDescription(configs.getOrDefault("enterprise_description", null));
+        vo.setName(configs.containsKey(ENTERPRISE_NAME_KEY)
+                ? configs.get(ENTERPRISE_NAME_KEY)
+                : resolveCurrentTenantName());
+        vo.setDescription(configs.getOrDefault(ENTERPRISE_DESCRIPTION_KEY, null));
 
-        String logo = configs.getOrDefault("enterprise_logo", null);
+        String logo = configs.getOrDefault(ENTERPRISE_LOGO_KEY, null);
         vo.setLogo(logo);
         if (StrUtil.isNotBlank(logo)) {
             vo.setLogoUrl(fileStorageService.getUrl(logo));
@@ -354,19 +360,29 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         Map<String, String> configs = new HashMap<>();
 
         if (updateBO.getName() != null) {
-            configs.put("enterprise_name", updateBO.getName());
+            configs.put(ENTERPRISE_NAME_KEY, updateBO.getName());
         }
         if (updateBO.getLogo() != null) {
-            configs.put("enterprise_logo", updateBO.getLogo());
+            configs.put(ENTERPRISE_LOGO_KEY, updateBO.getLogo());
         }
         if (updateBO.getDescription() != null) {
-            configs.put("enterprise_description", updateBO.getDescription());
+            configs.put(ENTERPRISE_DESCRIPTION_KEY, updateBO.getDescription());
         }
 
         if (!configs.isEmpty()) {
             updateConfigsWithType(configs, ENTERPRISE_CONFIG_TYPE);
             log.info("企业信息配置已更新");
         }
+    }
+
+    private String resolveCurrentTenantName() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        if (tenantId == null) {
+            return null;
+        }
+
+        CrmTenant tenant = tenantService.getById(tenantId);
+        return tenant != null ? StrUtil.nullToEmpty(tenant.getTenantName()).trim() : null;
     }
 
     @Transactional(rollbackFor = Exception.class)

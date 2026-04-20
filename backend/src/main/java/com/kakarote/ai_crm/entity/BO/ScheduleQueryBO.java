@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * 鏃ョ▼鏌ヨ鍙傛暟
@@ -35,4 +36,10 @@ public class ScheduleQueryBO extends PageEntity {
 
     @Schema(hidden = true)
     private Long currentUserId;
+
+    @Schema(hidden = true)
+    private Boolean scheduleAllData;
+
+    @Schema(hidden = true)
+    private List<Long> scheduleUserIds;
 }

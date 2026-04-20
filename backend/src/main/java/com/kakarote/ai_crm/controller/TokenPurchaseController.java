@@ -45,13 +45,8 @@ public class TokenPurchaseController {
     }
 
     @PostMapping(value = "/notify/wechat", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<String> handleWechatNotify(
-            @RequestHeader(name = "Wechatpay-Timestamp", required = false) String timestamp,
-            @RequestHeader(name = "Wechatpay-Nonce", required = false) String nonce,
-            @RequestHeader(name = "Wechatpay-Signature", required = false) String signature,
-            @RequestHeader(name = "Wechatpay-Serial", required = false) String serial,
-            @RequestBody String body) {
-        return ResponseEntity.ok(tokenPurchaseService.handleWechatNotify(timestamp, nonce, signature, serial, body));
+    public ResponseEntity<String> handleWechatNotify(@RequestBody String body) {
+        return ResponseEntity.ok(tokenPurchaseService.handleWechatNotify(body));
     }
 
     @PostMapping(value = "/notify/alipay", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)

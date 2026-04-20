@@ -1736,13 +1736,6 @@ async function handleAiFollowUpSaved() {
   await refreshFollowUpContext(customer.value.customerId, { resetFollowUps: true })
 }
 
-function handleOpenFollowUpDialog() {
-  if (!canCreateFollowUps.value) return
-  if (!customer.value) return
-  resetFollowUpForm(customer.value.customerId)
-  showAddFollowUpDialog.value = true
-}
-
 function handleEditFollowUp(followUp: FollowUp) {
   if (!canEditFollowUps.value) return
   editingFollowUpId.value = String(followUp.followUpId)

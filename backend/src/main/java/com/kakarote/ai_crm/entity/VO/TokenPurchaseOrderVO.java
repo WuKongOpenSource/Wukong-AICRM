@@ -30,6 +30,10 @@ public class TokenPurchaseOrderVO implements Serializable {
 
     private String qrCodeImage;
 
+    private String paymentMode;
+
+    private String paymentFormHtml;
+
     private Date expireTime;
 
     private Date paidTime;
