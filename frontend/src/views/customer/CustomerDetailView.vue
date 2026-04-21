@@ -149,7 +149,7 @@
                 class="h-8 shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-md shadow-primary/25 transition-colors hover:bg-primary/90 whitespace-nowrap"
                 @click="showBasicInfoDrawer = true"
               >
-                <span class="material-symbols-outlined text-base leading-none">description</span>
+                <span class="material-symbols-outlined text-base leading-none">info</span>
                 <span>{{ viewBasicInfoButtonText }}</span>
               </button>
               <el-dropdown
@@ -731,11 +731,12 @@
                 <button
                   v-if="canCreateTasks"
                   type="button"
-                  class="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-primary/20 transition-colors hover:bg-primary/90"
+                  class="size-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-primary hover:border-primary/30 transition-all"
+                  title="新建任务"
+                  aria-label="新建任务"
                   @click="handleAddTask"
                 >
-                  <span class="material-symbols-outlined text-[16px] leading-none">add</span>
-                  新建任务
+                  <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">add</span>
                 </button>
               </div>
               <div class="space-y-4">
@@ -1193,7 +1194,7 @@ const savedAiAnalysisTitle = '\u0041\u0049 \u667a\u80fd\u5206\u6790'
 const emptyAiAnalysisTitle = '\u6682\u65e0 AI \u5206\u6790'
 const emptyAiAnalysisDescription = '\u4fdd\u5b58\u5ba2\u6237\u540e\uff0c\u7cfb\u7edf\u4f1a\u81ea\u52a8\u89e6\u53d1 AI \u5206\u6790\uff0c\u7ed3\u679c\u4f1a\u5c55\u793a\u5728\u8fd9\u91cc\u3002'
 const aiReportSummaryTitle = 'AI \u62a5\u544a\u6458\u8981'
-const viewBasicInfoButtonText = '\u67e5\u770b\u57fa\u672c\u4fe1\u606f'
+const viewBasicInfoButtonText = '\u57fa\u672c\u4fe1\u606f'
 const basicInfoDrawerTitle = '\u57fa\u672c\u4fe1\u606f'
 const basicInfoDrawerSubtitle = '\u67e5\u770b\u5e76\u7ef4\u62a4\u5ba2\u6237\u8be6\u7ec6\u8d44\u6599'
 const AI_ANALYSIS_POLL_INTERVAL_MS = 2500
