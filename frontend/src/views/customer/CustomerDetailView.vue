@@ -21,7 +21,7 @@
 
         <!-- Customer Info Card -->
         <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-          <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div class="flex justify-between">
             <div class="flex gap-4 min-w-0">
               <div class="size-14 bg-slate-100 rounded-lg flex items-center justify-center border border-slate-200 overflow-hidden shrink-0">
                 <img
@@ -92,12 +92,9 @@
                 </div>
               </div>
             </div>
-            <div
-              class="flex shrink-0 flex-nowrap items-center justify-end gap-2 max-md:w-full max-md:min-w-0 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:overscroll-x-contain max-md:[-webkit-overflow-scrolling:touch] md:w-auto md:overflow-visible"
-            >
+            <div class="flex gap-2 shrink-0">
               <el-popover
                 v-if="canTransferCustomer"
-                class="shrink-0"
                 :visible="showTransferPopover"
                 trigger="manual"
                 virtual-triggering
@@ -142,34 +139,21 @@
                   </div>
                 </div>
               </el-popover>
-              <button
-                v-if="canEditCustomer"
-                type="button"
-                class="h-8 shrink-0 inline-flex items-center max-md:whitespace-nowrap px-4 border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
-                @click="handleEdit"
-              >
-                编辑资料
-              </button>
-              <button
-                v-if="canCreateFollowUps"
-                type="button"
-                class="h-8 shrink-0 inline-flex items-center gap-1.5 max-md:whitespace-nowrap px-4 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-bold hover:bg-primary/20 transition-colors"
-                @click="handleAiFollowUp"
-              >
+              <button v-if="canEditCustomer" class="h-8 px-4 inline-flex items-center border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors" @click="handleEdit">编辑资料</button>
+              <button v-if="canCreateFollowUps" class="h-8 px-4 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-primary/20 transition-colors" @click="handleAiFollowUp">
                 <WkIcon name="ai" class="text-sm" />
                 AI 跟进
               </button>
               <button
                 type="button"
-                class="h-8 shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-md shadow-primary/25 transition-colors hover:bg-primary/90 max-md:whitespace-nowrap"
+                class="h-8 shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-md shadow-primary/25 transition-colors hover:bg-primary/90 whitespace-nowrap"
                 @click="showBasicInfoDrawer = true"
               >
-                <span class="material-symbols-outlined text-base leading-none">description</span>
+                <span class="material-symbols-outlined text-base leading-none">info</span>
                 <span>{{ viewBasicInfoButtonText }}</span>
               </button>
               <el-dropdown
                 v-if="canTransferCustomer || canDeleteCustomer"
-                class="shrink-0"
                 trigger="click"
                 @visible-change="onHeaderMoreDropdownVisible"
               >
@@ -202,18 +186,16 @@
           </div>
 
           <!-- Stage Stepper (inside same card) -->
-          <div class="mt-5 pt-4 border-t border-slate-100 min-w-0">
+          <div class="mt-5 pt-4 border-t border-slate-100">
             <!-- <div class="flex items-center gap-2 mb-6">
               <span :class="sectionIconBoxClass" :style="getSectionIconStyle('customerStage')">
                 <WkIcon name="stage" :size="15" />
               </span>
               <h3 class="text-sm font-bold text-slate-900">客户阶段</h3>
             </div> -->
-            <div
-              class="relative -mx-4 px-4 md:mx-0 md:px-0 overflow-x-auto overscroll-x-contain md:overflow-visible [-webkit-overflow-scrolling:touch]"
-            >
-              <!-- Chevron segments: mobile = nowrap + horizontal scroll; md+ = wrap -->
-              <div class="relative flex min-w-min flex-nowrap md:flex-wrap items-stretch gap-0 md:gap-y-2">
+            <div class="relative overflow-visible">
+              <!-- Chevron segments (wrap layout, no scroll) -->
+              <div class="relative flex flex-wrap items-stretch gap-y-2">
                 <template v-for="(stage, idx) in stageFlow" :key="stage">
                   <el-popover
                     v-if="isTerminalStage(stage)"
@@ -261,7 +243,7 @@
                     </div>
                     <template #reference>
                       <div
-                        class="relative h-8 w-[180px] flex-none shrink-0 group"
+                        class="relative h-8 flex-none w-[180px] group"
                         :class="canChangeStage ? 'cursor-pointer' : 'cursor-default'"
                         :title="getStepperLabel(stage)"
                         :style="{ zIndex: getStepperZIndex(stage, idx) }"
@@ -299,7 +281,7 @@
 
                   <div
                     v-else
-                    class="relative h-8 w-[180px] flex-none shrink-0 group"
+                    class="relative h-8 flex-none w-[180px] group"
                     :class="canChangeStage ? 'cursor-pointer' : 'cursor-default'"
                     @click="handleStageChange(stage)"
                     :title="getStepperLabel(stage)"
@@ -336,7 +318,7 @@
       </div>
 
       <!-- 3-Column Content -->
-      <div class="flex-1 overflow-auto px-4 md:px-8 pb-8 pt-6">
+      <div class="flex-1 overflow-auto px-8 pb-8 pt-6">
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
           <!-- Left Column: Basic Info (col-span-3) -->
           <div class="lg:col-span-3 space-y-4">
@@ -749,11 +731,12 @@
                 <button
                   v-if="canCreateTasks"
                   type="button"
-                  class="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-primary/20 transition-colors hover:bg-primary/90"
+                  class="size-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-primary hover:border-primary/30 transition-all"
+                  title="新建任务"
+                  aria-label="新建任务"
                   @click="handleAddTask"
                 >
-                  <span class="material-symbols-outlined text-[16px] leading-none">add</span>
-                  新建任务
+                  <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">add</span>
                 </button>
               </div>
               <div class="space-y-4">
@@ -810,46 +793,13 @@
       </template>
     </el-dialog>
 
-    <!-- Add Follow-up Dialog -->
-    <el-dialog 
-      v-model="showAddFollowUpDialog" 
-      :title="isEditingFollowUp ? '编辑跟进记录' : '添加跟进记录'" 
-      :width="isMobile ? '95%' : '500px'" 
-      :fullscreen="isMobile"
-      class="wk-dialog--flush"
-      >
-      <el-form :model="followUpForm" label-width="80px">
-        <el-form-item label="跟进类型">
-          <el-select v-model="followUpForm.type" class="w-full">
-            <el-option label="电话" value="call" />
-            <el-option label="会议" value="meeting" />
-            <el-option label="邮件" value="email" />
-            <el-option label="拜访" value="visit" />
-            <el-option label="其他" value="other" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="跟进时间">
-          <el-date-picker v-model="followUpForm.followTime" type="datetime" class="w-full" placeholder="选择跟进时间" value-format="YYYY-MM-DD HH:mm:ss" />
-        </el-form-item>
-        <el-form-item label="跟进内容">
-          <el-input v-model="followUpForm.content" type="textarea" :rows="4" placeholder="请输入跟进内容" />
-        </el-form-item>
-        <el-form-item label="下次联系">
-          <el-date-picker
-            v-model="followUpForm.nextFollowTime"
-            type="datetime"
-            class="w-full"
-            placeholder="选择下次联系时间"
-            value-format="YYYY-MM-DD HH:mm:ss"
-            clearable
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showAddFollowUpDialog = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmitFollowUp">{{ isEditingFollowUp ? '保存' : '添加' }}</el-button>
-      </template>
-    </el-dialog>
+    <FollowUpUpsertDialog
+      v-model="showAddFollowUpDialog"
+      :customer-id="customer?.customerId || ''"
+      :editing-follow-up="editingFollowUpForDialog"
+      :submitting="submitting"
+      @submit="handleFollowUpDialogSubmit"
+    />
 
     <ContactUpsertDialog
       v-model="showAddContactDialog"
@@ -1102,11 +1052,13 @@ import { deleteContact, queryContactPageList, queryContactsByCustomer, setPrimar
 import { getEnabledFieldsByEntity } from '@/api/customField'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Task, TaskAddBO, TaskStatus } from '@/types/common'
-import type { Contact, CustomerAiReportVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpType, FollowUpUpdateBO } from '@/types/customer'
+import type { Contact, CustomerAiReportVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpUpdateBO } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 import { getCustomerAiStatusMeta } from '@/utils/customerAi'
 import { formatCustomFieldValue as formatCustomFieldDisplayValue } from '@/utils/customFieldDisplay'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
+import FollowUpUpsertDialog from '@/components/customer/FollowUpUpsertDialog.vue'
+import type { FollowUpUpsertSubmitPayload } from '@/components/customer/FollowUpUpsertDialog.vue'
 import AiParseInsightSidebar from '@/components/crm/AiParseInsightSidebar.vue'
 import FollowUpCard from '@/components/customer/FollowUpCard.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
@@ -1131,7 +1083,7 @@ const showAddContactDialog = ref(false)
 const showContactDetail = ref(false)
 const currentContact = ref<Contact | null>(null)
 const editingContact = ref<Contact | null>(null)
-const editingFollowUpId = ref('')
+const editingFollowUpForDialog = ref<FollowUp | null>(null)
 const contactAiImagePickerToken = ref(0)
 const showEditDialog = ref(false)
 const showBasicInfoDrawer = ref(false)
@@ -1211,7 +1163,7 @@ const savedAiAnalysisTitle = '\u0041\u0049 \u667a\u80fd\u5206\u6790'
 const emptyAiAnalysisTitle = '\u6682\u65e0 AI \u5206\u6790'
 const emptyAiAnalysisDescription = '\u4fdd\u5b58\u5ba2\u6237\u540e\uff0c\u7cfb\u7edf\u4f1a\u81ea\u52a8\u89e6\u53d1 AI \u5206\u6790\uff0c\u7ed3\u679c\u4f1a\u5c55\u793a\u5728\u8fd9\u91cc\u3002'
 const aiReportSummaryTitle = 'AI \u62a5\u544a\u6458\u8981'
-const viewBasicInfoButtonText = '\u67e5\u770b\u57fa\u672c\u4fe1\u606f'
+const viewBasicInfoButtonText = '\u57fa\u672c\u4fe1\u606f'
 const basicInfoDrawerTitle = '\u57fa\u672c\u4fe1\u606f'
 const basicInfoDrawerSubtitle = '\u67e5\u770b\u5e76\u7ef4\u62a4\u5ba2\u6237\u8be6\u7ec6\u8d44\u6599'
 const AI_ANALYSIS_POLL_INTERVAL_MS = 2500
@@ -1433,56 +1385,6 @@ function scheduleAiAnalysisPolling(customerId?: string, resetAttempts = false) {
 }
 
 
-function formatDateForApi(date: Date = new Date()): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  const seconds = String(date.getSeconds()).padStart(2, '0')
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
-}
-
-interface FollowUpFormState {
-  customerId: string
-  type: FollowUpType
-  content: string
-  followTime: string
-  nextFollowTime: string
-}
-
-const FOLLOW_UP_TYPES = new Set<FollowUpType>(['call', 'meeting', 'email', 'visit', 'other'])
-
-function normalizeFollowUpType(type?: string): FollowUpType {
-  return type && FOLLOW_UP_TYPES.has(type as FollowUpType) ? type as FollowUpType : 'call'
-}
-
-function normalizeDateTimeValue(value?: string): string {
-  if (!value) return ''
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
-    return value
-  }
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? value : formatDateForApi(parsed)
-}
-
-const followUpForm = reactive<FollowUpFormState>({
-  customerId: '',
-  type: 'call',
-  content: '',
-  followTime: formatDateForApi(),
-  nextFollowTime: ''
-})
-
-function resetFollowUpForm(customerId = customer.value?.customerId || '') {
-  editingFollowUpId.value = ''
-  followUpForm.customerId = customerId
-  followUpForm.type = 'call'
-  followUpForm.content = ''
-  followUpForm.followTime = formatDateForApi()
-  followUpForm.nextFollowTime = ''
-}
-
 const customer = computed(() => customerStore.currentCustomer)
 const canEditCustomer = computed(() => userStore.hasPermission('customer:edit'))
 const canTransferCustomer = computed(() => userStore.hasPermission('customer:transfer'))
@@ -1501,7 +1403,6 @@ const canDeleteFollowUps = computed(() => userStore.hasPermission('followup:dele
 const canViewTasks = computed(() => userStore.hasPermission('task:view'))
 const canCreateTasks = computed(() => userStore.hasPermission('task:create'))
 const canViewKnowledge = computed(() => userStore.hasPermission('knowledge:view'))
-const isEditingFollowUp = computed(() => !!editingFollowUpId.value)
 const filteredTransferUserList = computed(() => {
   const keyword = ownerSearch.value.trim().toLowerCase()
   if (!keyword) return transferUserList.value
@@ -1514,7 +1415,7 @@ const filteredTransferUserList = computed(() => {
 
 watch(showAddFollowUpDialog, (visible) => {
   if (!visible) {
-    resetFollowUpForm(route.params.id as string || customer.value?.customerId || '')
+    editingFollowUpForDialog.value = null
   }
 })
 
@@ -1522,7 +1423,6 @@ onMounted(async () => {
   const customerId = route.params.id as string
   if (customerId) {
     loading.value = true
-    resetFollowUpForm(customerId)
 
     const fetchTasks: Promise<any>[] = [
       customerStore.fetchCustomerDetail(customerId).catch(err => {
@@ -1760,19 +1660,13 @@ async function handleAiFollowUpSaved() {
 
 function handleOpenFollowUpDialog() {
   if (!canCreateFollowUps.value) return
-  if (!customer.value) return
-  resetFollowUpForm(customer.value.customerId)
+  editingFollowUpForDialog.value = null
   showAddFollowUpDialog.value = true
 }
 
 function handleEditFollowUp(followUp: FollowUp) {
   if (!canEditFollowUps.value) return
-  editingFollowUpId.value = String(followUp.followUpId)
-  followUpForm.customerId = String(followUp.customerId)
-  followUpForm.type = normalizeFollowUpType(followUp.type)
-  followUpForm.content = followUp.content || ''
-  followUpForm.followTime = normalizeDateTimeValue(followUp.followTime)
-  followUpForm.nextFollowTime = normalizeDateTimeValue(followUp.nextFollowTime)
+  editingFollowUpForDialog.value = followUp
   showAddFollowUpDialog.value = true
 }
 
@@ -2088,37 +1982,30 @@ async function handleRemoveTag(tag: CustomerTag) {
   } catch { /* Error handled */ }
 }
 
-async function handleSubmitFollowUp() {
-  if (isEditingFollowUp.value ? !canEditFollowUps.value : !canCreateFollowUps.value) return
-  if (!followUpForm.content.trim()) {
-    ElMessage.warning('请输入跟进内容')
-    return
-  }
-  if (!followUpForm.followTime) {
-    ElMessage.warning('请选择跟进时间')
-    return
-  }
+async function handleFollowUpDialogSubmit(payload: FollowUpUpsertSubmitPayload) {
+  const isEdit = payload.mode === 'edit'
+  if (isEdit ? !canEditFollowUps.value : !canCreateFollowUps.value) return
   submitting.value = true
   try {
-    const payload = {
-      type: followUpForm.type,
-      content: followUpForm.content.trim(),
-      followTime: followUpForm.followTime,
-      nextFollowTime: followUpForm.nextFollowTime || undefined
+    const body = {
+      type: payload.type,
+      content: payload.content,
+      followTime: payload.followTime,
+      nextFollowTime: payload.nextFollowTime
     }
-    if (isEditingFollowUp.value) {
+    if (isEdit) {
       await updateFollowUp({
-        followUpId: editingFollowUpId.value,
-        ...payload
+        followUpId: payload.followUpId!,
+        ...body
       } as FollowUpUpdateBO)
     } else {
       await addFollowUp({
-        customerId: followUpForm.customerId,
-        ...payload
+        customerId: payload.customerId,
+        ...body
       } as FollowUpAddBO)
     }
-    const successMessage = isEditingFollowUp.value ? '跟进记录已更新' : '跟进记录添加成功'
-    await refreshFollowUpContext(followUpForm.customerId, { resetFollowUps: !isEditingFollowUp.value })
+    const successMessage = isEdit ? '跟进记录已更新' : '跟进记录添加成功'
+    await refreshFollowUpContext(payload.customerId, { resetFollowUps: !isEdit })
     showAddFollowUpDialog.value = false
     ElMessage.success(successMessage)
   } catch { /* Error handled */ } finally {
@@ -2340,6 +2227,7 @@ function formatAmount(value?: number | null): string {
   })}`
 }
 
+/* Legacy helper kept only as a reference during the custom field display refactor.
 function formatCustomFieldValue(field: CustomField, value: any): string {
   if (value === null || value === undefined || value === '') return '-'
   switch (field.fieldType) {
@@ -2357,7 +2245,7 @@ function formatCustomFieldValue(field: CustomField, value: any): string {
     case 'datetime': return formatDateTime(value)
     default: return String(value)
   }
-}
+} */
 
 </script>
 

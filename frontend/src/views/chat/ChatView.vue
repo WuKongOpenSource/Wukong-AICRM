@@ -140,8 +140,6 @@
           </template>
         </template>
       </div>
-
-      <AiQuotaPanel variant="sidebar" />
     </aside>
 
     <!-- Main Area -->
@@ -505,7 +503,6 @@ import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
-import AiQuotaPanel from '@/components/layout/AiQuotaPanel.vue'
 import {
   registerAiQuotaResumeSendHandler,
   unregisterAiQuotaResumeSendHandler,

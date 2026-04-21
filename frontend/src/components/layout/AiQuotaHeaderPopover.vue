@@ -10,9 +10,9 @@
     <template #reference>
       <button
         type="button"
-        class="inline-flex max-w-[min(20rem,calc(100vw-8rem))] items-center gap-2 rounded-full border border-slate-200/80 bg-slate-100/80 px-3 py-1.5 text-left text-xs font-medium text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-100"
+        class="inline-flex max-w-[min(20rem,calc(100vw-8rem))] items-center gap-2 rounded-full bg-slate-100/80 px-3 py-1.5 text-left text-xs font-medium text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-100"
       >
-        <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-primary">auto_awesome</span>
+        <WkIcon name="ai" :size="18" class="shrink-0 leading-none text-primary" />
         <span v-if="currentAiMode === 'gift'" class="min-w-0 truncate tabular-nums">
           已使用 {{ tokenUsedWan }} / {{ tokenTotalWan }}万，剩余 {{ tokenProgressPercent }}%
         </span>
@@ -25,6 +25,7 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import WkIcon from '@/components/common/WkIcon.vue'
 import AiQuotaPanel from '@/components/layout/AiQuotaPanel.vue'
 import { useAiQuota } from '@/composables/useAiQuota'
 
