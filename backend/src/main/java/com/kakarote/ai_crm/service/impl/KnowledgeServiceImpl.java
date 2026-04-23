@@ -42,6 +42,7 @@ import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
 import com.kakarote.ai_crm.service.WeKnoraClient;
 import com.kakarote.ai_crm.utils.DocumentTextExtractor;
+import com.kakarote.ai_crm.utils.KnowledgeAnswerLocalizationUtil;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -849,6 +850,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
             3. 先给结论，再分点列出关键依据。
             4. 如果资料不足以得出确定结论，要明确说明信息不足。
             5. 不要输出“根据资料1/资料2”这类生硬措辞，改成自然表达。
+            6. 所有标题、分节名和标签都必须使用中文，不要出现 Summary、Retrieved Information、Key Points、References 等英文标题。
 
             用户问题：
             %s
@@ -863,7 +865,9 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
                 .user(prompt)
                 .call()
                 .content();
-            return StrUtil.isNotBlank(answer) ? answer.trim() : fallback;
+            return StrUtil.isNotBlank(answer)
+                ? KnowledgeAnswerLocalizationUtil.localizeToChinese(answer)
+                : fallback;
         } catch (Exception e) {
             log.warn("生成知识库 AI 检索答案失败，使用兜底摘要: {}", e.getMessage());
             return fallback;
