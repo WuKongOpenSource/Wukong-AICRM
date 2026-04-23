@@ -82,22 +82,10 @@ public class Customer implements Serializable {
     private String logo;
 
     /**
-     * 报价金额
+     * 预计成交金额
      */
-    @Schema(description = "报价金额")
+    @Schema(description = "预计成交金额")
     private BigDecimal quotation;
-
-    /**
-     * 合同金额
-     */
-    @Schema(description = "合同金额")
-    private BigDecimal contractAmount;
-
-    /**
-     * 收入金额
-     */
-    @Schema(description = "收入金额")
-    private BigDecimal revenue;
 
     /**
      * 最后联系时间
@@ -156,9 +144,9 @@ public class Customer implements Serializable {
     private String primaryContactPosition;
 
     /**
-     * 联系人数量(冗余)
+     * 联系人数(冗余)
      */
-    @Schema(description = "联系人数量(冗余)")
+    @Schema(description = "联系人数(冗余)")
     private Integer contactCount;
 
     /**

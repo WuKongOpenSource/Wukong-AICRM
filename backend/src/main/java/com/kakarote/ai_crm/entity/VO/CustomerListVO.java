@@ -1,9 +1,9 @@
 package com.kakarote.ai_crm.entity.VO;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
-import com.baomidou.mybatisplus.annotation.TableField;
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
@@ -45,14 +45,8 @@ public class CustomerListVO {
 
     private String address;
 
-    @Schema(description = "报价金额")
+    @Schema(description = "预计成交金额")
     private BigDecimal quotation;
-
-    @Schema(description = "合同金额")
-    private BigDecimal contractAmount;
-
-    @Schema(description = "收入金额")
-    private BigDecimal revenue;
 
     @Schema(description = "最后联系时间")
     private Date lastContactTime;
@@ -86,7 +80,7 @@ public class CustomerListVO {
     @Schema(description = "主联系人职位")
     private String primaryContactPosition;
 
-    @Schema(description = "联系人数量")
+    @Schema(description = "联系人数")
     private Integer contactCount;
 
     @Schema(description = "标签名称逗号分隔(内部字段)")

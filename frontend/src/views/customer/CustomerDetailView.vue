@@ -933,16 +933,8 @@
               <p v-else class="text-sm text-slate-900 font-medium">-</p>
             </div>
             <div>
-              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">报价金额</p>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">预计成交金额</p>
               <p class="text-sm text-slate-900 font-medium">{{ formatAmount(customer.quotation) }}</p>
-            </div>
-            <div>
-              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">合同金额</p>
-              <p class="text-sm text-slate-900 font-medium">{{ formatAmount(customer.contractAmount) }}</p>
-            </div>
-            <div>
-              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">回款金额</p>
-              <p class="text-sm text-slate-900 font-medium">{{ formatAmount(customer.revenue) }}</p>
             </div>
             <div>
               <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">负责人</p>

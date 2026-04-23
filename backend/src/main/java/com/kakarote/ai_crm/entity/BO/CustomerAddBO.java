@@ -37,12 +37,8 @@ public class CustomerAddBO {
     @Schema(description = "网站")
     private String website;
 
-    @Schema(description = "报价金额")
+    @Schema(description = "预计成交金额")
     private BigDecimal quotation;
-
-    private BigDecimal contractAmount;
-
-    private BigDecimal revenue;
 
     private String nextFollowTime;
 

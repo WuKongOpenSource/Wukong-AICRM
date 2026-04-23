@@ -76,9 +76,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
                     ), 40),
                     systemField("source", "来源", "text", "source", "VARCHAR(100)", null, "请输入客户来源", false, true, true, null, 50),
                     systemField("website", "网站", "text", "website", "VARCHAR(255)", null, "请输入网站地址", false, false, true, null, 60),
-                    systemField("quotation", "报价金额", "number", "quotation", "DECIMAL(15,2)", null, "请输入报价金额", false, false, true, null, 70),
-                    systemField("contractAmount", "合同金额", "number", "contract_amount", "DECIMAL(15,2)", null, "请输入合同金额", false, false, true, null, 80),
-                    systemField("revenue", "收入金额", "number", "revenue", "DECIMAL(15,2)", null, "请输入收入金额", false, false, true, null, 90),
+                    systemField("quotation", "预计成交金额", "number", "quotation", "DECIMAL(15,2)", null, "请输入预计成交金额", false, false, true, null, 70),
                     systemField("address", "地址", "textarea", "address", "VARCHAR(500)", null, "请输入客户地址", false, false, false, null, 100),
                     systemField("nextFollowTime", "下次跟进时间", "datetime", "next_follow_time", "TIMESTAMP", null, "请选择下次跟进时间", false, false, true, null, 110),
                     systemField("remark", "备注", "textarea", "remark", "TEXT", null, "请输入备注", false, false, false, null, 120)
@@ -98,43 +96,6 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
      * 单个实体最大自定义字段数
      */
     private static final int MAX_FIELDS_PER_ENTITY = 50;
-
-    /*
-            "customer", List.of(
-                    systemField("companyName", "公司名称", "text", "company_name", "VARCHAR(255)", null, "请输入公司名称", true, true, true, null, 10),
-                    systemField("industry", "所属行业", "text", "industry", "VARCHAR(100)", null, "请输入所属行业", false, true, true, null, 20),
-                    systemField("stage", "商机阶段", "select", "stage", "VARCHAR(50)", "lead", null, false, false, true, List.of(
-                            option("lead", "线索"),
-                            option("qualified", "资格审核"),
-                            option("proposal", "方案报价"),
-                            option("negotiation", "谈判中"),
-                            option("closed", "已成交"),
-                            option("lost", "已流失")
-                    ), 30),
-                    systemField("level", "客户级别", "select", "level", "CHAR(1)", "B", null, false, false, true, List.of(
-                            option("A", "A级客户"),
-                            option("B", "B级客户"),
-                            option("C", "C级客户")
-                    ), 40),
-                    systemField("source", "来源", "text", "source", "VARCHAR(100)", null, "请输入客户来源", false, true, true, null, 50),
-                    systemField("website", "网站", "text", "website", "VARCHAR(255)", null, "请输入网站地址", false, false, true, null, 60),
-                    systemField("quotation", "报价金额", "number", "quotation", "DECIMAL(15,2)", null, "请输入报价金额", false, false, true, null, 70),
-                    systemField("contractAmount", "合同金额", "number", "contract_amount", "DECIMAL(15,2)", null, "请输入合同金额", false, false, true, null, 80),
-                    systemField("revenue", "收入金额", "number", "revenue", "DECIMAL(15,2)", null, "请输入收入金额", false, false, true, null, 90),
-                    systemField("address", "地址", "textarea", "address", "VARCHAR(500)", null, "请输入客户地址", false, false, false, null, 100),
-                    systemField("nextFollowTime", "下次跟进时间", "datetime", "next_follow_time", "TIMESTAMP", null, "请选择下次跟进时间", false, false, true, null, 110),
-                    systemField("remark", "备注", "textarea", "remark", "TEXT", null, "请输入备注", false, false, false, null, 120)
-            ),
-            "contact", List.of(
-                    systemField("name", "姓名", "text", "name", "VARCHAR(100)", null, "请输入姓名", true, true, true, null, 10),
-                    systemField("position", "职位", "text", "position", "VARCHAR(100)", null, "请输入职位", false, true, true, null, 20),
-                    systemField("phone", "电话", "text", "phone", "VARCHAR(50)", null, "请输入电话", false, true, true, null, 30),
-                    systemField("email", "邮箱", "text", "email", "VARCHAR(100)", null, "请输入邮箱", false, true, true, null, 40),
-                    systemField("wechat", "微信", "text", "wechat", "VARCHAR(100)", null, "请输入微信号", false, true, false, null, 50),
-                    systemField("isPrimary", "主联系人", "checkbox", "is_primary", "SMALLINT", "0", null, false, false, true, null, 60),
-                    systemField("notes", "备注", "textarea", "notes", "TEXT", null, "请输入备注", false, false, false, null, 70)
-            )
-    ); */
 
     @Override
     @Transactional(rollbackFor = Exception.class)

@@ -19,9 +19,7 @@ CREATE TABLE `crm_customer` (
     `source` VARCHAR(100) COMMENT '客户来源',
     `address` VARCHAR(500) COMMENT '地址',
     `website` VARCHAR(255) COMMENT '网站',
-    `quotation` DECIMAL(15,2) DEFAULT 0 COMMENT '报价金额',
-    `contract_amount` DECIMAL(15,2) DEFAULT 0 COMMENT '合同金额',
-    `revenue` DECIMAL(15,2) DEFAULT 0 COMMENT '收入金额',
+    `quotation` DECIMAL(15,2) DEFAULT 0 COMMENT '预计成交金额',
     `last_contact_time` DATETIME COMMENT '最后联系时间',
     `next_follow_time` DATETIME COMMENT '下次跟进时间',
     `remark` TEXT COMMENT '备注',
@@ -143,6 +141,8 @@ CREATE TABLE `crm_knowledge` (
     `upload_user_id` BIGINT NOT NULL COMMENT '上传人ID',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `ai_analysis_snapshot` LONGTEXT COMMENT 'AI analysis snapshot',
+    `ai_analysis_time` DATETIME COMMENT 'AI analysis time',
     PRIMARY KEY (`knowledge_id`),
     INDEX `idx_customer_id` (`customer_id`),
     INDEX `idx_type` (`type`),
@@ -315,13 +315,13 @@ INSERT INTO `crm_ai_agent` (`agent_id`, `label`, `icon_name`, `prompt`, `persona
 (4, '生成跟进任务', 'ListTodo', '你是一个CRM助手，帮助用户基于客户情况生成跟进任务。分析客户状态并建议合适的跟进行动和时间。', '你是一个专业的销售助手，擅长制定跟进计划和任务安排。你会根据客户的阶段和历史，给出针对性的跟进建议。', NULL, 1, 4, 'default', 1, NOW());
 
 -- 插入示例客户数据
-INSERT INTO `crm_customer` (`customer_id`, `company_name`, `industry`, `stage`, `owner_id`, `level`, `source`, `address`, `website`, `quotation`, `contract_amount`, `revenue`, `last_contact_time`, `next_follow_time`, `remark`, `status`, `create_user_id`, `create_time`) VALUES
-(1001, '北京科技有限公司', '科技互联网', 'negotiation', 1, 'A', '官网咨询', '北京市海淀区中关村大街1号', 'https://www.bjtech.com', 500000.00, 0, 0, '2024-01-20 10:30:00', '2024-01-27 14:00:00', '大型互联网公司，对AI产品有强烈需求', 1, 1, NOW()),
-(1002, '上海金融集团', '金融服务', 'proposal', 1, 'A', '行业展会', '上海市浦东新区陆家嘴金融中心', 'https://www.shfinance.com', 800000.00, 0, 0, '2024-01-18 15:00:00', '2024-01-25 10:00:00', '金融行业头部客户，决策周期较长', 1, 1, NOW()),
-(1003, '广州制造业股份公司', '制造业', 'qualified', 1, 'B', '销售拜访', '广州市番禺区工业园区', 'https://www.gzmfg.com', 300000.00, 0, 0, '2024-01-15 09:00:00', '2024-01-28 09:00:00', '传统制造业转型，需要数字化解决方案', 1, 1, NOW()),
-(1004, '深圳教育科技公司', '教育培训', 'lead', 1, 'B', '线上推广', '深圳市南山区科技园', 'https://www.szedu.com', 0, 0, 0, NULL, '2024-01-30 14:00:00', '新线索，需要初步沟通了解需求', 1, 1, NOW()),
-(1005, '杭州电商平台', '零售电商', 'closed', 1, 'A', '客户转介绍', '杭州市西湖区互联网小镇', 'https://www.hzecom.com', 600000.00, 580000.00, 580000.00, '2024-01-10 16:00:00', NULL, '已成交客户，后续考虑追加销售', 1, 1, NOW()),
-(1006, '成都医疗健康公司', '医疗健康', 'lost', 1, 'C', '官网咨询', '成都市高新区天府软件园', 'https://www.cdhealth.com', 200000.00, 0, 0, '2024-01-05 11:00:00', NULL, '预算不足，暂时搁置', 1, 1, NOW());
+INSERT INTO `crm_customer` (`customer_id`, `company_name`, `industry`, `stage`, `owner_id`, `level`, `source`, `address`, `website`, `quotation`, `last_contact_time`, `next_follow_time`, `remark`, `status`, `create_user_id`, `create_time`) VALUES
+(1001, '北京科技有限公司', '科技互联网', 'negotiation', 1, 'A', '官网咨询', '北京市海淀区中关村大街1号', 'https://www.bjtech.com', 500000.00, '2024-01-20 10:30:00', '2024-01-27 14:00:00', '大型互联网公司，对AI产品有强烈需求', 1, 1, NOW()),
+(1002, '上海金融集团', '金融服务', 'proposal', 1, 'A', '行业展会', '上海市浦东新区陆家嘴金融中心', 'https://www.shfinance.com', 800000.00, '2024-01-18 15:00:00', '2024-01-25 10:00:00', '金融行业头部客户，决策周期较长', 1, 1, NOW()),
+(1003, '广州制造业股份公司', '制造业', 'qualified', 1, 'B', '销售拜访', '广州市番禺区工业园区', 'https://www.gzmfg.com', 300000.00, '2024-01-15 09:00:00', '2024-01-28 09:00:00', '传统制造业转型，需要数字化解决方案', 1, 1, NOW()),
+(1004, '深圳教育科技公司', '教育培训', 'lead', 1, 'B', '线上推广', '深圳市南山区科技园', 'https://www.szedu.com', 0, NULL, '2024-01-30 14:00:00', '新线索，需要初步沟通了解需求', 1, 1, NOW()),
+(1005, '杭州电商平台', '零售电商', 'closed', 1, 'A', '客户转介绍', '杭州市西湖区互联网小镇', 'https://www.hzecom.com', 600000.00, '2024-01-10 16:00:00', NULL, '已成交客户，后续考虑追加销售', 1, 1, NOW()),
+(1006, '成都医疗健康公司', '医疗健康', 'lost', 1, 'C', '官网咨询', '成都市高新区天府软件园', 'https://www.cdhealth.com', 200000.00, '2024-01-05 11:00:00', NULL, '预算不足，暂时搁置', 1, 1, NOW());
 
 -- 插入客户标签
 INSERT INTO `crm_customer_tag` (`id`, `customer_id`, `tag_name`, `create_time`) VALUES
@@ -364,7 +364,7 @@ INSERT INTO `crm_knowledge` (`knowledge_id`, `name`, `type`, `file_path`, `file_
 (4001, '北京科技产品演示会议记录.docx', 'meeting', '/uploads/2024/01/meeting_bjtech_20240120.docx', 52480, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 1001, 'AI产品演示会议记录，客户对智能分析和自动化功能表现出浓厚兴趣，计划安排技术团队深入测试。', '会议时间：2024年1月20日\n参会人：张明、李华、我方销售团队\n会议内容：产品功能演示、技术架构介绍、商务初步沟通', 1, 1, NOW()),
 (4002, '上海金融技术方案.pdf', 'proposal', '/uploads/2024/01/proposal_shfinance_v1.pdf', 1048576, 'application/pdf', 1002, '为上海金融集团定制的AI解决方案，包含数据分析、风控预警、智能报表等模块。', '上海金融集团AI解决方案\n1. 项目背景\n2. 解决方案\n3. 实施计划\n4. 商务报价', 1, 1, NOW()),
 (4003, '广州制造现场调研录音.mp3', 'recording', '/uploads/2024/01/visit_gzmfg_20240115.mp3', 15728640, 'audio/mpeg', 1003, '工厂现场调研录音，记录了生产线自动化需求和MES系统升级诉求。', NULL, 1, 1, NOW()),
-(4004, '杭州电商项目合同.pdf', 'contract', '/uploads/2024/01/contract_hzecom_2024.pdf', 524288, 'application/pdf', 1005, '与杭州电商平台签订的年度服务合同，合同金额58万元，服务期1年。', '服务合同\n甲方：杭州电商平台\n乙方：我司\n合同金额：580,000元\n服务期限：2024年1月1日至2024年12月31日', 1, 1, NOW());
+(4004, '杭州电商项目合同.pdf', 'contract', '/uploads/2024/01/contract_hzecom_2024.pdf', 524288, 'application/pdf', 1005, '与杭州电商平台签订的年度服务合同，项目金额58万元，服务期1年。', '服务合同\n甲方：杭州电商平台\n乙方：我司\n项目金额：580,000元\n服务期限：2024年1月1日至2024年12月31日', 1, 1, NOW());
 
 -- 插入知识库标签
 INSERT INTO `crm_knowledge_tag` (`id`, `knowledge_id`, `tag_name`, `create_time`) VALUES

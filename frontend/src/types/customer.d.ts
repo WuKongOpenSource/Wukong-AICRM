@@ -34,8 +34,6 @@ export interface CustomerListVO extends Customer {
   customFields?: Record<string, any>
   // Financial info
   quotation?: number
-  contractAmount?: number
-  revenue?: number
   remark?: string
   // Primary contact info
   primaryContactName?: string
@@ -50,8 +48,6 @@ export interface CustomerDetailVO extends Customer {
   source?: string
   stageName?: string
   quotation?: number
-  contractAmount?: number
-  revenue?: number
   lastContactTime?: string
   nextFollowTime?: string
   remark?: string
@@ -105,8 +101,6 @@ export interface CustomerAddBO {
   website?: string
   address?: string
   quotation?: number | null
-  contractAmount?: number | null
-  revenue?: number | null
   nextFollowTime?: string
   remark?: string
   description?: string
@@ -134,10 +128,6 @@ export interface CustomerQueryBO {
   source?: string
   quotationMin?: number
   quotationMax?: number
-  contractAmountMin?: number
-  contractAmountMax?: number
-  revenueMin?: number
-  revenueMax?: number
   lastContactStart?: string
   lastContactEnd?: string
   includeNoLastContact?: boolean
@@ -157,8 +147,6 @@ export interface CustomerQueryBO {
 export type CustomerQuerySortBy =
   | 'createTime'
   | 'quotation'
-  | 'contractAmount'
-  | 'revenue'
   | 'lastContactTime'
   | 'nextFollowTime'
   | 'contactCount'
@@ -181,10 +169,6 @@ export interface CustomerAiSearchQuery {
   source?: string
   quotationMin?: number
   quotationMax?: number
-  contractAmountMin?: number
-  contractAmountMax?: number
-  revenueMin?: number
-  revenueMax?: number
   lastContactStart?: string
   lastContactEnd?: string
   includeNoLastContact?: boolean

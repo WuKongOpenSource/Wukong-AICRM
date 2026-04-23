@@ -148,11 +148,11 @@
                       />
                     </div>
                     <div class="space-y-1.5">
-                      <label class="text-xs font-bold text-slate-500 uppercase ml-1">报价金额</label>
+                      <label class="text-xs font-bold text-slate-500 uppercase ml-1">预计成交金额</label>
                       <el-input
                         v-model.number="formData.quotation"
                         type="number"
-                        placeholder="请输入报价金额"
+                        placeholder="请输入预计成交金额"
                         size="large"
                         class="w-full wk-crm-el-field-input"
                       />
@@ -281,8 +281,6 @@ const formData = reactive<CustomerAddBO>({
   website: '',
   address: '',
   quotation: undefined,
-  contractAmount: undefined,
-  revenue: undefined,
   nextFollowTime: undefined,
   remark: '',
   description: '',
@@ -306,8 +304,6 @@ const CUSTOMER_SYSTEM_FIELD_NAMES = new Set([
   'source',
   'website',
   'quotation',
-  'contractAmount',
-  'revenue',
   'address',
   'nextFollowTime',
   'remark'
@@ -365,8 +361,6 @@ function buildCustomerFieldValues(c: CustomerLike): Record<string, any> {
     source: anyCustomer.source || '',
     website: anyCustomer.website || '',
     quotation: anyCustomer.quotation ?? undefined,
-    contractAmount: anyCustomer.contractAmount ?? undefined,
-    revenue: anyCustomer.revenue ?? undefined,
     address: anyCustomer.address || '',
     nextFollowTime: normalizeDateTimeValue(anyCustomer.nextFollowTime),
     remark: anyCustomer.remark || '',
@@ -438,8 +432,6 @@ function hydrateFromCustomer() {
     website: (c?.website || '') as any,
     address: (c?.address || '') as any,
     quotation: (c?.quotation ?? undefined) as any,
-    contractAmount: ((c as any)?.contractAmount ?? undefined) as any,
-    revenue: ((c as any)?.revenue ?? undefined) as any,
     nextFollowTime: normalizeDateTimeValue((c as any)?.nextFollowTime) as any,
     remark: ((c as any)?.remark || '') as any,
     description: (c?.description || '') as any
@@ -461,8 +453,6 @@ function resetAll() {
     website: '',
     address: '',
     quotation: undefined,
-    contractAmount: undefined,
-    revenue: undefined,
     nextFollowTime: undefined,
     remark: '',
     description: '',

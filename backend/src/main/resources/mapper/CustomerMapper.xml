@@ -64,18 +64,6 @@
         <if test="query.quotationMax != null">
             AND c.quotation <![CDATA[<=]]> #{query.quotationMax}
         </if>
-        <if test="query.contractAmountMin != null">
-            AND c.contract_amount <![CDATA[>=]]> #{query.contractAmountMin}
-        </if>
-        <if test="query.contractAmountMax != null">
-            AND c.contract_amount <![CDATA[<=]]> #{query.contractAmountMax}
-        </if>
-        <if test="query.revenueMin != null">
-            AND c.revenue <![CDATA[>=]]> #{query.revenueMin}
-        </if>
-        <if test="query.revenueMax != null">
-            AND c.revenue <![CDATA[<=]]> #{query.revenueMax}
-        </if>
         <if test="query.lastContactStart != null">
             AND c.last_contact_time <![CDATA[>=]]> #{query.lastContactStart}
         </if>
@@ -114,20 +102,6 @@
         <choose>
             <when test="query.sortBy == 'quotation'">
                 ORDER BY c.quotation
-                <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
-                NULLS LAST
-                <if test="query.keyword != null and query.keyword != ''">, pdb.score(c.customer_id) DESC</if>
-                , c.create_time DESC
-            </when>
-            <when test="query.sortBy == 'contractAmount'">
-                ORDER BY c.contract_amount
-                <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
-                NULLS LAST
-                <if test="query.keyword != null and query.keyword != ''">, pdb.score(c.customer_id) DESC</if>
-                , c.create_time DESC
-            </when>
-            <when test="query.sortBy == 'revenue'">
-                ORDER BY c.revenue
                 <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
                 NULLS LAST
                 <if test="query.keyword != null and query.keyword != ''">, pdb.score(c.customer_id) DESC</if>
@@ -179,8 +153,6 @@
             c.logo,
             c.address,
             c.quotation,
-            c.contract_amount,
-            c.revenue,
             c.last_contact_time,
             c.next_follow_time,
             c.remark,
@@ -213,8 +185,6 @@
             c.logo,
             c.address,
             c.quotation,
-            c.contract_amount,
-            c.revenue,
             c.last_contact_time,
             c.next_follow_time,
             c.remark,
@@ -259,8 +229,6 @@
             c.website,
             c.logo,
             c.quotation,
-            c.contract_amount,
-            c.revenue,
             c.last_contact_time,
             c.next_follow_time,
             c.remark,

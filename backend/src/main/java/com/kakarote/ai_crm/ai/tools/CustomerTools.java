@@ -56,7 +56,7 @@ public class CustomerTools {
             @ToolParam(description = "地址", required = false) String address,
             @ToolParam(description = "网站", required = false) String website,
             @ToolParam(description = "备注", required = false) String remark,
-            @ToolParam(description = "报价金额", required = false) String quotation) {
+            @ToolParam(description = "预计成交金额", required = false) String quotation) {
 
         log.info("【Tool调用】createCustomer: companyName={}, industry={}, level={}",
             companyName, industry, level);
@@ -190,42 +190,53 @@ public class CustomerTools {
         }
     }
 
-    @Tool(description = "修改客户信息。当用户要修改、编辑、更新已有客户的信息时调用。包括公司名称、行业、阶段、等级、地址、网站、金额等。")
+    @Tool(description = "修改客户信息。当用户要修改、编辑、更新已有客户的信息时调用。包括公司名称、行业、阶段、等级、地址、网站、金额等。客户标识既可以传客户ID，也可以传当前公司名称；优先使用客户ID。")
     @AiToolPermission(value = "customer:edit", action = "编辑客户")
     public String updateCustomer(
-            @ToolParam(description = "客户ID，数字类型，必填") String customerIdStr,
-            @ToolParam(description = "公司名称", required = false) String companyName,
+            @ToolParam(description = "客户标识，可以是客户ID（数字）或当前公司名称；优先使用客户ID") String customerIdStr,
+            @ToolParam(description = "公司名称。若用于按公司名定位客户且未提供客户ID，则仅作为查找标识，不会自动改名。", required = false) String companyName,
             @ToolParam(description = "行业，如互联网、金融、制造业等", required = false) String industry,
             @ToolParam(description = "商机阶段：lead(线索)/qualified(已验证)/proposal(方案)/negotiation(谈判)/closed(成交)/lost(流失)", required = false) String stage,
             @ToolParam(description = "客户级别：A（重要客户）、B（普通客户）、C（一般客户）", required = false) String level,
             @ToolParam(description = "地址", required = false) String address,
             @ToolParam(description = "网站", required = false) String website,
-            @ToolParam(description = "报价金额", required = false) String quotation,
-            @ToolParam(description = "合同金额", required = false) String contractAmount,
-            @ToolParam(description = "回款金额", required = false) String revenue,
+            @ToolParam(description = "预计成交金额", required = false) String quotation,
             @ToolParam(description = "下次跟进时间，格式：yyyy-MM-dd", required = false) String nextFollowTime,
             @ToolParam(description = "备注", required = false) String remark) {
 
-        log.info("【Tool调用】updateCustomer: customerId={}, companyName={}, stage={}, level={}",
+        log.info("【Tool调用】updateCustomer: customerIdentifier={}, companyName={}, stage={}, level={}",
             customerIdStr, companyName, stage, level);
 
         try {
-            if (StrUtil.isBlank(customerIdStr) || "null".equalsIgnoreCase(customerIdStr)) {
-                return "更新客户失败: 缺少客户ID参数";
+            String normalizedCustomerIdentifier = normalizeOptionalText(customerIdStr);
+            String normalizedCompanyName = normalizeOptionalText(companyName);
+            boolean companyNameUsedForLookup = normalizedCustomerIdentifier == null && normalizedCompanyName != null;
+            String customerIdentifier = companyNameUsedForLookup ? normalizedCompanyName : normalizedCustomerIdentifier;
+
+            if (customerIdentifier == null) {
+                return "更新客户失败: 缺少客户标识参数";
             }
 
             Long customerId;
+            String matchedCompanyName = null;
             try {
-                customerId = Long.parseLong(customerIdStr);
+                customerId = Long.parseLong(customerIdentifier);
             } catch (NumberFormatException e) {
-                return "更新客户失败: 客户ID格式无效";
+                AiCustomerMatcher.CustomerMatchResult matchResult = aiCustomerMatcher.match(customerIdentifier);
+                if (matchResult.isAmbiguous()) {
+                    return "更新客户失败: 客户名称「" + customerIdentifier + "」无法唯一匹配，可能是：" + matchResult.formatCandidateNames() + "。请提供更完整的客户名称或直接提供客户ID。";
+                }
+                if (!matchResult.isMatched()) {
+                    return "更新客户失败: 未找到名为「" + customerIdentifier + "」的客户";
+                }
+                customerId = matchResult.getCustomer().getCustomerId();
+                matchedCompanyName = matchResult.getCustomer().getCompanyName();
             }
 
             CustomerUpdateBO bo = new CustomerUpdateBO();
             bo.setCustomerId(customerId);
 
-            String normalizedCompanyName = normalizeOptionalText(companyName);
-            if (normalizedCompanyName != null) {
+            if (!companyNameUsedForLookup && normalizedCompanyName != null) {
                 bo.setCompanyName(normalizedCompanyName);
             }
             String normalizedIndustry = normalizeOptionalText(industry);
@@ -257,33 +268,21 @@ public class CustomerTools {
                 bo.setRemark(normalizedRemark);
             }
 
-            if (normalizeOptionalText(quotation) != null) {
+            String normalizedQuotation = normalizeOptionalText(quotation);
+            if (normalizedQuotation != null) {
                 try {
-                    bo.setQuotation(new BigDecimal(quotation.trim()));
+                    bo.setQuotation(new BigDecimal(normalizedQuotation));
                 } catch (NumberFormatException e) {
-                    log.warn("报价金额格式无效: {}", quotation);
-                }
-            }
-            if (normalizeOptionalText(contractAmount) != null) {
-                try {
-                    bo.setContractAmount(new BigDecimal(contractAmount.trim()));
-                } catch (NumberFormatException e) {
-                    log.warn("合同金额格式无效: {}", contractAmount);
-                }
-            }
-            if (normalizeOptionalText(revenue) != null) {
-                try {
-                    bo.setRevenue(new BigDecimal(revenue.trim()));
-                } catch (NumberFormatException e) {
-                    log.warn("回款金额格式无效: {}", revenue);
+                    log.warn("预计成交金额格式无效: {}", quotation);
                 }
             }
 
-            if (normalizeOptionalText(nextFollowTime) != null) {
+            String normalizedNextFollowTime = normalizeOptionalText(nextFollowTime);
+            if (normalizedNextFollowTime != null) {
                 try {
                     SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-                    dateFormat.parse(nextFollowTime.trim());
-                    bo.setNextFollowTime(nextFollowTime.trim());
+                    dateFormat.parse(normalizedNextFollowTime);
+                    bo.setNextFollowTime(normalizedNextFollowTime);
                 } catch (Exception e) {
                     log.warn("下次跟进时间格式无效: {}", nextFollowTime);
                 }
@@ -292,7 +291,10 @@ public class CustomerTools {
             customerService.updateCustomer(bo);
 
             StringBuilder result = new StringBuilder("客户信息已更新成功！");
-            if (normalizedCompanyName != null) {
+            result.append("\n- 客户ID: ").append(customerId);
+            if (companyNameUsedForLookup && matchedCompanyName != null) {
+                result.append("\n- 系统客户名称: ").append(matchedCompanyName);
+            } else if (normalizedCompanyName != null) {
                 result.append("\n- 公司名称: ").append(normalizedCompanyName);
             }
             if (normalizedStage != null) {
@@ -301,8 +303,8 @@ public class CustomerTools {
             if (normalizedLevel != null) {
                 result.append("\n- 等级: ").append(normalizedLevel);
             }
-            if (normalizeOptionalText(quotation) != null) {
-                result.append("\n- 报价金额: ").append(quotation.trim());
+            if (normalizedQuotation != null) {
+                result.append("\n- 预计成交金额: ").append(normalizedQuotation);
             }
             return result.toString();
         } catch (Exception e) {
@@ -415,7 +417,7 @@ public class CustomerTools {
             try {
                 bo.setQuotation(new BigDecimal(normalizedQuotation));
             } catch (NumberFormatException e) {
-                log.warn("报价金额格式无效: {}", quotation);
+                log.warn("预计成交金额格式无效: {}", quotation);
             }
         }
         return bo;

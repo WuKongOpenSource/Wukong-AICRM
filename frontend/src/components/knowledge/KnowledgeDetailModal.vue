@@ -655,6 +655,7 @@ async function loadDocument(id: string) {
   try {
     const detail = await getKnowledgeDetail(id)
     knowledge.value = detail
+    analysis.value = detail.aiAnalyzeResult ?? null
 
     const kind = resolvePreviewKind(detail.name, detail.mimeType)
     previewKind.value = kind
@@ -716,7 +717,7 @@ async function handleAnalyze() {
   analysisError.value = ''
 
   try {
-    analysis.value = await aiAnalyzeKnowledge(props.knowledgeId)
+    analysis.value = await aiAnalyzeKnowledge(props.knowledgeId, Boolean(analysis.value))
     const summary = analysis.value?.coreHighlights?.trim()
     if (summary) {
       if (knowledge.value) {

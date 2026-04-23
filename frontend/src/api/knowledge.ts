@@ -86,8 +86,13 @@ export function getKnowledgePreviewHtml(id: string): Promise<string> {
 /**
  * AI analyze knowledge document
  */
-export function aiAnalyzeKnowledge(id: string): Promise<KnowledgeAiAnalyzeVO> {
-  return post(`/knowledge/${id}/ai-analyze`)
+export function aiAnalyzeKnowledge(
+  id: string,
+  forceRefresh = false
+): Promise<KnowledgeAiAnalyzeVO> {
+  return post(`/knowledge/${id}/ai-analyze`, null, {
+    params: { forceRefresh }
+  })
 }
 
 /**
