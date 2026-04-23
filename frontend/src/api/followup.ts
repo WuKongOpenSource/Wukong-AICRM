@@ -82,6 +82,10 @@ export function getFollowUpAttachmentBlob(attachmentId: string): Promise<Blob> {
   return get(`/followup/attachment/${attachmentId}/download`, { responseType: 'blob' })
 }
 
+export function getFollowUpAttachmentPreviewHtml(attachmentId: string): Promise<string> {
+  return get(`/followup/attachment/${attachmentId}/preview-html`)
+}
+
 export function downloadFollowUpAttachment(attachmentId: string, filename: string): Promise<void> {
   return download(`/followup/attachment/${attachmentId}/download`, filename)
 }

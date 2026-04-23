@@ -2,7 +2,9 @@ package com.kakarote.ai_crm.controller;
 
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.auth.RequirePermission;
+import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.Result;
+import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.FollowUpAddBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpAiParseBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpQueryBO;
@@ -13,10 +15,12 @@ import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 import com.kakarote.ai_crm.service.AiAudioTranscriptionService;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IFollowUpService;
+import com.kakarote.ai_crm.utils.DocToHtmlConverter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
@@ -35,6 +39,7 @@ import java.util.List;
 /**
  * 跟进记录控制器
  */
+@Slf4j
 @RestController
 @RequestMapping("/followup")
 @Tag(name = "跟进记录")
@@ -107,6 +112,26 @@ public class FollowUpController {
     @RequirePermission("followup:create")
     public Result<String> aiTranscribe(@RequestPart("file") MultipartFile file) {
         return Result.ok(aiAudioTranscriptionService.transcribe(file));
+    }
+
+    @GetMapping("/attachment/{attachmentId}/preview-html")
+    @Operation(summary = "Preview follow-up .doc attachment as HTML")
+    @RequirePermission("followup:view")
+    public Result<String> previewAttachmentHtml(@PathVariable Long attachmentId) {
+        FollowUpAttachmentVO attachment = followUpService.getAttachment(attachmentId);
+        String fileName = attachment.getFileName();
+        String fileNameLower = fileName != null ? fileName.toLowerCase() : "";
+        if (!fileNameLower.endsWith(".doc") || fileNameLower.endsWith(".docx")) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "该文件不是 .doc 格式");
+        }
+        try (InputStream inputStream = fileStorageService.getFileStream(attachment.getFilePath())) {
+            return Result.ok(DocToHtmlConverter.convertToHtml(inputStream));
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to convert .doc follow-up attachment to HTML, attachmentId={}", attachmentId, e);
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "文档转换失败，请下载后查看");
+        }
     }
 
     @GetMapping("/attachment/{attachmentId}/download")
