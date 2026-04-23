@@ -19,11 +19,13 @@
                     should =&gt; ARRAY[
                         paradedb.match(
                             field =&gt; 'customer_search_cjk',
-                            value =&gt; CAST(#{query.keyword,jdbcType=VARCHAR} AS TEXT)
+                            value =&gt; CAST(#{query.keyword,jdbcType=VARCHAR} AS TEXT),
+                            conjunction_mode =&gt; true
                         ),
                         paradedb.match(
                             field =&gt; 'customer_search_ngram',
-                            value =&gt; CAST(#{query.keyword,jdbcType=VARCHAR} AS TEXT)
+                            value =&gt; CAST(#{query.keyword,jdbcType=VARCHAR} AS TEXT),
+                            conjunction_mode =&gt; true
                         )
                     ]
                 )
