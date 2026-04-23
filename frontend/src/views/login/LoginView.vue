@@ -1442,18 +1442,23 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1023px) {
   .auth-page {
-    overflow-y: auto;
+    overflow: hidden;
   }
 
   .auth-shell {
-    min-height: auto;
-    padding-block: 1.25rem;
+    min-height: 100vh;
+    height: 100vh;
+    padding: 0;
+    align-items: stretch;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .auth-card {
     flex-direction: column;
     max-height: none;
-    min-height: calc(100vh - 2.5rem);
+    min-height: 100%;
+    border-radius: 0;
   }
 
   .auth-form-panel::before,
