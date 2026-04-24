@@ -149,7 +149,7 @@
                 class="h-8 shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-md shadow-primary/25 transition-colors hover:bg-primary/90 whitespace-nowrap"
                 @click="showBasicInfoDrawer = true"
               >
-                <span class="material-symbols-outlined text-base leading-none">info</span>
+                <span class="material-symbols-outlined text-base leading-none">description</span>
                 <span>{{ viewBasicInfoButtonText }}</span>
               </button>
               <el-dropdown
