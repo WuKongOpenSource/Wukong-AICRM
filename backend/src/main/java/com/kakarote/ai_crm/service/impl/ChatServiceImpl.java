@@ -165,6 +165,12 @@ public class ChatServiceImpl implements IChatService {
             weekCalendar
         ) + """
 
+        [Customer ID chaining rule]
+        1. When createCustomer or confirmPendingCustomerCreation returns a customer ID, keep that exact customerId for the rest of the same user request and conversation turn.
+        2. If you create a follow-up, schedule, or other customer-related record for that newly created customer, pass the returned customerId into the tool instead of matching by customerName again.
+        3. If the user says "the above customer", "this customer", or asks for a follow-up/schedule immediately after customer creation, it refers to the most recently created customerId unless the user clearly names another customer.
+        4. Do not claim that a follow-up or schedule is associated with the new customer unless the tool result confirms the same customerId.
+
         【重复客户确认规则】
         1. 当你准备创建客户时，先调用 createCustomer，让系统检查是否存在同名客户。
         2. 如果 createCustomer 返回“已存在同名客户”“待确认”“尚未创建”等信息，你必须明确告诉用户发现了重复客户，并询问是否继续创建；此时绝不能声称已经创建成功。
