@@ -93,8 +93,58 @@
             </div>
           </div>
         </el-popover>
+        <!-- 视图切换：侧栏 + 表格/卡片/阶段 -->
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
+          <button
+            v-if="!isMobile"
+            type="button"
+            class="flex items-center justify-center size-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-primary hover:text-primary transition-all shadow-sm"
+            :class="{ 'border-primary text-primary bg-primary/5 ring-1 ring-primary/25 shadow-sm': showListInsightSidebar }"
+            title="切换 AI 洞察侧栏"
+            @click="showListInsightSidebar = !showListInsightSidebar"
+          >
+            <span class="material-symbols-outlined text-[20px]">view_sidebar</span>
+          </button>
+          <div class="flex bg-slate-100 p-1 rounded-lg shrink-0 border border-slate-200">
+            <button
+              type="button"
+              class="flex items-center justify-center size-8 rounded-md transition-all"
+              :class="listViewMode === 'list' ? 'bg-white text-primary shadow-sm ring-1 ring-primary/20' : 'text-slate-400 hover:text-slate-600'"
+              title="表格视图"
+              @click="listViewMode = 'list'"
+            >
+              <span class="material-symbols-outlined text-[20px]">list</span>
+            </button>
+            <button
+              type="button"
+              class="flex items-center justify-center size-8 rounded-md transition-all"
+              :class="listViewMode === 'card' ? 'bg-white text-primary shadow-sm ring-1 ring-primary/20' : 'text-slate-400 hover:text-slate-600'"
+              title="卡片视图"
+              @click="listViewMode = 'card'"
+            >
+              <span class="material-symbols-outlined text-[20px]">grid_view</span>
+            </button>
+            <button
+              type="button"
+              class="flex items-center justify-center size-8 rounded-md transition-all"
+              :class="listViewMode === 'stage' ? 'bg-white text-primary shadow-sm ring-1 ring-primary/25' : 'text-slate-400 hover:text-slate-600'"
+              title="阶段视图"
+              @click="listViewMode = 'stage'"
+            >
+              <span class="material-symbols-outlined text-[20px]">view_kanban</span>
+            </button>
+          </div>
+        </div>
+        <!-- 新增客户（与导入/导出已对调顺序） -->
+        <button
+          class="h-10 px-4 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
+          @click="openCreateCustomerDialog()"
+        >
+          <span class="material-symbols-outlined wk-plus-button-icon">person_add</span>
+          <span v-if="!isMobile">新增客户</span>
+        </button>
         <!-- Import/Export - desktop only -->
-        <div v-if="!isMobile" class="flex items-center gap-1.5 border-r border-slate-200 pr-3 mr-1">
+        <div v-if="!isMobile" class="flex items-center gap-1.5 border-l border-slate-200 pl-3 ml-0">
           <button class="h-10 px-4 text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-2" @click="showImportDialog = true">
             <span class="material-symbols-outlined text-[18px] leading-none">upload</span>
             导入
@@ -104,14 +154,6 @@
             导出
           </button>
         </div>
-        <!-- Add Customer -->
-        <button
-          class="h-10 px-4 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
-          @click="showAddDialog = true"
-        >
-          <span class="material-symbols-outlined wk-plus-button-icon">person_add</span>
-          <span v-if="!isMobile">新增客户</span>
-        </button>
       </div>
     </div>
 
@@ -153,10 +195,10 @@
       <div class="w-full min-w-0 flex-1 space-y-6">
         <div
           ref="tableCardRef"
-          class="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden"
+          class="bg-white border border-slate-200 rounded-xl shadow-sm flex min-h-0 min-w-0 flex-col overflow-hidden"
           v-loading="customerStore.loading"
         >
-          <div v-if="!isMobile">
+          <div v-if="listViewMode === 'list' && !isMobile">
             <el-table
               :data="customerStore.customerList"
               :height="tableHeight"
@@ -391,7 +433,7 @@
             </el-table>
           </div>
 
-          <div v-else class="wk-customer-cards px-3 py-3">
+          <div v-else-if="listViewMode === 'list' && isMobile" class="wk-customer-cards px-3 py-3">
             <div v-if="customerStore.customerList.length === 0" class="text-center py-16">
               <div class="size-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 mx-auto mb-4">
                 <span class="material-symbols-outlined text-4xl">group</span>
@@ -462,6 +504,28 @@
             </div>
           </div>
 
+          <CustomerListCardView
+            v-else-if="listViewMode === 'card'"
+            :customers="customerStore.customerList"
+            :scroll-max-height="cardStageBodyMaxHeight"
+            :industry-label="getMobileIndustryText"
+            :stage-label="getCardStageLabel"
+            @row-click="handleRowClick"
+            @ai-follow-up="handleAiFollowUp"
+          />
+
+          <CustomerListStageView
+            v-else-if="listViewMode === 'stage'"
+            :customers="customerStore.customerList"
+            :body-height="cardStageBodyMaxHeight"
+            :can-change-stage="canChangeStage"
+            :industry-label="getMobileIndustryText"
+            @row-click="handleRowClick"
+            @ai-follow-up="handleAiFollowUp"
+            @create-in-stage="openCreateCustomerDialog"
+            @stage-dropped="onStageDroppedFromBoard"
+          />
+
           <!-- Pagination -->
           <div
             v-if="customerStore.totalCount > 0"
@@ -502,7 +566,7 @@
       </div>
 
       <CustomerInsightSidebar
-        v-if="!isMobile"
+        v-if="!isMobile && showListInsightSidebar"
         :negotiation-count="negotiationCount"
         :overdue-count="overdueCount"
         :closed-count="closedCount"
@@ -515,6 +579,7 @@
       v-model="showAddDialog"
       :mode="editingCustomer ? 'edit' : 'create'"
       :customer="editingCustomer"
+      :initial-stage="createDialogInitialStage"
       @success="handleUpsertSuccess"
     />
 
@@ -546,9 +611,10 @@ import type {
   CustomerAiSearchParseVO,
   CustomerAiSearchQuery,
   CustomerExportBO,
-  CustomerListVO,
   CustomerImportResult,
-  CustomerQueryBO
+  CustomerListVO,
+  CustomerQueryBO,
+  CustomerStage
 } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 import { getListFieldsByEntity } from '@/api/customField'
@@ -558,10 +624,13 @@ import InlineEditableField from '@/components/common/InlineEditableField.vue'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
 import CustomerImportDialog from '@/views/customer/components/CustomerImportDialog.vue'
 import CustomerInsightSidebar from '@/views/customer/components/CustomerInsightSidebar.vue'
+import CustomerListCardView from '@/views/customer/components/CustomerListCardView.vue'
+import CustomerListStageView from '@/views/customer/components/CustomerListStageView.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { compactCustomerAiInsight, getCustomerAiStatusMeta } from '@/utils/customerAi'
 import { formatCustomFieldValue, getCustomFieldCheckboxState } from '@/utils/customFieldDisplay'
+import { normalizeListStage } from '@/utils/customerListViewUi'
 
 const router = useRouter()
 const route = useRoute()
@@ -573,12 +642,19 @@ const pageRootRef = ref<HTMLElement | null>(null)
 const tableCardRef = ref<HTMLElement | null>(null)
 const paginationBarRef = ref<HTMLElement | null>(null)
 const tableHeight = ref<number | undefined>(undefined)
+/** 卡片 / 阶段视图内容区最大高度（px），与表格可视区域算法一致，避免撑破视口 */
+const cardStageBodyMaxHeight = ref(420)
 let layoutObserver: ResizeObserver | null = null
 let tableHeightRaf = 0
 
+const LIST_VIEW_MODE_KEY = 'wk_customer_list_view_mode'
+
 const showAddDialog = ref(false)
+const createDialogInitialStage = ref<CustomerStage | null>(null)
 const editingCustomer = ref<CustomerListVO | null>(null)
 const listFields = ref<CustomField[]>([])
+const listViewMode = ref<'list' | 'card' | 'stage'>('list')
+const showListInsightSidebar = ref(true)
 
 const AI_CUSTOMER_LIST_FIELDS: CustomField[] = [
   {
@@ -861,9 +937,10 @@ function getTableNaturalHeight() {
   return naturalHeight > 0 ? Math.ceil(naturalHeight) : undefined
 }
 
-function updateTableHeight() {
+/** 白卡片内「表格 / 卡片网格 / 看板」可用高度（扣除底部分页与页面下边距），与 el-table 的 :height 计算同源 */
+function getAvailableListBodyHeight(): number {
   const tableCardEl = tableCardRef.value
-  if (!tableCardEl) return
+  if (!tableCardEl) return 420
 
   const scrollContainer = tableCardEl.closest('main')
   const pagePaddingBottom = pageRootRef.value
@@ -874,9 +951,30 @@ function updateTableHeight() {
     : window.innerHeight
   const paginationHeight = paginationBarRef.value?.offsetHeight ?? 0
   const cardBorderHeight = tableCardEl.offsetHeight - tableCardEl.clientHeight
-  const availableHeight = Math.floor(
-    viewportBottom - tableCardEl.getBoundingClientRect().top - paginationHeight - pagePaddingBottom - cardBorderHeight
+  const bottomGap = 8
+  return Math.floor(
+    viewportBottom
+      - tableCardEl.getBoundingClientRect().top
+      - paginationHeight
+      - pagePaddingBottom
+      - cardBorderHeight
+      - bottomGap
   )
+}
+
+function updateTableHeight() {
+  const tableCardEl = tableCardRef.value
+  if (!tableCardEl) return
+
+  const availableHeight = getAvailableListBodyHeight()
+  const minBodyPx = 200
+  cardStageBodyMaxHeight.value = Math.max(minBodyPx, availableHeight)
+
+  if (listViewMode.value === 'card' || listViewMode.value === 'stage') {
+    tableHeight.value = undefined
+    return
+  }
+
   const naturalHeight = getTableNaturalHeight()
 
   if (!naturalHeight) {
@@ -1142,6 +1240,15 @@ async function loadListCustomFields() {
 }
 
 onMounted(async () => {
+  try {
+    const saved = localStorage.getItem(LIST_VIEW_MODE_KEY)
+    if (saved === 'list' || saved === 'card' || saved === 'stage') {
+      listViewMode.value = saved
+    }
+  } catch {
+    /* ignore */
+  }
+
   aiSearchInput.value = aiSearchState.value?.normalizedQuery || aiSearchState.value?.originalQuery || ''
   queueTableHeightUpdate()
   window.addEventListener('resize', queueTableHeightUpdate, { passive: true })
@@ -1162,7 +1269,7 @@ onMounted(async () => {
   queueTableHeightUpdate()
 
   if (route.query.action === 'create') {
-    showAddDialog.value = true
+    openCreateCustomerDialog()
     router.replace({ path: route.path, query: {} })
   }
 })
@@ -1183,6 +1290,19 @@ onBeforeUnmount(() => {
 watch(() => [customerStore.totalCount, customerStore.customerList.length], async () => {
   await nextTick()
   queueTableHeightUpdate()
+})
+
+watch(listViewMode, (v) => {
+  try {
+    localStorage.setItem(LIST_VIEW_MODE_KEY, v)
+  } catch {
+    /* ignore */
+  }
+  void nextTick(() => queueTableHeightUpdate())
+})
+
+watch(showAddDialog, (open) => {
+  if (!open) createDialogInitialStage.value = null
 })
 
 const offCustomerListRefresh = appEvents.on(APP_EVENT.CUSTOMER_LIST_REFRESH, () => {
@@ -1237,6 +1357,33 @@ function getStageLabel(stage: string): string {
 function getConfiguredStageLabel(field: CustomField, stage: string): string {
   const optionLabel = getFieldOptionLabel(field, stage)
   return optionLabel !== stage ? optionLabel : getStageLabel(stage)
+}
+
+function getCardStageLabel(row: CustomerListVO): string {
+  const st = normalizeListStage(row.stage)
+  const field = listFields.value.find(f => f.fieldName === 'stage')
+  if (field) return getConfiguredStageLabel(field, st)
+  return getStageLabel(st)
+}
+
+async function onStageDroppedFromBoard(payload: { customerId: string; stage: CustomerStage }) {
+  if (!canChangeStage.value) return
+  const { customerId, stage } = payload
+  const row = customerStore.customerList.find(c => c.customerId === customerId)
+  if (!row) return
+  if (normalizeListStage(row.stage) === stage) return
+  try {
+    await updateCustomerStage(customerId, stage)
+    ElMessage.success('阶段已更新')
+    await customerStore.fetchCustomerList(false)
+  } catch {
+    /* Error handled by interceptor */
+  }
+}
+
+function openCreateCustomerDialog(stage?: CustomerStage) {
+  createDialogInitialStage.value = stage ?? null
+  showAddDialog.value = true
 }
 
 function getLevelBadgeClass(level: string): string {

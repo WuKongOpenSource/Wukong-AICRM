@@ -252,10 +252,14 @@ import type { CustomField } from '@/types/customField'
 type Mode = 'create' | 'edit'
 type CustomerLike = CustomerListVO | CustomerDetailVO | null
 
+const ALLOWED_STAGES: CustomerStage[] = ['lead', 'qualified', 'proposal', 'negotiation', 'closed', 'lost']
+
 const props = defineProps<{
   modelValue: boolean
   mode: Mode
   customer?: CustomerLike
+  /** 新建时预选的商机阶段（如阶段看板「+」带入） */
+  initialStage?: CustomerStage | null
 }>()
 
 const emit = defineEmits<{
@@ -443,6 +447,13 @@ function hydrateFromCustomer() {
   customerFieldValues.value = buildCustomerFieldValues(c)
 }
 
+function applyCreateInitialStage() {
+  const s = props.initialStage
+  if (!s || !ALLOWED_STAGES.includes(s)) return
+  formData.stage = s
+  customerFieldValues.value = { ...customerFieldValues.value, stage: s }
+}
+
 function resetAll() {
   Object.assign(formData, {
     companyName: '',
@@ -474,11 +485,14 @@ function handleClose() {
 
 // Keep local form in sync when opening / switching mode
 watch(
-  () => [props.modelValue, props.mode, props.customer] as const,
+  () => [props.modelValue, props.mode, props.customer, props.initialStage] as const,
   ([open]) => {
     if (!open) return
     if (props.mode === 'edit') hydrateFromCustomer()
-    else resetAll()
+    else {
+      resetAll()
+      applyCreateInitialStage()
+    }
   }
 )
 
