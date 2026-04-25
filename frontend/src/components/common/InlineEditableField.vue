@@ -1,137 +1,152 @@
 <template>
   <div
+    ref="anchorRef"
     class="inline-editable-field"
     :class="{ 'is-editing': editing, 'is-disabled': !editable }"
   >
     <template v-if="editing">
-      <div
-        class="inline-editable-field__editor"
-        :class="{ 'is-block': resolvedFieldType === 'textarea' }"
-        data-row-action="true"
-        @click.stop
-      >
-        <el-select
-          v-if="resolvedFieldType === 'select'"
-          ref="editorRef"
-          v-model="draftValue"
-          :placeholder="resolvedPlaceholder"
-          clearable
-          filterable
-          size="small"
-          class="inline-editable-field__control"
-          @keyup.enter="commit"
-          @keyup.esc="cancel"
-        >
-          <el-option
-            v-for="option in resolvedOptions"
-            :key="option.value"
-            :label="option.label"
-            :value="option.value"
-          />
-        </el-select>
-
-        <el-select
-          v-else-if="resolvedFieldType === 'multiselect'"
-          ref="editorRef"
-          v-model="draftValue"
-          :placeholder="resolvedPlaceholder"
-          multiple
-          clearable
-          filterable
-          collapse-tags
-          collapse-tags-tooltip
-          size="small"
-          class="inline-editable-field__control"
-          @keyup.enter="commit"
-          @keyup.esc="cancel"
-        >
-          <el-option
-            v-for="option in resolvedOptions"
-            :key="option.value"
-            :label="option.label"
-            :value="option.value"
-          />
-        </el-select>
-
-        <el-date-picker
-          v-else-if="resolvedFieldType === 'date'"
-          ref="editorRef"
-          v-model="draftValue"
-          type="date"
-          value-format="YYYY-MM-DD"
-          :placeholder="resolvedPlaceholder"
-          size="small"
-          class="inline-editable-field__control"
-          @keyup.enter="commit"
-          @keyup.esc="cancel"
-        />
-
-        <el-date-picker
-          v-else-if="resolvedFieldType === 'datetime'"
-          ref="editorRef"
-          v-model="draftValue"
-          type="datetime"
-          value-format="YYYY-MM-DD HH:mm:ss"
-          :placeholder="resolvedPlaceholder"
-          size="small"
-          class="inline-editable-field__control"
-          @keyup.enter="commit"
-          @keyup.esc="cancel"
-        />
-
-        <el-switch
-          v-else-if="resolvedFieldType === 'checkbox'"
-          v-model="draftValue"
-          size="small"
-          class="inline-editable-field__switch"
-          @keyup.enter="commit"
-          @keyup.esc="cancel"
-        />
-
-        <el-input
-          v-else-if="resolvedFieldType === 'textarea'"
-          ref="editorRef"
-          v-model="draftValue"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 4 }"
-          :placeholder="resolvedPlaceholder"
-          class="inline-editable-field__control"
-          @keyup.enter.ctrl="commit"
-          @keyup.esc="cancel"
-        />
-
-        <el-input
-          v-else
-          ref="editorRef"
-          v-model="draftValue"
-          :type="resolvedFieldType === 'number' ? 'number' : 'text'"
-          :placeholder="resolvedPlaceholder"
-          size="small"
-          class="inline-editable-field__control"
-          @keyup.enter="commit"
-          @keyup.esc="cancel"
-        />
-
-        <button
-          type="button"
-          class="inline-editable-field__action is-save"
-          :disabled="saving"
-          title="保存"
-          @click="commit"
-        >
-          <span v-if="saving" class="inline-editable-field__spinner"></span>
-          <span v-else class="material-symbols-outlined">check</span>
-        </button>
-        <button
-          type="button"
-          class="inline-editable-field__action"
-          :disabled="saving"
-          title="取消"
-          @click="cancel"
-        >
-          <span class="material-symbols-outlined">close</span>
-        </button>
+      <!-- 与展示态同结构占位，避免行高被 min-height 撑变；不可见且不响应事件 -->
+      <div class="inline-editable-field__ghost" aria-hidden="true">
+        <div class="inline-editable-field__display">
+          <div class="inline-editable-field__content">
+            <slot :value="modelValue" :display-value="resolvedDisplayValue">
+              <span class="inline-editable-field__fallback">{{ resolvedDisplayValue }}</span>
+            </slot>
+          </div>
+        </div>
       </div>
+      <Teleport to="body">
+        <div
+          ref="floatPanelRef"
+          class="inline-editable-field__float"
+          :style="floatStyle"
+          data-row-action="true"
+          @click.stop
+        >
+          <div
+            class="inline-editable-field__editor"
+            :class="{ 'is-block': resolvedFieldType === 'textarea' }"
+          >
+        <div class="inline-editable-field__editor-main">
+          <el-select
+            v-if="resolvedFieldType === 'select'"
+            ref="editorRef"
+            v-model="draftValue"
+            :placeholder="resolvedPlaceholder"
+            clearable
+            filterable
+            class="inline-editable-field__control"
+            @keyup.enter="commit"
+            @keyup.esc="cancel"
+          >
+            <el-option
+              v-for="option in resolvedOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+
+          <el-select
+            v-else-if="resolvedFieldType === 'multiselect'"
+            ref="editorRef"
+            v-model="draftValue"
+            :placeholder="resolvedPlaceholder"
+            multiple
+            clearable
+            filterable
+            collapse-tags
+            collapse-tags-tooltip
+            class="inline-editable-field__control"
+            @keyup.enter="commit"
+            @keyup.esc="cancel"
+          >
+            <el-option
+              v-for="option in resolvedOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+
+          <el-date-picker
+            v-else-if="resolvedFieldType === 'date'"
+            ref="editorRef"
+            v-model="draftValue"
+            type="date"
+            value-format="YYYY-MM-DD"
+            :placeholder="resolvedPlaceholder"
+            class="inline-editable-field__control"
+            @keyup.enter="commit"
+            @keyup.esc="cancel"
+          />
+
+          <el-date-picker
+            v-else-if="resolvedFieldType === 'datetime'"
+            ref="editorRef"
+            v-model="draftValue"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            :placeholder="resolvedPlaceholder"
+            class="inline-editable-field__control"
+            @keyup.enter="commit"
+            @keyup.esc="cancel"
+          />
+
+          <el-switch
+            v-else-if="resolvedFieldType === 'checkbox'"
+            v-model="draftValue"
+            class="inline-editable-field__switch"
+            @keyup.enter="commit"
+            @keyup.esc="cancel"
+          />
+
+          <el-input
+            v-else-if="resolvedFieldType === 'textarea'"
+            ref="editorRef"
+            v-model="draftValue"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 5 }"
+            :placeholder="resolvedPlaceholder"
+            class="inline-editable-field__control"
+            @keyup.enter.ctrl="commit"
+            @keyup.esc="cancel"
+          />
+
+          <el-input
+            v-else
+            ref="editorRef"
+            v-model="draftValue"
+            :type="resolvedFieldType === 'number' ? 'number' : 'text'"
+            :placeholder="resolvedPlaceholder"
+            class="inline-editable-field__control"
+            @keyup.enter="commit"
+            @keyup.esc="cancel"
+          />
+        </div>
+
+        <div class="inline-editable-field__editor-actions">
+          <button
+            type="button"
+            class="inline-editable-field__btn inline-editable-field__btn--secondary"
+            :disabled="saving"
+            @click="cancel"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            class="inline-editable-field__btn inline-editable-field__btn--primary"
+            :disabled="saving"
+            @click="commit"
+          >
+            <span v-if="saving" class="inline-editable-field__spinner inline-editable-field__spinner--btn"></span>
+            <span v-else>保存</span>
+          </button>
+        </div>
+          </div>
+        </div>
+      </Teleport>
     </template>
 
     <template v-else>
@@ -159,7 +174,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { CustomField, FieldOption, FieldType } from '@/types/customField'
 
@@ -198,6 +213,85 @@ const editing = ref(false)
 const saving = ref(false)
 const draftValue = ref<any>(null)
 const editorRef = ref<any>(null)
+const anchorRef = ref<HTMLElement | null>(null)
+const floatPanelRef = ref<HTMLElement | null>(null)
+const floatStyle = ref<Record<string, string>>({})
+
+const FLOAT_MARGIN = 12
+/* 浮动面板宽度约为原设计的 3/4，避免在表格上占得过宽 */
+const FLOAT_MIN_WIDTH = 216
+const FLOAT_MAX_WIDTH = 300
+/** 相对单元格底边向上偏移，使面板略盖住原内容（像素） */
+const FLOAT_OVERLAP_UP = 28
+
+let floatListenersBound = false
+let tableScrollEl: HTMLElement | null = null
+let floatResizeObserver: ResizeObserver | null = null
+
+function onFloatReposition() {
+  requestAnimationFrame(() => updateFloatPosition())
+}
+
+function updateFloatPosition() {
+  const anchor = anchorRef.value
+  const panel = floatPanelRef.value
+  if (!anchor || !panel) return
+
+  const ar = anchor.getBoundingClientRect()
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const targetW = Math.min(
+    FLOAT_MAX_WIDTH,
+    Math.max(FLOAT_MIN_WIDTH, vw - FLOAT_MARGIN * 2)
+  )
+  let left = ar.left + ar.width / 2 - targetW / 2
+  left = Math.max(FLOAT_MARGIN, Math.min(left, vw - targetW - FLOAT_MARGIN))
+
+  const gap = 6
+  const ph = panel.getBoundingClientRect().height
+  // 默认在锚点下方但整体上移，盖住单元格文案；空间不足时改到锚点上方
+  let top = ar.bottom + gap - FLOAT_OVERLAP_UP
+  if (top + ph > vh - FLOAT_MARGIN) {
+    top = ar.top - ph - gap
+  }
+  if (top < FLOAT_MARGIN) {
+    top = FLOAT_MARGIN
+  }
+
+  floatStyle.value = {
+    position: 'fixed',
+    left: `${Math.round(left)}px`,
+    top: `${Math.round(top)}px`,
+    width: `${Math.round(targetW)}px`,
+    /* 低于 Element Plus 下拉/日期层（约 2000+），避免选项被面板挡住 */
+    zIndex: '1900'
+  }
+}
+
+function bindFloatListeners() {
+  if (floatListenersBound) return
+  floatListenersBound = true
+  window.addEventListener('scroll', onFloatReposition, true)
+  window.addEventListener('resize', onFloatReposition)
+  tableScrollEl = anchorRef.value?.closest?.('.el-table__body-wrapper') ?? null
+  tableScrollEl?.addEventListener('scroll', onFloatReposition, true)
+  const el = floatPanelRef.value
+  if (el && typeof ResizeObserver !== 'undefined') {
+    floatResizeObserver = new ResizeObserver(onFloatReposition)
+    floatResizeObserver.observe(el)
+  }
+}
+
+function teardownFloatListeners() {
+  if (!floatListenersBound) return
+  floatListenersBound = false
+  window.removeEventListener('scroll', onFloatReposition, true)
+  window.removeEventListener('resize', onFloatReposition)
+  tableScrollEl?.removeEventListener('scroll', onFloatReposition, true)
+  tableScrollEl = null
+  floatResizeObserver?.disconnect()
+  floatResizeObserver = null
+}
 
 const resolvedFieldName = computed(() => props.fieldName || props.field?.fieldName || '')
 const resolvedFieldLabel = computed(() => props.fieldLabel || props.field?.fieldLabel || '字段')
@@ -275,13 +369,23 @@ async function startEdit() {
   draftValue.value = createDraftValue(props.modelValue)
   editing.value = true
   await nextTick()
-  const editor = editorRef.value
-  if (editor?.focus) editor.focus()
-  else if (editor?.$el?.querySelector) editor.$el.querySelector('input, textarea')?.focus()
+  await nextTick()
+  requestAnimationFrame(() => {
+    updateFloatPosition()
+    bindFloatListeners()
+    requestAnimationFrame(() => {
+      updateFloatPosition()
+      const editor = editorRef.value
+      if (editor?.focus) editor.focus()
+      else if (editor?.$el?.querySelector) editor.$el.querySelector('input, textarea')?.focus()
+    })
+  })
 }
 
 function cancel() {
   if (saving.value) return
+  teardownFloatListeners()
+  floatStyle.value = {}
   editing.value = false
   emit('cancel')
 }
@@ -297,6 +401,8 @@ async function commit() {
   saving.value = true
   try {
     await props.saveHandler?.(submitValue)
+    teardownFloatListeners()
+    floatStyle.value = {}
     editing.value = false
     emit('saved', submitValue)
   } finally {
@@ -309,12 +415,67 @@ watch(() => [props.modelValue, resolvedFieldName.value], () => {
     draftValue.value = createDraftValue(props.modelValue)
   }
 })
+
+watch(editing, (v) => {
+  if (!v) {
+    teardownFloatListeners()
+    floatStyle.value = {}
+  }
+})
+
+onUnmounted(() => {
+  teardownFloatListeners()
+})
 </script>
 
 <style scoped>
 .inline-editable-field {
   min-width: 0;
   width: 100%;
+}
+
+.inline-editable-field.is-editing {
+  position: relative;
+}
+
+.inline-editable-field__ghost {
+  visibility: hidden;
+  pointer-events: none;
+  user-select: none;
+  width: 100%;
+}
+
+.inline-editable-field__ghost .inline-editable-field__display {
+  width: 100%;
+}
+
+.inline-editable-field__float {
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+.inline-editable-field__float .inline-editable-field__editor {
+  overflow-x: visible;
+  padding: 12px 14px;
+  box-shadow:
+    0 12px 36px rgba(15, 23, 42, 0.14),
+    0 0 0 1px rgba(15, 23, 42, 0.06);
+}
+
+.inline-editable-field__float .inline-editable-field__editor-main {
+  overflow-x: visible;
+}
+
+.inline-editable-field__float .inline-editable-field__editor-actions {
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+
+.inline-editable-field__float .inline-editable-field__btn {
+  flex: 0 0 auto;
+  min-width: 72px;
+  padding: 0 16px;
+  font-size: 13px;
 }
 
 .inline-editable-field__display {
@@ -377,64 +538,122 @@ watch(() => [props.modelValue, resolvedFieldName.value], () => {
   pointer-events: auto;
 }
 
-.inline-editable-field__edit .material-symbols-outlined,
-.inline-editable-field__action .material-symbols-outlined {
+.inline-editable-field__edit .material-symbols-outlined {
   font-size: 17px;
   line-height: 1;
 }
 
 .inline-editable-field__editor {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   width: 100%;
-  min-width: 160px;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 8px 8px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow:
+    0 4px 18px rgba(15, 23, 42, 0.08),
+    0 0 0 1px rgba(15, 23, 42, 0.04);
+  overflow-x: hidden;
 }
 
-.inline-editable-field__editor.is-block {
-  align-items: flex-start;
+.inline-editable-field__editor.is-block .inline-editable-field__editor-main {
+  align-items: stretch;
+}
+
+.inline-editable-field__editor-main {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+}
+
+/* 窄列：flex-end + nowrap 会把按钮整体顶到右侧，多出的宽度向左溢出盖住左列；改为均分铺满当前单元格 */
+.inline-editable-field__editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  flex-shrink: 0;
 }
 
 .inline-editable-field__control {
   min-width: 0;
+  width: 100%;
   flex: 1 1 auto;
+}
+
+.inline-editable-field__editor :deep(.el-select),
+.inline-editable-field__editor :deep(.el-input),
+.inline-editable-field__editor :deep(.el-date-editor) {
+  width: 100% !important;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.inline-editable-field__editor :deep(.el-select .el-select__wrapper),
+.inline-editable-field__editor :deep(.el-input__wrapper) {
+  min-width: 0 !important;
 }
 
 .inline-editable-field__switch {
   flex: 0 0 auto;
 }
 
-.inline-editable-field__action {
+.inline-editable-field__btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: 0;
-  border-radius: 7px;
-  color: #64748b;
-  background: #f1f5f9;
-  transition: background 0.15s ease, color 0.15s ease;
-  flex: 0 0 auto;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+  white-space: nowrap;
 }
 
-.inline-editable-field__action:hover:not(:disabled) {
-  background: #e2e8f0;
+.inline-editable-field__btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.inline-editable-field__btn--secondary {
+  color: #475569;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.inline-editable-field__btn--secondary:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
   color: #334155;
 }
 
-.inline-editable-field__action.is-save {
+.inline-editable-field__btn--primary {
   color: #fff;
   background: #0b84ff;
+  border-color: #0b84ff;
 }
 
-.inline-editable-field__action.is-save:hover:not(:disabled) {
+.inline-editable-field__btn--primary:hover:not(:disabled) {
   background: #0875e3;
-}
-
-.inline-editable-field__action:disabled {
-  cursor: not-allowed;
-  opacity: 0.65;
+  border-color: #0875e3;
 }
 
 .inline-editable-field__spinner {
@@ -444,6 +663,10 @@ watch(() => [props.modelValue, resolvedFieldName.value], () => {
   border-top-color: #fff;
   border-radius: 999px;
   animation: inline-editable-spin 0.8s linear infinite;
+}
+
+.inline-editable-field__spinner--btn {
+  display: block;
 }
 
 @keyframes inline-editable-spin {
