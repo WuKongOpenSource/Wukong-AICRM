@@ -567,6 +567,10 @@ async function handleAiExtract() {
       formData.source = result.source
       customerFieldValues.value.source = result.source
     }
+    if (result.website) {
+      formData.website = result.website
+      customerFieldValues.value.website = result.website
+    }
     if (result.remark) {
       formData.remark = result.remark
       customerFieldValues.value.remark = result.remark
@@ -595,6 +599,7 @@ function hasCustomerFieldFilled(result: CustomerAiParseVO | null): boolean {
     || result.level
     || result.stage
     || result.source
+    || result.website
     || result.remark
     || result.contactName
     || result.contactPhone

@@ -138,6 +138,7 @@ export interface CustomerAiParseVO {
   level?: string
   stage?: string
   source?: string
+  website?: string
   remark?: string
   contactName?: string
   contactPhone?: string

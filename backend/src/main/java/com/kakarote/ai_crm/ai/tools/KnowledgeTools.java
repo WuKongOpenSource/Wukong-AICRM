@@ -205,7 +205,7 @@ public class KnowledgeTools {
                 sb.append(scope.invalidKnowledgeIds());
             }
 
-            appendReferenceSummary(sb, result.getReferences());
+            appendReferenceSummary(sb, weKnoraClient.filterRelevantChunks(result.getReferences(), query));
             String response = sb.toString();
             aiQuotaService.consumeEstimatedTokens(tenantId, "knowledge_tool_ask", query, response);
             return response;

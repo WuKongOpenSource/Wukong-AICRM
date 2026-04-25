@@ -152,6 +152,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     private TransactionTemplate transactionTemplate;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private static final Pattern WEBSITE_URL_PATTERN = Pattern.compile("(?i)\\b(?:https?://|www\\.)[^\\s，。；;、)）\\]】>]+");
 
     private static final String AI_CUSTOMER_PARSE_PROMPT = """
         你是一个专业的 CRM 助手。请从以下输入（文字描述、名片信息、邮件内容等）中提取客户信息，并进行智能分析。
@@ -168,6 +169,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
           "level": "客户级别，只能是 A、B 或 C（根据公司规模和潜力判断，大公司或明确需求为A，中等为B，其他为C）",
           "stage": "商机阶段，只能是以下之一: lead, qualified, proposal, negotiation, closed（默认 lead）",
           "source": "客户来源（如：线上广告、朋友介绍、展会等，若无法判断则留空）",
+          "website": "公司官网或网站 URL（如：https://example.com；若输入包含 URL 请提取到该字段）",
           "remark": "备注信息（补充描述）",
           "contactName": "联系人姓名",
           "contactPhone": "联系电话",
@@ -1087,6 +1089,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         snapshot.setLevel(detail.getLevel());
         snapshot.setStage(detail.getStage());
         snapshot.setSource(detail.getSource());
+        snapshot.setWebsite(detail.getWebsite());
         snapshot.setRemark(detail.getRemark());
 
         if (primaryContact != null) {
@@ -2916,7 +2919,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             }
 
             log.info("AI 客户录入解析原始响应: {}", response);
-            CustomerAiParseVO result = parseCustomerAiResponse(response);
+            CustomerAiParseVO result = parseCustomerAiResponse(response, parseBO.getContent());
             if (isEmptyCustomerAiParseResult(result)) {
                 throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR,
                         "AI 未提取到可填充的信息，请确认图片清晰或补充文字描述后重试");
@@ -2968,7 +2971,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
     }
 
-    private CustomerAiParseVO parseCustomerAiResponse(String response) {
+    private CustomerAiParseVO parseCustomerAiResponse(String response, String sourceContent) {
         try {
             // Strip markdown code block markers if present
             String json = response.trim();
@@ -2984,6 +2987,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             vo.setLevel(getJsonText(root, "level"));
             vo.setStage(getJsonText(root, "stage"));
             vo.setSource(getJsonText(root, "source"));
+            vo.setWebsite(resolveAiParsedWebsite(getJsonText(root, "website"), sourceContent));
             vo.setRemark(getJsonText(root, "remark"));
             vo.setContactName(getJsonText(root, "contactName"));
             vo.setContactPhone(getJsonText(root, "contactPhone"));
@@ -3002,7 +3006,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             return vo;
         } catch (Exception e) {
             log.warn("AI 客户录入响应 JSON 解析失败: {}", e.getMessage());
-            return buildFallbackCustomerResult();
+            return buildFallbackCustomerResult(sourceContent);
         }
     }
 
@@ -3768,6 +3772,42 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         return normalized;
     }
 
+    private String resolveAiParsedWebsite(String parsedWebsite, String sourceContent) {
+        String normalizedWebsite = normalizeWebsiteForAiParse(parsedWebsite);
+        if (StrUtil.isNotBlank(normalizedWebsite)) {
+            return normalizedWebsite;
+        }
+        return extractWebsiteFromContent(sourceContent);
+    }
+
+    private String extractWebsiteFromContent(String content) {
+        if (StrUtil.isBlank(content)) {
+            return null;
+        }
+        Matcher matcher = WEBSITE_URL_PATTERN.matcher(content);
+        if (!matcher.find()) {
+            return null;
+        }
+        return normalizeWebsiteForAiParse(matcher.group());
+    }
+
+    private String normalizeWebsiteForAiParse(String website) {
+        String normalized = StrUtil.trim(website);
+        if (StrUtil.isBlank(normalized)) {
+            return null;
+        }
+        while (normalized.length() > 0 && ".,;:，。；、)）]】>》".indexOf(normalized.charAt(normalized.length() - 1)) >= 0) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        if (StrUtil.isBlank(normalized)) {
+            return null;
+        }
+        if (normalized.toLowerCase(Locale.ROOT).startsWith("www.")) {
+            normalized = "https://" + normalized;
+        }
+        return customerLogoService.normalizeWebsite(normalized);
+    }
+
     private String getJsonText(JsonNode root, String field) {
         if (root.has(field) && !root.get(field).isNull()) {
             return root.get(field).asText();
@@ -3783,8 +3823,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         return result;
     }
 
-    private CustomerAiParseVO buildFallbackCustomerResult() {
+    private CustomerAiParseVO buildFallbackCustomerResult(String sourceContent) {
         CustomerAiParseVO vo = new CustomerAiParseVO();
+        vo.setWebsite(extractWebsiteFromContent(sourceContent));
         vo.setTags(List.of());
         vo.setKeyPoints(List.of());
         return vo;
@@ -3800,6 +3841,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 result.getLevel(),
                 result.getStage(),
                 result.getSource(),
+                result.getWebsite(),
                 result.getRemark(),
                 result.getContactName(),
                 result.getContactPhone(),

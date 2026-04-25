@@ -48,6 +48,10 @@ public class WeKnoraClient {
     private final CrmTenantMapper crmTenantMapper;
     private final ConcurrentHashMap<Long, Object> tenantLocks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> conversationSessionCache = new ConcurrentHashMap<>();
+    private static final Set<String> REFERENCE_QUERY_STOP_TERMS = Set.of(
+            "什么", "怎么", "怎样", "如何", "是否", "能否", "可以", "需要", "有关", "关于",
+            "问题", "搜索", "检索", "文档", "资料", "内容", "这个", "那个", "哪些", "哪个"
+    );
 
     @Autowired
     public WeKnoraClient(WeKnoraConfig config, CrmTenantMapper crmTenantMapper) {
@@ -748,23 +752,14 @@ public class WeKnoraClient {
                             root.get("data"), new TypeReference<List<WeKnoraChunk>>() {});
                     double threshold = config.getSearch().getVectorThreshold();
                     int maxCount = config.getSearch().getMatchCount();
-                    List<WeKnoraChunk> filteredChunks = chunks.stream()
-                            .filter(c -> c.getScore() == null || c.getScore() >= threshold)
+                    List<WeKnoraChunk> filteredChunks = filterRelevantChunks(chunks, query).stream()
                             .limit(maxCount)
                             .toList();
-
-                    if (!filteredChunks.isEmpty()) {
-                        return filteredChunks;
-                    }
-                    List<WeKnoraChunk> fallbackChunks = chunks.stream()
-                            .limit(maxCount)
-                            .toList();
-                    if (!fallbackChunks.isEmpty()) {
-                        log.info("WeKnora 鎼滅储缁撴灉鍏ㄩ儴浣庝簬闃堝€硷紝杩斿洖 TopN 鍏滃簳: threshold={}, rawCount={}, query={}",
+                    if (filteredChunks.isEmpty() && !chunks.isEmpty()) {
+                        log.info("WeKnora 搜索结果未达到相关性要求，返回空结果: threshold={}, rawCount={}, query={}",
                                 threshold, chunks.size(), abbreviateForLog(query));
-                        return fallbackChunks;
                     }
-                    return Collections.emptyList();
+                    return filteredChunks;
                 }
             }
             log.warn("WeKnora 搜索返回空结果: {}", response.getBody());
@@ -773,6 +768,90 @@ public class WeKnoraClient {
             log.error("WeKnora 搜索异常: {}", e.getMessage(), e);
             return Collections.emptyList();
         }
+    }
+
+    /**
+     * WeKnora 的不同接口返回的 score 语义并不完全一致。优先信任配置阈值；
+     * 对低分引用，只在标题或内容能直接命中用户问题关键词时保留，避免把无关文档展示成参考文件。
+     */
+    public List<WeKnoraChunk> filterRelevantChunks(List<WeKnoraChunk> chunks, String query) {
+        if (chunks == null || chunks.isEmpty()) {
+            return Collections.emptyList();
+        }
+        double threshold = config.getSearch().getVectorThreshold();
+        return chunks.stream()
+                .filter(chunk -> isRelevantChunk(chunk, query, threshold))
+                .toList();
+    }
+
+    private boolean isRelevantChunk(WeKnoraChunk chunk, String query, double threshold) {
+        if (chunk == null) {
+            return false;
+        }
+        Double score = chunk.getScore();
+        if (score != null && score >= threshold) {
+            return true;
+        }
+        if (score == null && threshold <= 0) {
+            return true;
+        }
+        return matchesQueryText(chunk, query);
+    }
+
+    private boolean matchesQueryText(WeKnoraChunk chunk, String query) {
+        List<String> terms = extractQueryTerms(query);
+        if (terms.isEmpty()) {
+            return false;
+        }
+
+        String searchableText = normalizeReferenceText(String.join(" ",
+                StrUtil.blankToDefault(chunk.getKnowledgeTitle(), ""),
+                StrUtil.blankToDefault(chunk.getKnowledgeFilename(), ""),
+                StrUtil.blankToDefault(chunk.getContent(), "")
+        ));
+        if (StrUtil.isBlank(searchableText)) {
+            return false;
+        }
+
+        long hits = terms.stream()
+                .filter(searchableText::contains)
+                .count();
+        return hits >= Math.min(2, terms.size());
+    }
+
+    private List<String> extractQueryTerms(String query) {
+        String normalized = normalizeReferenceText(query);
+        if (StrUtil.isBlank(normalized)) {
+            return Collections.emptyList();
+        }
+
+        LinkedHashSet<String> terms = new LinkedHashSet<>();
+        for (String token : normalized.split("\\s+")) {
+            if (token.length() >= 2 && !REFERENCE_QUERY_STOP_TERMS.contains(token)) {
+                terms.add(token);
+            }
+        }
+
+        String compact = normalized.replace(" ", "");
+        if (compact.length() >= 2) {
+            for (int i = 0; i <= compact.length() - 2; i++) {
+                String gram = compact.substring(i, i + 2);
+                if (!REFERENCE_QUERY_STOP_TERMS.contains(gram)) {
+                    terms.add(gram);
+                }
+            }
+        }
+        return new ArrayList<>(terms);
+    }
+
+    private String normalizeReferenceText(String text) {
+        if (StrUtil.isBlank(text)) {
+            return "";
+        }
+        return text.toLowerCase(Locale.ROOT)
+                .replaceAll("[\\p{P}\\p{Punct}]+", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     public WeKnoraChatResult askKnowledgeQuestion(Long tenantId, Long conversationId, String query) {
