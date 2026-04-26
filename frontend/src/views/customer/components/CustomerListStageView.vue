@@ -26,7 +26,7 @@
               {{ col.label }}
             </span>
             <span
-              class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+              class="inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold leading-none tabular-nums"
               :class="col.countBadgeClass"
             >
               {{ columnCount(col.id) }}
@@ -184,8 +184,9 @@ const emit = defineEmits<{
 const draggingCustomerId = ref<string | null>(null)
 const dropTargetStage = shallowRef<CustomerStage | null>(null)
 
+/** 拖拽时留在原位的卡片：不用 ring-offset + ring-primary，否则会出现双层浅蓝线框。勿加 pointer-events-none，会破坏原生 drag。 */
 const cardDraggingClass =
-  'opacity-55 shadow-md ring-2 ring-primary/35 ring-offset-2 ring-offset-[#F4F5F7] scale-[0.98]'
+  'opacity-[0.5] scale-[0.99] shadow-none ring-1 ring-inset ring-slate-300/70 bg-slate-50/50'
 
 function rowsInStage(stage: CustomerStage) {
   return customersInStage(props.customers, stage)
