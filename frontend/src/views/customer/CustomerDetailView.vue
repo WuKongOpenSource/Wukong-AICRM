@@ -11,7 +11,7 @@
       <div class="sticky top-0 z-20 bg-background-light/90 backdrop-blur-md px-4 md:px-8 pt-4 pb-4 border-b border-slate-200/50 shrink-0">
         <!-- Breadcrumb -->
         <div class="flex items-center gap-2 text-sm text-slate-500 mb-3">
-          <button @click="router.push('/customer')" class="hover:text-primary flex items-center gap-1 transition-colors">
+          <button @click="handleBackToCustomerList" class="hover:text-primary flex items-center gap-1 transition-colors">
             <WkIcon name="customer" :size="14" />
             客户管理
           </button>
@@ -1244,6 +1244,10 @@ import TaskEditDialog from '@/views/task/components/TaskEditDialog.vue'
 import KnowledgeDetailModal from '@/components/knowledge/KnowledgeDetailModal.vue'
 import KnowledgeUploadDialog from '@/components/knowledge/KnowledgeUploadDialog.vue'
 import InlineEditableField from '@/components/common/InlineEditableField.vue'
+import {
+  CUSTOMER_DETAIL_LIST_PAGE_QUERY_KEY,
+  CUSTOMER_LIST_PAGE_QUERY_KEY
+} from '@/views/customer/constants'
 import { appEvents, APP_EVENT } from '@/utils/events'
 
 const route = useRoute()
@@ -1283,6 +1287,27 @@ const contactPage = ref(1)
 const contactPageSize = ref(5)
 const contactLoading = ref(false)
 const customerKnowledgeList = ref<Knowledge[]>([])
+
+function parsePositivePageQuery(value: unknown): number | null {
+  if (typeof value !== 'string') return null
+  const page = Number(value)
+  if (!Number.isInteger(page) || page < 1) return null
+  return page
+}
+
+function buildCustomerListRoute() {
+  const listPage = parsePositivePageQuery(route.query[CUSTOMER_DETAIL_LIST_PAGE_QUERY_KEY])
+  return {
+    path: '/customer',
+    query: listPage && listPage > 1
+      ? { [CUSTOMER_LIST_PAGE_QUERY_KEY]: String(listPage) }
+      : {}
+  }
+}
+
+function handleBackToCustomerList() {
+  router.push(buildCustomerListRoute())
+}
 const customerKnowledgeLoading = ref(false)
 const showKnowledgeUploadDialog = ref(false)
 const knowledgeUploadDialogRef = ref<InstanceType<typeof KnowledgeUploadDialog> | null>(null)
@@ -2003,7 +2028,7 @@ async function handleDeleteCustomer() {
   try {
     await customerStore.removeCustomer(customer.value.customerId)
     ElMessage.success('客户已删除')
-    router.push('/customer')
+    handleBackToCustomerList()
   } catch {
     // Error handled by interceptor
   }
