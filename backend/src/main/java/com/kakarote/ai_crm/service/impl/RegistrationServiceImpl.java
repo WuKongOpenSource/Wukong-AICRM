@@ -14,12 +14,16 @@ import com.kakarote.ai_crm.entity.BO.RegisterBO;
 import com.kakarote.ai_crm.entity.BO.ResetPasswordBO;
 import com.kakarote.ai_crm.entity.PO.CrmTenant;
 import com.kakarote.ai_crm.entity.PO.ManagerDept;
+import com.kakarote.ai_crm.entity.PO.ManagerMenu;
 import com.kakarote.ai_crm.entity.PO.ManagerRole;
+import com.kakarote.ai_crm.entity.PO.ManagerRoleMenu;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.PO.ManagerUserRole;
 import com.kakarote.ai_crm.mapper.ManagerDeptMapper;
 import com.kakarote.ai_crm.service.ICrmTenantService;
 import com.kakarote.ai_crm.service.ICustomFieldService;
+import com.kakarote.ai_crm.service.IManagerMenuService;
+import com.kakarote.ai_crm.service.IManagerRoleMenuService;
 import com.kakarote.ai_crm.service.IManagerRoleService;
 import com.kakarote.ai_crm.service.IManagerUserRoleService;
 import com.kakarote.ai_crm.service.ISystemConfigService;
@@ -35,20 +39,32 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 @Slf4j
 @Service
 public class RegistrationServiceImpl implements RegistrationService {
 
     public static final String SUPER_ADMIN_REALM = "super_admin";
+    public static final String DEFAULT_ROLE_REALM = "default_user";
 
     private static final String EMAIL_CODE_CACHE_PREFIX = "register:email:code:";
     private static final int EMAIL_CODE_EXPIRE_SECONDS = 600;
     private static final int EMAIL_CODE_COOLDOWN_SECONDS = 60;
     private static final int REGISTER_EMAIL_TYPE = 1;
     private static final int RESET_PASSWORD_EMAIL_TYPE = 2;
+    private static final int MENU_TYPE_ACTION = 5;
+    private static final int DATA_SCOPE_SELF = 1;
+    private static final Set<String> SYSTEM_SETTING_MODULES = Set.of(
+            "user", "dept", "role", "config", "customField", "agent"
+    );
+    private static final Set<String> DATA_SCOPE_MODULES = Set.of(
+            "customer", "contact", "task", "followup", "schedule", "knowledge"
+    );
 
     @Autowired
     private ICrmTenantService tenantService;
@@ -58,6 +74,12 @@ public class RegistrationServiceImpl implements RegistrationService {
 
     @Autowired
     private IManagerRoleService roleService;
+
+    @Autowired
+    private IManagerMenuService menuService;
+
+    @Autowired
+    private IManagerRoleMenuService roleMenuService;
 
     @Autowired
     private ManageUserService manageUserService;
@@ -132,6 +154,7 @@ public class RegistrationServiceImpl implements RegistrationService {
                     .createTime(LocalDateTime.now())
                     .build();
             roleService.save(adminRole);
+            initializeDefaultRole();
 
             ManagerUser user = new ManagerUser();
             user.setUsername(email);
@@ -307,6 +330,74 @@ public class RegistrationServiceImpl implements RegistrationService {
     private String normalizeText(String value) {
         String normalized = StrUtil.trim(value);
         return StrUtil.isBlank(normalized) ? null : normalized;
+    }
+
+    /**
+     * 初始化新企业默认角色。
+     */
+    private void initializeDefaultRole() {
+        ManagerRole defaultRole = ManagerRole.builder()
+                .roleName("默认角色")
+                .realm(DEFAULT_ROLE_REALM)
+                .description("默认角色")
+                .dataType(DATA_SCOPE_SELF)
+                .createTime(LocalDateTime.now())
+                .build();
+        roleService.save(defaultRole);
+        initializeDefaultRolePermissions(defaultRole.getRoleId());
+    }
+
+    /**
+     * 默认角色拥有除系统设置外的所有功能权限，业务数据权限固定为本人。
+     */
+    private void initializeDefaultRolePermissions(Long roleId) {
+        List<ManagerMenu> menus = menuService.list();
+        if (CollUtil.isEmpty(menus)) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        List<ManagerRoleMenu> roleMenus = new ArrayList<>();
+        for (ManagerMenu menu : menus) {
+            String realm = menu.getRealm();
+            if (!Objects.equals(menu.getType(), MENU_TYPE_ACTION) || StrUtil.isBlank(realm)) {
+                continue;
+            }
+
+            String module = resolvePermissionModule(realm);
+            if (SYSTEM_SETTING_MODULES.contains(module)) {
+                continue;
+            }
+
+            ManagerRoleMenu roleMenu = new ManagerRoleMenu();
+            roleMenu.setRoleId(roleId);
+            roleMenu.setMenuId(menu.getMenuId());
+            roleMenu.setDataScope(resolveDefaultDataScope(module, realm));
+            roleMenu.setCreateTime(now);
+            roleMenus.add(roleMenu);
+        }
+
+        if (CollUtil.isNotEmpty(roleMenus)) {
+            roleMenuService.saveBatch(roleMenus);
+        }
+    }
+
+    /**
+     * 获取权限所属模块。
+     */
+    private String resolvePermissionModule(String realm) {
+        int separatorIndex = realm.indexOf(':');
+        return separatorIndex >= 0 ? realm.substring(0, separatorIndex) : realm;
+    }
+
+    /**
+     * 只有业务数据模块需要写入数据范围；新建等无范围权限保持为空。
+     */
+    private Integer resolveDefaultDataScope(String module, String realm) {
+        if (DATA_SCOPE_MODULES.contains(module) && !realm.endsWith(":create")) {
+            return DATA_SCOPE_SELF;
+        }
+        return null;
     }
 
     /**
