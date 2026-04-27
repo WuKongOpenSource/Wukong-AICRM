@@ -41,7 +41,7 @@
               class="flex flex-col bg-white"
             >
               <div class="p-5 flex items-center justify-between border-b border-slate-100">
-                <div class="flex flex-col">
+                <div class="hidden sm:flex sm:flex-col">
                   <span class="text-sm font-medium" :class="day.isToday ? 'text-primary' : 'text-slate-400'">
                     {{ day.label }}
                   </span>
@@ -59,7 +59,7 @@
                   v-for="event in getEventsForDate(day.fullDate)"
                   :key="event.scheduleId"
                   @click="selectedEvent = event; selectedTask = null"
-                  class="p-3 rounded-xl border border-primary/20 bg-primary/5 shadow-sm hover:shadow-md hover:bg-primary/10 transition-all cursor-pointer"
+                  class="p-[3px] sm:p-3 rounded-xl border border-primary/20 bg-primary/5 shadow-sm hover:shadow-md hover:bg-primary/10 transition-all cursor-pointer"
                 >
                   <p class="text-xs font-bold text-primary mb-1 truncate">{{ event.title }}</p>
                   <p class="text-xs text-slate-500 truncate">{{ formatTime(event.startTime) }} • {{ event.customerName || event.participantNames || '' }}</p>
@@ -250,9 +250,9 @@
     </div>
 
     <ScheduleDetailDrawer
-      v-if="!isMobile"
       v-model="showScheduleDetailDrawer"
       :schedule="selectedEvent"
+      :is-mobile="isMobile"
       @edit="handleEditScheduleFromDetail"
       @deleted="handleScheduleDeleted"
     />
@@ -332,7 +332,7 @@ function getLunarText(dateStr: string): string {
 }
 
 const showScheduleDetailDrawer = computed({
-  get: () => !!selectedEvent.value && !isMobile.value,
+  get: () => !!selectedEvent.value,
   set: (val: boolean) => {
     if (!val) selectedEvent.value = null
   }

@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-full min-h-0 bg-slate-50/30 overflow-hidden">
+  <div :class="['flex h-full min-h-0 bg-slate-50/30', isMobile ? 'overflow-y-auto' : 'overflow-hidden']">
     <!-- Sidebar Navigation (Desktop) -->
     <aside
       v-if="!isMobile"
@@ -159,7 +159,7 @@
       </div>
 
       <!-- Content Grid -->
-      <div class="min-h-0 flex-1 overflow-y-auto p-6 md:p-8">
+      <div :class="['min-h-0 flex-1 p-6 md:p-8', isMobile ? '' : 'overflow-y-auto']">
         <div class="mx-auto max-w-7xl">
           <KnowledgeSearchResultPanel
             v-if="showAiSearchResult"

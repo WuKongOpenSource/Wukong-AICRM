@@ -2,12 +2,12 @@
   <el-drawer
     v-model="visible"
     direction="rtl"
-    :size="'400px'"
+    :size="isMobile ? '100%' : '400px'"
     :with-header="false"
-    :modal="false"
-    :lock-scroll="false"
+    :modal="isMobile"
+    :lock-scroll="isMobile"
     body-class="schedule-detail-drawer__body"
-    modal-penetrable
+    :modal-penetrable="!isMobile"
     class="schedule-detail-drawer"
   >
     <div v-if="schedule" class="h-full flex flex-col bg-white shadow-2xl">
@@ -146,6 +146,7 @@ import { deleteSchedule, type ScheduleVO } from '@/api/schedule'
 const props = defineProps<{
   modelValue: boolean
   schedule: ScheduleVO | null
+  isMobile?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -161,6 +162,8 @@ const visible = computed({
   get: () => props.modelValue,
   set: (value: boolean) => emit('update:modelValue', value)
 })
+
+const isMobile = computed(() => !!props.isMobile)
 
 function formatTime(dateStr: string): string {
   if (!dateStr) return ''

@@ -29,7 +29,7 @@
 
         <div class="flex-1 overflow-y-auto px-6 py-5">
           <div v-if="step === 1" class="space-y-6">
-            <section class="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-center">
+            <section class="hidden md:block rounded-2xl border border-slate-200 bg-slate-50 p-5 text-center">
               <div class="mx-auto mb-4 flex size-20 items-center justify-center rounded-full"
                 :class="isRecording ? 'bg-red-100 text-red-500' : isTranscribing ? 'bg-amber-100 text-amber-500' : 'bg-primary/10 text-primary'"
               >

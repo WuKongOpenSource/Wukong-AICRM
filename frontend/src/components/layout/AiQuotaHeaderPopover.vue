@@ -13,8 +13,8 @@
         class="inline-flex max-w-[min(20rem,calc(100vw-8rem))] items-center gap-2 rounded-full bg-slate-100/80 px-3 py-1.5 text-left text-xs font-medium text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-100"
       >
         <WkIcon name="ai" :size="18" class="shrink-0 leading-none text-primary" />
-        <span v-if="currentAiMode === 'gift'" class="min-w-0 truncate tabular-nums">
-          已使用 {{ tokenUsedWan }} / {{ tokenTotalWan }}万，剩余 {{ tokenProgressPercent }}%
+        <span v-if="currentAiMode === 'gift'" class="hidden min-w-0 truncate tabular-nums md:inline">
+          <span class="hidden md:inline">已使用 </span>{{ tokenUsedWan }} / {{ tokenTotalWan }}万<span class="hidden md:inline">，剩余 </span>{{ tokenProgressPercent }}%
         </span>
         <span v-else class="min-w-0 truncate text-slate-600">AI 额度 · 点击查看</span>
       </button>

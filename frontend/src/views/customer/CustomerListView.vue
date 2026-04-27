@@ -2,9 +2,19 @@
   <div ref="pageRootRef" data-customer-page-root class="flex flex-col gap-6 px-6 py-6">
     <!-- Header -->
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h2 class="text-2xl font-bold text-slate-900">客户列表</h2>
-        <p class="text-sm text-slate-500">管理您的客户关系并查看 AI 驱动的业务洞察。</p>
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h2 class="text-2xl font-bold text-slate-900">客户列表</h2>
+          <p class="text-sm text-slate-500">管理您的客户关系并查看 AI 驱动的业务洞察。</p>
+        </div>
+
+        <button
+          v-if="isMobile"
+          class="h-10 px-4 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 shrink-0"
+          @click="openCreateCustomerDialog()"
+        >
+          <span class="material-symbols-outlined wk-plus-button-icon">person_add</span>
+        </button>
       </div>
       <div class="flex flex-nowrap sm:flex-wrap items-center gap-3 flex-wrap">
         <!-- Search -->
@@ -137,11 +147,12 @@
         </div>
         <!-- 新增客户（与导入/导出已对调顺序） -->
         <button
+          v-if="!isMobile"
           class="h-10 px-4 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
           @click="openCreateCustomerDialog()"
         >
           <span class="material-symbols-outlined wk-plus-button-icon">person_add</span>
-          <span v-if="!isMobile">新增客户</span>
+          <span>新增客户</span>
         </button>
         <!-- Import/Export - desktop only -->
         <div v-if="!isMobile" class="flex items-center gap-1.5 border-l border-slate-200 pl-3 ml-0">
@@ -477,14 +488,14 @@
 
                     <div class="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
                       <div class="min-w-0">
-                        <div class="text-[11px] font-bold text-slate-400 tracking-wide uppercase">industry</div>
+                        <div class="text-[11px] font-bold text-slate-400 tracking-wide uppercase">{{ mobileIndustryLabel }}</div>
                         <div class="text-sm text-slate-600 truncate" :title="getMobileIndustryText(row)">
                           {{ getMobileIndustryText(row) }}
                         </div>
                       </div>
 
                       <div class="min-w-0">
-                        <div class="text-[11px] font-bold text-slate-400 tracking-wide uppercase">level</div>
+                        <div class="text-[11px] font-bold text-slate-400 tracking-wide uppercase">{{ mobileLevelLabel }}</div>
                         <div class="mt-0.5 min-w-0 wk-cell-status-badges">
                           <span
                             v-if="row.level"
@@ -533,7 +544,7 @@
             class="shrink-0 px-6 py-4 bg-slate-50/50 flex items-center justify-between border-t border-slate-200"
           >
             <span class="text-sm text-slate-500">
-              共 {{ customerStore.totalCount }} 条客户数据
+              共 {{ customerStore.totalCount }} 条<span class="hidden md:inline">客户数据</span>
             </span>
             <div class="flex items-center gap-1">
               <button
@@ -1089,6 +1100,9 @@ const visiblePages = computed(() => {
 
 const industryField = computed(() => listFields.value.find(field => field.fieldName === 'industry') || null)
 const levelField = computed(() => listFields.value.find(field => field.fieldName === 'level') || null)
+
+const mobileIndustryLabel = computed(() => industryField.value?.fieldLabel || 'INDUSTRY')
+const mobileLevelLabel = computed(() => levelField.value?.fieldLabel || 'LEVEL')
 
 function getMobileIndustryText(row: CustomerListVO): string {
   if (!industryField.value) return (row.industry as unknown as string) || '-'

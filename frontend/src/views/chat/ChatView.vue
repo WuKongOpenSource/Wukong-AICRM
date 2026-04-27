@@ -150,6 +150,32 @@
       <!-- Chat View -->
       <template v-if="currentView === 'chat'">
         <div class="flex-1 flex flex-col overflow-hidden">
+          <!-- Mobile top bar (chat detail) -->
+          <div
+            v-if="isMobile"
+            class="shrink-0 sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-100 px-4 py-3"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-primary transition-colors"
+                @click="mobilePanel = 'sessions'"
+              >
+                <span class="material-symbols-outlined text-[18px] leading-none">arrow_back</span>
+                历史对话
+              </button>
+
+              <button
+                type="button"
+                class="h-9 px-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition-all inline-flex items-center gap-1.5"
+                @click="handleNewSession"
+              >
+                <span class="material-symbols-outlined wk-plus-button-icon text-[18px] leading-none">add</span>
+                开启新对话
+              </button>
+            </div>
+          </div>
+
           <!-- Messages Area -->
           <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 scroll-smooth pb-4">
             <!-- Welcome Section (no messages) -->
@@ -340,7 +366,11 @@
               <!-- Input Box -->
               <div class="relative group">
                 <div class="absolute inset-0 bg-primary/5 blur-xl rounded-2xl group-focus-within:bg-primary/10 transition-all opacity-0 group-focus-within:opacity-100"></div>
-                <div class="relative flex items-center bg-white border border-slate-200 rounded-2xl p-2 shadow-xl shadow-slate-200/40 focus-within:border-primary transition-all">
+                <div
+                  class="relative flex bg-white border border-slate-200 rounded-2xl p-2 shadow-xl shadow-slate-200/40 focus-within:border-primary transition-all"
+                  :class="isMobile ? 'flex-col items-stretch gap-2' : 'items-center'"
+                >
+                  <div class="flex items-center w-full">
                   <input
                     ref="fileInputRef"
                     type="file"
@@ -365,8 +395,9 @@
                     @keydown.enter.exact.prevent="handleSend"
                     @paste="handlePaste"
                   />
-                  <div class="flex items-center gap-2 pr-1">
+                  <div class="flex items-center gap-2 pr-1 shrink-0">
                     <button
+                      v-if="!isMobile"
                       type="button"
                       class="h-10 rounded-full border px-3.5 text-sm shadow-sm transition-all"
                       :class="chatStore.ragEnabled
@@ -383,6 +414,37 @@
                         <span>知识库检索</span>
                       </span>
                     </button>
+                    <button
+                      v-if="!isMobile"
+                      class="size-10 rounded-xl bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
+                      :disabled="(!inputText.trim() && selectedFiles.length === 0) || chatStore.isStreaming || isUploading"
+                      @click="handleSend"
+                    >
+                      <span v-if="chatStore.isStreaming || isUploading" class="material-symbols-outlined text-xl animate-spin">progress_activity</span>
+                      <span v-else class="material-symbols-outlined text-xl">send</span>
+                    </button>
+                  </div>
+                  </div>
+
+                  <div v-if="isMobile" class="flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      class="h-10 self-start inline-flex rounded-xl border px-3.5 text-sm shadow-sm transition-all"
+                      :class="chatStore.ragEnabled
+                        ? 'border-primary/25 bg-primary/10 text-primary shadow-primary/10'
+                        : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'"
+                      :aria-pressed="chatStore.ragEnabled"
+                      :title="chatStore.ragEnabled ? '已启用 知识库 检索' : '点击启用 知识库 检索'"
+                      @click="chatStore.setRagEnabled(!chatStore.ragEnabled)"
+                    >
+                      <span class="flex items-center justify-center gap-1.5">
+                        <span class="material-symbols-outlined text-[18px] leading-none">
+                          menu_book
+                        </span>
+                        <span>知识库检索</span>
+                      </span>
+                    </button>
+
                     <button
                       class="size-10 rounded-xl bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
                       :disabled="(!inputText.trim() && selectedFiles.length === 0) || chatStore.isStreaming || isUploading"
@@ -871,6 +933,7 @@ function formatTime(date: Date): string {
 <style scoped>
 .line-clamp-1 {
   display: -webkit-box;
+  line-clamp: 1;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -878,6 +941,7 @@ function formatTime(date: Date): string {
 
 .line-clamp-2 {
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;

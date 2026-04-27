@@ -7,92 +7,137 @@
 
     <!-- Content -->
     <template v-else-if="customer">
-      <!-- Sticky Header -->
-      <div class="sticky top-0 z-20 bg-background-light/90 backdrop-blur-md px-4 md:px-8 pt-4 pb-4 border-b border-slate-200/50 shrink-0">
-        <!-- Breadcrumb -->
-        <div class="flex items-center gap-2 text-sm text-slate-500 mb-3">
-          <button @click="handleBackToCustomerList" class="hover:text-primary flex items-center gap-1 transition-colors">
-            <WkIcon name="customer" :size="14" />
-            客户管理
-          </button>
-          <span class="material-symbols-outlined text-xs">chevron_right</span>
-          <span class="text-slate-900 font-medium">客户详情</span>
-        </div>
+      <div class="min-h-0 flex-1 overflow-auto">
+        <!-- Sticky Header -->
+        <div class="static z-20 bg-background-light/90 backdrop-blur-md px-4 md:px-8 pt-4 pb-4 border-b border-slate-200/50 shrink-0 md:sticky md:top-0">
+          <!-- Breadcrumb -->
+          <div class="flex items-center gap-2 text-sm text-slate-500 mb-3">
+            <button @click="handleBackToCustomerList" class="hover:text-primary flex items-center gap-1 transition-colors">
+              <WkIcon name="customer" :size="14" />
+              客户管理
+            </button>
+            <span class="material-symbols-outlined text-xs">chevron_right</span>
+            <span class="text-slate-900 font-medium">客户详情</span>
+          </div>
 
-        <!-- Customer Info Card -->
-        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-          <div class="flex flex-col gap-3 md:flex-row md:justify-between md:gap-0 justify-between">
-            <div class="flex min-w-0 gap-4">
-              <div class="size-14 bg-slate-100 rounded-lg flex items-center justify-center border border-slate-200 overflow-hidden shrink-0">
-                <img
-                  v-if="customer.logoUrl"
-                  :src="customer.logoUrl"
-                  :alt="customer.companyName || 'company logo'"
-                  class="size-full object-contain bg-white"
-                />
-                <span v-else class="text-2xl font-bold text-slate-400">{{ customer.companyName?.charAt(0) || '?' }}</span>
-              </div>
-              <div class="min-w-0 space-y-2">
-                <div class="flex items-center gap-3 flex-wrap">
-                  <h2 class="text-lg md:text-xl font-bold text-slate-900 truncate">{{ customer.companyName }}</h2>
-                  <!-- <span
-                    class="px-2 py-0.5 text-xs font-bold rounded uppercase"
-                    :class="getStageBadgeClass(customer.stage)"
-                  >{{ getStageLabel(customer.stage) }}</span> -->
-                  <span v-if="customer.level"
-                    class="px-2 py-0.5 text-xs font-bold rounded"
-                    :class="{
-                      'bg-emerald-100 text-emerald-700': customer.level === 'A',
-                      'bg-blue-100 text-blue-700': customer.level === 'B',
-                      'bg-slate-100 text-slate-600': customer.level === 'C'
-                    }"
-                  >{{ customer.level }}级客户</span>
+          <!-- Customer Info Card -->
+          <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+            <div class="flex flex-col gap-3 md:flex-row md:justify-between md:gap-0 justify-between">
+              <div class="flex min-w-0 gap-4">
+                <div class="size-14 bg-slate-100 rounded-lg flex items-center justify-center border border-slate-200 overflow-hidden shrink-0">
+                  <img
+                    v-if="customer.logoUrl"
+                    :src="customer.logoUrl"
+                    :alt="customer.companyName || 'company logo'"
+                    class="size-full object-contain bg-white"
+                  />
+                  <span v-else class="text-2xl font-bold text-slate-400">{{ customer.companyName?.charAt(0) || '?' }}</span>
                 </div>
-                <div class="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-                  <div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
-                    <div class="flex items-center gap-1 shrink-0">
-                      <span class="text-slate-400">联系人:</span>
-                      <span class="text-slate-600 font-medium">{{ primaryContact?.name || '-' }}</span>
-                    </div>
-                    <div class="flex items-center gap-1 shrink-0">
-                      <span class="text-slate-400">手机:</span>
-                      <span class="text-slate-600 font-mono font-medium">{{ primaryContact?.phone || '-' }}</span>
-                    </div>
-                    <div class="flex items-center gap-1 shrink-0">
-                      <span class="text-slate-400">状态:</span>
-                      <span class="text-primary font-bold">{{ getStageLabel(customer.stage) }}</span>
-                    </div>
+                <div class="min-w-0 space-y-2">
+                  <div class="flex flex-col items-start gap-1 md:flex-row md:items-center md:gap-3 md:flex-wrap">
+                    <h2 class="text-lg md:text-xl font-bold text-slate-900 truncate">{{ customer.companyName }}</h2>
+                    <!-- <span
+                      class="px-2 py-0.5 text-xs font-bold rounded uppercase"
+                      :class="getStageBadgeClass(customer.stage)"
+                    >{{ getStageLabel(customer.stage) }}</span> -->
+                    <span v-if="customer.level"
+                      class="px-2 py-0.5 text-xs font-bold rounded"
+                      :class="{
+                        'bg-emerald-100 text-emerald-700': customer.level === 'A',
+                        'bg-blue-100 text-blue-700': customer.level === 'B',
+                        'bg-slate-100 text-slate-600': customer.level === 'C'
+                      }"
+                    >{{ customer.level }}级客户</span>
                   </div>
-                  <div
-                    v-if="customer.tags?.length || canEditCustomerTags"
-                    class="ml-2 flex min-w-0 flex-wrap items-center justify-end gap-2"
-                  >
-                    <span
-                      v-for="tag in customer.tags"
-                      :key="tag.tagId"
-                      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 group"
+                  <div class="hidden md:flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+                    <div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+                      <div class="flex items-center gap-1 shrink-0">
+                        <span class="text-slate-400">联系人:</span>
+                        <span class="text-slate-600 font-medium">{{ primaryContact?.name || '-' }}</span>
+                      </div>
+                      <div class="flex items-center gap-1 shrink-0">
+                        <span class="text-slate-400">手机:</span>
+                        <span class="text-slate-600 font-mono font-medium">{{ primaryContact?.phone || '-' }}</span>
+                      </div>
+                      <div class="flex items-center gap-1 shrink-0">
+                        <span class="text-slate-400">状态:</span>
+                        <span class="text-primary font-bold">{{ getStageLabel(customer.stage) }}</span>
+                      </div>
+                    </div>
+                    <div
+                      v-if="customer.tags?.length || canEditCustomerTags"
+                      class="ml-2 flex min-w-0 flex-wrap items-center justify-end gap-2"
                     >
-                      {{ tag.tagName }}
                       <span
+                        v-for="tag in customer.tags"
+                        :key="tag.tagId"
+                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 group"
+                      >
+                        {{ tag.tagName }}
+                        <span
+                          v-if="canEditCustomerTags"
+                          class="material-symbols-outlined text-xs text-slate-400 hover:text-red-500 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                          @click="handleRemoveTag(tag)"
+                        >close</span>
+                      </span>
+                      <button
                         v-if="canEditCustomerTags"
-                        class="material-symbols-outlined text-xs text-slate-400 hover:text-red-500 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-                        @click="handleRemoveTag(tag)"
-                      >close</span>
-                    </span>
-                    <button
-                      v-if="canEditCustomerTags"
-                      type="button"
-                      class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-primary border border-dashed border-primary/30 hover:bg-primary/5 transition-colors"
-                      @click="showAddTagDialog = true"
-                    >
-                      <span class="wk-plus-button-mark" aria-hidden="true">+</span>
-                      <span>添加标签</span>
-                    </button>
+                        type="button"
+                        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-primary border border-dashed border-primary/30 hover:bg-primary/5 transition-colors"
+                        @click="showAddTagDialog = true"
+                      >
+                        <span class="wk-plus-button-mark" aria-hidden="true">+</span>
+                        <span>添加标签</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-            <div class="flex w-full flex-wrap justify-end gap-2 md:w-auto md:flex-nowrap md:justify-start shrink-0">
+
+              <!-- Mobile: move contact/tags row under whole left block -->
+              <div class="mt-0 flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-sm md:hidden">
+                <div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+                  <div class="flex items-center gap-1 shrink-0">
+                    <span class="text-slate-400">联系人:</span>
+                    <span class="text-slate-600 font-medium">{{ primaryContact?.name || '-' }}</span>
+                  </div>
+                  <div class="flex items-center gap-1 shrink-0">
+                    <span class="text-slate-400">手机:</span>
+                    <span class="text-slate-600 font-mono font-medium">{{ primaryContact?.phone || '-' }}</span>
+                  </div>
+                  <div class="flex items-center gap-1 shrink-0">
+                    <span class="text-slate-400">状态:</span>
+                    <span class="text-primary font-bold">{{ getStageLabel(customer.stage) }}</span>
+                  </div>
+                </div>
+                <div
+                  v-if="customer.tags?.length || canEditCustomerTags"
+                  class="ml-0 flex min-w-0 flex-wrap items-center justify-end gap-2"
+                >
+                  <span
+                    v-for="tag in customer.tags"
+                    :key="tag.tagId"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 group"
+                  >
+                    {{ tag.tagName }}
+                    <span
+                      v-if="canEditCustomerTags"
+                      class="material-symbols-outlined text-xs text-slate-400 hover:text-red-500 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                      @click="handleRemoveTag(tag)"
+                    >close</span>
+                  </span>
+                  <button
+                    v-if="canEditCustomerTags"
+                    type="button"
+                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-primary border border-dashed border-primary/30 hover:bg-primary/5 transition-colors"
+                    @click="showAddTagDialog = true"
+                  >
+                    <span class="wk-plus-button-mark" aria-hidden="true">+</span>
+                    <span>添加标签</span>
+                  </button>
+                </div>
+              </div>
+              <div class="flex w-full flex-wrap justify-end gap-2 md:w-auto md:flex-nowrap md:justify-start shrink-0">
               <el-popover
                 v-if="canTransferCustomer"
                 :visible="showTransferPopover"
@@ -318,7 +363,7 @@
       </div>
 
       <!-- 3-Column Content -->
-      <div class="flex-1 overflow-auto wk-mobile-px-15 md:px-8 pb-8 pt-6">
+      <div class="wk-mobile-px-15 md:px-8 pb-8 pt-6">
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
           <!-- Left Column: Basic Info (col-span-3) -->
           <div class="lg:col-span-3 space-y-4">
@@ -417,24 +462,25 @@
 
           <!-- Center Column: Follow-ups Timeline (col-span-6)；标题图标与时间轴节点共用 28px 轨宽以便纵轴对齐 -->
           <div v-if="canViewFollowUps" class="lg:col-span-6 space-y-4">
-            <div class="grid grid-cols-[1.75rem_minmax(0,1fr)] items-center gap-x-2">
+            <div class="grid grid-cols-[1.75rem_minmax(0,1fr)] items-start gap-x-2 md:items-center">
               <span
                 :class="sectionIconBoxClass"
-                class="justify-self-center"
+                class="justify-self-center self-start mt-0.5 md:self-center md:mt-0"
                 :style="getSectionIconStyle('recentActivity')"
               >
                 <span :class="sectionMaterialIconClass">history</span>
               </span>
-              <div class="flex min-w-0 items-center justify-between gap-2">
-                <h3 class="truncate text-lg font-bold text-slate-900">最近活动 - AI时间轴</h3>
-                <div class="flex shrink-0 items-center gap-3">
+              <div class="flex min-w-0 flex-col items-start gap-2 md:flex-row md:items-center md:justify-between">
+                <h3 class="min-w-0 truncate text-lg font-bold text-slate-900 mt-[3px] md:mt-0">最近活动 - AI时间轴</h3>
+                <div class="flex w-full justify-start md:w-auto shrink-0 flex-wrap items-center gap-2 md:gap-3">
                   <div class="flex flex-wrap items-center gap-2">
                     <button
-                      v-for="option in followUpTypeFilters"
+                      v-for="(option, index) in followUpTypeFilters"
                       :key="option.value || 'all'"
                       type="button"
                       :class="[
-                        'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                        'rounded-full py-1.5 text-xs font-medium transition-colors md:px-3',
+                        isMobile && index === 0 ? 'pl-3 pr-3' : 'px-3',
                         selectedFollowUpType === option.value
                           ? 'bg-primary text-white shadow-sm'
                           : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -816,6 +862,7 @@
           </div>
         </div>
       </div>
+      </div>
     </template>
 
     <!-- Add Tag Dialog -->
@@ -1131,11 +1178,14 @@
     <el-dialog
       v-model="showAiReportDialog"
       title="AI 分析报告"
-      width="680px"
+      :width="isMobile ? 'calc(100% - 40px)' : '680px'"
       class="wk-dialog--flush"
       destroy-on-close
     >
-      <div class="space-y-4">
+      <div
+        class="space-y-4"
+        :class="isMobile ? 'max-h-[calc(100vh-10rem)] overflow-y-auto pb-[env(safe-area-inset-bottom)]' : ''"
+      >
         <section class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
           <p class="text-xs font-bold uppercase tracking-wider text-slate-500">AI 状态探测</p>
           <div class="mt-3">

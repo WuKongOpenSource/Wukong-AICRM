@@ -155,7 +155,7 @@
     v-model="open"
     title="任务详情"
     width="95%"
-    fullscreen
+    :fullscreen="false"
     class="task-detail-dialog"
   >
     <template v-if="task">
