@@ -63,11 +63,11 @@
         <!-- Calendar Views -->
         <div
           class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm relative"
-          :class="viewMode === 'month' ? 'min-h-0 flex flex-1 flex-col' : 'shrink-0'"
+          :class="viewMode === 'grid' || viewMode === 'month' ? 'min-h-0 flex flex-1 flex-col' : 'shrink-0'"
         >
           <Transition name="wk-cal-view" mode="out-in">
           <!-- Week View -->
-          <div v-if="viewMode === 'grid'" key="grid" class="grid grid-cols-7 divide-x divide-slate-200 min-h-[180px]">
+          <div v-if="viewMode === 'grid'" key="grid" class="grid min-h-[400px] flex-1 grid-cols-7 divide-x divide-slate-200">
             <div
               v-for="day in weekDays"
               :key="day.label"
@@ -88,7 +88,7 @@
                 >{{ day.date }}</span>
               </div>
               <div
-                class="flex-1 p-3 space-y-3"
+                class="flex-1 p-3 space-y-4"
                 :class="isMobile && getEventsForDate(day.fullDate).length ? 'cursor-pointer' : ''"
                 @click="openMobileEventsDialog(day.fullDate)"
               >
@@ -100,35 +100,54 @@
                   />
                 </div>
                 <template v-else>
-                  <div
-                    v-for="event in getEventsForDate(day.fullDate)"
-                    :key="event.scheduleId"
-                    @click="selectedEvent = event; selectedTask = null"
-                    class="p-[3px] sm:p-3 rounded-xl border border-primary/20 bg-primary/5 shadow-sm hover:shadow-md hover:bg-primary/10 transition-all cursor-pointer"
-                  >
-                    <p class="text-xs font-bold text-primary mb-1 truncate">{{ event.title }}</p>
-                    <p class="text-xs text-slate-500 truncate">{{ formatTime(event.startTime) }} • {{ event.customerName || event.participantNames || '' }}</p>
+                  <div v-if="getEventsForDate(day.fullDate).length > 0" class="space-y-2">
+                    <div
+                      v-for="event in getEventsForDate(day.fullDate)"
+                      :key="event.scheduleId"
+                      @click="selectedEvent = event; selectedTask = null"
+                      class="p-3 rounded-xl border border-primary/20 bg-primary/5 shadow-sm hover:shadow-md hover:bg-primary/10 transition-all cursor-pointer"
+                    >
+                      <h4 class="text-xs font-bold text-primary mb-1.5 truncate" :title="event.title">{{ event.title }}</h4>
+                      <p class="text-[10px] text-slate-500 truncate">
+                        {{ formatScheduleTimeRange(event.startTime, event.endTime) }}
+                        <template v-if="event.customerName || event.participantNames">
+                          • {{ event.customerName || event.participantNames }}
+                        </template>
+                      </p>
+                    </div>
                   </div>
                   <!-- Tasks -->
-                  <div
-                    v-for="task in getTasksForDate(day.fullDate)"
-                    :key="task.taskId"
-                    class="p-3 rounded-xl border border-slate-200 bg-white shadow-sm transition-all flex items-start gap-2"
-                  >
-                    <button
-                      @click.stop="handleToggleTask(task)"
-                      class="mt-0.5 shrink-0 size-4 rounded-sm border flex items-center justify-center transition-colors"
-                      :class="task.status === 'COMPLETED'
-                        ? 'bg-emerald-500 border-emerald-500 text-white'
-                        : 'border-slate-300 hover:border-primary text-transparent hover:text-primary/20'"
+                  <div v-if="getTasksForDate(day.fullDate).length > 0" class="space-y-2 pt-2 border-t border-slate-100">
+                    <div
+                      v-for="task in getTasksForDate(day.fullDate)"
+                      :key="task.taskId"
+                      class="p-3 rounded-xl border shadow-sm transition-all flex items-start gap-2 cursor-pointer"
+                      :class="{
+                        'bg-slate-50 border-slate-200 opacity-60': task.status === 'COMPLETED',
+                        'bg-red-50 border-red-100': task.status !== 'COMPLETED' && normalizeTaskPriority(task.priority) === 'HIGH',
+                        'bg-white border-slate-200': task.status !== 'COMPLETED' && normalizeTaskPriority(task.priority) !== 'HIGH'
+                      }"
+                      @click="selectTask(task)"
                     >
-                      <span class="material-symbols-outlined text-[12px] font-bold">check</span>
-                    </button>
-                    <div class="min-w-0 flex-1" @click="selectTask(task)">
-                      <p class="text-xs font-bold mb-1 truncate" :class="task.status === 'COMPLETED' ? 'text-slate-500 line-through' : 'text-slate-700'">
-                        {{ task.title }}
-                      </p>
-                      <p class="text-xs text-slate-400 truncate">{{ task.customerName || '' }}</p>
+                      <button
+                        @click.stop="handleToggleTask(task)"
+                        class="mt-0.5 shrink-0 size-4 rounded-sm border flex items-center justify-center transition-colors"
+                        :class="task.status === 'COMPLETED'
+                          ? 'bg-emerald-500 border-emerald-500 text-white'
+                          : 'border-slate-300 hover:border-primary text-transparent hover:text-primary/20'"
+                      >
+                        <span class="material-symbols-outlined text-[12px] font-bold">check</span>
+                      </button>
+                      <div class="min-w-0 flex-1">
+                        <h4
+                          class="text-xs font-bold mb-1 truncate"
+                          :class="task.status === 'COMPLETED' ? 'text-slate-500' : 'text-slate-700'"
+                          :title="task.title"
+                        >
+                          {{ task.title }}
+                        </h4>
+                        <p class="text-[10px] text-slate-400 truncate">{{ task.customerName || '' }}</p>
+                      </div>
                     </div>
                   </div>
                 </template>
@@ -151,23 +170,21 @@
               <div
                 v-for="(cell, i) in monthCells"
                 :key="i"
-                class="min-h-0 p-2"
+                class="min-h-[120px] p-2"
                 :class="{ 'bg-slate-50/50': !cell.isCurrentMonth }"
               >
                 <div class="flex justify-between items-start mb-1">
-                  <div class="flex flex-col gap-0.5 item-center w-full text-center">
-                    <span
-                      class="size-6 flex items-center justify-center rounded-full w-full text-xs font-medium"
-                      :class="cell.isToday
-                        ? 'bg-primary text-white font-bold'
-                        : !cell.isCurrentMonth ? 'text-slate-300' : 'text-slate-700'"
-                    >
-                      {{ cell.isCurrentMonth ? cell.date : '' }}
-                    </span>
-                    <span v-if="cell.isCurrentMonth && cell.fullDate && !isMobile" class="text-xs text-slate-400 leading-none">
-                      {{ getLunarText(cell.fullDate) }}
-                    </span>
-                  </div>
+                  <span v-if="cell.fullDate && !isMobile" class="text-[10px] text-slate-400 leading-6">
+                    {{ getLunarText(cell.fullDate) }}
+                  </span>
+                  <span
+                    class="size-6 flex items-center justify-center rounded-full text-xs font-medium"
+                    :class="cell.isToday
+                      ? 'bg-primary text-white font-bold'
+                      : !cell.isCurrentMonth ? 'text-slate-300' : 'text-slate-700'"
+                  >
+                    {{ cell.date }}
+                  </span>
                 </div>
                 <div
                   v-if="cell.fullDate"
@@ -187,17 +204,24 @@
                   </div>
                   <template v-else>
                     <div
-                      v-for="event in getEventsForDate(cell.fullDate)"
+                      v-for="event in getMonthEventsForDate(cell.fullDate)"
                       :key="event.scheduleId"
                       @click="selectedEvent = event; selectedTask = null"
-                      class="px-2 py-1 text-xs font-medium bg-primary/10 text-primary rounded truncate cursor-pointer hover:bg-primary/20"
+                      class="px-2 py-1 text-[10px] font-medium bg-primary/10 text-primary rounded truncate cursor-pointer hover:bg-primary/20"
+                      :title="event.title"
                     >
                       {{ formatTime(event.startTime) }} {{ event.title }}
                     </div>
                     <div
-                      v-for="task in getTasksForDate(cell.fullDate)"
+                      v-for="task in getMonthTasksForDate(cell.fullDate)"
                       :key="task.taskId"
-                      class="px-2 py-1 text-xs font-medium rounded truncate cursor-pointer flex items-center gap-1 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                      class="px-2 py-1 text-[10px] font-medium rounded truncate cursor-pointer flex items-center gap-1"
+                      :class="{
+                        'bg-slate-100 text-slate-500': task.status === 'COMPLETED',
+                        'bg-red-50 text-red-600 hover:bg-red-100': task.status !== 'COMPLETED' && normalizeTaskPriority(task.priority) === 'HIGH',
+                        'bg-slate-50 text-slate-700 hover:bg-slate-100': task.status !== 'COMPLETED' && normalizeTaskPriority(task.priority) !== 'HIGH'
+                      }"
+                      :title="task.title"
                     >
                       <div
                         class="shrink-0 size-3 rounded-sm border flex items-center justify-center transition-colors"
@@ -206,13 +230,15 @@
                           : 'border-slate-300 text-transparent'"
                         @click.stop="handleToggleTask(task)"
                       >
-                        <span class="material-symbols-outlined text-xs font-bold">check</span>
+                        <span class="material-symbols-outlined text-[8px] font-bold">check</span>
                       </div>
                       <span
                         @click="selectTask(task)"
                         class="truncate"
-                        :class="task.status === 'COMPLETED' ? 'line-through text-slate-500' : ''"
                       >{{ task.title }}</span>
+                    </div>
+                    <div v-if="getMonthOverflowCount(cell.fullDate) > 0" class="text-[10px] text-slate-400 px-1">
+                      还有 {{ getMonthOverflowCount(cell.fullDate) }} 项...
                     </div>
                   </template>
                 </div>
@@ -419,13 +445,47 @@ const lunarFormatter = new Intl.DateTimeFormat('zh-Hans-u-ca-chinese', {
   day: 'numeric'
 })
 
+const lunarDayNames = [
+  '初一',
+  '初二',
+  '初三',
+  '初四',
+  '初五',
+  '初六',
+  '初七',
+  '初八',
+  '初九',
+  '初十',
+  '十一',
+  '十二',
+  '十三',
+  '十四',
+  '十五',
+  '十六',
+  '十七',
+  '十八',
+  '十九',
+  '二十',
+  '廿一',
+  '廿二',
+  '廿三',
+  '廿四',
+  '廿五',
+  '廿六',
+  '廿七',
+  '廿八',
+  '廿九',
+  '三十'
+]
+
 function getLunarText(dateStr: string): string {
   try {
     if (!dateStr) return ''
     const d = new Date(dateStr)
     if (Number.isNaN(d.getTime())) return ''
-    // Example output (depends on runtime): "二月18" / "闰二月18"
-    return lunarFormatter.format(d)
+    const dayPart = lunarFormatter.formatToParts(d).find(part => part.type === 'day')?.value
+    const lunarDay = Number.parseInt(dayPart ?? '', 10)
+    return lunarDayNames[lunarDay - 1] ?? dayPart ?? ''
   } catch {
     return ''
   }
@@ -527,9 +587,7 @@ const monthCells = computed(() => {
   const month = anchor.getMonth()
   const todayStr = toDateStr(new Date())
   const firstDay = new Date(year, month, 1)
-  const lastDay = new Date(year, month + 1, 0)
   const startDow = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1
-  const totalDays = lastDay.getDate()
   const cells: {
     date: number
     isCurrentMonth: boolean
@@ -538,13 +596,13 @@ const monthCells = computed(() => {
   }[] = []
   for (let i = 0; i < 35; i++) {
     const date = i - startDow + 1
-    const isCurrentMonth = date > 0 && date <= totalDays
-    const cellDate = isCurrentMonth ? new Date(year, month, date) : null
+    const cellDate = new Date(year, month, date)
+    const isCurrentMonth = cellDate.getMonth() === month
     cells.push({
-      date: isCurrentMonth ? date : 0,
+      date: cellDate.getDate(),
       isCurrentMonth,
-      isToday: !!(cellDate && toDateStr(cellDate) === todayStr),
-      fullDate: cellDate ? toDateStr(cellDate) : ''
+      isToday: toDateStr(cellDate) === todayStr,
+      fullDate: toDateStr(cellDate)
     })
   }
   return cells
@@ -654,6 +712,13 @@ function formatTime(dateStr: string): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+function formatScheduleTimeRange(startTime: string, endTime?: string): string {
+  const start = formatTime(startTime)
+  const end = endTime ? formatTime(endTime) : ''
+  if (!end || end === start) return start
+  return `${start}-${end}`
+}
+
 function getEventsForDate(dateStr: string): ScheduleVO[] {
   return schedules.value.filter(e => toDateStr(new Date(e.startTime)) === dateStr)
 }
@@ -667,6 +732,20 @@ function normalizeDueDate(dueDate: string): string {
 
 function getTasksForDate(dateStr: string): Task[] {
   return tasks.value.filter(t => normalizeDueDate(t.dueDate ?? '') === dateStr)
+}
+
+function getMonthEventsForDate(dateStr: string): ScheduleVO[] {
+  return getEventsForDate(dateStr).slice(0, 2)
+}
+
+function getMonthTasksForDate(dateStr: string): Task[] {
+  return getTasksForDate(dateStr).slice(0, 2)
+}
+
+function getMonthOverflowCount(dateStr: string): number {
+  const eventCount = getEventsForDate(dateStr).length
+  const taskCount = getTasksForDate(dateStr).length
+  return Math.max(0, eventCount - 2) + Math.max(0, taskCount - 2)
 }
 
 async function handleToggleTask(task: Task) {
