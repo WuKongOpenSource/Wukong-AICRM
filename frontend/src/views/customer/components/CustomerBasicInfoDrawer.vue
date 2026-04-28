@@ -61,7 +61,7 @@
           </div>
         </div>
 
-        <div class="space-y-5">
+        <div class="space-y-5 text-left">
           <section
             v-if="currentAiReportVisible"
             class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4"

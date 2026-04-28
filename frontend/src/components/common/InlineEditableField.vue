@@ -223,6 +223,8 @@ const FLOAT_MIN_WIDTH = 216
 const FLOAT_MAX_WIDTH = 300
 /** 相对单元格底边向上偏移，使面板略盖住原内容（像素） */
 const FLOAT_OVERLAP_UP = 28
+/** 普通页面内联编辑时的基准层；在抽屉/对话框内会按遮罩层抬高 */
+const FLOAT_Z_INDEX_BASE = 1900
 
 let floatListenersBound = false
 let tableScrollEl: HTMLElement | null = null
@@ -230,6 +232,16 @@ let floatResizeObserver: ResizeObserver | null = null
 
 function onFloatReposition() {
   requestAnimationFrame(() => updateFloatPosition())
+}
+
+/** 锚点在 ElDrawer / ElDialog 等 Teleport 遮罩内时，浮动层也在 body 上，必须高于 .el-overlay 的 z-index，否则会整层被挡住看起来像「点了没反应」 */
+function resolveFloatZIndex(anchor: HTMLElement): number {
+  const overlay = anchor.closest?.('.el-overlay') as HTMLElement | null
+  if (!overlay) return FLOAT_Z_INDEX_BASE
+  const raw = window.getComputedStyle(overlay).zIndex
+  const parsed = raw === 'auto' ? NaN : Number.parseInt(raw, 10)
+  if (!Number.isFinite(parsed) || parsed <= 0) return FLOAT_Z_INDEX_BASE
+  return Math.max(FLOAT_Z_INDEX_BASE, parsed + 1)
 }
 
 function updateFloatPosition() {
@@ -244,7 +256,8 @@ function updateFloatPosition() {
     FLOAT_MAX_WIDTH,
     Math.max(FLOAT_MIN_WIDTH, vw - FLOAT_MARGIN * 2)
   )
-  let left = ar.left + ar.width / 2 - targetW / 2
+  /* 左缘与锚点一致，表单/抽屉里与上方字段标题对齐；窄视口则贴边夹紧 */
+  let left = ar.left
   left = Math.max(FLOAT_MARGIN, Math.min(left, vw - targetW - FLOAT_MARGIN))
 
   const gap = 6
@@ -263,8 +276,8 @@ function updateFloatPosition() {
     left: `${Math.round(left)}px`,
     top: `${Math.round(top)}px`,
     width: `${Math.round(targetW)}px`,
-    /* 低于 Element Plus 下拉/日期层（约 2000+），避免选项被面板挡住 */
-    zIndex: '1900'
+    /* 在遮罩（抽屉/对话框）内时高于遮罩；普通场景保持 1900，下拉/日期打开时会再申请更高 z-index */
+    zIndex: String(resolveFloatZIndex(anchor))
   }
 }
 
@@ -541,6 +554,18 @@ onUnmounted(() => {
 .inline-editable-field__edit .material-symbols-outlined {
   font-size: 17px;
   line-height: 1;
+}
+
+/* 无 hover 的触屏设备：编辑钮不能长期 pointer-events:none，否则无法点开 */
+@media (hover: none) {
+  .inline-editable-field:has(.inline-editable-field__edit) .inline-editable-field__content {
+    padding-right: 32px;
+  }
+
+  .inline-editable-field__edit {
+    opacity: 0.92;
+    pointer-events: auto;
+  }
 }
 
 .inline-editable-field__editor {
