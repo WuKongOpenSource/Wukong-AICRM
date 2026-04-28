@@ -11,8 +11,10 @@
     class="schedule-detail-drawer"
   >
     <div v-if="schedule" class="h-full flex flex-col bg-white shadow-2xl">
-      <div class="flex items-center justify-between border-b border-slate-100 p-6">
-        <span class="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-primary">
+      <div class="flex items-center justify-between px-8 pt-8 pb-4">
+        <span
+          class="rounded-full bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-primary"
+        >
           日程详情
         </span>
         <div class="flex items-center gap-2">
@@ -48,22 +50,66 @@
         </div>
       </div>
 
-      <div class="flex-1 min-h-0 overflow-y-auto p-8">
-        <h2 class="mb-2 text-2xl font-bold leading-tight text-slate-900">{{ schedule.title }}</h2>
+      <div class="flex-1 min-h-0 overflow-y-auto px-8 pb-8 pt-0">
+        <h2 class="mb-8 text-2xl font-bold leading-tight text-slate-900">{{ schedule.title }}</h2>
 
-        <div class="mb-8 flex flex-wrap items-center gap-4 text-sm text-slate-500">
-          <div class="flex items-center gap-1">
-            <span class="material-symbols-outlined text-sm">schedule</span>
-            {{ formatDateTime(schedule.startTime) }}
-            <template v-if="schedule.endTime"> ~ {{ formatEndDateTime(schedule.startTime, schedule.endTime) }}</template>
+        <div class="mb-8 grid grid-cols-2 gap-4">
+          <!-- 参考 ScheduleDetailDrawer.tsx 216 行起： slate 底卡片 + 主色图标与标题同一行 -->
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="mb-2 flex items-center gap-2">
+              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">schedule</span>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">开始时间</p>
+            </div>
+            <p class="text-xs font-bold text-slate-700">{{ formatDateTime(schedule.startTime) }}</p>
           </div>
-          <div v-if="schedule.location" class="flex items-center gap-1">
-            <span class="material-symbols-outlined text-sm">location_on</span>
-            <span class="break-words">{{ schedule.location }}</span>
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="mb-2 flex items-center gap-2">
+              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">schedule</span>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">结束时间</p>
+            </div>
+            <p class="text-xs font-bold text-slate-700">
+              {{ schedule.endTime ? formatEndDateTime(schedule.startTime, schedule.endTime) : '未填写' }}
+            </p>
           </div>
-          <div v-if="schedule.typeName" class="flex items-center gap-1">
-            <span class="material-symbols-outlined text-sm">label</span>
-            {{ schedule.typeName }}
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="mb-2 flex items-center gap-2">
+              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">label</span>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">类型</p>
+            </div>
+            <p class="text-xs font-bold text-slate-700 break-words">{{ schedule.typeName || '未填写' }}</p>
+          </div>
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="mb-2 flex items-center gap-2">
+              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">location_on</span>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">地点</p>
+            </div>
+            <p class="text-xs font-bold text-slate-700 break-words">{{ schedule.location || '未填写' }}</p>
+          </div>
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="mb-2 flex items-center gap-2">
+              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">person</span>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">创建人</p>
+            </div>
+            <p class="text-xs font-bold text-slate-700 break-words">{{ displayCreateUserName }}</p>
+          </div>
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="mb-2 flex items-center gap-2">
+              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">calendar_clock</span>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">创建时间</p>
+            </div>
+            <p class="text-xs font-bold text-slate-700 break-words">{{ displayCreateTime }}</p>
           </div>
         </div>
 
@@ -89,26 +135,14 @@
             </div>
           </section>
 
-          <section v-if="schedule.participantUsers?.length || schedule.participantNames">
-            <div class="mb-4 flex items-center gap-2">
+          <section v-if="participantsLine">
+            <div class="mb-2 flex items-center gap-2">
               <span class="material-symbols-outlined text-[18px] text-slate-400">group</span>
               <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400">参与人</h3>
             </div>
-            <div class="rounded-2xl border border-slate-100 bg-slate-50 p-5">
-              <div v-if="schedule.participantUsers?.length" class="flex flex-wrap gap-2">
-                <div
-                  v-for="user in schedule.participantUsers"
-                  :key="user.userId"
-                  class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700"
-                >
-                  <span class="flex size-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                    {{ (user.realname || user.username || '?').charAt(0) }}
-                  </span>
-                  <span class="font-medium">{{ user.realname || user.username }}</span>
-                </div>
-              </div>
-              <p v-else class="whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{{ schedule.participantNames }}</p>
-            </div>
+            <p class="whitespace-pre-wrap text-sm font-medium leading-relaxed text-slate-700">
+              {{ participantsLine }}
+            </p>
           </section>
 
           <section v-if="schedule.description">
@@ -164,6 +198,30 @@ const visible = computed({
 })
 
 const isMobile = computed(() => !!props.isMobile)
+
+const displayCreateTime = computed(() => {
+  const t = props.schedule?.createTime
+  if (!t) return '未知'
+  return formatDateTime(t)
+})
+
+const displayCreateUserName = computed(() => {
+  const name = props.schedule?.createUserName?.trim()
+  return name || '未知'
+})
+
+/** 参与人一行展示：优先结构化列表用逗号拼接，否则用 participantNames */
+const participantsLine = computed(() => {
+  const s = props.schedule
+  if (!s) return ''
+  if (s.participantUsers?.length) {
+    return s.participantUsers
+      .map((u) => (u.realname || u.username || '').trim())
+      .filter(Boolean)
+      .join(', ')
+  }
+  return (s.participantNames || '').trim()
+})
 
 function formatTime(dateStr: string): string {
   if (!dateStr) return ''

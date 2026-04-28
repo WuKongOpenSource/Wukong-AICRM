@@ -11,28 +11,30 @@
     class="task-detail-drawer"
   >
     <div v-if="task" class="h-full flex flex-col bg-white shadow-2xl">
-      <!-- Header -->
-      <div class="flex items-center justify-between p-6 border-b border-slate-100">
-        <span class="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full uppercase tracking-widest">
+      <!-- Header：与 ScheduleDetailDrawer 一致，无底部分割线 -->
+      <div class="flex items-center justify-between px-8 pt-8 pb-4">
+        <span
+          class="rounded-full bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-primary"
+        >
           任务详情
         </span>
         <div class="flex items-center gap-2">
           <button
             v-if="canEdit"
-            @click="$emit('edit', task)"
-            class="size-9 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-primary transition-colors"
+            class="size-9 rounded-full text-slate-400 transition-colors hover:bg-primary/10 hover:text-primary"
             type="button"
             aria-label="编辑任务"
             title="编辑任务"
+            @click="$emit('edit', task)"
           >
             <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
           </button>
           <button
-            @click="open = false"
-            class="size-9 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+            class="size-9 rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
             type="button"
             aria-label="关闭任务详情"
             title="关闭"
+            @click="open = false"
           >
             <span class="material-symbols-outlined text-xl leading-none">close</span>
           </button>
@@ -40,37 +42,62 @@
       </div>
 
       <!-- Content -->
-      <div class="flex-1 min-h-0 overflow-y-auto p-8">
-        <h2 class="text-2xl font-bold text-slate-900 mb-2 line-clamp-2">{{ task.title }}</h2>
+      <div class="flex-1 min-h-0 overflow-y-auto px-8 pb-8 pt-0">
+        <h2 class="mb-8 line-clamp-2 text-2xl font-bold leading-tight text-slate-900">{{ task.title }}</h2>
 
-        <div class="grid grid-cols-2 gap-4 my-8">
-          <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">截止时间</p>
+        <div class="mb-8 grid grid-cols-2 gap-4">
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="mb-2 flex items-center gap-2">
+              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">schedule</span>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">截止时间</p>
+            </div>
             <p :class="['text-xs font-bold', isOverdue(task) ? 'text-red-500' : 'text-slate-700']">
               {{ task.dueDate ? formatDateTime(task.dueDate) : '未设定' }}
             </p>
-            <p v-if="isOverdue(task)" class="text-xs text-red-500 font-bold mt-1">(已延期)</p>
+            <p v-if="isOverdue(task)" class="mt-1 text-xs font-bold text-red-500">(已延期)</p>
           </div>
-          <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">优先级</p>
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="mb-2 flex items-center gap-2">
+              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">priority_high</span>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">优先级</p>
+            </div>
             <p :class="['text-xs font-bold uppercase', getPriorityColor(task.priority)]">
               {{ getPriorityLabel(task.priority) }}
             </p>
           </div>
-          <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">负责人</p>
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="mb-2 flex items-center gap-2">
+              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">person</span>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">负责人</p>
+            </div>
             <p class="text-xs font-bold text-slate-700">{{ task.assignedToName || '未分配' }}</p>
           </div>
-          <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">任务状态</p>
-            <p class="text-xs font-bold text-primary uppercase">{{ getStatusLabel(task.status) }}</p>
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="mb-2 flex items-center gap-2">
+              <span class="material-symbols-outlined shrink-0 text-[16px] text-primary leading-none">task_alt</span>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">任务状态</p>
+            </div>
+            <p class="text-xs font-bold uppercase text-primary">{{ getStatusLabel(task.status) }}</p>
           </div>
         </div>
 
         <div class="space-y-8">
           <section v-if="task.participantNames">
-            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">参与人</h3>
-            <p class="text-sm text-slate-700">{{ task.participantNames }}</p>
+            <div class="mb-2 flex items-center gap-2">
+              <span class="material-symbols-outlined text-[18px] text-slate-400">group</span>
+              <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400">参与人</h3>
+            </div>
+            <p class="whitespace-pre-wrap text-sm font-medium leading-relaxed text-slate-700">
+              {{ task.participantNames }}
+            </p>
           </section>
 
           <section v-if="task.customerName">
@@ -94,9 +121,12 @@
           </section>
 
           <section v-if="task.description">
-            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">任务描述</h3>
-            <div class="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
-              <p class="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{{ task.description }}</p>
+            <div class="mb-4 flex items-center gap-2">
+              <span class="material-symbols-outlined text-[18px] text-slate-400">notes</span>
+              <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400">任务描述</h3>
+            </div>
+            <div class="rounded-2xl border border-slate-100 bg-slate-50 p-5">
+              <p class="whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{{ task.description }}</p>
             </div>
           </section>
 
@@ -161,26 +191,39 @@
     <template v-if="task">
       <h2 class="text-lg font-bold text-slate-900 mb-4">{{ task.title }}</h2>
 
-      <div class="grid grid-cols-2 gap-3 mb-6">
-        <div class="p-3 bg-slate-50 rounded-xl">
-          <p class="text-xs font-bold text-slate-400 uppercase mb-1">截止时间</p>
+      <div class="mb-6 grid grid-cols-2 gap-3">
+        <div class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+          <div class="mb-1.5 flex items-center gap-1.5">
+            <span class="material-symbols-outlined shrink-0 text-[14px] text-primary leading-none">schedule</span>
+            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">截止时间</p>
+          </div>
           <p :class="['text-xs font-bold', isOverdue(task) ? 'text-red-500' : 'text-slate-700']">
             {{ task.dueDate ? formatDateTime(task.dueDate) : '未设定' }}
           </p>
+          <p v-if="isOverdue(task)" class="mt-0.5 text-[11px] font-bold text-red-500">(已延期)</p>
         </div>
-        <div class="p-3 bg-slate-50 rounded-xl">
-          <p class="text-xs font-bold text-slate-400 uppercase mb-1">优先级</p>
-          <p :class="['text-xs font-bold', getPriorityColor(task.priority)]">
+        <div class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+          <div class="mb-1.5 flex items-center gap-1.5">
+            <span class="material-symbols-outlined shrink-0 text-[14px] text-primary leading-none">priority_high</span>
+            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">优先级</p>
+          </div>
+          <p :class="['text-xs font-bold uppercase', getPriorityColor(task.priority)]">
             {{ getPriorityLabel(task.priority) }}
           </p>
         </div>
-        <div class="p-3 bg-slate-50 rounded-xl">
-          <p class="text-xs font-bold text-slate-400 uppercase mb-1">负责人</p>
+        <div class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+          <div class="mb-1.5 flex items-center gap-1.5">
+            <span class="material-symbols-outlined shrink-0 text-[14px] text-primary leading-none">person</span>
+            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">负责人</p>
+          </div>
           <p class="text-xs font-bold text-slate-700">{{ task.assignedToName || '未分配' }}</p>
         </div>
-        <div class="p-3 bg-slate-50 rounded-xl">
-          <p class="text-xs font-bold text-slate-400 uppercase mb-1">状态</p>
-          <p class="text-xs font-bold text-primary">{{ getStatusLabel(task.status) }}</p>
+        <div class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+          <div class="mb-1.5 flex items-center gap-1.5">
+            <span class="material-symbols-outlined shrink-0 text-[14px] text-primary leading-none">task_alt</span>
+            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">状态</p>
+          </div>
+          <p class="text-xs font-bold uppercase text-primary">{{ getStatusLabel(task.status) }}</p>
         </div>
       </div>
 

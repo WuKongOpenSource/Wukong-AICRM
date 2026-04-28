@@ -5,23 +5,52 @@
       <div class="w-full space-y-6">
         <!-- Header -->
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 class="text-2xl font-bold text-slate-900">智能日程安排</h2>
-            <p class="text-sm text-slate-500 mt-1">{{ currentDateStr }} • 今天有 {{ todayScheduleCount }} 场会议和 {{ todayTaskCount }} 个待办任务</p>
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6 min-w-0">
+            <div class="min-w-0">
+              <h2 class="text-2xl font-bold text-slate-900">智能日程安排</h2>
+              <p class="text-sm text-slate-500 mt-1">{{ currentDateStr }} • 今天有 {{ todayScheduleCount }} 场会议和 {{ todayTaskCount }} 个待办任务</p>
+            </div>
+            <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1 shrink-0">
+              <button
+                type="button"
+                class="size-8 flex items-center justify-center rounded-lg hover:bg-slate-50 text-slate-600 transition-colors"
+                aria-label="上一段"
+                @click="shiftCalendarAnchor(-1)"
+              >
+                <span class="material-symbols-outlined text-[20px]">chevron_left</span>
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1 text-xs font-bold text-slate-600 hover:text-primary transition-colors"
+                @click="goCalendarToday"
+              >
+                今天
+              </button>
+              <button
+                type="button"
+                class="size-8 flex items-center justify-center rounded-lg hover:bg-slate-50 text-slate-600 transition-colors"
+                aria-label="下一段"
+                @click="shiftCalendarAnchor(1)"
+              >
+                <span class="material-symbols-outlined text-[20px]">chevron_right</span>
+              </button>
+            </div>
           </div>
-          <div class="flex items-center gap-4">
+          <div class="flex items-center gap-4 flex-wrap">
             <div class="flex items-center bg-slate-50 p-1 rounded-lg border border-slate-200">
               <button
                 v-for="mode in viewModes"
                 :key="mode.value"
+                type="button"
                 @click="viewMode = mode.value"
                 class="px-5 py-1.5 text-sm font-medium rounded-md transition-colors"
                 :class="viewMode === mode.value
-                  ? 'bg-white text-primary shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'"
+                  ? 'bg-white text-primary'
+                  : 'text-slate-600 hover:text-slate-900'"
               >{{ mode.label }}</button>
             </div>
             <button
+              type="button"
               @click="openCreateScheduleDialog"
               class="px-6 py-2.5 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary/90 transition-colors shadow-sm flex items-center gap-2"
             >
@@ -33,8 +62,9 @@
 
         <!-- Calendar Views -->
         <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm relative">
+          <Transition name="wk-cal-view" mode="out-in">
           <!-- Week View -->
-          <div v-if="viewMode === 'grid'" class="grid grid-cols-7 divide-x divide-slate-200 min-h-[180px]">
+          <div v-if="viewMode === 'grid'" key="grid" class="grid grid-cols-7 divide-x divide-slate-200 min-h-[180px]">
             <div
               v-for="day in weekDays"
               :key="day.label"
@@ -104,7 +134,7 @@
           </div>
 
           <!-- Month View -->
-          <div v-else-if="viewMode === 'month'" class="min-h-[400px] flex flex-col">
+          <div v-else-if="viewMode === 'month'" key="month" class="min-h-[400px] flex flex-col">
             <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
               <div
                 v-for="dayLabel in ['周一','周二','周三','周四','周五','周六','周日']"
@@ -188,14 +218,14 @@
           </div>
 
           <!-- List View -->
-          <div v-else class="p-6">
+          <div v-else key="list" class="p-6">
             <div class="max-w-3xl mx-auto space-y-8">
-              <div v-if="schedules.length === 0 && tasks.length === 0" class="text-center py-20 text-slate-400">
+              <div v-if="listDayGroups.length === 0" class="text-center py-20 text-slate-400">
                 <span class="material-symbols-outlined text-4xl mb-2">calendar_today</span>
-                <p class="text-sm">暂无日程安排和待办任务</p>
+                <p class="text-sm">{{ schedules.length === 0 && tasks.length === 0 ? '暂无日程安排和待办任务' : '当日暂无日程安排和待办任务' }}</p>
               </div>
 
-              <div v-for="group in listGroups" :key="group.dateStr" class="space-y-4">
+              <div v-for="group in listDayGroups" :key="group.dateStr" class="space-y-4">
                 <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span class="size-2 rounded-full bg-primary"></span>
                   {{ group.header }}
@@ -275,6 +305,7 @@
               </div>
             </div>
           </div>
+          </Transition>
         </div>
       </div>
     </div>
@@ -389,6 +420,13 @@ const { isMobile } = useResponsive()
 const route = useRoute()
 const router = useRouter()
 
+function toDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 const lunarFormatter = new Intl.DateTimeFormat('zh-Hans-u-ca-chinese', {
   month: 'short',
   day: 'numeric'
@@ -478,24 +516,103 @@ const mobileMonthEvents = computed(() => {
   return getEventsForDate(mobileMonthEventsDialogDate.value)
 })
 
-const now = new Date()
+const calendarAnchorDate = ref<Date>(new Date())
 const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
+function shiftCalendarAnchor(direction: number) {
+  const d = new Date(calendarAnchorDate.value)
+  if (viewMode.value === 'grid') {
+    d.setDate(d.getDate() + 7 * direction)
+  } else if (viewMode.value === 'month') {
+    d.setMonth(d.getMonth() + direction)
+  } else {
+    d.setDate(d.getDate() + direction)
+  }
+  calendarAnchorDate.value = d
+}
+
+function goCalendarToday() {
+  calendarAnchorDate.value = new Date()
+}
+
+const weekDays = computed(() => {
+  const anchor = calendarAnchorDate.value
+  const dow = anchor.getDay()
+  const mondayOffset = dow === 0 ? -6 : 1 - dow
+  const todayStr = toDateStr(new Date())
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(anchor)
+    d.setDate(anchor.getDate() + mondayOffset + i)
+    return {
+      label: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][i],
+      date: d.getDate(),
+      fullDate: toDateStr(d),
+      isToday: toDateStr(d) === todayStr
+    }
+  })
+})
+
+const monthCells = computed(() => {
+  const anchor = calendarAnchorDate.value
+  const year = anchor.getFullYear()
+  const month = anchor.getMonth()
+  const todayStr = toDateStr(new Date())
+  const firstDay = new Date(year, month, 1)
+  const lastDay = new Date(year, month + 1, 0)
+  const startDow = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1
+  const totalDays = lastDay.getDate()
+  const cells: {
+    date: number
+    isCurrentMonth: boolean
+    isToday: boolean
+    fullDate: string
+  }[] = []
+  for (let i = 0; i < 35; i++) {
+    const date = i - startDow + 1
+    const isCurrentMonth = date > 0 && date <= totalDays
+    const cellDate = isCurrentMonth ? new Date(year, month, date) : null
+    cells.push({
+      date: isCurrentMonth ? date : 0,
+      isCurrentMonth,
+      isToday: !!(cellDate && toDateStr(cellDate) === todayStr),
+      fullDate: cellDate ? toDateStr(cellDate) : ''
+    })
+  }
+  return cells
+})
+
 const currentDateStr = computed(() => {
-  const y = now.getFullYear()
-  const m = now.getMonth() + 1
-  const d = now.getDate()
-  const dayName = dayNames[now.getDay()]
-  return `${y}年${m}月${d}日，${dayName}`
+  const d = calendarAnchorDate.value
+  const y = d.getFullYear()
+  const m = d.getMonth() + 1
+  const day = d.getDate()
+  const dayName = dayNames[d.getDay()] ?? ''
+  if (viewMode.value === 'month') {
+    return `${y}年${m}月`
+  }
+  if (viewMode.value === 'list') {
+    return `${y}年${m}月${day}日，${dayName}`
+  }
+  const days = weekDays.value
+  if (days.length >= 7) {
+    const s = new Date(days[0].fullDate + 'T12:00:00')
+    const e = new Date(days[6].fullDate + 'T12:00:00')
+    const sm = s.getMonth() + 1
+    const sd = s.getDate()
+    const em = e.getMonth() + 1
+    const ed = e.getDate()
+    return `${s.getFullYear()}年${sm}月${sd}日 — ${e.getFullYear()}年${em}月${ed}日，本周`
+  }
+  return `${y}年${m}月${day}日，${dayName}`
 })
 
 const todayScheduleCount = computed(() => {
-  const todayStr = toDateStr(now)
+  const todayStr = toDateStr(new Date())
   return schedules.value.filter(e => toDateStr(new Date(e.startTime)) === todayStr).length
 })
 
 const todayTaskCount = computed(() => {
-  const todayStr = toDateStr(now)
+  const todayStr = toDateStr(new Date())
   return tasks.value.filter(t => t.status !== 'COMPLETED' && normalizeDueDate(t.dueDate ?? '') === todayStr).length
 })
 
@@ -561,13 +678,6 @@ async function openScheduleFromRouteQuery(scheduleId: string) {
 }
 
 // --- Helpers ---
-
-function toDateStr(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
 
 function formatTime(dateStr: string): string {
   if (!dateStr) return ''
@@ -817,47 +927,6 @@ function formatDateTimeLocal(dateStr: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-// --- Week View ---
-
-const weekDays = computed(() => {
-  const today = now.getDay()
-  const mondayOffset = today === 0 ? -6 : 1 - today
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(now)
-    d.setDate(now.getDate() + mondayOffset + i)
-    return {
-      label: ['周一','周二','周三','周四','周五','周六','周日'][i],
-      date: d.getDate(),
-      fullDate: toDateStr(d),
-      isToday: d.toDateString() === now.toDateString()
-    }
-  })
-})
-
-// --- Month View ---
-
-const monthCells = computed(() => {
-  const year = now.getFullYear()
-  const month = now.getMonth()
-  const firstDay = new Date(year, month, 1)
-  const lastDay = new Date(year, month + 1, 0)
-  const startDow = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1
-  const totalDays = lastDay.getDate()
-  const cells = []
-  for (let i = 0; i < 35; i++) {
-    const date = i - startDow + 1
-    const isCurrentMonth = date > 0 && date <= totalDays
-    const cellDate = isCurrentMonth ? new Date(year, month, date) : null
-    cells.push({
-      date: isCurrentMonth ? date : 0,
-      isCurrentMonth,
-      isToday: isCurrentMonth && date === now.getDate(),
-      fullDate: cellDate ? toDateStr(cellDate) : ''
-    })
-  }
-  return cells
-})
-
 type ListItem =
   | { key: string; kind: 'schedule'; time: number; timeLabel: string; payload: ScheduleVO }
   | { key: string; kind: 'task'; time: number; timeLabel: string; payload: Task }
@@ -868,7 +937,7 @@ function getDayHeader(dateStr: string): string {
   const m = d.getMonth() + 1
   const day = d.getDate()
   const dayName = dayNames[d.getDay()] ?? ''
-  const isToday = toDateStr(d) === toDateStr(now)
+  const isToday = toDateStr(d) === toDateStr(new Date())
   return `${y}年${m}月${day}日，${dayName}${isToday ? ' (今天)' : ''}`
 }
 
@@ -917,4 +986,21 @@ const listGroups = computed(() => {
     }))
     .sort((a, b) => new Date(a.dateStr).getTime() - new Date(b.dateStr).getTime())
 })
+
+const listDayGroups = computed(() => {
+  const anchorStr = toDateStr(calendarAnchorDate.value)
+  return listGroups.value.filter(g => g.dateStr === anchorStr)
+})
 </script>
+
+<style scoped>
+.wk-cal-view-enter-active,
+.wk-cal-view-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.wk-cal-view-enter-from,
+.wk-cal-view-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+</style>
