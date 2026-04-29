@@ -186,21 +186,22 @@ public class KnowledgeTools {
                     result.isCompleted());
 
             if (isUnavailableRagAnswer(result.getAnswer())) {
-                log.debug("RAG知识库问答结果不可用，尝试检索兜底: tenantId={}, conversationId={}",
+                log.debug("RAG知识库问答结果不可用，片段检索兜底已临时关闭: tenantId={}, conversationId={}",
                         tenantId, conversationId);
-                String fallback = buildRagFallbackContext(query, scope, tenantId);
-                if (StrUtil.isNotBlank(fallback)) {
-                    log.debug("RAG知识库问答兜底成功: tenantId={}, conversationId={}, fallbackLength={}",
-                            tenantId, conversationId, fallback.length());
-                    aiQuotaService.consumeEstimatedTokens(tenantId, "knowledge_tool_ask", query, fallback);
-                    return fallback;
-                }
+                // 暂时关闭片段检索兜底，统一验证 RAG 问答模式效果。
+                // String fallback = buildRagFallbackContext(query, scope, tenantId);
+                // if (StrUtil.isNotBlank(fallback)) {
+                //     log.debug("RAG知识库问答兜底成功: tenantId={}, conversationId={}, fallbackLength={}",
+                //             tenantId, conversationId, fallback.length());
+                //     aiQuotaService.consumeEstimatedTokens(tenantId, "knowledge_tool_ask", query, fallback);
+                //     return fallback;
+                // }
                 if (!scope.invalidKnowledgeIds().isEmpty()) {
                     String response = "当前未能直接从知识库生成回答。以下文件ID无效或尚未完成解析: " + scope.invalidKnowledgeIds();
                     aiQuotaService.consumeEstimatedTokens(tenantId, "knowledge_tool_ask", query, response);
                     return response;
                 }
-                String response = "当前未能直接从知识库生成回答，请尝试换一种问法，或先查看相关文档片段。";
+                String response = "当前未能直接从知识库生成回答，请尝试换一种问法。";
                 aiQuotaService.consumeEstimatedTokens(tenantId, "knowledge_tool_ask", query, response);
                 return response;
             }
@@ -222,10 +223,11 @@ public class KnowledgeTools {
             throw e;
         } catch (Exception e) {
             log.warn("RAG 知识库问答失败: query={}, error={}", query, e.getMessage(), e);
-            String fallback = buildRagFallbackContext(query, resolveKnowledgeScope(knowledgeIdsStr), AiContextHolder.getCurrentTenantId());
-            if (StrUtil.isNotBlank(fallback)) {
-                return fallback;
-            }
+            // 暂时关闭异常场景下的片段检索兜底，统一验证 RAG 问答模式效果。
+            // String fallback = buildRagFallbackContext(query, resolveKnowledgeScope(knowledgeIdsStr), AiContextHolder.getCurrentTenantId());
+            // if (StrUtil.isNotBlank(fallback)) {
+            //     return fallback;
+            // }
             return "知识库问答失败: " + e.getMessage();
         }
     }
@@ -233,7 +235,8 @@ public class KnowledgeTools {
     /**
      * 搜索知识内容。
      */
-    @Tool(description = "在知识库中语义检索原始文档片段。当用户明确要查看原文、核对出处、查找相关片段或列出命中文档时调用。若目标是直接回答知识库问题，优先使用 askKnowledgeQuestion。")
+    // 暂时不作为 AI Tool 暴露，避免聊天链路返回原始片段；保留方法便于后续恢复。
+    // @Tool(description = "在知识库中语义检索原始文档片段。当用户明确要查看原文、核对出处、查找相关片段或列出命中文档时调用。若目标是直接回答知识库问题，优先使用 askKnowledgeQuestion。")
     @AiToolPermission(value = "knowledge:view", action = "搜索知识库内容")
     public String searchKnowledgeContent(
             @ToolParam(description = "搜索关键词或问题，例如：合同付款条款、客户需求分析、会议讨论的技术方案") String query) {

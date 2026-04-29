@@ -883,43 +883,22 @@ public class ChatServiceImpl implements IChatService {
             return null;
         }
 
-        boolean preferAnswerFirst = shouldPreferKnowledgeAnswer(content);
         try {
-            if (preferAnswerFirst) {
-                String askResponse = knowledgeTools.askKnowledgeQuestion(content, null);
-                if (isUsableKnowledgeAnswerResponse(askResponse)) {
-                    log.debug("知识库问句优先由 askKnowledgeQuestion 命中: sessionId={}, tenantId={}, responseLength={}",
-                            sessionId, tenantId, askResponse.length());
-                    return askResponse;
-                }
-
-                log.debug("askKnowledgeQuestion 未命中或结果不可用，回退 searchKnowledgeContent: sessionId={}, tenantId={}",
-                        sessionId, tenantId);
-                String searchResponse = knowledgeTools.searchKnowledgeContent(content);
-                if (isUsableKnowledgeSearchResponse(searchResponse)) {
-                    log.debug("知识库问句已由 searchKnowledgeContent 兜底处理: sessionId={}, tenantId={}, responseLength={}",
-                            sessionId, tenantId, searchResponse.length());
-                    return searchResponse;
-                }
-                return StrUtil.isNotBlank(askResponse) ? askResponse : searchResponse;
-            }
-
-            String searchResponse = knowledgeTools.searchKnowledgeContent(content);
-            if (isUsableKnowledgeSearchResponse(searchResponse)) {
-                log.debug("知识库原文检索优先由 searchKnowledgeContent 命中: sessionId={}, tenantId={}, responseLength={}",
-                        sessionId, tenantId, searchResponse.length());
-                return searchResponse;
-            }
-
-            log.debug("searchKnowledgeContent 未命中或结果不可用，回退 askKnowledgeQuestion: sessionId={}, tenantId={}",
-                    sessionId, tenantId);
             String askResponse = knowledgeTools.askKnowledgeQuestion(content, null);
             if (isUsableKnowledgeAnswerResponse(askResponse)) {
-                log.debug("知识库原文检索已由 askKnowledgeQuestion 兜底处理: sessionId={}, tenantId={}, responseLength={}",
+                log.debug("知识库问答模式由 askKnowledgeQuestion 处理: sessionId={}, tenantId={}, responseLength={}",
                         sessionId, tenantId, askResponse.length());
                 return askResponse;
             }
-            return StrUtil.isNotBlank(searchResponse) ? searchResponse : askResponse;
+
+            // 暂时关闭片段检索分支，统一验证 RAG 问答模式效果。
+            // String searchResponse = knowledgeTools.searchKnowledgeContent(content);
+            // if (isUsableKnowledgeSearchResponse(searchResponse)) {
+            //     log.debug("知识库片段检索由 searchKnowledgeContent 处理: sessionId={}, tenantId={}, responseLength={}",
+            //             sessionId, tenantId, searchResponse.length());
+            //     return searchResponse;
+            // }
+            return askResponse;
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
@@ -1014,9 +993,9 @@ public class ChatServiceImpl implements IChatService {
         return """
                 【知识库问题处理规则】
                 1. 优先使用知识库工具，不要直接凭空回答。
-                2. 如果用户是在提问、希望直接得到结论、解释条款或总结信息，优先调用 askKnowledgeQuestion。
-                3. 只有当用户明确要求查看原文、出处、片段、页码或命中文档时，才优先调用 searchKnowledgeContent。
-                4. 若 askKnowledgeQuestion 没有拿到可用答案，再尝试 searchKnowledgeContent；若 searchKnowledgeContent 先拿到片段但用户还需要结论，再调用 askKnowledgeQuestion。
+                2. 所有知识库相关问题都调用 askKnowledgeQuestion，由 RAG 问答模式直接生成结论。
+                3. 回答应基于知识库内容，优先给出结论，再补充必要依据。
+                4. searchKnowledgeContent 片段检索模式暂时关闭，不要调用它返回原始片段。
                 """;
     }
 
