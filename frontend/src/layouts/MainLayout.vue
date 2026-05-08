@@ -76,7 +76,7 @@
                 >
                   <div class="flex min-w-0 items-center gap-2">
                     <span
-                      class="block min-w-0 flex-1 truncate text-sm font-semibold leading-5"
+                      class="block min-w-0 flex-1 truncate text-sm leading-5"
                       :class="isSessionActive(session.sessionId) ? 'text-primary' : 'text-slate-700'"
                       :title="session.title || '新对话'"
                     >{{ session.title || '新对话' }}</span>
@@ -105,7 +105,7 @@
                 >
                   <div class="flex min-w-0 items-center gap-2">
                     <span
-                      class="block min-w-0 flex-1 truncate text-sm font-semibold leading-5"
+                      class="block min-w-0 flex-1 truncate text-sm leading-5"
                       :class="isSessionActive(session.sessionId) ? 'text-primary' : 'text-slate-700'"
                       :title="session.title || '新对话'"
                     >{{ session.title || '新对话' }}</span>
@@ -134,7 +134,7 @@
                 >
                   <div class="flex min-w-0 items-center gap-2">
                     <span
-                      class="block min-w-0 flex-1 truncate text-sm font-semibold leading-5"
+                      class="block min-w-0 flex-1 truncate text-sm leading-5"
                       :class="isSessionActive(session.sessionId) ? 'text-primary' : 'text-slate-700'"
                       :title="session.title || '新对话'"
                     >{{ session.title || '新对话' }}</span>

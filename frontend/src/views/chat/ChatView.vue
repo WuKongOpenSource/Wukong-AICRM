@@ -224,11 +224,11 @@
 
                 <!-- AI Message -->
                 <div v-if="message.role !== 'user'" class="flex gap-4 md:gap-5">
-                  <div class="size-9 rounded-xl bg-primary flex items-center justify-center text-white shrink-0 shadow-lg shadow-primary/20">
+                  <div v-if="false" class="size-9 rounded-xl bg-primary flex items-center justify-center text-white shrink-0 shadow-lg shadow-primary/20">
                     <WkIcon name="ai" class="text-lg" />
                   </div>
                   <div class="flex-1 space-y-3 min-w-0">
-                    <div class="bg-slate-50 text-slate-700 rounded-2xl rounded-tl-none p-4 inline-block max-w-full text-left text-sm leading-relaxed border border-slate-100">
+                    <div class="text-slate-700 rounded-2xl rounded-tl-none p-4 inline-block max-w-full text-left leading-relaxed text-[16px]">
                       <div
                         class="wk-markdown"
                         :class="{ 'streaming-cursor': message.isStreaming }"
@@ -275,7 +275,7 @@
 
                 <!-- User Message -->
                 <div v-else class="flex gap-4 md:gap-5 flex-row-reverse">
-                  <div class="size-9 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200 flex items-center justify-center">
+                  <div v-if="false" class="size-9 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200 flex items-center justify-center">
                     <img
                       v-if="showUserAvatarImage"
                       :src="userStore.avatar"
@@ -288,7 +288,8 @@
                     </span>
                   </div>
                   <div class="space-y-3 min-w-0" :class="isMobile ? 'max-w-[85%]' : 'max-w-[70%]'">
-                    <div class="bg-primary text-white rounded-2xl rounded-tr-none p-4 shadow-lg shadow-primary/10 text-sm leading-relaxed">
+                    <!-- <div class="bg-primary text-white rounded-2xl rounded-tr-none p-4 shadow-lg shadow-primary/10 text-sm leading-relaxed"> -->
+                    <div class="bg-[#e9e9e980] text-[#0d0d0d] rounded-[24px] px-4 py-[0.6rem] text-[16px] leading-relaxed">
                       <div class="whitespace-pre-wrap">{{ message.content || '...' }}</div>
                     </div>
                     <!-- User Attachments -->
@@ -319,7 +320,7 @@
                         </template>
                       </div>
                     </div>
-                    <div class="text-xs text-slate-400 font-medium text-right">{{ formatTime(message.timestamp) }}</div>
+                    <!-- <div class="text-xs text-slate-400 font-medium text-right">{{ formatTime(message.timestamp) }}</div> -->
                   </div>
                 </div>
               </div>
