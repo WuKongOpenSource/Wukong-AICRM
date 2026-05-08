@@ -1,10 +1,7 @@
 <template>
   <div class="flex h-full" :class="{ 'flex-col': isMobile }">
     <!-- Internal Sidebar: Chat History -->
-    <aside
-      v-if="!isMobile || mobilePanel === 'sessions'"
-      :class="isMobile ? 'flex-1 flex flex-col bg-slate-50/50' : 'w-72 border-r border-slate-100 bg-slate-50/50 flex flex-col shrink-0'"
-    >
+    <aside v-if="isMobile && mobilePanel === 'sessions'" class="flex flex-1 flex-col bg-slate-50/50">
       <div class="p-6 pb-2">
         <button
           class="w-full flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition-all"
@@ -332,17 +329,6 @@
           <!-- Input Area -->
           <div class="shrink-0 p-4 md:p-8 bg-gradient-to-t from-white via-white to-transparent">
             <div class="max-w-4xl mx-auto space-y-4">
-              <!-- Quick Action Chips -->
-              <div v-if="chatStore.messages.length === 0" class="flex flex-wrap gap-2 justify-center">
-                <button
-                  v-for="action in quickActions"
-                  :key="action.label"
-                  class="px-4 py-1.5 bg-white border border-slate-200 rounded-full text-sm text-slate-500 hover:border-primary hover:text-primary transition-all shadow-sm"
-                  @click="sendQuickMessage(action.text)"
-                >
-                  {{ action.label }}
-                </button>
-              </div>
 
               <!-- Selected Files Preview -->
               <div v-if="selectedFiles.length > 0" class="flex flex-wrap gap-2">
@@ -366,9 +352,10 @@
               <!-- Input Box -->
               <div class="relative group">
                 <div class="absolute inset-0 bg-primary/5 blur-xl rounded-2xl group-focus-within:bg-primary/10 transition-all opacity-0 group-focus-within:opacity-100"></div>
+                <!-- focus-within:border-primary -->
                 <div
-                  class="relative flex bg-white border border-slate-200 rounded-2xl p-2 shadow-xl shadow-slate-200/40 focus-within:border-primary transition-all"
-                  :class="isMobile ? 'flex-col items-stretch gap-2' : 'items-center'"
+                  class="relative flex bg-white border border-[#0d0d0d0d] rounded-2xl p-2 shadow-[0_0_#0000,0_0_#0000,0_0_#0000,0_0_#0000,0px_3px_6px_0px_#0000000a,0px_4px_80px_8px_#0000000a,0px_0px_1px_0px_#0000009e]  transition-all"
+                  :class="isMobile ? 'flex-col items-stretch gap-2' : 'items-center rounded-[28px] p-[6px]'"
                 >
                   <div class="flex items-center w-full">
                   <input
@@ -389,7 +376,7 @@
                   <input
                     v-model="inputText"
                     type="text"
-                    class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-slate-900 px-3 py-3 text-sm placeholder:text-slate-400"
+                    class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none px-3 py-3 text-[#0d0d0d] text-[16px] leading-[16px] placeholder:text-[#909090] placeholder:text-[16px]"
                     placeholder="输入指令，如：总结今天与张总的会议..."
                     :disabled="chatStore.isStreaming || isUploading"
                     @keydown.enter.exact.prevent="handleSend"
@@ -416,12 +403,18 @@
                     </button>
                     <button
                       v-if="!isMobile"
-                      class="size-10 rounded-xl bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
+                      class="size-10 rounded-full flex items-center justify-center transition-colors"
+                      :class="chatStore.isStreaming
+                        ? 'bg-[#e5e5e5] text-[#0d0d0d]'
+                        : ((!inputText.trim() && selectedFiles.length === 0) || isUploading)
+                          ? 'bg-[#e5e5e5] text-[#909090]'
+                          : 'bg-[#0d0d0d] text-white hover:bg-[#0d0d0d]/90'"
                       :disabled="(!inputText.trim() && selectedFiles.length === 0) || chatStore.isStreaming || isUploading"
                       @click="handleSend"
                     >
-                      <span v-if="chatStore.isStreaming || isUploading" class="material-symbols-outlined text-xl animate-spin">progress_activity</span>
-                      <span v-else class="material-symbols-outlined text-xl">send</span>
+                      <span v-if="chatStore.isStreaming" class="material-symbols-outlined text-[20px] leading-none">stop</span>
+                      <span v-else-if="isUploading" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
+                      <span v-else class="material-symbols-outlined text-[20px] leading-none">arrow_upward</span>
                     </button>
                   </div>
                   </div>
@@ -446,15 +439,33 @@
                     </button>
 
                     <button
-                      class="size-10 rounded-xl bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
+                      class="size-10 rounded-full flex items-center justify-center transition-colors"
+                      :class="chatStore.isStreaming
+                        ? 'bg-[#e5e5e5] text-[#0d0d0d]'
+                        : ((!inputText.trim() && selectedFiles.length === 0) || isUploading)
+                          ? 'bg-[#e5e5e5] text-[#909090]'
+                          : 'bg-[#0d0d0d] text-white hover:bg-[#0d0d0d]/90'"
                       :disabled="(!inputText.trim() && selectedFiles.length === 0) || chatStore.isStreaming || isUploading"
                       @click="handleSend"
                     >
-                      <span v-if="chatStore.isStreaming || isUploading" class="material-symbols-outlined text-xl animate-spin">progress_activity</span>
-                      <span v-else class="material-symbols-outlined text-xl">send</span>
+                      <span v-if="chatStore.isStreaming" class="material-symbols-outlined text-[20px] leading-none">stop</span>
+                      <span v-else-if="isUploading" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
+                      <span v-else class="material-symbols-outlined text-[20px] leading-none">arrow_upward</span>
                     </button>
                   </div>
                 </div>
+              </div>
+
+              <!-- Quick Action Chips -->
+              <div v-if="chatStore.messages.length === 0" class="flex flex-wrap gap-2 justify-center">
+                <button
+                  v-for="action in quickActions"
+                  :key="action.label"
+                  class="px-4 py-1.5 bg-white border border-slate-200 rounded-full text-sm text-slate-500 hover:border-primary hover:text-primary transition-all shadow-sm"
+                  @click="sendQuickMessage(action.text)"
+                >
+                  {{ action.label }}
+                </button>
               </div>
               <p class="text-center text-xs text-slate-300 uppercase tracking-[0.4em]">内容由AI生成，请核查重要信息</p>
             </div>

@@ -14,37 +14,164 @@
         </div>
       </div>
 
-      <nav class="flex-1 space-y-1 overflow-y-auto px-4 py-4">
+      <nav class="flex-1 overflow-y-auto px-4 py-4">
+        <div class="space-y-1">
+          <!-- Chat: New session (acts like a primary nav item) -->
+          <button
+            class="flex w-full items-center justify-left gap-2 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
+            @click="handleNewSession"
+          >
+            <span class="material-symbols-outlined wk-plus-button-icon text-[18px] leading-none">add</span>
+            新对话
+          </button>
+
+          <template v-for="group in pcMainNavGroups" :key="group.title || 'default'">
+            <div v-if="group.title" class="pb-2 pt-4">
+              <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">{{ group.title }}</p>
+            </div>
+            <button
+              v-for="item in group.items"
+              :key="item.key"
+              @click="handlePrimaryNavClick(item)"
+              class="flex w-full items-center gap-2 rounded-lg px-3 py-2 transition-colors"
+              :class="isPrimaryActive(item) ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100'"
+            >
+              <WkIcon :name="item.icon" :size="22" class="shrink-0" />
+              <span class="truncate text-sm font-medium">{{ item.label }}</span>
+              <span
+                v-if="item.children?.length"
+                class="material-symbols-outlined ml-auto shrink-0 text-base"
+                :class="isPrimarySelected(item) ? 'text-primary' : 'text-slate-300'"
+              >
+                chevron_right
+              </span>
+            </button>
+          </template>
+
+          <!-- Chat: recent sessions under Knowledge menu -->
+          <div class="pt-2" />
+          <div class="mx-1 h-px bg-slate-100" />
+          <div class="space-y-1 pt-2">
+            <p class="px-3 pb-1 text-xs font-bold uppercase tracking-widest text-slate-400">最近</p>
+
+            <div v-if="chatStore.sessionsLoading && chatStore.sessions.length === 0" class="flex justify-center py-6">
+              <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+            </div>
+
+            <div v-else-if="chatStore.sessions.length === 0" class="px-3 py-6 text-center text-xs text-slate-400">
+              暂无对话记录
+            </div>
+
+            <template v-else>
+              <template v-if="groupedChatSessions.today.length > 0">
+                <p class="px-3 pt-2 pb-1 text-xs font-bold uppercase tracking-widest text-slate-400">今天</p>
+                <button
+                  v-for="session in groupedChatSessions.today"
+                  :key="session.sessionId"
+                  class="group w-full min-w-0 overflow-hidden rounded-xl border p-3 text-left transition-all"
+                  :class="isSessionActive(session.sessionId)
+                    ? 'border-slate-200 bg-white shadow-sm shadow-slate-200/80'
+                    : 'border-transparent hover:bg-slate-100/50'"
+                  @click="handleSelectSession(session.sessionId)"
+                >
+                  <div class="flex min-w-0 items-center gap-2">
+                    <span
+                      class="block min-w-0 flex-1 truncate text-sm font-semibold leading-5"
+                      :class="isSessionActive(session.sessionId) ? 'text-primary' : 'text-slate-700'"
+                      :title="session.title || '新对话'"
+                    >{{ session.title || '新对话' }}</span>
+                    <span
+                      class="material-symbols-outlined inline-flex w-5 shrink-0 items-center justify-center text-[14px] leading-none text-slate-300 transition-all"
+                      :class="isSessionActive(session.sessionId)
+                        ? 'pointer-events-auto opacity-100'
+                        : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 hover:text-red-500'"
+                      @click.stop="handleDeleteSession(session.sessionId)"
+                    >close</span>
+                  </div>
+                  <!-- <span class="text-xs font-medium text-slate-400">{{ formatSessionTime(session.updateTime || session.createTime) }}</span> -->
+                </button>
+              </template>
+
+              <template v-if="groupedChatSessions.yesterday.length > 0">
+                <p class="px-3 pt-2 pb-1 text-xs font-bold uppercase tracking-widest text-slate-400">昨天</p>
+                <button
+                  v-for="session in groupedChatSessions.yesterday"
+                  :key="session.sessionId"
+                  class="group w-full min-w-0 overflow-hidden rounded-xl border p-3 text-left transition-all"
+                  :class="isSessionActive(session.sessionId)
+                    ? 'border-slate-200 bg-white shadow-sm shadow-slate-200/80'
+                    : 'border-transparent hover:bg-slate-100/50'"
+                  @click="handleSelectSession(session.sessionId)"
+                >
+                  <div class="flex min-w-0 items-center gap-2">
+                    <span
+                      class="block min-w-0 flex-1 truncate text-sm font-semibold leading-5"
+                      :class="isSessionActive(session.sessionId) ? 'text-primary' : 'text-slate-700'"
+                      :title="session.title || '新对话'"
+                    >{{ session.title || '新对话' }}</span>
+                    <span
+                      class="material-symbols-outlined inline-flex w-5 shrink-0 items-center justify-center text-[14px] leading-none text-slate-300 transition-all"
+                      :class="isSessionActive(session.sessionId)
+                        ? 'pointer-events-auto opacity-100'
+                        : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 hover:text-red-500'"
+                      @click.stop="handleDeleteSession(session.sessionId)"
+                    >close</span>
+                  </div>
+                  <span class="text-xs font-medium text-slate-400">{{ formatSessionTime(session.updateTime || session.createTime) }}</span>
+                </button>
+              </template>
+
+              <template v-if="groupedChatSessions.earlier.length > 0">
+                <!-- <p class="px-3 pt-2 pb-1 text-xs font-bold uppercase tracking-widest text-slate-400">更早</p> -->
+                <button
+                  v-for="session in groupedChatSessions.earlier"
+                  :key="session.sessionId"
+                  class="group w-full min-w-0 overflow-hidden rounded-xl border p-3 text-left transition-all"
+                  :class="isSessionActive(session.sessionId)
+                    ? 'border-slate-200 bg-white shadow-sm shadow-slate-200/80'
+                    : 'border-transparent hover:bg-slate-100/50'"
+                  @click="handleSelectSession(session.sessionId)"
+                >
+                  <div class="flex min-w-0 items-center gap-2">
+                    <span
+                      class="block min-w-0 flex-1 truncate text-sm font-semibold leading-5"
+                      :class="isSessionActive(session.sessionId) ? 'text-primary' : 'text-slate-700'"
+                      :title="session.title || '新对话'"
+                    >{{ session.title || '新对话' }}</span>
+                    <span
+                      class="material-symbols-outlined inline-flex w-5 shrink-0 items-center justify-center text-[14px] leading-none text-slate-300 transition-all"
+                      :class="isSessionActive(session.sessionId)
+                        ? 'pointer-events-auto opacity-100'
+                        : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 hover:text-red-500'"
+                      @click.stop="handleDeleteSession(session.sessionId)"
+                    >close</span>
+                  </div>
+                  <!-- <span class="text-xs font-medium text-slate-400">{{ formatSessionTime(session.updateTime || session.createTime) }}</span> -->
+                </button>
+              </template>
+            </template>
+          </div>
+
+        </div>
+      </nav>
+
+      <div v-if="showConfigSection" class="shrink-0 border-t border-slate-200 px-4 py-3">
+        <div class="pb-2 pt-1">
+          <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">配置与服务</p>
+        </div>
         <button
-          v-for="item in mainNavItems"
+          v-for="item in configNavItems"
           :key="item.route"
           @click="navigateTo(item.route)"
-          class="flex w-full items-center gap-3 rounded-lg px-3 py-2 transition-colors"
+          class="flex w-full items-center gap-2 rounded-lg px-3 py-2 transition-colors"
           :class="isActive(item.route) ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100'"
         >
           <WkIcon :name="item.icon" :size="22" class="shrink-0" />
-          <span class="text-sm font-medium">{{ item.label }}</span>
+          <span class="truncate text-sm font-medium">{{ item.label }}</span>
         </button>
+      </div>
 
-        <div v-if="showConfigSection" class="pb-2 pt-4">
-          <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">配置与服务</p>
-        </div>
-
-        <template v-if="showConfigSection">
-          <button
-            v-for="item in configNavItems"
-            :key="item.route"
-            @click="navigateTo(item.route)"
-            class="flex w-full items-center gap-3 rounded-lg px-3 py-2 transition-colors"
-            :class="isActive(item.route) ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100'"
-          >
-            <WkIcon :name="item.icon" :size="22" class="shrink-0" />
-            <span class="text-sm font-medium">{{ item.label }}</span>
-          </button>
-        </template>
-      </nav>
-
-      <div class="border-t border-slate-200 p-4">
+      <div class="border-slate-200 p-4">
         <div class="flex cursor-pointer items-center gap-3 rounded-xl bg-slate-50 p-2" @click="showUserMenu = !showUserMenu">
           <div v-if="userStore.avatar" class="size-8 overflow-hidden rounded-full">
             <img :src="userStore.avatar" class="h-full w-full object-cover" alt="avatar" />
@@ -109,6 +236,44 @@
         </div>
       </Transition>
     </aside>
+
+    <Transition name="secondary-panel">
+      <aside
+        v-if="!isMobile && showSecondaryPanel"
+        class="relative flex wk-screen w-64 flex-shrink-0 flex-col border-r border-slate-200 bg-white"
+      >
+        <div class="flex items-center justify-between px-4 py-5">
+          <p class="truncate text-xs font-bold tracking-wider text-slate-400">{{ secondaryTitle }}</p>
+          <button class="text-slate-300 transition-colors hover:text-slate-500" @click="selectedPrimaryKey = ''">
+            <span class="material-symbols-outlined text-sm">close</span>
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto px-4 pb-4">
+          <div class="space-y-1">
+            <button
+              v-for="child in activeSecondaryItems"
+              :key="child.key"
+              class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
+              :class="isActive(child.route) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
+              @click="navigateTo(child.route)"
+            >
+              <WkIcon
+                v-if="child.icon"
+                :name="child.icon"
+                :size="22"
+                class="shrink-0"
+                :class="isActive(child.route) ? 'text-primary' : 'text-slate-400'"
+              />
+              <span v-else class="material-symbols-outlined shrink-0 text-[20px]" :class="isActive(child.route) ? 'text-primary' : 'text-slate-300'">
+                subdirectory_arrow_right
+              </span>
+              <span class="truncate text-sm font-medium">{{ child.label }}</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+    </Transition>
 
     <div v-if="isMobile" class="fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-2 border-b border-slate-200 bg-white px-4">
       <button
@@ -177,7 +342,7 @@
           </Transition>
         </div>
 
-        
+
       </div>
 
       <div class="flex shrink-0 items-center gap-2">
@@ -215,16 +380,50 @@
             </div>
           </div>
           <nav class="flex-1 space-y-1 overflow-y-auto px-4 py-4">
-            <button
-              v-for="item in mainNavItems"
-              :key="item.route"
-              @click="mobileNavigate(item.route)"
-              class="flex w-full items-center gap-3 rounded-lg px-3 py-2 transition-colors"
-              :class="isActive(item.route) ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100'"
-            >
-              <WkIcon :name="item.icon" :size="22" class="shrink-0" />
-              <span class="text-sm font-medium">{{ item.label }}</span>
-            </button>
+            <template v-for="group in mobileMainNavGroups" :key="group.title || 'default'">
+              <div v-if="group.title" class="pb-2 pt-4">
+                <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">{{ group.title }}</p>
+              </div>
+              <div v-for="item in group.items" :key="item.key" class="space-y-1">
+                <button
+                  class="flex w-full items-center gap-3 rounded-lg px-3 py-2 transition-colors"
+                  :class="isPrimaryActive(item) ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100'"
+                  @click="handleMobilePrimaryNavClick(item)"
+                >
+                  <WkIcon :name="item.icon" :size="22" class="shrink-0" />
+                  <span class="text-sm font-medium">{{ item.label }}</span>
+                  <span
+                    v-if="item.children?.length"
+                    class="material-symbols-outlined ml-auto shrink-0 text-base transition-transform"
+                    :class="isMobilePrimaryExpanded(item.key) ? 'rotate-90 text-primary' : 'text-slate-300'"
+                  >
+                    chevron_right
+                  </span>
+                </button>
+
+                <div v-if="item.children?.length && isMobilePrimaryExpanded(item.key)" class="ml-3 border-l border-slate-100 pl-3">
+                  <button
+                    v-for="child in item.children"
+                    :key="child.key"
+                    class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
+                    :class="isActive(child.route) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
+                    @click="mobileNavigate(child.route)"
+                  >
+                    <WkIcon
+                      v-if="child.icon"
+                      :name="child.icon"
+                      :size="20"
+                      class="shrink-0"
+                      :class="isActive(child.route) ? 'text-primary' : 'text-slate-400'"
+                    />
+                    <span v-else class="material-symbols-outlined shrink-0 text-[18px]" :class="isActive(child.route) ? 'text-primary' : 'text-slate-300'">
+                      subdirectory_arrow_right
+                    </span>
+                    <span class="truncate text-sm font-medium">{{ child.label }}</span>
+                  </button>
+                </div>
+              </div>
+            </template>
 
             <div v-if="showConfigSection" class="pb-2 pt-4">
               <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">配置与服务</p>
@@ -370,7 +569,7 @@
 
     <div class="flex flex-1 flex-col overflow-hidden" :class="{ 'pt-14': isMobile }">
       <header
-        v-if="!isMobile"
+        v-if="showDesktopHeader"
         class="relative z-[100] flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-[10px] md:px-8"
       >
         <div class="flex flex-1 items-center gap-4 mr-1">
@@ -467,7 +666,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import defaultLogoImg from '@/assets/images/logo.png'
 import FloatingActionButton from '@/components/common/FloatingActionButton.vue'
 import AiChatDrawer from '@/components/common/AiChatDrawer.vue'
@@ -480,13 +679,16 @@ import { queryGlobalSearch, type GlobalSearchResult } from '@/api/search'
 import { useChatDrawer } from '@/composables/useChatDrawer'
 import { useEnterpriseStore } from '@/stores/enterprise'
 import { useResponsive } from '@/composables/useResponsive'
+import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
 import { appEvents, APP_EVENT } from '@/utils/events'
+import type { ChatSession } from '@/types/common'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const enterpriseStore = useEnterpriseStore()
+const chatStore = useChatStore()
 const { isMobile } = useResponsive()
 const { isOpen: chatDrawerOpen } = useChatDrawer()
 
@@ -507,10 +709,14 @@ let globalSearchTimer: ReturnType<typeof setTimeout> | null = null
 let globalSearchRequestId = 0
 
 type MainNavItem = {
+  key: string
   icon: WkIconName
   label: string
   route: string
   permission: string
+  groupTitle?: string
+  secondaryTitle?: string
+  children?: SecondaryNavItem[]
 }
 
 type ConfigNavItem = {
@@ -520,12 +726,30 @@ type ConfigNavItem = {
   permission: string[]
 }
 
+type SecondaryNavItem = {
+  key: string
+  icon?: WkIconName
+  label: string
+  route: string
+}
+
 const allMainNavItems: MainNavItem[] = [
-  { icon: 'ai', label: 'AI 助手', route: '/chat', permission: 'chat' },
-  { icon: 'customer', label: '客户管理', route: '/customer', permission: 'customer' },
-  { icon: 'task', label: '任务管理', route: '/task', permission: 'task' },
-  { icon: 'meetingRecord', label: '日程安排', route: '/calendar', permission: 'schedule' },
-  { icon: 'knowledge', label: '知识库', route: '/knowledge', permission: 'knowledge' },
+  { key: 'chat', icon: 'ai', label: 'AI 助手', route: '/chat', permission: 'chat', groupTitle: 'AI 助手' },
+  { key: 'knowledge', icon: 'knowledge', label: '知识库', route: '/knowledge', permission: 'knowledge' },
+  {
+    key: 'crm',
+    icon: 'customer',
+    label: 'CRM管理',
+    route: '/customer',
+    permission: 'customer',
+    groupTitle: '业务应用',
+    secondaryTitle: 'CRM管理',
+    children: [
+      { key: 'crm-customer', icon: 'customer', label: '客户管理', route: '/customer' },
+      { key: 'crm-task', icon: 'task', label: '任务管理', route: '/task' },
+      { key: 'crm-calendar', icon: 'meetingRecord', label: '日程安排', route: '/calendar' },
+    ],
+  },
 ]
 
 const allConfigNavItems: ConfigNavItem[] = [
@@ -535,6 +759,30 @@ const allConfigNavItems: ConfigNavItem[] = [
 const mainNavItems = computed(() =>
   allMainNavItems.filter(item => item.permission === 'chat' || userStore.hasPermission(item.permission))
 )
+
+const pcMainNavItems = computed(() => mainNavItems.value.filter(item => item.key !== 'chat'))
+
+type MainNavGroup = {
+  title?: string
+  items: MainNavItem[]
+}
+
+function groupMainNavItems(items: MainNavItem[]): MainNavGroup[] {
+  const groups: MainNavGroup[] = []
+  for (const item of items) {
+    const title = item.groupTitle?.trim() || ''
+    const last = groups[groups.length - 1]
+    if (!last || (last.title || '') !== title) {
+      groups.push({ title: title || undefined, items: [item] })
+    } else {
+      last.items.push(item)
+    }
+  }
+  return groups
+}
+
+const pcMainNavGroups = computed(() => groupMainNavItems(pcMainNavItems.value))
+const mobileMainNavGroups = computed(() => groupMainNavItems(mainNavItems.value))
 
 const configNavItems = computed(() =>
   allConfigNavItems.filter(item => item.permission.some(permission => userStore.hasPermission(permission)))
@@ -549,11 +797,63 @@ const activeMenu = computed(() => {
   return path
 })
 
+const showDesktopHeader = computed(() => {
+  if (isMobile.value) return false
+  return !route.path.startsWith('/knowledge') && !route.path.startsWith('/chat')
+})
+
+const selectedPrimaryKey = ref<string>('')
+
+const selectedPrimaryItem = computed(() => mainNavItems.value.find(item => item.key === selectedPrimaryKey.value) || null)
+
+const activeSecondaryItems = computed(() => selectedPrimaryItem.value?.children || [])
+
+const showSecondaryPanel = computed(() => activeSecondaryItems.value.length > 0)
+
+const secondaryTitle = computed(() => {
+  if (!selectedPrimaryItem.value) return '二级菜单'
+  return selectedPrimaryItem.value.secondaryTitle || `${selectedPrimaryItem.value.label} / 二级菜单`
+})
+
+const expandedMobilePrimaryKeys = ref<string[]>([])
+
+watch(
+  () => drawerVisible.value,
+  isOpen => {
+    if (!isOpen) return
+    // 默认直接展开所有带二级菜单的一级菜单
+    expandedMobilePrimaryKeys.value = mainNavItems.value.filter(item => item.children?.length).map(item => item.key)
+  }
+)
+
+function isMobilePrimaryExpanded(key: string) {
+  return expandedMobilePrimaryKeys.value.includes(key)
+}
+
+function toggleMobilePrimaryExpanded(key: string) {
+  if (isMobilePrimaryExpanded(key)) {
+    expandedMobilePrimaryKeys.value = expandedMobilePrimaryKeys.value.filter(k => k !== key)
+    return
+  }
+  expandedMobilePrimaryKeys.value = [...expandedMobilePrimaryKeys.value, key]
+}
+
+function handleMobilePrimaryNavClick(item: MainNavItem) {
+  if (item.children?.length) {
+    toggleMobilePrimaryExpanded(item.key)
+    return
+  }
+  mobileNavigate(item.route)
+}
+
 watch(
   () => route.fullPath,
   () => {
     showUserMenu.value = false
     closeGlobalSearchDropdown()
+    if (selectedPrimaryKey.value && !selectedPrimaryItem.value) {
+      selectedPrimaryKey.value = ''
+    }
   }
 )
 
@@ -568,6 +868,7 @@ watch(
 
 onMounted(() => {
   enterpriseStore.loadConfig()
+  void chatStore.fetchSessions()
   document.addEventListener('click', handleDocumentClick)
 })
 
@@ -581,6 +882,95 @@ onBeforeUnmount(() => {
 
 function isActive(routePath: string) {
   return activeMenu.value === routePath
+}
+
+function isPrimarySelected(item: MainNavItem) {
+  return selectedPrimaryKey.value === item.key
+}
+
+function isPrimaryActive(item: MainNavItem) {
+  if (isPrimarySelected(item)) return true
+  if (item.children?.some(child => isActive(child.route))) return true
+  return isActive(item.route)
+}
+
+function handlePrimaryNavClick(item: MainNavItem) {
+  if (item.children?.length) {
+    selectedPrimaryKey.value = item.key
+    const firstChildRoute = item.children[0]?.route
+    if (firstChildRoute) {
+      navigateTo(firstChildRoute)
+    }
+    return
+  }
+  selectedPrimaryKey.value = ''
+  navigateTo(item.route)
+}
+
+const groupedChatSessions = computed(() => {
+  const today: ChatSession[] = []
+  const yesterday: ChatSession[] = []
+  const earlier: ChatSession[] = []
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const yesterdayStart = todayStart - 86400000
+
+  for (const session of chatStore.sessions) {
+    const time = new Date(session.updateTime || session.createTime).getTime()
+    if (time >= todayStart) {
+      today.push(session)
+    } else if (time >= yesterdayStart) {
+      yesterday.push(session)
+    } else {
+      earlier.push(session)
+    }
+  }
+
+  return { today, yesterday, earlier }
+})
+
+async function handleNewSession() {
+  selectedPrimaryKey.value = ''
+  await router.push('/chat')
+  chatStore.clearMessages()
+  await chatStore.startNewSession('新对话')
+}
+
+async function handleSelectSession(sessionId: string) {
+  selectedPrimaryKey.value = ''
+  await router.push('/chat')
+  await chatStore.selectSession(sessionId)
+}
+
+function isSessionActive(sessionId: string): boolean {
+  return route.path.startsWith('/chat') && chatStore.currentSessionId === sessionId
+}
+
+async function handleDeleteSession(sessionId: string) {
+  try {
+    await ElMessageBox.confirm('确定要删除这个对话吗？删除后无法恢复。', '删除对话', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+      confirmButtonClass: 'el-button--danger',
+    })
+    await chatStore.removeSession(sessionId)
+    ElMessage.success('对话已删除')
+  } catch {
+    // User cancelled
+  }
+}
+
+function formatSessionTime(dateStr: string): string {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const time = date.getTime()
+
+  if (time >= todayStart) {
+    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  }
+  return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function navigateTo(path: string) {
@@ -804,6 +1194,17 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
 .profile-drawer-leave-to {
   opacity: 0;
   transform: translateY(100%);
+}
+
+.secondary-panel-enter-active,
+.secondary-panel-leave-active {
+  transition: transform 0.2s ease, opacity 0.15s ease;
+}
+
+.secondary-panel-enter-from,
+.secondary-panel-leave-to {
+  opacity: 0;
+  transform: translateX(-8px);
 }
 
 .line-clamp-2 {
