@@ -52,4 +52,5 @@ export interface UserInfo {
   deptId?: number
   deptName?: string
   sex?: number
+  tenantId?: string | number
 }

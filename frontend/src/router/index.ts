@@ -68,6 +68,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '知识库', icon: 'menu_book', permission: 'knowledge' }
       },
       {
+        path: 'sync',
+        name: 'DataSync',
+        component: () => import('@/views/sync/SyncDataView.vue'),
+        meta: { title: '数据同步', icon: 'sync_alt', permission: 'config' }
+      },
+      {
         path: 'settings',
         redirect: '/settings/team'
       },

@@ -83,6 +83,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             "source",
             "address",
             "website",
+            "logo",
             "quotation",
             "nextFollowTime",
             "remark"
@@ -298,7 +299,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         Customer customer = BeanUtil.copyProperties(customerAddBO, Customer.class);
         customer.setOwnerId(currentUserId);
         customer.setWebsite(customerLogoService.normalizeWebsite(customer.getWebsite()));
-        customer.setLogo("");
+        customer.setLogo(normalizeLogoValue(customerAddBO.getLogo()));
         customer.setStatus(1);
         customer.setAiAnalysisStatus(AI_ANALYSIS_STATUS_PENDING);
         customer.setAiAnalysisRequestedAt(analysisRequestedAt);
@@ -359,10 +360,13 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
         boolean websiteChanged = !Objects.equals(customerUpdateBO.getWebsite(), customer.getWebsite());
         String previousLogo = customer.getLogo();
-        BeanUtil.copyProperties(customerUpdateBO, customer, "customerId", "createUserId", "createTime", "customFields");
+        boolean logoProvided = customerUpdateBO.getLogo() != null;
+        BeanUtil.copyProperties(customerUpdateBO, customer, "customerId", "createUserId", "createTime", "customFields", "logo");
         String normalizedWebsite = customerLogoService.normalizeWebsite(customerUpdateBO.getWebsite());
         customer.setWebsite(normalizedWebsite);
-        if (websiteChanged) {
+        if (logoProvided) {
+            customer.setLogo(normalizeLogoValue(customerUpdateBO.getLogo()));
+        } else if (websiteChanged) {
             customer.setLogo("");
         }
         customer.setAiAnalysisStatus(AI_ANALYSIS_STATUS_PENDING);
@@ -370,7 +374,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         customFieldService.validateUniqueCustomFieldValues("customer", customer.getCustomerId(),
                 buildCustomerUniqueFieldValues(customer, customerUpdateBO.getCustomFields()));
         updateById(customer);
-        if (websiteChanged) {
+        if (!Objects.equals(previousLogo, customer.getLogo())) {
             deleteCustomerLogoAfterCommit(previousLogo);
         }
 
@@ -686,6 +690,14 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     }
 
     /**
+     * 标准化Logo值。
+     */
+    private String normalizeLogoValue(Object value) {
+        String normalizedLogo = normalizeStringValue(value);
+        return normalizedLogo == null ? "" : normalizedLogo;
+    }
+
+    /**
      * 解析字段BIGDecimal。
      */
     private BigDecimal parseFieldBigDecimal(Object value) {
@@ -832,6 +844,10 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                     wrapper.set(Customer::getLogo, "");
                 }
             }
+            case "logo" -> {
+                uniqueValue = normalizeLogoValue(value);
+                wrapper.set(Customer::getLogo, uniqueValue);
+            }
             case "quotation" -> {
                 uniqueValue = parseFieldBigDecimal(value);
                 wrapper.set(Customer::getQuotation, uniqueValue);
@@ -847,11 +863,13 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Field is not editable");
         }
 
-        Map<String, Object> uniqueValues = new HashMap<>();
-        uniqueValues.put(fieldName, uniqueValue);
-        customFieldService.validateUniqueCustomFieldValues("customer", customerId, uniqueValues);
+        if (!"logo".equals(fieldName)) {
+            Map<String, Object> uniqueValues = new HashMap<>();
+            uniqueValues.put(fieldName, uniqueValue);
+            customFieldService.validateUniqueCustomFieldValues("customer", customerId, uniqueValues);
+        }
         update(wrapper);
-        if (websiteChanged) {
+        if (websiteChanged || ("logo".equals(fieldName) && !Objects.equals(previousLogo, uniqueValue))) {
             deleteCustomerLogoAfterCommit(previousLogo);
         }
         refreshCustomerAfterInlineUpdate(customerId, "quotation".equals(fieldName));

@@ -264,6 +264,7 @@ public class AuthController {
         userVO.setUsername(user.getUsername());
         userVO.setRealname(user.getRealname());
         userVO.setImg(user.getImg());
+        userVO.setTenantId(user.getTenantId());
         if (StrUtil.isNotBlank(user.getImg())) {
             try {
                 userVO.setImgUrl(fileStorageService.getUrl(user.getImg()));

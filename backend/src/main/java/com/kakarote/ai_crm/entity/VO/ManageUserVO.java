@@ -54,6 +54,10 @@ public class ManageUserVO {
     @Schema(description = "直属上级ID")
     private Long parentId;
 
+    @Schema(description = "租户ID")
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long tenantId;
+
     @Schema(description = "上级名称")
     private String parentName;
 

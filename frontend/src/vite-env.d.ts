@@ -51,6 +51,8 @@ declare module '@vue-office/pptx/lib/v3/index.js' {
 interface ImportMetaEnv {
   /** 后端 API 根地址；可留空，未设置时等同 '' */
   readonly VITE_API_BASE_URL?: string
+  /** 数据同步服务 API 根地址；默认使用 /syncapi 代理 */
+  readonly VITE_SYNC_API_BASE_URL?: string
 }
 
 interface ImportMeta {

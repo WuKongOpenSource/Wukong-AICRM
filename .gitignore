@@ -12,6 +12,8 @@ frontend/.env.local
 frontend/.env.*.local
 frontend/tsconfig.tsbuildinfo
 frontend/tsconfig.node.tsbuildinfo
+mcp_server/node_modules
+mcp_server/dist
 uploads/**
 backend/src/main/resources/public/
 backend/src/main/resources/cert/**

@@ -529,6 +529,7 @@ const allMainNavItems: MainNavItem[] = [
 ]
 
 const allConfigNavItems: ConfigNavItem[] = [
+  { icon: 'import', label: '数据同步', route: '/sync', permission: ['config'] },
   { icon: 'settings', label: '系统设置', route: '/settings', permission: ['user', 'role', 'config', 'dept', 'customField'] },
 ]
 
@@ -545,6 +546,7 @@ const showConfigSection = computed(() => configNavItems.value.length > 0)
 const activeMenu = computed(() => {
   const path = route.path
   if (path.startsWith('/customer')) return '/customer'
+  if (path.startsWith('/sync')) return '/sync'
   if (path.startsWith('/settings')) return '/settings'
   return path
 })

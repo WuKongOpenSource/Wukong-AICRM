@@ -100,6 +100,7 @@ export interface CustomerAddBO {
   email?: string
   source?: string
   website?: string
+  logo?: string
   address?: string
   quotation?: number | null
   nextFollowTime?: string

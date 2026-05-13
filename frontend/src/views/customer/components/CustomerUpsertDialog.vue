@@ -83,6 +83,17 @@
                     <span class="w-1 h-3 bg-primary rounded-full"></span>
                     基础信息
                   </h3>
+                  <div class="mb-5 space-y-1.5">
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">公司 LOGO</label>
+                    <CustomerLogoUploader
+                      :logo-url="customerLogoUrl"
+                      :alt="formData.companyName || '公司 Logo'"
+                      :disabled="submitting"
+                      :size="72"
+                      @uploaded="handleFormLogoUploaded"
+                      @removed="handleFormLogoRemoved"
+                    />
+                  </div>
                   <DynamicFieldForm
                     ref="dynamicFieldFormRef"
                     entity-type="customer"
@@ -247,6 +258,7 @@ import { isRequestErrorHandled } from '@/utils/requestError'
 import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
 import AiSmartEntrySection from '@/components/crm/AiSmartEntrySection.vue'
 import AiParseInsightSidebar from '@/components/crm/AiParseInsightSidebar.vue'
+import CustomerLogoUploader from './CustomerLogoUploader.vue'
 import type { CustomerAddBO, CustomerDetailVO, CustomerLevel, CustomerListVO, CustomerStage } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 
@@ -276,6 +288,8 @@ const isEdit = computed(() => props.mode === 'edit')
 const submitting = ref(false)
 const dynamicFieldFormRef = ref<InstanceType<typeof DynamicFieldForm>>()
 const customerFieldValues = ref<Record<string, any>>({})
+const customerLogoUrl = ref('')
+const customerLogoTouched = ref(false)
 
 const formData = reactive<CustomerAddBO>({
   companyName: '',
@@ -284,6 +298,7 @@ const formData = reactive<CustomerAddBO>({
   stage: 'lead',
   source: '',
   website: '',
+  logo: '',
   address: '',
   quotation: undefined,
   nextFollowTime: undefined,
@@ -436,6 +451,7 @@ function hydrateFromCustomer() {
     stage: (c?.stage || 'lead') as CustomerStage,
     source: (c?.source || '') as any,
     website: (c?.website || '') as any,
+    logo: ((c as any)?.logo || '') as any,
     address: (c?.address || '') as any,
     quotation: (c?.quotation ?? undefined) as any,
     nextFollowTime: normalizeDateTimeValue((c as any)?.nextFollowTime) as any,
@@ -446,6 +462,8 @@ function hydrateFromCustomer() {
   formData.contactName = pc.name || ''
   formData.contactPhone = pc.phone || ''
   formData.contactEmail = pc.email || ''
+  customerLogoUrl.value = ((c as any)?.logoUrl || '') as string
+  customerLogoTouched.value = false
   customerFieldValues.value = buildCustomerFieldValues(c)
 }
 
@@ -465,6 +483,7 @@ function resetAll() {
     stage: 'lead',
     source: '',
     website: '',
+    logo: '',
     address: '',
     quotation: undefined,
     nextFollowTime: undefined,
@@ -474,6 +493,8 @@ function resetAll() {
     contactPhone: '',
     contactEmail: ''
   })
+  customerLogoUrl.value = ''
+  customerLogoTouched.value = false
   customerFieldValues.value = { level: null }
   aiInputText.value = ''
   aiParsing.value = false
@@ -517,6 +538,18 @@ function removeAiImage() {
   if (aiImagePreview.value) URL.revokeObjectURL(aiImagePreview.value)
   aiImageFile.value = null
   aiImagePreview.value = null
+}
+
+function handleFormLogoUploaded(payload: { logo: string; logoUrl: string }) {
+  formData.logo = payload.logo
+  customerLogoUrl.value = payload.logoUrl
+  customerLogoTouched.value = true
+}
+
+function handleFormLogoRemoved() {
+  formData.logo = ''
+  customerLogoUrl.value = ''
+  customerLogoTouched.value = true
 }
 
 async function handleAiExtract() {
@@ -638,6 +671,7 @@ async function handleSubmit() {
       ...formData,
       ...systemValues,
       companyName,
+      logo: isEdit.value && !customerLogoTouched.value ? undefined : formData.logo,
       aiParseSnapshot: !isEdit.value && aiParseResult.value ? JSON.stringify(aiParseResult.value) : undefined,
       customFields: customValues
     }

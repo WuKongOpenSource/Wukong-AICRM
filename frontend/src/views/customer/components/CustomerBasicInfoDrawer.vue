@@ -29,39 +29,19 @@
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-        <div class="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-5">
-          <div class="flex items-center gap-4">
-            <div class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white text-2xl font-black text-slate-400">
-              <img
-                v-if="customer.logoUrl"
-                :src="customer.logoUrl"
-                :alt="customer.companyName || 'company logo'"
-                class="size-full object-contain"
-              />
-              <span v-else>{{ customer.companyName?.charAt(0) || '?' }}</span>
-            </div>
-            <div class="min-w-0">
-              <h4 class="truncate text-lg font-bold text-slate-900">{{ customer.companyName }}</h4>
-              <div class="mt-2 flex flex-wrap items-center gap-2">
-                <span
-                  class="px-2 py-0.5 text-xs font-bold rounded uppercase"
-                  :class="getStageBadgeClass(customer.stage)"
-                >{{ getStageLabel(customer.stage) }}</span>
-                <span
-                  v-if="customer.level"
-                  class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold"
-                  :class="{
-                    'bg-emerald-50 text-emerald-600': customer.level === 'A',
-                    'bg-blue-50 text-blue-600': customer.level === 'B',
-                    'bg-slate-100 text-slate-500': customer.level === 'C'
-                  }"
-                >{{ customer.level }}级</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div class="space-y-5 text-left">
+          <div>
+            <p class="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">公司 LOGO</p>
+            <CustomerLogoUploader
+              :logo-url="customer.logoUrl"
+              :alt="customer.companyName || '公司 Logo'"
+              :disabled="!canEditCustomer || logoSaving"
+              :size="64"
+              @uploaded="handleLogoUploaded"
+              @removed="handleLogoRemoved"
+            />
+          </div>
+
           <section
             v-if="currentAiReportVisible"
             class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4"
@@ -251,12 +231,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useCustomerStore } from '@/stores/customer'
 import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import InlineEditableField from '@/components/common/InlineEditableField.vue'
+import CustomerLogoUploader from './CustomerLogoUploader.vue'
 import type { Contact, CustomerAiReportVO, CustomerDetailVO } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 import { compactCustomerAiInsight, getCustomerAiStatusMeta } from '@/utils/customerAi'
@@ -300,6 +281,7 @@ const primaryContactInlineFields: Record<string, Partial<CustomField>> = {
 }
 
 const canEditCustomer = computed(() => userStore.hasPermission('customer:edit'))
+const logoSaving = ref(false)
 
 function isPrimaryContact(contact?: Pick<Contact, 'isPrimary'> | null): boolean {
   const value = contact?.isPrimary as boolean | number | string | undefined
@@ -324,30 +306,6 @@ const currentAiReportVisible = computed(() =>
 
 function getAiStatusMeta(value: string | undefined | null) {
   return getCustomerAiStatusMeta(value)
-}
-
-function getStageBadgeClass(stage: string): string {
-  const classes: Record<string, string> = {
-    lead: 'bg-slate-100 text-slate-800',
-    qualified: 'bg-blue-100 text-blue-800',
-    proposal: 'bg-amber-100 text-amber-800',
-    negotiation: 'bg-purple-100 text-purple-800',
-    closed: 'bg-green-100 text-green-800',
-    lost: 'bg-red-100 text-red-800'
-  }
-  return classes[stage] || 'bg-slate-100 text-slate-800'
-}
-
-function getStageLabel(stage: string): string {
-  const labels: Record<string, string> = {
-    lead: '线索',
-    qualified: '已验证',
-    proposal: '方案',
-    negotiation: '谈判',
-    closed: '成交',
-    lost: '流失'
-  }
-  return labels[stage] || stage
 }
 
 function formatDateTime(dateStr?: string): string {
@@ -381,6 +339,33 @@ async function handleInlineDetailFieldSave(
     emit('contactsUpdated', detail.contacts || [])
   }
   ElMessage.success('保存成功')
+}
+
+async function saveLogoValue(logo: string, successMessage: string) {
+  if (!props.customer || logoSaving.value) return
+  logoSaving.value = true
+  try {
+    await customerStore.editCustomerField(
+      {
+        customerId: props.customer.customerId,
+        fieldName: 'logo',
+        fieldSource: 'system',
+        value: logo
+      },
+      { refreshList: true }
+    )
+    ElMessage.success(successMessage)
+  } finally {
+    logoSaving.value = false
+  }
+}
+
+async function handleLogoUploaded(payload: { logo: string; logoUrl: string }) {
+  await saveLogoValue(payload.logo, 'Logo 保存成功')
+}
+
+async function handleLogoRemoved() {
+  await saveLogoValue('', 'Logo 已移除')
 }
 </script>
 

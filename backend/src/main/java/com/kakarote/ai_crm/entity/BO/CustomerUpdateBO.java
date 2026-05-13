@@ -40,6 +40,9 @@ public class CustomerUpdateBO {
     @Schema(description = "网站")
     private String website;
 
+    @Schema(description = "公司 Logo")
+    private String logo;
+
     @Schema(description = "预计成交金额")
     private BigDecimal quotation;
 
