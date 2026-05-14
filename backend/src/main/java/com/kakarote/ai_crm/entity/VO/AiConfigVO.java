@@ -62,31 +62,31 @@ public class AiConfigVO implements Serializable {
     @Schema(description = "当前模式下 AI 是否可立即使用")
     private Boolean ready;
 
-    @Schema(description = "注册赠送 token 总量")
-    private Long giftTokenTotal;
+    @Schema(description = "注册赠送积分总量")
+    private Long giftCreditTotal;
 
-    @Schema(description = "注册赠送 token 已使用量")
-    private Long giftTokenUsed;
+    @Schema(description = "注册赠送积分已使用量")
+    private Long giftCreditUsed;
 
-    @Schema(description = "注册赠送 token 剩余额度")
-    private Long giftTokenRemaining;
+    @Schema(description = "注册赠送积分剩余额度")
+    private Long giftCreditRemaining;
 
-    @Schema(description = "赠送 token 是否仍可用")
-    private Boolean giftTokenAvailable;
+    @Schema(description = "赠送积分是否仍可用")
+    private Boolean giftCreditAvailable;
 
-    private Long purchasedTokenTotal;
+    private Long purchasedCreditTotal;
 
-    private Long purchasedTokenUsed;
+    private Long purchasedCreditUsed;
 
-    private Long purchasedTokenRemaining;
+    private Long purchasedCreditRemaining;
 
-    private Long tokenTotal;
+    private Long creditTotal;
 
-    private Long tokenUsed;
+    private Long creditUsed;
 
-    private Long tokenRemaining;
+    private Long creditRemaining;
 
-    private Boolean tokenAvailable;
+    private Boolean creditAvailable;
 
     @Schema(description = "最后更新时间")
     private Date updateTime;

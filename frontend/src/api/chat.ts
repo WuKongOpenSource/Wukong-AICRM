@@ -1,5 +1,5 @@
 import { post, get, getToken, getApiBaseUrl } from '@/utils/request'
-import type { ChatSession, ChatMessage, ChatAttachmentDTO } from '@/types/common'
+import type { ChatSession, ChatMessage, ChatAttachmentDTO, ChatModelOption } from '@/types/common'
 
 /**
  * Create chat session
@@ -33,6 +33,10 @@ export function getMessageList(sessionId: string): Promise<ChatMessage[]> {
   return get(`/chat/message/list/${sessionId}`)
 }
 
+export function getChatModelOptions(): Promise<ChatModelOption[]> {
+  return get('/chat/model/options')
+}
+
 /**
  * Send message (streaming)
  * Handles SSE (Server-Sent Events) format parsing
@@ -44,7 +48,9 @@ export async function sendMessageStream(
   onComplete?: () => void,
   onError?: (error: Error) => void,
   attachments?: ChatAttachmentDTO[],
-  ragEnabled?: boolean
+  ragEnabled?: boolean,
+  modelProvider?: string,
+  modelName?: string
 ): Promise<void> {
   const token = getToken()
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
@@ -69,7 +75,14 @@ export async function sendMessageStream(
         'Accept': 'text/event-stream',
         ...(token ? { 'Manager-Token': token } : {})
       },
-      body: JSON.stringify({ sessionId, content, attachments: attachments || undefined, ragEnabled })
+      body: JSON.stringify({
+        sessionId,
+        content,
+        attachments: attachments || undefined,
+        ragEnabled,
+        modelProvider: modelProvider || undefined,
+        modelName: modelName || undefined
+      })
     })
 
     if (!response.ok) {
@@ -150,6 +163,20 @@ function parseSSEEvent(event: string): string | null {
 /**
  * Send message (sync)
  */
-export function sendMessageSync(sessionId: string, content: string, attachments?: ChatAttachmentDTO[], ragEnabled?: boolean): Promise<string> {
-  return post('/chat/sendSync', { sessionId, content, attachments: attachments || undefined, ragEnabled })
+export function sendMessageSync(
+  sessionId: string,
+  content: string,
+  attachments?: ChatAttachmentDTO[],
+  ragEnabled?: boolean,
+  modelProvider?: string,
+  modelName?: string
+): Promise<string> {
+  return post('/chat/sendSync', {
+    sessionId,
+    content,
+    attachments: attachments || undefined,
+    ragEnabled,
+    modelProvider: modelProvider || undefined,
+    modelName: modelName || undefined
+  })
 }

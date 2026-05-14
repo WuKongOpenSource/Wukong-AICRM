@@ -5,65 +5,65 @@ import com.kakarote.ai_crm.entity.PO.CrmTenant;
 
 public interface ICrmTenantService extends IService<CrmTenant> {
 
-    long DEFAULT_GIFT_TOKEN_TOTAL = 200_000L;
+    long DEFAULT_GIFT_CREDIT_TOTAL = 200_000L;
 
     /**
-     * 获取租户赠送 token 总量。
+     * 获取租户赠送积分总量。
      */
-    long getGiftTokenTotal(Long tenantId);
+    long getGiftCreditTotal(Long tenantId);
 
     /**
-     * 获取租户赠送 token 已使用量。
+     * 获取租户赠送积分已使用量。
      */
-    long getGiftTokenUsed(Long tenantId);
+    long getGiftCreditUsed(Long tenantId);
 
     /**
-     * 获取租户赠送 token 剩余额度。
+     * 获取租户赠送积分剩余额度。
      */
-    long getGiftTokenRemaining(Long tenantId);
+    long getGiftCreditRemaining(Long tenantId);
 
     /**
      * 当前租户是否仍可使用赠送额度。
      */
-    boolean hasAvailableGiftTokens(Long tenantId);
+    boolean hasAvailableGiftCredits(Long tenantId);
 
     /**
-     * 获取PurchasedTokenTotal。
+     * 获取PurchasedCreditTotal。
      */
-    long getPurchasedTokenTotal(Long tenantId);
+    long getPurchasedCreditTotal(Long tenantId);
 
     /**
-     * 获取PurchasedTokenUsed。
+     * 获取PurchasedCreditUsed。
      */
-    long getPurchasedTokenUsed(Long tenantId);
+    long getPurchasedCreditUsed(Long tenantId);
 
     /**
-     * 获取PurchasedToken剩余。
+     * 获取PurchasedCredit剩余。
      */
-    long getPurchasedTokenRemaining(Long tenantId);
+    long getPurchasedCreditRemaining(Long tenantId);
 
     /**
-     * 获取TotalToken剩余。
+     * 获取TotalCredit剩余。
      */
-    long getTotalTokenRemaining(Long tenantId);
+    long getTotalCreditRemaining(Long tenantId);
 
     /**
-     * 判断是否存在可用Tokens。
+     * 判断是否存在可用积分。
      */
-    boolean hasAvailableTokens(Long tenantId);
+    boolean hasAvailableCredits(Long tenantId);
 
     /**
      * 消耗赠送额度。额度不足时会自动扣到 0，不会出现负数。
      */
-    void consumeGiftTokens(Long tenantId, long consumeTokens);
+    void consumeGiftCredits(Long tenantId, long consumeCredits);
 
     /**
-     * 消耗Tokens。
+     * 消耗积分。
      */
-    void consumeTokens(Long tenantId, long consumeTokens);
+    void consumeCredits(Long tenantId, long consumeCredits);
 
     /**
-     * 新增PurchasedTokens。
+     * 新增PurchasedCredits。
      */
-    void addPurchasedTokens(Long tenantId, long tokenAmount);
+    void addPurchasedCredits(Long tenantId, long creditAmount);
 }

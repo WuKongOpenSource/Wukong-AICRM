@@ -498,15 +498,15 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         AiModelCapabilities capabilities = descriptor.resolveCapabilities(displaySnapshot.model());
 
         Long tenantId = UserUtil.getTenantId();
-        long giftTokenTotal = tenantService.getGiftTokenTotal(tenantId);
-        long giftTokenUsed = tenantService.getGiftTokenUsed(tenantId);
-        long giftTokenRemaining = tenantService.getGiftTokenRemaining(tenantId);
-        long purchasedTokenTotal = tenantService.getPurchasedTokenTotal(tenantId);
-        long purchasedTokenUsed = tenantService.getPurchasedTokenUsed(tenantId);
-        long purchasedTokenRemaining = tenantService.getPurchasedTokenRemaining(tenantId);
-        long tokenTotal = giftTokenTotal + purchasedTokenTotal;
-        long tokenUsed = giftTokenUsed + purchasedTokenUsed;
-        long tokenRemaining = giftTokenRemaining + purchasedTokenRemaining;
+        long giftCreditTotal = tenantService.getGiftCreditTotal(tenantId);
+        long giftCreditUsed = tenantService.getGiftCreditUsed(tenantId);
+        long giftCreditRemaining = tenantService.getGiftCreditRemaining(tenantId);
+        long purchasedCreditTotal = tenantService.getPurchasedCreditTotal(tenantId);
+        long purchasedCreditUsed = tenantService.getPurchasedCreditUsed(tenantId);
+        long purchasedCreditRemaining = tenantService.getPurchasedCreditRemaining(tenantId);
+        long creditTotal = giftCreditTotal + purchasedCreditTotal;
+        long creditUsed = giftCreditUsed + purchasedCreditUsed;
+        long creditRemaining = giftCreditRemaining + purchasedCreditRemaining;
 
         AiConfigVO vo = new AiConfigVO();
         vo.setProvider(descriptor.getCode());
@@ -528,18 +528,18 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         ));
         vo.setMode(effectiveSnapshot.mode().getCode());
         vo.setCustomConfigSaved(customConfigSaved);
-        vo.setReady(isAiReady(effectiveSnapshot.mode(), effectiveSnapshot.apiKey(), tokenRemaining));
-        vo.setGiftTokenTotal(giftTokenTotal);
-        vo.setGiftTokenUsed(giftTokenUsed);
-        vo.setGiftTokenRemaining(giftTokenRemaining);
-        vo.setGiftTokenAvailable(giftTokenRemaining > 0);
-        vo.setPurchasedTokenTotal(purchasedTokenTotal);
-        vo.setPurchasedTokenUsed(purchasedTokenUsed);
-        vo.setPurchasedTokenRemaining(purchasedTokenRemaining);
-        vo.setTokenTotal(tokenTotal);
-        vo.setTokenUsed(tokenUsed);
-        vo.setTokenRemaining(tokenRemaining);
-        vo.setTokenAvailable(tokenRemaining > 0);
+        vo.setReady(isAiReady(effectiveSnapshot.mode(), effectiveSnapshot.apiKey(), creditRemaining));
+        vo.setGiftCreditTotal(giftCreditTotal);
+        vo.setGiftCreditUsed(giftCreditUsed);
+        vo.setGiftCreditRemaining(giftCreditRemaining);
+        vo.setGiftCreditAvailable(giftCreditRemaining > 0);
+        vo.setPurchasedCreditTotal(purchasedCreditTotal);
+        vo.setPurchasedCreditUsed(purchasedCreditUsed);
+        vo.setPurchasedCreditRemaining(purchasedCreditRemaining);
+        vo.setCreditTotal(creditTotal);
+        vo.setCreditUsed(creditUsed);
+        vo.setCreditRemaining(creditRemaining);
+        vo.setCreditAvailable(creditRemaining > 0);
         vo.setUpdateTime(getLatestAiConfigUpdateTime());
         return vo;
     }
@@ -603,8 +603,8 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
     /**
      * 判断是否AI就绪。
      */
-    private boolean isAiReady(AiMode mode, String apiKey, long tokenRemaining) {
-        return StrUtil.isNotBlank(apiKey) && tokenRemaining > 0;
+    private boolean isAiReady(AiMode mode, String apiKey, long creditRemaining) {
+        return StrUtil.isNotBlank(apiKey) && creditRemaining > 0;
     }
 
     /**

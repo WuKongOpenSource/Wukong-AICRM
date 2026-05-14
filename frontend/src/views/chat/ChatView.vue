@@ -414,6 +414,27 @@
                         <span>知识库检索</span>
                       </span>
                     </button>
+                    <el-select
+                      v-if="!isMobile && chatStore.modelOptions.length > 0"
+                      v-model="chatStore.selectedModelKey"
+                      class="w-48"
+                      size="large"
+                      :disabled="chatStore.isStreaming || isUploading || chatStore.modelOptionsLoading"
+                      placeholder="选择模型"
+                      @change="chatStore.setSelectedModelKey"
+                    >
+                      <el-option
+                        v-for="option in chatStore.modelOptions"
+                        :key="chatStore.toModelKey(option)"
+                        :label="option.displayName || option.modelName"
+                        :value="chatStore.toModelKey(option)"
+                      >
+                        <div class="flex items-center justify-between gap-4">
+                          <span class="truncate">{{ option.displayName || option.modelName }}</span>
+                          <span class="shrink-0 text-xs text-slate-400">{{ formatModelMultiplier(option.creditMultiplier) }}</span>
+                        </div>
+                      </el-option>
+                    </el-select>
                     <button
                       v-if="!isMobile"
                       class="size-10 rounded-xl bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
@@ -444,6 +465,28 @@
                         <span>知识库检索</span>
                       </span>
                     </button>
+
+                    <el-select
+                      v-if="chatStore.modelOptions.length > 0"
+                      v-model="chatStore.selectedModelKey"
+                      class="min-w-0 flex-1"
+                      size="large"
+                      :disabled="chatStore.isStreaming || isUploading || chatStore.modelOptionsLoading"
+                      placeholder="选择模型"
+                      @change="chatStore.setSelectedModelKey"
+                    >
+                      <el-option
+                        v-for="option in chatStore.modelOptions"
+                        :key="chatStore.toModelKey(option)"
+                        :label="option.displayName || option.modelName"
+                        :value="chatStore.toModelKey(option)"
+                      >
+                        <div class="flex items-center justify-between gap-4">
+                          <span class="truncate">{{ option.displayName || option.modelName }}</span>
+                          <span class="shrink-0 text-xs text-slate-400">{{ formatModelMultiplier(option.creditMultiplier) }}</span>
+                        </div>
+                      </el-option>
+                    </el-select>
 
                     <button
                       class="size-10 rounded-xl bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
@@ -684,6 +727,7 @@ onMounted(async () => {
   registerAiQuotaResumeSendHandler(handleSend)
   await Promise.all([
     chatStore.fetchSessions(),
+    chatStore.fetchModelOptions(),
     agentStore.fetchEnabledAgents(),
     loadAiConfig(),
   ])
@@ -786,6 +830,11 @@ async function handleSend() {
 function sendQuickMessage(text: string) {
   inputText.value = text
   handleSend()
+}
+
+function formatModelMultiplier(value?: number) {
+  const multiplier = Number(value || 1)
+  return `${multiplier.toFixed(multiplier % 1 === 0 ? 0 : 2)}x 积分`
 }
 
 function renderAssistantMessage(content: string, isStreaming = false): string {

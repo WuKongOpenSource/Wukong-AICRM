@@ -14,9 +14,9 @@
       >
         <WkIcon name="ai" :size="18" class="shrink-0 leading-none text-primary" />
         <span v-if="currentAiMode === 'gift'" class="hidden min-w-0 truncate tabular-nums md:inline">
-          <span class="hidden md:inline">已使用 </span>{{ tokenUsedWan }} / {{ tokenTotalWan }}万<span class="hidden md:inline">，剩余 </span>{{ tokenProgressPercent }}%
+          <span class="hidden md:inline">已使用 </span>{{ creditUsedWan }} / {{ creditTotalWan }}万<span class="hidden md:inline">，剩余 </span>{{ creditProgressPercent }}%
         </span>
-        <span v-else class="min-w-0 truncate text-slate-600">AI 额度 · 点击查看</span>
+        <span v-else class="min-w-0 truncate text-slate-600">AI 积分 · 点击查看</span>
       </button>
     </template>
     <AiQuotaPanel variant="popover" />
@@ -29,7 +29,7 @@ import WkIcon from '@/components/common/WkIcon.vue'
 import AiQuotaPanel from '@/components/layout/AiQuotaPanel.vue'
 import { useAiQuota } from '@/composables/useAiQuota'
 
-const { loadAiConfig, currentAiMode, tokenUsedWan, tokenTotalWan, tokenProgressPercent } = useAiQuota()
+const { loadAiConfig, currentAiMode, creditUsedWan, creditTotalWan, creditProgressPercent } = useAiQuota()
 
 onMounted(() => {
   void loadAiConfig()

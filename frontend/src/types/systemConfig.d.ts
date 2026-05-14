@@ -58,17 +58,17 @@ export interface AiConfig {
   mode?: AiMode
   customConfigSaved?: boolean
   ready?: boolean
-  giftTokenTotal?: number
-  giftTokenUsed?: number
-  giftTokenRemaining?: number
-  giftTokenAvailable?: boolean
-  purchasedTokenTotal?: number
-  purchasedTokenUsed?: number
-  purchasedTokenRemaining?: number
-  tokenTotal?: number
-  tokenUsed?: number
-  tokenRemaining?: number
-  tokenAvailable?: boolean
+  giftCreditTotal?: number
+  giftCreditUsed?: number
+  giftCreditRemaining?: number
+  giftCreditAvailable?: boolean
+  purchasedCreditTotal?: number
+  purchasedCreditUsed?: number
+  purchasedCreditRemaining?: number
+  creditTotal?: number
+  creditUsed?: number
+  creditRemaining?: number
+  creditAvailable?: boolean
   updateTime?: string
 }
 

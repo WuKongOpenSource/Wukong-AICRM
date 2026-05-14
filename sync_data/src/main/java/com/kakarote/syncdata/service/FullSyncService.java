@@ -359,10 +359,12 @@ public class FullSyncService {
         target.update("""
                 INSERT INTO crm_tenant (
                     tenant_id, tenant_name, status, max_users,
-                    gift_token_total, gift_token_used, remark,
+                    gift_credit_total, gift_credit_used,
+                    purchased_credit_total, purchased_credit_used,
+                    remark,
                     create_time, update_time
                 )
-                VALUES (?, ?, 1, 200, 200000, 0, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                VALUES (?, ?, 1, 200, 200000, 0, 0, 0, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 ON CONFLICT (tenant_id) DO NOTHING
                 """, tenantId, "WK CRM " + companyId, "Bound to wk_crm.company_id=" + companyId);
         mappingRepository.upsertMapping("wk_admin_company", companyId, companyId, "crm_tenant", tenantId, tenantId);
@@ -383,8 +385,10 @@ public class FullSyncService {
         values.put("contact_phone", Rows.trimToLength(phone, 20));
         values.put("status", companyStatus == null || companyStatus == 1 ? 1 : 0);
         values.put("max_users", 200);
-        values.put("gift_token_total", 200000L);
-        values.put("gift_token_used", 0L);
+        values.put("gift_credit_total", 200000L);
+        values.put("gift_credit_used", 0L);
+        values.put("purchased_credit_total", 0L);
+        values.put("purchased_credit_used", 0L);
         values.put("remark", "Migrated from wk_admin_company.company_id=" + companyId);
         values.put("create_time", Rows.timestamp(row, "create_time"));
         values.put("update_time", Timestamp.valueOf(LocalDateTime.now()));
@@ -405,8 +409,10 @@ public class FullSyncService {
         values.put("tenant_name", "WK CRM " + safeCompanyId);
         values.put("status", 1);
         values.put("max_users", 200);
-        values.put("gift_token_total", 200000L);
-        values.put("gift_token_used", 0L);
+        values.put("gift_credit_total", 200000L);
+        values.put("gift_credit_used", 0L);
+        values.put("purchased_credit_total", 0L);
+        values.put("purchased_credit_used", 0L);
         values.put("remark", "Synthetic tenant created by full sync.");
         values.put("create_time", Timestamp.valueOf(LocalDateTime.now()));
         values.put("update_time", Timestamp.valueOf(LocalDateTime.now()));

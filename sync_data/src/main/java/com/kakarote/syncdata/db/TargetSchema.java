@@ -268,8 +268,10 @@ public class TargetSchema {
                         status INTEGER NOT NULL DEFAULT 1,
                         expire_time TIMESTAMP,
                         max_users INTEGER DEFAULT 50,
-                        gift_token_total BIGINT DEFAULT 200000,
-                        gift_token_used BIGINT DEFAULT 0,
+                        gift_credit_total BIGINT DEFAULT 200000,
+                        gift_credit_used BIGINT DEFAULT 0,
+                        purchased_credit_total BIGINT DEFAULT 0,
+                        purchased_credit_used BIGINT DEFAULT 0,
                         remark VARCHAR(500),
                         create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -330,6 +332,10 @@ public class TargetSchema {
 
         addIfTableExists("crm_schedule", "participant_user_ids", "TEXT");
         addIfTableExists("manager_user", "tenant_id", "BIGINT");
+        addIfTableExists("crm_tenant", "gift_credit_total", "BIGINT DEFAULT 200000");
+        addIfTableExists("crm_tenant", "gift_credit_used", "BIGINT DEFAULT 0");
+        addIfTableExists("crm_tenant", "purchased_credit_total", "BIGINT DEFAULT 0");
+        addIfTableExists("crm_tenant", "purchased_credit_used", "BIGINT DEFAULT 0");
         addIfTableExists("manager_dept", "tenant_id", "BIGINT");
         addIfTableExists("manager_role", "tenant_id", "BIGINT");
         addIfTableExists("manager_user_role", "tenant_id", "BIGINT");

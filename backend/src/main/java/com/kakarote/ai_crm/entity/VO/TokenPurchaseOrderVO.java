@@ -14,7 +14,7 @@ public class TokenPurchaseOrderVO implements Serializable {
 
     private String planName;
 
-    private Long tokenAmount;
+    private Long creditAmount;
 
     private Integer amountFen;
 

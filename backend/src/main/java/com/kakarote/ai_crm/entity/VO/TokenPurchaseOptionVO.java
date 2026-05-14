@@ -12,11 +12,11 @@ public class TokenPurchaseOptionVO implements Serializable {
 
     private int orderExpireMinutes;
 
-    private Long giftTokenRemaining;
+    private Long giftCreditRemaining;
 
-    private Long purchasedTokenRemaining;
+    private Long purchasedCreditRemaining;
 
-    private Long tokenRemaining;
+    private Long creditRemaining;
 
     private List<PlanVO> plans;
 
@@ -27,7 +27,7 @@ public class TokenPurchaseOptionVO implements Serializable {
         private String id;
         private String name;
         private String description;
-        private Long tokenAmount;
+        private Long creditAmount;
         private Integer priceFen;
     }
 

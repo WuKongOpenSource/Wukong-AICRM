@@ -184,9 +184,22 @@ export interface ChatMessage {
   content: string
   functionCall?: string
   functionResult?: string
-  tokens?: number
+  tokensUsed?: number
+  creditsUsed?: number
+  creditMultiplier?: number
+  modelName?: string
+  billingModelProvider?: string
+  billingModelName?: string
   attachments?: ChatAttachmentVO[]
   createTime: string
+}
+
+export interface ChatModelOption {
+  provider: string
+  providerLabel: string
+  modelName: string
+  displayName: string
+  creditMultiplier: number
 }
 
 export interface ChatAttachmentVO {
@@ -210,6 +223,8 @@ export interface ChatSendBO {
   content: string
   attachments?: ChatAttachmentDTO[]
   ragEnabled?: boolean
+  modelProvider?: string
+  modelName?: string
 }
 
 // Enum types

@@ -17,6 +17,7 @@ import com.kakarote.ai_crm.entity.BO.SessionCreateBO;
 import com.kakarote.ai_crm.entity.PO.ChatAttachment;
 import com.kakarote.ai_crm.entity.PO.ChatMessage;
 import com.kakarote.ai_crm.entity.PO.ChatSession;
+import com.kakarote.ai_crm.entity.VO.AiModelOptionVO;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
 import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
 import com.kakarote.ai_crm.mapper.ChatMessageMapper;
@@ -39,6 +40,7 @@ import org.springframework.util.MimeType;
 import reactor.core.publisher.Flux;
 
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.TextStyle;
@@ -80,6 +82,9 @@ public class ChatServiceImpl implements IChatService {
 
     @Autowired
     private AiQuotaService aiQuotaService;
+
+    @Autowired
+    private AiModelPricingService aiModelPricingService;
 
     private static final int MAX_EXTRACTED_TEXT_LENGTH = 3000;
 
@@ -307,6 +312,14 @@ public class ChatServiceImpl implements IChatService {
     }
 
     /**
+     * 获取聊天可选模型。
+     */
+    @Override
+    public List<AiModelOptionVO> getModelOptions() {
+        return aiModelPricingService.listEnabledOptions(chatClientProvider.getAvailableProviderCodes());
+    }
+
+    /**
      * 流式返回聊天。
      */
     @Override
@@ -365,7 +378,17 @@ public class ChatServiceImpl implements IChatService {
             enhancedContent = enhancedContent + "\n\n" + attachmentContext;
         }
 
-        AiModelCapabilities capabilities = chatClientProvider.getCurrentCapabilities();
+        ChatBillingContext billingContext;
+        try {
+            billingContext = resolveChatBillingContext(sendBO);
+        } catch (BusinessException exception) {
+            saveMessage(sessionId, "assistant", exception.getMsg());
+            updateSessionTime(sessionId);
+            AiContextHolder.clear();
+            return Flux.just(exception.getMsg());
+        }
+
+        AiModelCapabilities capabilities = billingContext.runtimeConfig().capabilities();
         if (containsImageAttachment(attachments) && !capabilities.isSupportsVision()) {
             enhancedContent = enhancedContent + "\n\n[系统提示] 当前配置的模型不支持图片直传，请仅基于可提取文本回答；如需图片理解，请切换到支持视觉的模型。";
         }
@@ -377,7 +400,7 @@ public class ChatServiceImpl implements IChatService {
         AtomicReference<Integer> totalTokensRef = new AtomicReference<>(0);
         AtomicReference<String> modelNameRef = new AtomicReference<>(null);
 
-        String unavailableTip = resolveAiUnavailableTip(currentTenantId);
+        String unavailableTip = resolveAiUnavailableTip(currentTenantId, billingContext.runtimeConfig());
         if (unavailableTip != null) {
             saveMessage(sessionId, "assistant", unavailableTip);
             updateSessionTime(sessionId);
@@ -386,7 +409,8 @@ public class ChatServiceImpl implements IChatService {
         }
 
         String quotaTip = aiQuotaService.resolveQuotaFailureMessage(
-            currentTenantId, "chat", enhancedSystemPrompt, history, enhancedContent
+            currentTenantId, "chat", enhancedSystemPrompt, history, enhancedContent,
+            billingContext.pricing().creditMultiplier()
         );
         if (quotaTip != null) {
             saveMessage(sessionId, "assistant", quotaTip);
@@ -397,14 +421,17 @@ public class ChatServiceImpl implements IChatService {
 
         log.debug("开始 AI 对话，启用工具调用...");
 
-        if (!chatClientProvider.isApiKeyConfigured()) {
+        if (StrUtil.isBlank(billingContext.runtimeConfig().apiKey())) {
             String tip = "请先在系统设置-系统参数设置-AI/API设置中配置AI大模型相关信息";
             saveMessage(sessionId, "assistant", tip);
             AiContextHolder.clear();
             return Flux.just(tip);
         }
 
-        ChatClient chatClient = chatClientProvider.getChatClient();
+        ChatClient chatClient = chatClientProvider.getChatClient(
+            billingContext.runtimeConfig().providerCode(),
+            billingContext.runtimeConfig().model()
+        );
 
         final String finalSystemPrompt = enhancedSystemPrompt;
         final String finalContent = enhancedContent;
@@ -464,10 +491,15 @@ public class ChatServiceImpl implements IChatService {
                 );
                 log.debug("AI 对话完成，响应长度: {}, tokens: prompt={}, completion={}, total={}",
                     fullResponse.length(), usage.promptTokens(), usage.completionTokens(), usage.totalTokens());
+                long creditsUsed = aiQuotaService.resolveCredits(
+                    usage.totalTokens(), billingContext.pricing().creditMultiplier());
                 saveMessage(sessionId, "assistant", fullResponse.toString(),
                     usage.promptTokens(), usage.completionTokens(),
-                    usage.totalTokens(), modelNameRef.get());
-                aiQuotaService.consumeResolvedTokens(currentTenantId, "chat", usage);
+                    usage.totalTokens(), StrUtil.blankToDefault(modelNameRef.get(), billingContext.runtimeConfig().model()),
+                    creditsUsed, billingContext.pricing().creditMultiplier(),
+                    billingContext.runtimeConfig().providerCode(), billingContext.runtimeConfig().model());
+                aiQuotaService.consumeResolvedTokens(
+                    currentTenantId, "chat", usage, billingContext.pricing().creditMultiplier());
                 updateSessionTime(sessionId);
                 // 会话结束后清理当前会话的 AiContextHolder。
                 AiContextHolder.clear();
@@ -534,14 +566,24 @@ public class ChatServiceImpl implements IChatService {
             enhancedContent = enhancedContent + "\n\n" + attachmentContext;
         }
 
-        AiModelCapabilities capabilities = chatClientProvider.getCurrentCapabilities();
+        ChatBillingContext billingContext;
+        try {
+            billingContext = resolveChatBillingContext(sendBO);
+        } catch (BusinessException exception) {
+            saveMessage(sessionId, "assistant", exception.getMsg());
+            updateSessionTime(sessionId);
+            AiContextHolder.clear();
+            return exception.getMsg();
+        }
+
+        AiModelCapabilities capabilities = billingContext.runtimeConfig().capabilities();
         if (containsImageAttachment(attachments) && !capabilities.isSupportsVision()) {
             enhancedContent = enhancedContent + "\n\n[系统提示] 当前配置的模型不支持图片直传，请仅基于可提取文本回答；如需图片理解，请切换到支持视觉的模型。";
         }
 
         List<Media> mediaList = buildMediaList(attachments, capabilities);
 
-        String unavailableTip = resolveAiUnavailableTip(currentTenantId);
+        String unavailableTip = resolveAiUnavailableTip(currentTenantId, billingContext.runtimeConfig());
         if (unavailableTip != null) {
             saveMessage(sessionId, "assistant", unavailableTip);
             updateSessionTime(sessionId);
@@ -549,7 +591,8 @@ public class ChatServiceImpl implements IChatService {
         }
 
         String quotaTip = aiQuotaService.resolveQuotaFailureMessage(
-            currentTenantId, "chat", enhancedSystemPrompt, history, enhancedContent
+            currentTenantId, "chat", enhancedSystemPrompt, history, enhancedContent,
+            billingContext.pricing().creditMultiplier()
         );
         if (quotaTip != null) {
             saveMessage(sessionId, "assistant", quotaTip);
@@ -558,7 +601,17 @@ public class ChatServiceImpl implements IChatService {
         }
 
         try {
-            ChatClient chatClient = chatClientProvider.getChatClient();
+            if (StrUtil.isBlank(billingContext.runtimeConfig().apiKey())) {
+                String tip = "请先在系统设置-系统参数设置-AI/API设置中配置AI大模型相关信息";
+                saveMessage(sessionId, "assistant", tip);
+                updateSessionTime(sessionId);
+                return tip;
+            }
+
+            ChatClient chatClient = chatClientProvider.getChatClient(
+                billingContext.runtimeConfig().providerCode(),
+                billingContext.runtimeConfig().model()
+            );
 
             final String finalSystemPrompt = enhancedSystemPrompt;
             final String finalContent = enhancedContent;
@@ -597,9 +650,15 @@ public class ChatServiceImpl implements IChatService {
                 response
             );
 
+            long creditsUsed = aiQuotaService.resolveCredits(
+                usageSnapshot.totalTokens(), billingContext.pricing().creditMultiplier());
             saveMessage(sessionId, "assistant", response,
-                usageSnapshot.promptTokens(), usageSnapshot.completionTokens(), usageSnapshot.totalTokens(), modelName);
-            aiQuotaService.consumeResolvedTokens(currentTenantId, "chat", usageSnapshot);
+                usageSnapshot.promptTokens(), usageSnapshot.completionTokens(), usageSnapshot.totalTokens(),
+                StrUtil.blankToDefault(modelName, billingContext.runtimeConfig().model()),
+                creditsUsed, billingContext.pricing().creditMultiplier(),
+                billingContext.runtimeConfig().providerCode(), billingContext.runtimeConfig().model());
+            aiQuotaService.consumeResolvedTokens(
+                currentTenantId, "chat", usageSnapshot, billingContext.pricing().creditMultiplier());
             updateSessionTime(sessionId);
 
             return response;
@@ -819,6 +878,18 @@ public class ChatServiceImpl implements IChatService {
     private Long saveMessage(Long sessionId, String role, String content,
                              Integer promptTokens, Integer completionTokens,
                              Integer totalTokens, String modelName) {
+        return saveMessage(sessionId, role, content, promptTokens, completionTokens, totalTokens, modelName,
+            0L, BigDecimal.ONE, null, null);
+    }
+
+    /**
+     * 保存消息。
+     */
+    private Long saveMessage(Long sessionId, String role, String content,
+                             Integer promptTokens, Integer completionTokens,
+                             Integer totalTokens, String modelName,
+                             Long creditsUsed, BigDecimal creditMultiplier,
+                             String billingModelProvider, String billingModelName) {
         ChatMessage message = new ChatMessage();
         message.setSessionId(sessionId);
         message.setRole(role);
@@ -827,6 +898,10 @@ public class ChatServiceImpl implements IChatService {
         message.setCompletionTokens(completionTokens != null ? completionTokens : 0);
         message.setTokensUsed(totalTokens != null ? totalTokens : 0);
         message.setModelName(modelName);
+        message.setCreditsUsed(creditsUsed != null ? creditsUsed : 0L);
+        message.setCreditMultiplier(creditMultiplier != null ? creditMultiplier : BigDecimal.ONE);
+        message.setBillingModelProvider(billingModelProvider);
+        message.setBillingModelName(billingModelName);
         message.setCreateTime(new Date());
         chatMessageMapper.insert(message);
 
@@ -835,6 +910,24 @@ public class ChatServiceImpl implements IChatService {
         }
 
         return message.getMessageId();
+    }
+
+    /**
+     * 解析本次聊天模型与计费倍率。
+     */
+    private ChatBillingContext resolveChatBillingContext(ChatSendBO sendBO) {
+        boolean explicitModelSelection = StrUtil.isNotBlank(sendBO.getModelProvider()) || StrUtil.isNotBlank(sendBO.getModelName());
+        DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig = chatClientProvider.getRuntimeConfigSnapshot(
+            sendBO.getModelProvider(), sendBO.getModelName());
+        AiModelPricingService.PricingSnapshot pricing = aiModelPricingService.resolvePricing(
+            runtimeConfig.providerCode(), runtimeConfig.model(), explicitModelSelection);
+        return new ChatBillingContext(runtimeConfig, pricing);
+    }
+
+    private record ChatBillingContext(
+        DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig,
+        AiModelPricingService.PricingSnapshot pricing
+    ) {
     }
 
     /**
@@ -970,8 +1063,8 @@ public class ChatServiceImpl implements IChatService {
     /**
      * 解析AIUnavailableTIP。
      */
-    private String resolveAiUnavailableTip(Long tenantId) {
-        if (!chatClientProvider.isApiKeyConfigured()) {
+    private String resolveAiUnavailableTip(Long tenantId, DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig) {
+        if (runtimeConfig == null || StrUtil.isBlank(runtimeConfig.apiKey())) {
             return "请先在系统设置中配置 AI 服务，或切换到赠送额度模式。";
         }
         if (tenantId == null) {

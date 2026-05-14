@@ -57,7 +57,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Token 购买服务。
+ * 积分购买服务。
  * 这里统一编排购买选项、订单创建、第三方下单、回调处理和到账入账逻辑，
  * 让前端购买弹窗只围绕订单状态做展示和轮询。
  */
@@ -102,9 +102,9 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
         TokenPurchaseOptionVO vo = new TokenPurchaseOptionVO();
         vo.setEnabled(properties.isEnabled());
         vo.setOrderExpireMinutes(properties.getOrderExpireMinutes());
-        vo.setGiftTokenRemaining(tenantService.getGiftTokenRemaining(tenantId));
-        vo.setPurchasedTokenRemaining(tenantService.getPurchasedTokenRemaining(tenantId));
-        vo.setTokenRemaining(tenantService.getTotalTokenRemaining(tenantId));
+        vo.setGiftCreditRemaining(tenantService.getGiftCreditRemaining(tenantId));
+        vo.setPurchasedCreditRemaining(tenantService.getPurchasedCreditRemaining(tenantId));
+        vo.setCreditRemaining(tenantService.getTotalCreditRemaining(tenantId));
 
         List<TokenPurchaseOptionVO.PlanVO> plans = new ArrayList<>();
         for (Plan plan : properties.getResolvedPlans()) {
@@ -112,7 +112,7 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
             item.setId(plan.getId());
             item.setName(plan.getName());
             item.setDescription(plan.getDescription());
-            item.setTokenAmount(plan.getTokenAmount());
+            item.setCreditAmount(plan.getCreditAmount());
             item.setPriceFen(plan.getPriceFen());
             plans.add(item);
         }
@@ -149,7 +149,7 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
         order.setOrderNo("TP" + IdUtil.getSnowflakeNextIdStr());
         order.setPlanId(plan.getId());
         order.setPlanName(plan.getName());
-        order.setTokenAmount(plan.getTokenAmount());
+        order.setCreditAmount(plan.getCreditAmount());
         order.setAmountFen(plan.getPriceFen());
         order.setPaymentChannel(channel);
         order.setStatus(STATUS_PENDING);
@@ -287,7 +287,7 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
      */
     private void ensurePurchaseEnabled() {
         if (!properties.isEnabled()) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前环境未启用 Token 购买");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前环境未启用积分购买");
         }
     }
 
@@ -453,14 +453,14 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
 
     /**
      * 支付平台回调可能重复投递，所以成功入账必须保持幂等。
-     * 已支付订单再次回调时直接返回，不重复增加 token。
+     * 已支付订单再次回调时直接返回，不重复增加积分。
      */
     private void markOrderPaid(TokenPurchaseOrder order, String providerOrderNo, String payload) {
         if (STATUS_PAID.equals(order.getStatus())) {
             return;
         }
         markOrderStatus(order, STATUS_PAID, providerOrderNo, payload);
-        tenantService.addPurchasedTokens(order.getTenantId(), order.getTokenAmount());
+        tenantService.addPurchasedCredits(order.getTenantId(), order.getCreditAmount());
     }
 
     /**
@@ -514,14 +514,14 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
      * 生成支付标题，直接展示给第三方支付平台。
      */
     private String buildOrderSubject(TokenPurchaseOrder order) {
-        return "AI CRM Token 充值 - " + order.getTokenAmount() + " Token";
+        return "AI CRM 积分充值 - " + order.getCreditAmount() + " 积分";
     }
 
     /**
      * 生成支付补充说明，用在支付宝等支持 body 的场景。
      */
     private String buildOrderBody(TokenPurchaseOrder order) {
-        return "AI CRM Token plan 充值: " + StrUtil.blankToDefault(order.getPlanName(), order.getPlanId());
+        return "AI CRM 积分套餐充值: " + StrUtil.blankToDefault(order.getPlanName(), order.getPlanId());
     }
 
     /**

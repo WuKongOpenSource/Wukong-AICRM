@@ -5,10 +5,11 @@ import {
   getSessionList,
   deleteSession,
   getMessageList,
+  getChatModelOptions,
   sendMessageStream,
   sendMessageSync
 } from '@/api/chat'
-import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, ChatMessage } from '@/types/common'
+import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, ChatMessage, ChatModelOption } from '@/types/common'
 
 interface LocalMessage {
   id: string
@@ -28,6 +29,7 @@ interface StreamingTask {
 
 export const useChatStore = defineStore('chat', () => {
   const RAG_ENABLED_STORAGE_KEY = 'wk_ai_crm:chat_rag_enabled:v1'
+  const MODEL_STORAGE_KEY = 'wk_ai_crm:chat_selected_model:v1'
 
   const sessions = ref<ChatSession[]>([])
   const currentSessionId = ref<string | null>(null)
@@ -35,7 +37,10 @@ export const useChatStore = defineStore('chat', () => {
   const streamingTasks = ref<Record<string, StreamingTask>>({})
   const loading = ref(false)
   const sessionsLoading = ref(false)
+  const modelOptionsLoading = ref(false)
+  const modelOptions = ref<ChatModelOption[]>([])
   const ragEnabled = ref(loadRagEnabled())
+  const selectedModelKey = ref(loadSelectedModelKey())
 
   const messages = computed(() => {
     if (!currentSessionId.value) return []
@@ -52,12 +57,34 @@ export const useChatStore = defineStore('chat', () => {
     sessions.value.find(s => s.sessionId === currentSessionId.value)
   )
 
+  const selectedModel = computed(() => {
+    if (!modelOptions.value.length) return null
+    return modelOptions.value.find(option => toModelKey(option) === selectedModelKey.value) || modelOptions.value[0]
+  })
+
   async function fetchSessions() {
     sessionsLoading.value = true
     try {
       sessions.value = await getSessionList()
     } finally {
       sessionsLoading.value = false
+    }
+  }
+
+  async function fetchModelOptions() {
+    modelOptionsLoading.value = true
+    try {
+      modelOptions.value = await getChatModelOptions()
+      if (modelOptions.value.length) {
+        const exists = modelOptions.value.some(option => toModelKey(option) === selectedModelKey.value)
+        if (!selectedModelKey.value || !exists) {
+          setSelectedModelKey(toModelKey(modelOptions.value[0]))
+        }
+      } else {
+        selectedModelKey.value = ''
+      }
+    } finally {
+      modelOptionsLoading.value = false
     }
   }
 
@@ -153,7 +180,9 @@ export const useChatStore = defineStore('chat', () => {
           assistantMessage.isStreaming = false
         },
         attachments,
-        useRag ?? ragEnabled.value
+        useRag ?? ragEnabled.value,
+        selectedModel.value?.provider,
+        selectedModel.value?.modelName
       )
     } catch (error) {
       console.error('sendMessage error:', error)
@@ -179,7 +208,14 @@ export const useChatStore = defineStore('chat', () => {
 
     loading.value = true
     try {
-      const response = await sendMessageSync(sessionId, content, undefined, useRag ?? ragEnabled.value)
+      const response = await sendMessageSync(
+        sessionId,
+        content,
+        undefined,
+        useRag ?? ragEnabled.value,
+        selectedModel.value?.provider,
+        selectedModel.value?.modelName
+      )
 
       appendSessionMessage(sessionId, {
         id: createLocalMessageId('assistant'),
@@ -206,6 +242,15 @@ export const useChatStore = defineStore('chat', () => {
     ragEnabled.value = value
     try {
       localStorage.setItem(RAG_ENABLED_STORAGE_KEY, value ? '1' : '0')
+    } catch {
+      // ignore storage failures
+    }
+  }
+
+  function setSelectedModelKey(value: string) {
+    selectedModelKey.value = value
+    try {
+      localStorage.setItem(MODEL_STORAGE_KEY, value)
     } catch {
       // ignore storage failures
     }
@@ -316,6 +361,18 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function loadSelectedModelKey(): string {
+    try {
+      return localStorage.getItem(MODEL_STORAGE_KEY) || ''
+    } catch {
+      return ''
+    }
+  }
+
+  function toModelKey(option: ChatModelOption): string {
+    return `${option.provider}::${option.modelName}`
+  }
+
   return {
     sessions,
     currentSessionId,
@@ -327,9 +384,14 @@ export const useChatStore = defineStore('chat', () => {
     currentSessionIsStreaming,
     loading,
     sessionsLoading,
+    modelOptionsLoading,
+    modelOptions,
+    selectedModelKey,
+    selectedModel,
     ragEnabled,
     currentSession,
     fetchSessions,
+    fetchModelOptions,
     startNewSession,
     selectSession,
     removeSession,
@@ -337,6 +399,8 @@ export const useChatStore = defineStore('chat', () => {
     sendMessageWithSync,
     clearMessages,
     setRagEnabled,
+    setSelectedModelKey,
+    toModelKey,
     isSessionStreaming
   }
 })

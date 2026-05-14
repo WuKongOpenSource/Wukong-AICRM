@@ -6,6 +6,7 @@ import lombok.Data;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.util.Date;
 
 /**
@@ -67,6 +68,18 @@ public class ChatMessage implements Serializable {
      */
     @Schema(description = "使用的模型")
     private String modelName;
+
+    @Schema(description = "扣除积分数")
+    private Long creditsUsed;
+
+    @Schema(description = "积分倍率")
+    private BigDecimal creditMultiplier;
+
+    @Schema(description = "计费模型服务商")
+    private String billingModelProvider;
+
+    @Schema(description = "计费模型名称")
+    private String billingModelName;
 
     /**
      * 函数调用(JSON)

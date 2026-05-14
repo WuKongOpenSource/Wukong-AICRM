@@ -3,6 +3,7 @@ package com.kakarote.ai_crm.controller;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.SessionCreateBO;
+import com.kakarote.ai_crm.entity.VO.AiModelOptionVO;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
 import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
 import com.kakarote.ai_crm.service.IChatService;
@@ -64,6 +65,15 @@ public class ChatController {
     @Operation(summary = "获取会话消息历史")
     public Result<List<ChatMessageVO>> getMessageList(@PathVariable("sessionId") Long sessionId) {
         return Result.ok(chatService.getMessageList(sessionId));
+    }
+
+    /**
+     * 获取聊天可选模型。
+     */
+    @GetMapping("/model/options")
+    @Operation(summary = "获取聊天可选模型")
+    public Result<List<AiModelOptionVO>> getModelOptions() {
+        return Result.ok(chatService.getModelOptions());
     }
 
     /**

@@ -51,29 +51,29 @@ function normalizeAiConfig(config?: Partial<AiConfig> | Partial<AiConfigUpdateBO
     mode: (config as Partial<AiConfig> | null)?.mode || 'gift',
     customConfigSaved: (config as Partial<AiConfig> | null)?.customConfigSaved ?? false,
     ready: (config as Partial<AiConfig> | null)?.ready ?? Boolean(config?.apiKey?.trim()),
-    giftTokenTotal: (config as Partial<AiConfig> | null)?.giftTokenTotal ?? 0,
-    giftTokenUsed: (config as Partial<AiConfig> | null)?.giftTokenUsed ?? 0,
-    giftTokenRemaining: (config as Partial<AiConfig> | null)?.giftTokenRemaining ?? 0,
-    giftTokenAvailable: (config as Partial<AiConfig> | null)?.giftTokenAvailable
-      ?? (((config as Partial<AiConfig> | null)?.giftTokenRemaining ?? 0) > 0),
-    purchasedTokenTotal: (config as Partial<AiConfig> | null)?.purchasedTokenTotal ?? 0,
-    purchasedTokenUsed: (config as Partial<AiConfig> | null)?.purchasedTokenUsed ?? 0,
-    purchasedTokenRemaining: (config as Partial<AiConfig> | null)?.purchasedTokenRemaining ?? 0,
-    tokenTotal: (config as Partial<AiConfig> | null)?.tokenTotal
-      ?? ((config as Partial<AiConfig> | null)?.giftTokenTotal ?? 0),
-    tokenUsed: (config as Partial<AiConfig> | null)?.tokenUsed
-      ?? ((config as Partial<AiConfig> | null)?.giftTokenUsed ?? 0),
-    tokenRemaining: (config as Partial<AiConfig> | null)?.tokenRemaining
-      ?? ((config as Partial<AiConfig> | null)?.giftTokenRemaining ?? 0),
-    tokenAvailable: (config as Partial<AiConfig> | null)?.tokenAvailable
-      ?? (((config as Partial<AiConfig> | null)?.tokenRemaining
-        ?? (config as Partial<AiConfig> | null)?.giftTokenRemaining
+    giftCreditTotal: (config as Partial<AiConfig> | null)?.giftCreditTotal ?? 0,
+    giftCreditUsed: (config as Partial<AiConfig> | null)?.giftCreditUsed ?? 0,
+    giftCreditRemaining: (config as Partial<AiConfig> | null)?.giftCreditRemaining ?? 0,
+    giftCreditAvailable: (config as Partial<AiConfig> | null)?.giftCreditAvailable
+      ?? (((config as Partial<AiConfig> | null)?.giftCreditRemaining ?? 0) > 0),
+    purchasedCreditTotal: (config as Partial<AiConfig> | null)?.purchasedCreditTotal ?? 0,
+    purchasedCreditUsed: (config as Partial<AiConfig> | null)?.purchasedCreditUsed ?? 0,
+    purchasedCreditRemaining: (config as Partial<AiConfig> | null)?.purchasedCreditRemaining ?? 0,
+    creditTotal: (config as Partial<AiConfig> | null)?.creditTotal
+      ?? ((config as Partial<AiConfig> | null)?.giftCreditTotal ?? 0),
+    creditUsed: (config as Partial<AiConfig> | null)?.creditUsed
+      ?? ((config as Partial<AiConfig> | null)?.giftCreditUsed ?? 0),
+    creditRemaining: (config as Partial<AiConfig> | null)?.creditRemaining
+      ?? ((config as Partial<AiConfig> | null)?.giftCreditRemaining ?? 0),
+    creditAvailable: (config as Partial<AiConfig> | null)?.creditAvailable
+      ?? (((config as Partial<AiConfig> | null)?.creditRemaining
+        ?? (config as Partial<AiConfig> | null)?.giftCreditRemaining
         ?? 0) > 0),
     updateTime: config && 'updateTime' in config ? config.updateTime : undefined,
   }
 }
 
-export function formatWanToken(value: number): string {
+export function formatWanCredit(value: number): string {
   return (value / 10000).toFixed(1)
 }
 
@@ -85,36 +85,42 @@ export function useAiQuota() {
   const aiReady = computed(() => Boolean(aiConfig.value?.ready))
   const hasAiApiKeyConfigured = computed(() => aiReady.value)
   const canManageAiConfig = computed(() => userStore.hasPermission('config:ai'))
-  const tokenTotal = computed(() => aiConfig.value?.tokenTotal ?? aiConfig.value?.giftTokenTotal ?? 0)
-  const tokenRemaining = computed(() => aiConfig.value?.tokenRemaining ?? aiConfig.value?.giftTokenRemaining ?? 0)
-  const tokenUsed = computed(() => {
-    const explicit = aiConfig.value?.tokenUsed ?? aiConfig.value?.giftTokenUsed
+  const creditTotal = computed(() => aiConfig.value?.creditTotal ?? aiConfig.value?.giftCreditTotal ?? 0)
+  const creditRemaining = computed(() => aiConfig.value?.creditRemaining ?? aiConfig.value?.giftCreditRemaining ?? 0)
+  const creditUsed = computed(() => {
+    const explicit = aiConfig.value?.creditUsed ?? aiConfig.value?.giftCreditUsed
     if (explicit != null && explicit >= 0) return explicit
-    return Math.max(0, tokenTotal.value - tokenRemaining.value)
+    return Math.max(0, creditTotal.value - creditRemaining.value)
   })
-  const tokenProgressPercent = computed(() => {
-    if (tokenTotal.value <= 0) return 0
-    return Math.max(0, Math.min(100, Math.round((tokenRemaining.value / tokenTotal.value) * 100)))
+  const creditProgressPercent = computed(() => {
+    if (creditTotal.value <= 0) return 0
+    return Math.max(0, Math.min(100, Math.round((creditRemaining.value / creditTotal.value) * 100)))
   })
-  const tokenRemainingWan = computed(() => formatWanToken(tokenRemaining.value))
-  const tokenTotalWan = computed(() => formatWanToken(tokenTotal.value))
-  const tokenUsedWan = computed(() => formatWanToken(tokenUsed.value))
+  const creditRemainingWan = computed(() => formatWanCredit(creditRemaining.value))
+  const creditTotalWan = computed(() => formatWanCredit(creditTotal.value))
+  const creditUsedWan = computed(() => formatWanCredit(creditUsed.value))
 
-  const giftTokenRemaining = tokenRemaining
-  const giftTokenProgressPercent = tokenProgressPercent
-  const giftTokenRemainingWan = tokenRemainingWan
-  const giftTokenTotalWan = tokenTotalWan
+  const giftCreditRemaining = creditRemaining
+  const giftCreditProgressPercent = creditProgressPercent
+  const giftCreditRemainingWan = creditRemainingWan
+  const giftCreditTotalWan = creditTotalWan
 
   const aiStatusBadgeText = computed(() => {
+    if (creditRemaining.value <= 0) {
+      return '积分已用完'
+    }
     if (currentAiMode.value === 'gift') {
-      return giftTokenRemaining.value > 0 ? '赠送额度' : '已用完'
+      return giftCreditRemaining.value > 0 ? '赠送积分' : '已用完'
     }
     return aiReady.value ? '自定义模型已就绪' : '待配置'
   })
 
   const aiStatusBadgeClass = computed(() => {
+    if (creditRemaining.value <= 0) {
+      return 'bg-amber-50 text-amber-600'
+    }
     if (currentAiMode.value === 'gift') {
-      return giftTokenRemaining.value > 0
+      return giftCreditRemaining.value > 0
         ? 'bg-emerald-50 text-emerald-600'
         : 'bg-amber-50 text-amber-600'
     }
@@ -123,8 +129,8 @@ export function useAiQuota() {
       : 'bg-slate-100 text-slate-500'
   })
 
-  const giftTokenProgressClass = computed(() => {
-    if (giftTokenRemaining.value <= 0) return 'bg-amber-400'
+  const giftCreditProgressClass = computed(() => {
+    if (giftCreditRemaining.value <= 0) return 'bg-amber-400'
     return currentAiMode.value === 'gift' ? 'bg-primary' : 'bg-blue-500'
   })
 
@@ -285,15 +291,15 @@ export function useAiQuota() {
       return true
     }
 
-    if (currentAiMode.value === 'gift' && tokenRemaining.value <= 0) {
+    if (creditRemaining.value <= 0) {
       resumeSendAfterTokenPurchase.value = true
       isTokenPurchaseDialogOpen.value = true
       return false
     }
 
     if (!canManageAiConfig.value) {
-      if (currentAiMode.value === 'gift' && giftTokenRemaining.value <= 0) {
-        ElMessage.warning('赠送 token 已用完，请联系管理员配置 AI 服务或购买套餐。')
+      if (creditRemaining.value <= 0) {
+        ElMessage.warning('AI 积分已用完，请联系管理员购买套餐。')
       } else {
         ElMessage.warning('当前 AI 服务未就绪，请联系管理员处理。')
       }
@@ -319,20 +325,20 @@ export function useAiQuota() {
     currentAiMode,
     hasAiApiKeyConfigured,
     canManageAiConfig,
-    tokenTotal,
-    tokenRemaining,
-    tokenUsed,
-    tokenProgressPercent,
-    tokenRemainingWan,
-    tokenTotalWan,
-    tokenUsedWan,
-    giftTokenRemaining,
-    giftTokenProgressPercent,
-    giftTokenRemainingWan,
-    giftTokenTotalWan,
+    creditTotal,
+    creditRemaining,
+    creditUsed,
+    creditProgressPercent,
+    creditRemainingWan,
+    creditTotalWan,
+    creditUsedWan,
+    giftCreditRemaining,
+    giftCreditProgressPercent,
+    giftCreditRemainingWan,
+    giftCreditTotalWan,
     aiStatusBadgeText,
     aiStatusBadgeClass,
-    giftTokenProgressClass,
+    giftCreditProgressClass,
     loadAiConfig,
     goToAiSettings,
     handleApiKeyModalVisibleChange,

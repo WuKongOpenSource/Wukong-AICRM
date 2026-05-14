@@ -12,15 +12,12 @@ public interface CrmTenantMapper extends BaseMapper<CrmTenant> {
 
     @Update("""
             UPDATE crm_tenant
-            SET gift_token_used = LEAST(COALESCE(gift_token_total, 0), COALESCE(gift_token_used, 0) + #{consumeTokens}),
+            SET gift_credit_used = LEAST(COALESCE(gift_credit_total, 0), COALESCE(gift_credit_used, 0) + #{consumeCredits}),
                 update_time = CURRENT_TIMESTAMP
             WHERE tenant_id = #{tenantId}
-    /**
-     * 消耗赠送Tokens。
-     */
-              AND COALESCE(gift_token_total, 0) > COALESCE(gift_token_used, 0)
+              AND COALESCE(gift_credit_total, 0) > COALESCE(gift_credit_used, 0)
             """)
-    int consumeGiftTokens(@Param("tenantId") Long tenantId, @Param("consumeTokens") Long consumeTokens);
+    int consumeGiftCredits(@Param("tenantId") Long tenantId, @Param("consumeCredits") Long consumeCredits);
 
     /**
      * 查询按ID并锁定更新。
@@ -34,13 +31,13 @@ public interface CrmTenantMapper extends BaseMapper<CrmTenant> {
     CrmTenant selectByIdForUpdate(@Param("tenantId") Long tenantId);
 
     /**
-     * 新增PurchasedTokens。
+     * 新增PurchasedCredits。
      */
     @Update("""
             UPDATE crm_tenant
-            SET purchased_token_total = COALESCE(purchased_token_total, 0) + #{tokenAmount},
+            SET purchased_credit_total = COALESCE(purchased_credit_total, 0) + #{creditAmount},
                 update_time = CURRENT_TIMESTAMP
             WHERE tenant_id = #{tenantId}
             """)
-    int addPurchasedTokens(@Param("tenantId") Long tenantId, @Param("tokenAmount") Long tokenAmount);
+    int addPurchasedCredits(@Param("tenantId") Long tenantId, @Param("creditAmount") Long creditAmount);
 }

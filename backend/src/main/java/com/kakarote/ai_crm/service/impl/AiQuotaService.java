@@ -12,10 +12,12 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 /**
- * Unified AI quota validation and token billing service.
+ * Unified AI credit validation and token usage billing service.
  */
 @Slf4j
 @Service
@@ -24,6 +26,7 @@ public class AiQuotaService {
     private static final String DEFAULT_ACTION_NAME = "AI操作";
     private static final int MIN_REQUIRED_TOKENS = 32;
     private static final int RESPONSE_BUFFER_TOKENS = 128;
+    private static final BigDecimal DEFAULT_CREDIT_MULTIPLIER = BigDecimal.ONE;
 
     @Autowired
     private ICrmTenantService tenantService;
@@ -45,6 +48,13 @@ public class AiQuotaService {
     /**
      * 确保额度可用。
      */
+    public void ensureQuotaAvailable(String actionName, int requiredTokens, BigDecimal creditMultiplier) {
+        ensureQuotaAvailable(resolveCurrentTenantId(), actionName, requiredTokens, creditMultiplier);
+    }
+
+    /**
+     * 确保额度可用。
+     */
     public void ensureQuotaAvailable(String actionName, String systemPrompt,
                                      List<Message> history, String currentContent) {
         ensureQuotaAvailable(resolveCurrentTenantId(), actionName, systemPrompt, history, currentContent);
@@ -61,8 +71,23 @@ public class AiQuotaService {
     /**
      * 确保额度可用。
      */
+    public void ensureQuotaAvailable(Long tenantId, String actionName, String systemPrompt,
+                                     List<Message> history, String currentContent, BigDecimal creditMultiplier) {
+        ensureQuotaAvailable(tenantId, actionName, estimateRequiredTokens(systemPrompt, history, currentContent), creditMultiplier);
+    }
+
+    /**
+     * 确保额度可用。
+     */
     public void ensureQuotaAvailable(Long tenantId, String actionName, int requiredTokens) {
-        String failureMessage = resolveQuotaFailureMessage(tenantId, actionName, requiredTokens);
+        ensureQuotaAvailable(tenantId, actionName, requiredTokens, DEFAULT_CREDIT_MULTIPLIER);
+    }
+
+    /**
+     * 确保额度可用。
+     */
+    public void ensureQuotaAvailable(Long tenantId, String actionName, int requiredTokens, BigDecimal creditMultiplier) {
+        String failureMessage = resolveQuotaFailureMessage(tenantId, actionName, requiredTokens, creditMultiplier);
         if (failureMessage != null) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, failureMessage);
         }
@@ -94,17 +119,34 @@ public class AiQuotaService {
     /**
      * 解析额度Failure消息。
      */
+    public String resolveQuotaFailureMessage(Long tenantId, String actionName, String systemPrompt,
+                                             List<Message> history, String currentContent, BigDecimal creditMultiplier) {
+        return resolveQuotaFailureMessage(
+            tenantId, actionName, estimateRequiredTokens(systemPrompt, history, currentContent), creditMultiplier);
+    }
+
+    /**
+     * 解析额度Failure消息。
+     */
     public String resolveQuotaFailureMessage(Long tenantId, String actionName, int requiredTokens) {
+        return resolveQuotaFailureMessage(tenantId, actionName, requiredTokens, DEFAULT_CREDIT_MULTIPLIER);
+    }
+
+    /**
+     * 解析额度Failure消息。
+     */
+    public String resolveQuotaFailureMessage(Long tenantId, String actionName, int requiredTokens, BigDecimal creditMultiplier) {
         String normalizedActionName = normalizeActionName(actionName);
         if (tenantId == null) {
-            return normalizedActionName + "失败：当前租户信息缺失，无法校验AI额度";
+            return normalizedActionName + "失败：当前租户信息缺失，无法校验AI积分";
         }
 
-        long remainingTokens = tenantService.getTotalTokenRemaining(tenantId);
-        if (remainingTokens >= Math.max(requiredTokens, 1)) {
+        long requiredCredits = resolveCredits(requiredTokens, creditMultiplier);
+        long remainingCredits = tenantService.getTotalCreditRemaining(tenantId);
+        if (remainingCredits >= Math.max(requiredCredits, 1L)) {
             return null;
         }
-        return "AI额度不足，本次" + normalizedActionName + "失败，请充值后重试";
+        return "AI积分不足，本次" + normalizedActionName + "失败，请充值后重试";
     }
 
     /**
@@ -157,10 +199,20 @@ public class AiQuotaService {
      * 消耗ResolvedTokens。
      */
     public void consumeResolvedTokens(Long tenantId, String actionName, TokenUsageSnapshot usageSnapshot) {
+        consumeResolvedTokens(tenantId, actionName, usageSnapshot, DEFAULT_CREDIT_MULTIPLIER);
+    }
+
+    /**
+     * 消耗ResolvedTokens对应的积分。
+     */
+    public long consumeResolvedTokens(Long tenantId, String actionName, TokenUsageSnapshot usageSnapshot,
+                                      BigDecimal creditMultiplier) {
         if (usageSnapshot == null) {
-            return;
+            return 0L;
         }
-        consumeTokens(tenantId, actionName, usageSnapshot.totalTokens());
+        long creditsUsed = resolveCredits(usageSnapshot.totalTokens(), creditMultiplier);
+        consumeCredits(tenantId, actionName, creditsUsed, usageSnapshot.totalTokens(), creditMultiplier);
+        return creditsUsed;
     }
 
     /**
@@ -179,15 +231,42 @@ public class AiQuotaService {
     }
 
     /**
-     * 消耗Tokens。
+     * 消耗积分。
      */
-    public void consumeTokens(Long tenantId, String actionName, Integer totalTokens) {
-        if (tenantId == null || totalTokens == null || totalTokens <= 0) {
+    public void consumeCredits(Long tenantId, String actionName, long creditsUsed,
+                               Integer totalTokens, BigDecimal creditMultiplier) {
+        if (tenantId == null || creditsUsed <= 0) {
             return;
         }
-        tenantService.consumeTokens(tenantId, totalTokens.longValue());
-        log.info("AI额度扣减完成: tenantId={}, action={}, totalTokens={}",
-            tenantId, normalizeActionName(actionName), totalTokens);
+        tenantService.consumeCredits(tenantId, creditsUsed);
+        log.info("AI积分扣减完成: tenantId={}, action={}, totalTokens={}, multiplier={}, creditsUsed={}",
+            tenantId, normalizeActionName(actionName), totalTokens,
+            normalizeCreditMultiplier(creditMultiplier), creditsUsed);
+    }
+
+    /**
+     * 根据总 token 和倍率解析积分消耗。
+     */
+    public long resolveCredits(Integer totalTokens, BigDecimal creditMultiplier) {
+        if (totalTokens == null || totalTokens <= 0) {
+            return 0L;
+        }
+        BigDecimal multiplier = normalizeCreditMultiplier(creditMultiplier);
+        return BigDecimal.valueOf(totalTokens.longValue())
+            .multiply(multiplier)
+            .setScale(0, RoundingMode.CEILING)
+            .max(BigDecimal.ONE)
+            .longValue();
+    }
+
+    /**
+     * 标准化积分倍率。
+     */
+    public BigDecimal normalizeCreditMultiplier(BigDecimal creditMultiplier) {
+        if (creditMultiplier == null || creditMultiplier.compareTo(BigDecimal.ZERO) <= 0) {
+            return DEFAULT_CREDIT_MULTIPLIER;
+        }
+        return creditMultiplier;
     }
 
     /**

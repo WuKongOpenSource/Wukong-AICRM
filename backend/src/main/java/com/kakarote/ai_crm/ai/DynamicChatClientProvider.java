@@ -13,6 +13,9 @@ import com.kakarote.ai_crm.ai.tools.FollowupTools;
 import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
 import com.kakarote.ai_crm.ai.tools.ScheduleTools;
 import com.kakarote.ai_crm.ai.tools.TaskTools;
+import com.kakarote.ai_crm.common.exception.BusinessException;
+import com.kakarote.ai_crm.common.result.SystemCodeEnum;
+import com.kakarote.ai_crm.config.SystemAiModelProperties;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.PO.SystemConfig;
 import com.kakarote.ai_crm.mapper.SystemConfigMapper;
@@ -31,8 +34,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -57,11 +63,15 @@ public class DynamicChatClientProvider {
     private static final String OPENAI_PROXY_BASE_URL = "http://52.198.150.151";
 
     private final ConcurrentHashMap<Long, ChatClient> tenantChatClients = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, ChatClient> selectedModelChatClients = new ConcurrentHashMap<>();
     private final Object lock = new Object();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private SystemConfigMapper systemConfigMapper;
+
+    @Autowired
+    private SystemAiModelProperties systemAiModelProperties;
 
     @Autowired
     private CustomerTools customerTools;
@@ -132,6 +142,18 @@ public class DynamicChatClientProvider {
     }
 
     /**
+     * 获取指定模型的聊天客户端。
+     */
+    public ChatClient getChatClient(String providerCode, String modelName) {
+        if (StrUtil.isBlank(providerCode) && StrUtil.isBlank(modelName)) {
+            return getChatClient();
+        }
+        AiRuntimeConfig runtimeConfig = resolveRuntimeConfigForSelection(loadAiConfigsFromDB(), providerCode, modelName);
+        String cacheKey = buildSelectedClientCacheKey(runtimeConfig);
+        return selectedModelChatClients.computeIfAbsent(cacheKey, key -> createChatClient(runtimeConfig));
+    }
+
+    /**
      * 刷新聊天客户端。
      */
     public void refreshChatClient() {
@@ -146,6 +168,7 @@ public class DynamicChatClientProvider {
 
             ChatClient client = createChatClient(runtimeConfig);
             tenantChatClients.put(key, client);
+            evictSelectedModelChatClients(key);
 
             log.info("ChatClient 刷新完成: tenantId={}, mode={}, provider={}, baseUrl={}, model={}",
                     key, runtimeConfig.mode().getCode(), runtimeConfig.providerCode(),
@@ -168,10 +191,58 @@ public class DynamicChatClientProvider {
     }
 
     /**
+     * 获取指定模型能力。
+     */
+    public AiModelCapabilities getCapabilities(String providerCode, String modelName) {
+        return resolveRuntimeConfigForSelection(loadAiConfigsFromDB(), providerCode, modelName).capabilities();
+    }
+
+    /**
      * 获取当前运行时配置快照。
      */
     public AiRuntimeConfigSnapshot getCurrentRuntimeConfigSnapshot() {
         AiRuntimeConfig runtimeConfig = resolveRuntimeConfig(loadAiConfigsFromDB());
+        return toSnapshot(runtimeConfig);
+    }
+
+    /**
+     * 获取指定模型运行时配置快照。
+     */
+    public AiRuntimeConfigSnapshot getRuntimeConfigSnapshot(String providerCode, String modelName) {
+        AiRuntimeConfig runtimeConfig = StrUtil.isBlank(providerCode) && StrUtil.isBlank(modelName)
+                ? resolveRuntimeConfig(loadAiConfigsFromDB())
+                : resolveRuntimeConfigForSelection(loadAiConfigsFromDB(), providerCode, modelName);
+        return toSnapshot(runtimeConfig);
+    }
+
+    /**
+     * 获取当前租户可调用的服务商编码。
+     */
+    public List<String> getAvailableProviderCodes() {
+        Map<String, String> configs = loadAiConfigsFromDB();
+        Set<String> providers = ConcurrentHashMap.newKeySet();
+        loadSavedProviderConfigs(configs).values().stream()
+                .filter(snapshot -> StrUtil.isNotBlank(snapshot.apiKey()))
+                .forEach(snapshot -> providers.add(snapshot.providerCode()));
+
+        AiRuntimeConfig giftRuntimeConfig = resolveGiftRuntimeConfig();
+        if (StrUtil.isNotBlank(giftRuntimeConfig.apiKey())) {
+            providers.add(giftRuntimeConfig.providerCode());
+        }
+
+        loadSystemProviderSnapshots().values().stream()
+                .filter(snapshot -> StrUtil.isNotBlank(snapshot.apiKey()))
+                .forEach(snapshot -> providers.add(snapshot.providerCode()));
+
+        AiRuntimeConfig effectiveRuntimeConfig = resolveRuntimeConfig(configs);
+        if (StrUtil.isNotBlank(effectiveRuntimeConfig.apiKey())) {
+            providers.add(effectiveRuntimeConfig.providerCode());
+        }
+
+        return providers.stream().sorted().toList();
+    }
+
+    private AiRuntimeConfigSnapshot toSnapshot(AiRuntimeConfig runtimeConfig) {
         return new AiRuntimeConfigSnapshot(
                 runtimeConfig.providerCode(),
                 runtimeConfig.apiUrl(),
@@ -203,6 +274,7 @@ public class DynamicChatClientProvider {
     public void evictTenantChatClient(Long tenantId) {
         if (tenantId != null) {
             tenantChatClients.remove(tenantId);
+            evictSelectedModelChatClients(tenantId);
         }
     }
 
@@ -371,6 +443,150 @@ public class DynamicChatClientProvider {
         }
 
         // 自定义模式缺少可用快照时统一回退到赠送模式，保证新租户或脏配置场景下仍能得到可工作的默认模型。
+        return resolveGiftRuntimeConfig();
+    }
+
+    /**
+     * 解析指定模型运行时配置。
+     */
+    private AiRuntimeConfig resolveRuntimeConfigForSelection(Map<String, String> configs,
+                                                             String providerCode,
+                                                             String modelName) {
+        String rawRequestedProvider = StrUtil.nullToEmpty(providerCode).trim();
+        String requestedProvider = StrUtil.isBlank(rawRequestedProvider)
+                ? ""
+                : AiProviderRegistry.resolve(rawRequestedProvider, null).getCode();
+        String requestedModel = StrUtil.nullToEmpty(modelName).trim();
+        AiRuntimeConfig currentRuntimeConfig = resolveRuntimeConfig(configs);
+
+        if (StrUtil.isBlank(requestedProvider)) {
+            requestedProvider = currentRuntimeConfig.providerCode();
+        }
+        if (StrUtil.isBlank(requestedModel)) {
+            requestedModel = currentRuntimeConfig.model();
+        }
+
+        SavedProviderConfigSnapshot savedProvider = loadSavedProviderConfigs(configs).get(requestedProvider);
+        if (savedProvider != null) {
+            AiProviderDescriptor descriptor = AiProviderRegistry.resolve(savedProvider.providerCode(), savedProvider.apiUrl());
+            return new AiRuntimeConfig(
+                    savedProvider.providerCode(),
+                    savedProvider.apiUrl(),
+                    savedProvider.apiKey(),
+                    requestedModel,
+                    savedProvider.temperature(),
+                    savedProvider.maxTokens(),
+                    savedProvider.extraHeadersJson(),
+                    descriptor.resolveCapabilities(requestedModel),
+                    AiMode.CUSTOM
+            );
+        }
+
+        AiRuntimeConfig systemRuntimeConfig = resolveSystemRuntimeConfig(requestedProvider, requestedModel);
+        if (systemRuntimeConfig != null) {
+            return systemRuntimeConfig;
+        }
+
+        AiRuntimeConfig giftRuntimeConfig = resolveGiftRuntimeConfig();
+        if (Objects.equals(giftRuntimeConfig.providerCode(), requestedProvider)) {
+            AiProviderDescriptor descriptor = AiProviderRegistry.resolve(giftRuntimeConfig.providerCode(), giftRuntimeConfig.apiUrl());
+            return new AiRuntimeConfig(
+                    giftRuntimeConfig.providerCode(),
+                    giftRuntimeConfig.apiUrl(),
+                    giftRuntimeConfig.apiKey(),
+                    requestedModel,
+                    giftRuntimeConfig.temperature(),
+                    giftRuntimeConfig.maxTokens(),
+                    giftRuntimeConfig.extraHeadersJson(),
+                    descriptor.resolveCapabilities(requestedModel),
+                    giftRuntimeConfig.mode()
+            );
+        }
+
+        if (Objects.equals(currentRuntimeConfig.providerCode(), requestedProvider)) {
+            AiProviderDescriptor descriptor = AiProviderRegistry.resolve(currentRuntimeConfig.providerCode(), currentRuntimeConfig.apiUrl());
+            return new AiRuntimeConfig(
+                    currentRuntimeConfig.providerCode(),
+                    currentRuntimeConfig.apiUrl(),
+                    currentRuntimeConfig.apiKey(),
+                    requestedModel,
+                    currentRuntimeConfig.temperature(),
+                    currentRuntimeConfig.maxTokens(),
+                    currentRuntimeConfig.extraHeadersJson(),
+                    descriptor.resolveCapabilities(requestedModel),
+                    currentRuntimeConfig.mode()
+            );
+        }
+
+        throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前模型服务商未配置，无法切换模型");
+    }
+
+    private AiRuntimeConfig resolveSystemRuntimeConfig(String providerCode, String requestedModel) {
+        SystemProviderSnapshot snapshot = loadSystemProviderSnapshots().get(providerCode);
+        if (snapshot == null || StrUtil.isBlank(snapshot.apiKey())) {
+            return null;
+        }
+
+        String model = StrUtil.blankToDefault(StrUtil.trim(requestedModel), snapshot.model());
+        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(snapshot.providerCode(), snapshot.apiUrl());
+        return new AiRuntimeConfig(
+                descriptor.getCode(),
+                snapshot.apiUrl(),
+                snapshot.apiKey(),
+                model,
+                snapshot.temperature(),
+                snapshot.maxTokens(),
+                snapshot.extraHeadersJson(),
+                descriptor.resolveCapabilities(model),
+                AiMode.GIFT
+        );
+    }
+
+    private Map<String, SystemProviderSnapshot> loadSystemProviderSnapshots() {
+        if (systemAiModelProperties == null || systemAiModelProperties.getProviders() == null
+                || systemAiModelProperties.getProviders().isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, SystemProviderSnapshot> snapshots = new LinkedHashMap<>();
+        systemAiModelProperties.getProviders().forEach((configuredProviderCode, provider) -> {
+            if (provider == null || Boolean.FALSE.equals(provider.getEnabled())
+                    || StrUtil.isBlank(provider.getApiKey())) {
+                return;
+            }
+
+            String normalizedBaseUrl = normalizeCompatibleBaseUrl(provider.getBaseUrl());
+            AiProviderDescriptor descriptor = AiProviderRegistry.resolve(configuredProviderCode, normalizedBaseUrl);
+            String apiUrl = normalizeCompatibleBaseUrl(StrUtil.blankToDefault(normalizedBaseUrl, descriptor.getBaseUrl()));
+            if (StrUtil.isBlank(apiUrl)) {
+                return;
+            }
+
+            String model = StrUtil.blankToDefault(StrUtil.trim(provider.getModel()), resolveDefaultModel(descriptor));
+            snapshots.put(descriptor.getCode(), new SystemProviderSnapshot(
+                    descriptor.getCode(),
+                    apiUrl,
+                    provider.getApiKey().trim(),
+                    model,
+                    provider.getTemperature() != null ? provider.getTemperature() : defaultTemperature,
+                    provider.getMaxTokens() != null ? provider.getMaxTokens() : defaultMaxTokens,
+                    StrUtil.blankToDefault(provider.getExtraHeadersJson(), null)
+            ));
+        });
+        return snapshots;
+    }
+
+    private String resolveDefaultModel(AiProviderDescriptor descriptor) {
+        if (descriptor != null && descriptor.getRecommendedModels() != null && !descriptor.getRecommendedModels().isEmpty()) {
+            return descriptor.getRecommendedModels().get(0);
+        }
+        return defaultModel;
+    }
+
+    /**
+     * 解析赠送模式运行时配置。
+     */
+    private AiRuntimeConfig resolveGiftRuntimeConfig() {
         String resolvedApiUrl = normalizeCompatibleBaseUrl(StrUtil.blankToDefault(giftBaseUrl, defaultBaseUrl));
         AiProviderDescriptor descriptor = AiProviderRegistry.resolve(null, resolvedApiUrl);
         String resolvedApiKey = StrUtil.blankToDefault(giftApiKey, defaultApiKey);
@@ -386,6 +602,31 @@ public class DynamicChatClientProvider {
                 descriptor.resolveCapabilities(resolvedModel),
                 AiMode.GIFT
         );
+    }
+
+    /**
+     * 构建指定模型 ChatClient 缓存 Key。
+     */
+    private String buildSelectedClientCacheKey(AiRuntimeConfig runtimeConfig) {
+        Long tenantId = TenantContextHolder.getTenantId();
+        long tenantKey = tenantId != null ? tenantId : 0L;
+        return tenantKey
+                + "|" + runtimeConfig.providerCode()
+                + "|" + runtimeConfig.apiUrl()
+                + "|" + runtimeConfig.model()
+                + "|" + Objects.hashCode(runtimeConfig.apiKey())
+                + "|" + runtimeConfig.maxTokens()
+                + "|" + runtimeConfig.temperature()
+                + "|" + Objects.hashCode(runtimeConfig.extraHeadersJson())
+                + "|" + (runtimeConfig.capabilities() != null && runtimeConfig.capabilities().isSupportsToolCall());
+    }
+
+    /**
+     * 清理当前租户的指定模型客户端缓存。
+     */
+    private void evictSelectedModelChatClients(long tenantKey) {
+        String prefix = tenantKey + "|";
+        selectedModelChatClients.keySet().removeIf(key -> key.startsWith(prefix));
     }
 
     /**
@@ -638,6 +879,17 @@ public class DynamicChatClientProvider {
     }
 
     private record SavedProviderConfigSnapshot(
+            String providerCode,
+            String apiUrl,
+            String apiKey,
+            String model,
+            Double temperature,
+            Integer maxTokens,
+            String extraHeadersJson
+    ) {
+    }
+
+    private record SystemProviderSnapshot(
             String providerCode,
             String apiUrl,
             String apiKey,

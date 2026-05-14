@@ -32,7 +32,7 @@ public class TokenPurchaseOrder implements Serializable {
 
     private String planName;
 
-    private Long tokenAmount;
+    private Long creditAmount;
 
     private Integer amountFen;
 

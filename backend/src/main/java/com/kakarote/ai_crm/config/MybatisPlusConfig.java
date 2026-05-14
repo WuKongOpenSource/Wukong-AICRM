@@ -30,7 +30,8 @@ public class MybatisPlusConfig {
             "manager_menu",            // 菜单定义全局共享
             "manager_role_menu",       // 跟随 role 隔离，role 已按租户隔离
             "crm_tenant",              // 租户主表本身不做隔离
-            "crm_custom_field_pool"    // 字段池全局共享，跨租户复用物理列
+            "crm_custom_field_pool",   // 字段池全局共享，跨租户复用物理列
+            "crm_ai_model_pricing"     // 模型积分倍率为平台全局配置，仅数据库维护
     );
 
     /**

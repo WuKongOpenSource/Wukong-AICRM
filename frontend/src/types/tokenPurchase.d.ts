@@ -6,7 +6,7 @@ export interface TokenPurchasePlan {
   id: string
   name: string
   description?: string
-  tokenAmount: number
+  creditAmount: number
   priceFen: number
 }
 
@@ -20,9 +20,9 @@ export interface TokenPurchaseChannel {
 export interface TokenPurchaseOptions {
   enabled: boolean
   orderExpireMinutes: number
-  giftTokenRemaining: number
-  purchasedTokenRemaining: number
-  tokenRemaining: number
+  giftCreditRemaining: number
+  purchasedCreditRemaining: number
+  creditRemaining: number
   plans: TokenPurchasePlan[]
   channels: TokenPurchaseChannel[]
 }
@@ -31,7 +31,7 @@ export interface TokenPurchaseOrder {
   orderNo: string
   planId: string
   planName: string
-  tokenAmount: number
+  creditAmount: number
   amountFen: number
   amountDisplay: string
   paymentChannel: PaymentChannel

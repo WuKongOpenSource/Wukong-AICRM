@@ -12,117 +12,117 @@ import org.springframework.transaction.annotation.Transactional;
 public class CrmTenantServiceImpl extends ServiceImpl<CrmTenantMapper, CrmTenant> implements ICrmTenantService {
 
     /**
-     * 获取赠送TokenTotal。
+     * 获取赠送CreditTotal。
      */
     @Override
-    public long getGiftTokenTotal(Long tenantId) {
+    public long getGiftCreditTotal(Long tenantId) {
         CrmTenant tenant = tenantId != null ? getById(tenantId) : null;
         if (tenant == null) {
             return 0L;
         }
-        Long total = tenant.getGiftTokenTotal();
-        return total != null && total > 0 ? total : DEFAULT_GIFT_TOKEN_TOTAL;
+        Long total = tenant.getGiftCreditTotal();
+        return total != null && total > 0 ? total : DEFAULT_GIFT_CREDIT_TOTAL;
     }
 
     /**
-     * 获取赠送TokenUsed。
+     * 获取赠送CreditUsed。
      */
     @Override
-    public long getGiftTokenUsed(Long tenantId) {
+    public long getGiftCreditUsed(Long tenantId) {
         CrmTenant tenant = tenantId != null ? getById(tenantId) : null;
-        if (tenant == null || tenant.getGiftTokenUsed() == null) {
+        if (tenant == null || tenant.getGiftCreditUsed() == null) {
             return 0L;
         }
-        return Math.max(tenant.getGiftTokenUsed(), 0L);
+        return Math.max(tenant.getGiftCreditUsed(), 0L);
     }
 
     /**
-     * 获取赠送Token剩余。
+     * 获取赠送Credit剩余。
      */
     @Override
-    public long getGiftTokenRemaining(Long tenantId) {
-        long total = getGiftTokenTotal(tenantId);
-        long used = getGiftTokenUsed(tenantId);
+    public long getGiftCreditRemaining(Long tenantId) {
+        long total = getGiftCreditTotal(tenantId);
+        long used = getGiftCreditUsed(tenantId);
         return Math.max(total - used, 0L);
     }
 
     /**
-     * 判断是否存在可用赠送Tokens。
+     * 判断是否存在可用赠送Credits。
      */
     @Override
-    public boolean hasAvailableGiftTokens(Long tenantId) {
-        return getGiftTokenRemaining(tenantId) > 0;
+    public boolean hasAvailableGiftCredits(Long tenantId) {
+        return getGiftCreditRemaining(tenantId) > 0;
     }
 
     /**
-     * 获取PurchasedTokenTotal。
+     * 获取PurchasedCreditTotal。
      */
     @Override
-    public long getPurchasedTokenTotal(Long tenantId) {
+    public long getPurchasedCreditTotal(Long tenantId) {
         CrmTenant tenant = tenantId != null ? getById(tenantId) : null;
-        if (tenant == null || tenant.getPurchasedTokenTotal() == null) {
+        if (tenant == null || tenant.getPurchasedCreditTotal() == null) {
             return 0L;
         }
-        return Math.max(tenant.getPurchasedTokenTotal(), 0L);
+        return Math.max(tenant.getPurchasedCreditTotal(), 0L);
     }
 
     /**
-     * 获取PurchasedTokenUsed。
+     * 获取PurchasedCreditUsed。
      */
     @Override
-    public long getPurchasedTokenUsed(Long tenantId) {
+    public long getPurchasedCreditUsed(Long tenantId) {
         CrmTenant tenant = tenantId != null ? getById(tenantId) : null;
-        if (tenant == null || tenant.getPurchasedTokenUsed() == null) {
+        if (tenant == null || tenant.getPurchasedCreditUsed() == null) {
             return 0L;
         }
-        return Math.max(tenant.getPurchasedTokenUsed(), 0L);
+        return Math.max(tenant.getPurchasedCreditUsed(), 0L);
     }
 
     /**
-     * 获取PurchasedToken剩余。
+     * 获取PurchasedCredit剩余。
      */
     @Override
-    public long getPurchasedTokenRemaining(Long tenantId) {
-        long total = getPurchasedTokenTotal(tenantId);
-        long used = getPurchasedTokenUsed(tenantId);
+    public long getPurchasedCreditRemaining(Long tenantId) {
+        long total = getPurchasedCreditTotal(tenantId);
+        long used = getPurchasedCreditUsed(tenantId);
         return Math.max(total - used, 0L);
     }
 
     /**
-     * 获取TotalToken剩余。
+     * 获取TotalCredit剩余。
      */
     @Override
-    public long getTotalTokenRemaining(Long tenantId) {
-        return getGiftTokenRemaining(tenantId) + getPurchasedTokenRemaining(tenantId);
+    public long getTotalCreditRemaining(Long tenantId) {
+        return getGiftCreditRemaining(tenantId) + getPurchasedCreditRemaining(tenantId);
     }
 
     /**
-     * 判断是否存在可用Tokens。
+     * 判断是否存在可用Credits。
      */
     @Override
-    public boolean hasAvailableTokens(Long tenantId) {
-        return getTotalTokenRemaining(tenantId) > 0;
+    public boolean hasAvailableCredits(Long tenantId) {
+        return getTotalCreditRemaining(tenantId) > 0;
     }
 
     /**
-     * 消耗赠送Tokens。
+     * 消耗赠送Credits。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void consumeGiftTokens(Long tenantId, long consumeTokens) {
-        if (tenantId == null || consumeTokens <= 0) {
+    public void consumeGiftCredits(Long tenantId, long consumeCredits) {
+        if (tenantId == null || consumeCredits <= 0) {
             return;
         }
-        baseMapper.consumeGiftTokens(tenantId, consumeTokens);
+        baseMapper.consumeGiftCredits(tenantId, consumeCredits);
     }
 
     /**
-     * 消耗Tokens。
+     * 消耗Credits。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void consumeTokens(Long tenantId, long consumeTokens) {
-        if (tenantId == null || consumeTokens <= 0) {
+    public void consumeCredits(Long tenantId, long consumeCredits) {
+        if (tenantId == null || consumeCredits <= 0) {
             return;
         }
 
@@ -131,35 +131,35 @@ public class CrmTenantServiceImpl extends ServiceImpl<CrmTenantMapper, CrmTenant
             return;
         }
 
-        long giftTotal = ObjectUtil.defaultIfNull(tenant.getGiftTokenTotal(), DEFAULT_GIFT_TOKEN_TOTAL);
-        long giftUsed = Math.max(ObjectUtil.defaultIfNull(tenant.getGiftTokenUsed(), 0L), 0L);
+        long giftTotal = ObjectUtil.defaultIfNull(tenant.getGiftCreditTotal(), DEFAULT_GIFT_CREDIT_TOTAL);
+        long giftUsed = Math.max(ObjectUtil.defaultIfNull(tenant.getGiftCreditUsed(), 0L), 0L);
         long giftRemaining = Math.max(giftTotal - giftUsed, 0L);
 
-        long purchasedTotal = Math.max(ObjectUtil.defaultIfNull(tenant.getPurchasedTokenTotal(), 0L), 0L);
-        long purchasedUsed = Math.max(ObjectUtil.defaultIfNull(tenant.getPurchasedTokenUsed(), 0L), 0L);
+        long purchasedTotal = Math.max(ObjectUtil.defaultIfNull(tenant.getPurchasedCreditTotal(), 0L), 0L);
+        long purchasedUsed = Math.max(ObjectUtil.defaultIfNull(tenant.getPurchasedCreditUsed(), 0L), 0L);
         long purchasedRemaining = Math.max(purchasedTotal - purchasedUsed, 0L);
 
-        long consumeGift = Math.min(giftRemaining, consumeTokens);
-        long consumePurchased = Math.min(purchasedRemaining, Math.max(consumeTokens - consumeGift, 0L));
+        long consumeGift = Math.min(giftRemaining, consumeCredits);
+        long consumePurchased = Math.min(purchasedRemaining, Math.max(consumeCredits - consumeGift, 0L));
 
         if (consumeGift <= 0 && consumePurchased <= 0) {
             return;
         }
 
-        tenant.setGiftTokenUsed(giftUsed + consumeGift);
-        tenant.setPurchasedTokenUsed(purchasedUsed + consumePurchased);
+        tenant.setGiftCreditUsed(giftUsed + consumeGift);
+        tenant.setPurchasedCreditUsed(purchasedUsed + consumePurchased);
         updateById(tenant);
     }
 
     /**
-     * 新增PurchasedTokens。
+     * 新增PurchasedCredits。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void addPurchasedTokens(Long tenantId, long tokenAmount) {
-        if (tenantId == null || tokenAmount <= 0) {
+    public void addPurchasedCredits(Long tenantId, long creditAmount) {
+        if (tenantId == null || creditAmount <= 0) {
             return;
         }
-        baseMapper.addPurchasedTokens(tenantId, tokenAmount);
+        baseMapper.addPurchasedCredits(tenantId, creditAmount);
     }
 }

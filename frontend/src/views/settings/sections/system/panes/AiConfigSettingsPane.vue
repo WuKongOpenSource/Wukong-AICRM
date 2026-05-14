@@ -19,11 +19,11 @@
                 {{ currentMode === 'gift' ? '赠送额度模式' : '自定义模型模式' }}
               </el-tag>
               <span class="text-sm text-slate-500">
-                剩余 {{ giftTokenRemainingWan }} / {{ giftTokenTotalWan }} 万 token
+                剩余 {{ giftCreditRemainingWan }} / {{ giftCreditTotalWan }} 万积分
               </span>
             </div>
             <p class="mt-2 text-xs text-slate-500">
-              未配置自定义模型时默认消耗赠送额度；切换到自定义模型后仍会继续统计 token 用量。
+              未配置自定义模型时默认消耗赠送积分；切换到自定义模型后仍会继续统计积分用量。
             </p>
           </div>
 
@@ -45,7 +45,7 @@
               启用已保存自定义模型
             </el-button>
             <el-button type="primary" @click="isTokenPurchaseDialogOpen = true">
-              购买 Token
+              购买积分
             </el-button>
           </div>
         </div>
@@ -348,11 +348,11 @@ const currentProviderPreset = computed(() => {
 
 const configuredProviders = computed(() => providerOptions.value.filter((item) => item.configured))
 const currentMode = computed(() => loadedConfig.value?.mode || 'gift')
-const giftTokenTotal = computed(() => loadedConfig.value?.tokenTotal ?? loadedConfig.value?.giftTokenTotal ?? 0)
-const giftTokenRemaining = computed(() => loadedConfig.value?.tokenRemaining ?? loadedConfig.value?.giftTokenRemaining ?? 0)
-const giftTokenRemainingWan = computed(() => (giftTokenRemaining.value / 10000).toFixed(1))
-const giftTokenTotalWan = computed(() => (giftTokenTotal.value / 10000).toFixed(1))
-const canUseGiftMode = computed(() => currentMode.value !== 'gift' && giftTokenRemaining.value > 0)
+const giftCreditTotal = computed(() => loadedConfig.value?.creditTotal ?? loadedConfig.value?.giftCreditTotal ?? 0)
+const giftCreditRemaining = computed(() => loadedConfig.value?.creditRemaining ?? loadedConfig.value?.giftCreditRemaining ?? 0)
+const giftCreditRemainingWan = computed(() => (giftCreditRemaining.value / 10000).toFixed(1))
+const giftCreditTotalWan = computed(() => (giftCreditTotal.value / 10000).toFixed(1))
+const canUseGiftMode = computed(() => currentMode.value !== 'gift' && giftCreditRemaining.value > 0)
 const canUseSavedCustomMode = computed(() => currentMode.value !== 'custom' && Boolean(loadedConfig.value?.customConfigSaved))
 const currentProviderModels = computed(() => currentProviderPreset.value?.models || [])
 

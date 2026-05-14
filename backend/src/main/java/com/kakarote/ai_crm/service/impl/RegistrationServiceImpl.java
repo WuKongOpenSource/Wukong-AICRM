@@ -124,8 +124,8 @@ public class RegistrationServiceImpl implements RegistrationService {
         tenant.setContactName(StrUtil.isNotBlank(realname) ? realname : email);
         tenant.setStatus(1);
         tenant.setMaxUsers(50);
-        tenant.setGiftTokenTotal(ICrmTenantService.DEFAULT_GIFT_TOKEN_TOTAL);
-        tenant.setGiftTokenUsed(0L);
+        tenant.setGiftCreditTotal(ICrmTenantService.DEFAULT_GIFT_CREDIT_TOTAL);
+        tenant.setGiftCreditUsed(0L);
         tenant.setCreateTime(new Date());
         tenant.setUpdateTime(new Date());
         tenantService.save(tenant);

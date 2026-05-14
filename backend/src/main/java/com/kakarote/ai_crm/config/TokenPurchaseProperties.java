@@ -32,7 +32,7 @@ public class TokenPurchaseProperties {
         if (plans != null) {
             for (Plan plan : plans) {
                 if (plan == null || !plan.isEnabled() || StrUtil.hasBlank(plan.getId(), plan.getName())
-                        || plan.getTokenAmount() == null || plan.getTokenAmount() <= 0
+                        || plan.getCreditAmount() == null || plan.getCreditAmount() <= 0
                         || plan.getPriceFen() == null || plan.getPriceFen() <= 0) {
                     continue;
                 }
@@ -44,8 +44,8 @@ public class TokenPurchaseProperties {
             Plan defaultPlan = new Plan();
             defaultPlan.setId("starter-100w");
             defaultPlan.setName("快速选购方案");
-            defaultPlan.setDescription("1,000,000 Token");
-            defaultPlan.setTokenAmount(1_000_000L);
+            defaultPlan.setDescription("1,000,000 积分");
+            defaultPlan.setCreditAmount(1_000_000L);
             defaultPlan.setPriceFen(6000);
             defaultPlan.setSort(1);
             resolved.add(defaultPlan);
@@ -60,7 +60,7 @@ public class TokenPurchaseProperties {
         private String id;
         private String name;
         private String description;
-        private Long tokenAmount;
+        private Long creditAmount;
         private Integer priceFen;
         private int sort;
         private boolean enabled = true;

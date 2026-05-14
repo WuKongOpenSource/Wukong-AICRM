@@ -24,8 +24,8 @@
             <span class="material-symbols-outlined text-xl">bolt</span>
           </div>
           <div class="min-w-0">
-            <h3 class="text-lg font-bold tracking-tight text-slate-900">Token 余额不足</h3>
-            <p class="mt-0.5 text-xs leading-relaxed text-slate-500">请购买更多 Token 以继续使用 AI 功能。</p>
+            <h3 class="text-lg font-bold tracking-tight text-slate-900">积分余额不足</h3>
+            <p class="mt-0.5 text-xs leading-relaxed text-slate-500">请购买更多积分以继续使用 AI 功能。</p>
           </div>
         </div>
       </div>
@@ -50,11 +50,11 @@
       <div class="space-y-5 px-6 py-5">
         <div v-if="!isPaying" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5">
           <div class="flex items-center justify-between gap-4">
-            <span class="text-xs font-semibold text-slate-500">当前剩余 Token</span>
-            <span class="text-xl font-bold tabular-nums tracking-tight text-rose-500">{{ formatToken(options?.tokenRemaining ?? 0) }}</span>
+            <span class="text-xs font-semibold text-slate-500">当前剩余积分</span>
+            <span class="text-xl font-bold tabular-nums tracking-tight text-rose-500">{{ formatCredit(options?.creditRemaining ?? 0) }}</span>
           </div>
           <p class="mt-1.5 text-[11px] leading-relaxed text-slate-400">
-            赠送额度 {{ formatToken(options?.giftTokenRemaining ?? 0) }}，已购额度 {{ formatToken(options?.purchasedTokenRemaining ?? 0) }}
+            赠送积分 {{ formatCredit(options?.giftCreditRemaining ?? 0) }}，已购积分 {{ formatCredit(options?.purchasedCreditRemaining ?? 0) }}
           </p>
         </div>
 
@@ -138,7 +138,7 @@
                     <span class="material-symbols-outlined text-[22px]">auto_awesome</span>
                   </div>
                   <div class="min-w-0">
-                    <div class="text-base font-bold tracking-tight text-slate-900">{{ formatToken(plan.tokenAmount) }} Token</div>
+                    <div class="text-base font-bold tracking-tight text-slate-900">{{ formatCredit(plan.creditAmount) }} 积分</div>
                     <div class="mt-0.5 text-xs font-medium text-slate-500">{{ plan.description || '标准充值方案' }}</div>
                   </div>
                 </div>
@@ -231,7 +231,7 @@
         <div class="flex items-start justify-between gap-4">
           <div>
             <div class="text-base font-bold text-slate-900">{{ order.planName }}</div>
-            <div class="mt-1 text-sm text-slate-500">{{ formatToken(order.tokenAmount) }} Token</div>
+            <div class="mt-1 text-sm text-slate-500">{{ formatCredit(order.creditAmount) }} 积分</div>
             <div class="mt-2 text-xs text-slate-400">{{ order.orderNo }}</div>
           </div>
           <el-tag :type="statusTagType(order.status)">{{ statusText(order.status) }}</el-tag>
@@ -374,7 +374,7 @@ function stopPolling() {
 
 async function handlePaid(order: TokenPurchaseOrder) {
   stopPolling()
-  ElMessage.success('支付成功，Token 已到账')
+  ElMessage.success('支付成功，积分已到账')
   await Promise.all([loadOptions(), loadRecentOrders()])
   emit('paid', order)
   emit('update:modelValue', false)
@@ -396,7 +396,7 @@ function handleClose() {
   emit('update:modelValue', false)
 }
 
-function formatToken(value: number): string {
+function formatCredit(value: number): string {
   return new Intl.NumberFormat('zh-CN').format(value || 0)
 }
 

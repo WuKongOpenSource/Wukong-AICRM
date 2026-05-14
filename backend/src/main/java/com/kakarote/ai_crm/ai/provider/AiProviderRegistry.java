@@ -14,6 +14,10 @@ public final class AiProviderRegistry {
     public static final String DEFAULT_PROVIDER = "dashscope";
 
     private static final Map<String, AiProviderDescriptor> PROVIDERS = new LinkedHashMap<>();
+    private static final Map<String, String> PROVIDER_ALIASES = Map.of(
+            "kimi", "moonshot",
+            "moonshot-ai", "moonshot"
+    );
 
     static {
         register(AiProviderDescriptor.builder()
@@ -217,15 +221,16 @@ public final class AiProviderRegistry {
         if (StrUtil.isBlank(providerCode)) {
             return PROVIDERS.get(DEFAULT_PROVIDER);
         }
-        return PROVIDERS.getOrDefault(providerCode.trim().toLowerCase(), PROVIDERS.get(DEFAULT_PROVIDER));
+        return PROVIDERS.getOrDefault(normalizeProviderCode(providerCode), PROVIDERS.get(DEFAULT_PROVIDER));
     }
 
     /**
      * 解析AI 服务商。
      */
     public static AiProviderDescriptor resolve(String providerCode, String apiUrl) {
-        if (StrUtil.isNotBlank(providerCode) && PROVIDERS.containsKey(providerCode.trim().toLowerCase())) {
-            return get(providerCode);
+        String normalizedProviderCode = normalizeProviderCode(providerCode);
+        if (StrUtil.isNotBlank(normalizedProviderCode) && PROVIDERS.containsKey(normalizedProviderCode)) {
+            return get(normalizedProviderCode);
         }
         if (StrUtil.isNotBlank(apiUrl)) {
             for (AiProviderDescriptor descriptor : PROVIDERS.values()) {
@@ -234,7 +239,7 @@ public final class AiProviderRegistry {
                 }
             }
         }
-        if (StrUtil.isNotBlank(providerCode)) {
+        if (StrUtil.isNotBlank(normalizedProviderCode)) {
             return get("custom");
         }
         return get(DEFAULT_PROVIDER);
@@ -252,6 +257,14 @@ public final class AiProviderRegistry {
      */
     private static void register(AiProviderDescriptor descriptor) {
         PROVIDERS.put(descriptor.getCode(), descriptor);
+    }
+
+    private static String normalizeProviderCode(String providerCode) {
+        if (StrUtil.isBlank(providerCode)) {
+            return "";
+        }
+        String normalized = providerCode.trim().toLowerCase();
+        return PROVIDER_ALIASES.getOrDefault(normalized, normalized);
     }
 
     /**

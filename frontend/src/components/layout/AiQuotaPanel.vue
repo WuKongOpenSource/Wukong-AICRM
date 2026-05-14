@@ -2,7 +2,7 @@
   <div v-if="variant === 'sidebar'" class="border-t border-slate-100 p-4">
     <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60">
       <div class="mb-3 flex items-center justify-between gap-3">
-        <p class="text-xs font-bold uppercase tracking-widest text-slate-400">AI 额度</p>
+        <p class="text-xs font-bold uppercase tracking-widest text-slate-400">AI 积分</p>
         <span class="inline-flex rounded-full px-2 py-1 text-[11px] font-bold" :class="aiStatusBadgeClass">
           {{ aiStatusBadgeText }}
         </span>
@@ -10,17 +10,17 @@
 
       <template v-if="currentAiMode === 'gift'">
         <div class="mb-1 flex flex-wrap items-baseline gap-1">
-          <span class="text-xs font-semibold tabular-nums text-slate-900">{{ giftTokenRemainingWan }}</span>
-          <span class="text-xs font-medium text-slate-400">/ {{ giftTokenTotalWan }} 万 token</span>
+          <span class="text-xs font-semibold tabular-nums text-slate-900">{{ giftCreditRemainingWan }}</span>
+          <span class="text-xs font-medium text-slate-400">/ {{ giftCreditTotalWan }} 万积分</span>
         </div>
-        <p v-if="giftTokenRemaining <= 0" class="mb-3 text-xs text-slate-500">
-          Token 已用完，可购买套餐或配置 AI 服务后继续使用。
+        <p v-if="giftCreditRemaining <= 0" class="mb-3 text-xs text-slate-500">
+          积分已用完，可购买套餐或配置 AI 服务后继续使用。
         </p>
         <div class="mb-4 h-2 overflow-hidden rounded-full bg-slate-100">
           <div
             class="h-full rounded-full transition-all"
-            :class="giftTokenProgressClass"
-            :style="{ width: `${giftTokenProgressPercent}%` }"
+            :class="giftCreditProgressClass"
+            :style="{ width: `${giftCreditProgressPercent}%` }"
           />
         </div>
       </template>
@@ -36,10 +36,10 @@
         <button
           type="button"
           class="flex-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="currentAiMode !== 'gift' && !canManageAiConfig"
-          @click="currentAiMode === 'gift' ? openTokenPurchaseDialog() : openApiKeySetup()"
+          :disabled="currentAiMode !== 'gift' && creditRemaining > 0 && !canManageAiConfig"
+          @click="currentAiMode === 'gift' || creditRemaining <= 0 ? openTokenPurchaseDialog() : openApiKeySetup()"
         >
-          {{ currentAiMode === 'gift' ? '购买 Token' : '配置 AI 服务' }}
+          {{ currentAiMode === 'gift' || creditRemaining <= 0 ? '购买积分' : '配置 AI 服务' }}
         </button>
       </div>
 
@@ -60,7 +60,7 @@
 
   <div v-else class="box-border w-full min-w-0 max-w-full overflow-hidden px-1 py-1">
     <div class="mb-3 flex min-w-0 items-start justify-between gap-2">
-      <p class="min-w-0 flex-1 text-sm font-bold leading-snug text-slate-900">AI Token 额度</p>
+      <p class="min-w-0 flex-1 text-sm font-bold leading-snug text-slate-900">AI 积分额度</p>
       <span
         class="inline-flex max-w-[45%] shrink-0 items-center justify-center truncate rounded-full px-2 py-0.5 text-[11px] font-bold"
         :class="popoverBadgeClass"
@@ -73,17 +73,17 @@
       <div class="mb-2 min-w-0 space-y-1 text-xs">
         <p class="break-words font-medium leading-relaxed text-slate-600">
           已使用
-          <span class="font-semibold tabular-nums text-slate-900">{{ tokenUsedWan }}</span>
-          / {{ tokenTotalWan }}万
+          <span class="font-semibold tabular-nums text-slate-900">{{ creditUsedWan }}</span>
+          / {{ creditTotalWan }}万
         </p>
-        <p class="font-semibold text-primary">剩余 {{ tokenProgressPercent }}%</p>
+        <p class="font-semibold text-primary">剩余 {{ creditProgressPercent }}%</p>
       </div>
 
       <div class="mb-4 h-1.5 w-full min-w-0 max-w-full overflow-hidden rounded-full bg-slate-100">
         <div
           class="h-full max-w-full rounded-full transition-all"
-          :class="giftTokenProgressClass"
-          :style="{ width: `${giftTokenProgressPercent}%` }"
+          :class="giftCreditProgressClass"
+          :style="{ width: `${giftCreditProgressPercent}%` }"
         />
       </div>
     </template>
@@ -100,11 +100,11 @@
       <button
         type="button"
         class="inline-flex min-h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl bg-primary px-2 py-2 text-xs font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-        :disabled="currentAiMode !== 'gift' && !canManageAiConfig"
-        @click="currentAiMode === 'gift' ? openTokenPurchaseDialog() : openApiKeySetup()"
+        :disabled="currentAiMode !== 'gift' && creditRemaining > 0 && !canManageAiConfig"
+        @click="currentAiMode === 'gift' || creditRemaining <= 0 ? openTokenPurchaseDialog() : openApiKeySetup()"
       >
         <span class="material-symbols-outlined shrink-0 text-[16px] leading-none">bolt</span>
-        <span class="min-w-0 truncate">{{ currentAiMode === 'gift' ? '购买 Token' : '配置 AI 服务' }}</span>
+        <span class="min-w-0 truncate">{{ currentAiMode === 'gift' || creditRemaining <= 0 ? '购买积分' : '配置 AI 服务' }}</span>
       </button>
     </div>
   </div>
@@ -128,14 +128,15 @@ const {
   currentAiMode,
   aiStatusBadgeText,
   aiStatusBadgeClass,
-  giftTokenRemaining,
-  giftTokenRemainingWan,
-  giftTokenTotalWan,
-  giftTokenProgressPercent,
-  giftTokenProgressClass,
-  tokenUsedWan,
-  tokenTotalWan,
-  tokenProgressPercent,
+  giftCreditRemaining,
+  giftCreditRemainingWan,
+  giftCreditTotalWan,
+  giftCreditProgressPercent,
+  giftCreditProgressClass,
+  creditUsedWan,
+  creditTotalWan,
+  creditRemaining,
+  creditProgressPercent,
   hasAiApiKeyConfigured,
   canManageAiConfig,
   goToAiSettings,
@@ -148,7 +149,7 @@ onMounted(() => {
 })
 
 const popoverBadgeClass = computed(() => {
-  if (currentAiMode.value === 'gift' && giftTokenRemaining.value > 0) {
+  if (currentAiMode.value === 'gift' && giftCreditRemaining.value > 0) {
     return 'border border-amber-200/80 bg-amber-50 text-amber-800'
   }
   return aiStatusBadgeClass.value

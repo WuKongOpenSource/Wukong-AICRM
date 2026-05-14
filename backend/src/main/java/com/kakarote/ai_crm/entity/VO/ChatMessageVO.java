@@ -3,6 +3,7 @@ package com.kakarote.ai_crm.entity.VO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 
@@ -30,6 +31,18 @@ public class ChatMessageVO {
 
     @Schema(description = "使用的模型")
     private String modelName;
+
+    @Schema(description = "扣除积分数")
+    private Long creditsUsed;
+
+    @Schema(description = "积分倍率")
+    private BigDecimal creditMultiplier;
+
+    @Schema(description = "计费模型服务商")
+    private String billingModelProvider;
+
+    @Schema(description = "计费模型名称")
+    private String billingModelName;
 
     @Schema(description = "附件列表")
     private List<AttachmentVO> attachments;
