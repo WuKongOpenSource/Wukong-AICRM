@@ -196,13 +196,11 @@ export const useChatStore = defineStore('chat', () => {
     if (id) {
       if (!streamingTasks.value[id]) {
         let msgs = messagesBySessionId.value[id] || []
-        const draftSession = sessions.value.find(s => s.sessionId === id)
-        const draftAppCode = normalizeAppCode(draftSession?.appCode)
         if (msgs.length === 0) {
           await selectSession(id)
           msgs = messagesBySessionId.value[id] || []
         }
-        if (msgs.length === 0 && !streamingTasks.value[id] && draftAppCode === normalizedAppCode) {
+        if (msgs.length === 0 && !streamingTasks.value[id]) {
           setSelectedAppCode(normalizedAppCode)
           return id
         }
@@ -253,8 +251,6 @@ export const useChatStore = defineStore('chat', () => {
 
     const effectiveAppCode = resolveEffectiveAppCode(appCodeOrUseRag, knowledgeIds)
     if (!currentSessionId.value) {
-      await startNewSession(undefined, undefined, undefined, effectiveAppCode)
-    } else if (shouldStartNewSessionForApp(effectiveAppCode)) {
       await startNewSession(undefined, undefined, undefined, effectiveAppCode)
     } else {
       setSelectedAppCode(effectiveAppCode)
@@ -329,8 +325,6 @@ export const useChatStore = defineStore('chat', () => {
   async function sendMessageWithSync(content: string, appCodeOrUseRag?: string | boolean): Promise<string> {
     const effectiveAppCode = resolveEffectiveAppCode(appCodeOrUseRag)
     if (!currentSessionId.value) {
-      await startNewSession(undefined, undefined, undefined, effectiveAppCode)
-    } else if (shouldStartNewSessionForApp(effectiveAppCode)) {
       await startNewSession(undefined, undefined, undefined, effectiveAppCode)
     } else {
       setSelectedAppCode(effectiveAppCode)
@@ -515,15 +509,6 @@ export const useChatStore = defineStore('chat', () => {
       return KNOWLEDGE_APP_CODE
     }
     return normalizeAppCode(selectedAppCode.value)
-  }
-
-  function shouldStartNewSessionForApp(appCode: string): boolean {
-    const sessionId = currentSessionId.value
-    if (!sessionId) return false
-    const session = sessions.value.find(s => s.sessionId === sessionId)
-    const currentAppCode = normalizeAppCode(session?.appCode || selectedAppCode.value)
-    if (currentAppCode === appCode) return false
-    return (messagesBySessionId.value[sessionId] || []).length > 0
   }
 
   function normalizeAppCode(appCode?: string): string {
