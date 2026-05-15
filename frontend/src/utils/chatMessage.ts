@@ -26,5 +26,6 @@ export function getAssistantMessageStatusLabel(isStreaming = false): string {
 }
 
 export function getAssistantMessagePlaceholder(isStreaming = false): string {
-  return isStreaming ? '正在整理答案' : ''
+  // return isStreaming ? '正在整理答案' : ''
+  return isStreaming ? '' : ''
 }

@@ -13,7 +13,7 @@
             <div class="bg-white border-b border-slate-200 px-6 md:px-8 py-5 flex items-center justify-between shrink-0">
               <div class="flex items-center gap-4">
                 <div class="size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-                  <WkIcon name="settings" :size="24" />
+                  <WkIcon name="set" :size="24" />
                 </div>
                 <div>
                   <h2 class="text-xl font-bold text-slate-900">账号设置</h2>

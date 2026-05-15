@@ -6,7 +6,7 @@ import { useUserStore } from '@/stores/user'
 const settingsComponent = () => import('@/views/settings/SettingsView.vue')
 const settingsMeta = {
   title: '系统设置',
-  icon: 'settings',
+  icon: 'set',
   permission: ['user', 'role', 'config', 'dept', 'customField']
 }
 

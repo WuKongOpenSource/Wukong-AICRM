@@ -20,6 +20,7 @@ import com.kakarote.ai_crm.entity.PO.ChatSession;
 import com.kakarote.ai_crm.entity.VO.AiModelOptionVO;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
 import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
+import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import com.kakarote.ai_crm.mapper.ChatMessageMapper;
 import com.kakarote.ai_crm.mapper.ChatSessionMapper;
 import com.kakarote.ai_crm.service.*;
@@ -79,6 +80,9 @@ public class ChatServiceImpl implements IChatService {
 
     @Autowired
     private KnowledgeTools knowledgeTools;
+
+    @Autowired
+    private IKnowledgeService knowledgeService;
 
     @Autowired
     private AiQuotaService aiQuotaService;
@@ -328,6 +332,7 @@ public class ChatServiceImpl implements IChatService {
         Long sessionId = sendBO.getSessionId();
         String content = sendBO.getContent();
         List<ChatSendBO.AttachmentDTO> attachments = sendBO.getAttachments();
+        List<Long> knowledgeIds = sendBO.getKnowledgeIds();
 
         Long currentUserId = UserUtil.getUserIdOrNull();
         Long currentTenantId = UserUtil.getTenantId();
@@ -348,7 +353,7 @@ public class ChatServiceImpl implements IChatService {
 
         String routedKnowledgeResponse;
         try {
-            routedKnowledgeResponse = tryHandleKnowledgeQuestion(content, attachments, ragEnabled);
+            routedKnowledgeResponse = tryHandleKnowledgeQuestion(content, attachments, ragEnabled, knowledgeIds);
         } catch (BusinessException exception) {
             saveMessage(sessionId, "assistant", exception.getMsg());
             updateSessionTime(sessionId);
@@ -376,6 +381,10 @@ public class ChatServiceImpl implements IChatService {
         String enhancedContent = content;
         if (StrUtil.isNotBlank(attachmentContext)) {
             enhancedContent = enhancedContent + "\n\n" + attachmentContext;
+        }
+        String knowledgeSelectionContext = buildKnowledgeSelectionContext(knowledgeIds);
+        if (StrUtil.isNotBlank(knowledgeSelectionContext)) {
+            enhancedContent = enhancedContent + "\n\n" + knowledgeSelectionContext;
         }
 
         ChatBillingContext billingContext;
@@ -520,6 +529,7 @@ public class ChatServiceImpl implements IChatService {
         Long sessionId = sendBO.getSessionId();
         String content = sendBO.getContent();
         List<ChatSendBO.AttachmentDTO> attachments = sendBO.getAttachments();
+        List<Long> knowledgeIds = sendBO.getKnowledgeIds();
 
         Long currentUserId = UserUtil.getUserIdOrNull();
         Long currentTenantId = UserUtil.getTenantId();
@@ -539,7 +549,7 @@ public class ChatServiceImpl implements IChatService {
 
         String routedKnowledgeResponse;
         try {
-            routedKnowledgeResponse = tryHandleKnowledgeQuestion(content, attachments, ragEnabled);
+            routedKnowledgeResponse = tryHandleKnowledgeQuestion(content, attachments, ragEnabled, knowledgeIds);
         } catch (BusinessException exception) {
             saveMessage(sessionId, "assistant", exception.getMsg());
             updateSessionTime(sessionId);
@@ -564,6 +574,10 @@ public class ChatServiceImpl implements IChatService {
         String enhancedContent = content;
         if (StrUtil.isNotBlank(attachmentContext)) {
             enhancedContent = enhancedContent + "\n\n" + attachmentContext;
+        }
+        String knowledgeSelectionContext = buildKnowledgeSelectionContext(knowledgeIds);
+        if (StrUtil.isNotBlank(knowledgeSelectionContext)) {
+            enhancedContent = enhancedContent + "\n\n" + knowledgeSelectionContext;
         }
 
         ChatBillingContext billingContext;
@@ -675,6 +689,34 @@ public class ChatServiceImpl implements IChatService {
             // 非流式分支在 finally 清理当前会话的 AiContextHolder。
             AiContextHolder.clear();
         }
+    }
+
+    /**
+     * 将用户选中的知识库文档（仅 ID）转为对话补充说明，不读取文件二进制。
+     */
+    private String buildKnowledgeSelectionContext(List<Long> knowledgeIds) {
+        if (CollUtil.isEmpty(knowledgeIds)) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("[用户从知识库选中的文档]\n");
+        for (Long id : knowledgeIds) {
+            if (id == null) {
+                continue;
+            }
+            try {
+                KnowledgeVO vo = knowledgeService.getKnowledgeDetail(id);
+                if (vo != null && StrUtil.isNotBlank(vo.getName())) {
+                    sb.append(String.format("- 《%s》（knowledgeId=%s）\n", vo.getName(), id));
+                } else {
+                    sb.append(String.format("- knowledgeId=%s\n", id));
+                }
+            } catch (Exception e) {
+                log.debug("读取知识库元数据失败: knowledgeId={}, error={}", id, e.getMessage());
+                sb.append(String.format("- knowledgeId=%s（元数据暂不可用）\n", id));
+            }
+        }
+        return sb.toString();
     }
 
     /**
@@ -959,11 +1001,13 @@ public class ChatServiceImpl implements IChatService {
     /**
      * 处理tryHandleKnowledgeQuestion方法逻辑。
      */
-    private String tryHandleKnowledgeQuestion(String content, List<ChatSendBO.AttachmentDTO> attachments, boolean ragEnabled) {
+    private String tryHandleKnowledgeQuestion(String content, List<ChatSendBO.AttachmentDTO> attachments, boolean ragEnabled,
+                                              List<Long> knowledgeIds) {
         Long sessionId = AiContextHolder.getCurrentSessionId();
         Long tenantId = AiContextHolder.getCurrentTenantId();
-        log.debug("知识库前置路由检查: sessionId={}, tenantId={}, ragEnabled={}, hasAttachments={}, content={}",
-                sessionId, tenantId, ragEnabled, CollUtil.isNotEmpty(attachments), abbreviateForLog(content));
+        log.debug("知识库前置路由检查: sessionId={}, tenantId={}, ragEnabled={}, hasAttachments={}, knowledgeIdCount={}, content={}",
+                sessionId, tenantId, ragEnabled, CollUtil.isNotEmpty(attachments),
+                knowledgeIds == null ? 0 : knowledgeIds.size(), abbreviateForLog(content));
 
         if (!ragEnabled) {
             log.debug("知识库前置路由跳过: RAG 开关未开启, sessionId={}, tenantId={}", sessionId, tenantId);
@@ -976,8 +1020,13 @@ public class ChatServiceImpl implements IChatService {
             return null;
         }
 
+        String knowledgeIdsStr = null;
+        if (CollUtil.isNotEmpty(knowledgeIds)) {
+            knowledgeIdsStr = knowledgeIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+        }
+
         try {
-            String askResponse = knowledgeTools.askKnowledgeQuestion(content, null);
+            String askResponse = knowledgeTools.askKnowledgeQuestion(content, knowledgeIdsStr);
             if (isUsableKnowledgeAnswerResponse(askResponse)) {
                 log.debug("知识库问答模式由 askKnowledgeQuestion 处理: sessionId={}, tenantId={}, responseLength={}",
                         sessionId, tenantId, askResponse.length());

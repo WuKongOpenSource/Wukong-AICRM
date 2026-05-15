@@ -30,9 +30,61 @@ interface StreamingTask {
 export const useChatStore = defineStore('chat', () => {
   const RAG_ENABLED_STORAGE_KEY = 'wk_ai_crm:chat_rag_enabled:v1'
   const MODEL_STORAGE_KEY = 'wk_ai_crm:chat_selected_model:v1'
+  const CRM_CONTEXT_ENABLED_STORAGE_KEY = 'wk_ai_crm:chat_crm_context_enabled:v1'
+  const DRAFT_SESSION_STORAGE_KEY = 'wk_ai_crm:chat_draft_session_id:v1'
 
   const sessions = ref<ChatSession[]>([])
   const currentSessionId = ref<string | null>(null)
+  /** Incremented so ChatView can focus the composer after sidebar session / new-chat actions. */
+  const composerFocusNonce = ref(0)
+  function requestComposerFocus() {
+    composerFocusNonce.value += 1
+  }
+  // Tracks the last "new session" that is still empty (draft).
+  // Used to avoid creating multiple empty sessions by repeated clicks.
+  // Persisted so refresh / new tab still treats the same empty session as draft.
+  const draftSessionId = ref<string | null>(loadDraftSessionIdFromStorage())
+
+  function loadDraftSessionIdFromStorage(): string | null {
+    try {
+      const v = localStorage.getItem(DRAFT_SESSION_STORAGE_KEY)
+      return v && v.length > 0 ? v : null
+    } catch {
+      return null
+    }
+  }
+
+  function persistDraftSessionId(id: string | null) {
+    try {
+      if (id) localStorage.setItem(DRAFT_SESSION_STORAGE_KEY, id)
+      else localStorage.removeItem(DRAFT_SESSION_STORAGE_KEY)
+    } catch {
+      // ignore storage failures
+    }
+  }
+
+  function setDraftSessionId(id: string | null) {
+    draftSessionId.value = id
+    persistDraftSessionId(id)
+  }
+
+  async function reconcileDraftSessionAfterFetch() {
+    const id = draftSessionId.value
+    if (!id) return
+    const exists = sessions.value.some(s => s.sessionId === id)
+    if (!exists) {
+      setDraftSessionId(null)
+      return
+    }
+    try {
+      const dbMessages = await getMessageList(id)
+      if (dbMessages.length > 0) {
+        setDraftSessionId(null)
+      }
+    } catch {
+      setDraftSessionId(null)
+    }
+  }
   const messagesBySessionId = ref<Record<string, LocalMessage[]>>({})
   const streamingTasks = ref<Record<string, StreamingTask>>({})
   const loading = ref(false)
@@ -41,6 +93,7 @@ export const useChatStore = defineStore('chat', () => {
   const modelOptions = ref<ChatModelOption[]>([])
   const ragEnabled = ref(loadRagEnabled())
   const selectedModelKey = ref(loadSelectedModelKey())
+  const crmContextEnabled = ref(loadCrmContextEnabled())
 
   const messages = computed(() => {
     if (!currentSessionId.value) return []
@@ -66,6 +119,7 @@ export const useChatStore = defineStore('chat', () => {
     sessionsLoading.value = true
     try {
       sessions.value = await getSessionList()
+      await reconcileDraftSessionAfterFetch()
     } finally {
       sessionsLoading.value = false
     }
@@ -93,7 +147,26 @@ export const useChatStore = defineStore('chat', () => {
     setSessionMessages(sessionId, [])
     await fetchSessions()
     currentSessionId.value = sessionId
+    setDraftSessionId(sessionId)
     return sessionId
+  }
+
+  async function startNewSessionIfNeeded(title?: string, agentId?: string, customerId?: string): Promise<string> {
+    const id = draftSessionId.value
+    if (id) {
+      if (!streamingTasks.value[id]) {
+        let msgs = messagesBySessionId.value[id] || []
+        if (msgs.length === 0) {
+          await selectSession(id)
+          msgs = messagesBySessionId.value[id] || []
+        }
+        if (msgs.length === 0 && !streamingTasks.value[id]) {
+          return id
+        }
+      }
+      setDraftSessionId(null)
+    }
+    return await startNewSession(title, agentId, customerId)
   }
 
   async function selectSession(sessionId: string) {
@@ -117,13 +190,17 @@ export const useChatStore = defineStore('chat', () => {
     if (currentSessionId.value === sessionId) {
       currentSessionId.value = null
     }
+    if (draftSessionId.value === sessionId) {
+      setDraftSessionId(null)
+    }
   }
 
   async function sendMessage(
     content: string,
     attachments?: ChatAttachmentDTO[],
     attachmentVOs?: ChatAttachmentVO[],
-    useRag?: boolean
+    useRag?: boolean,
+    knowledgeIds?: string[]
   ): Promise<void> {
     if (isStreaming.value) return
 
@@ -142,6 +219,9 @@ export const useChatStore = defineStore('chat', () => {
       timestamp: new Date(),
       attachments: attachmentVOs
     })
+    if (draftSessionId.value === sessionId) {
+      setDraftSessionId(null)
+    }
 
     appendSessionMessage(sessionId, {
       id: assistantMessageId,
@@ -182,7 +262,8 @@ export const useChatStore = defineStore('chat', () => {
         attachments,
         useRag ?? ragEnabled.value,
         selectedModel.value?.provider,
-        selectedModel.value?.modelName
+        selectedModel.value?.modelName,
+        knowledgeIds
       )
     } catch (error) {
       console.error('sendMessage error:', error)
@@ -251,6 +332,15 @@ export const useChatStore = defineStore('chat', () => {
     selectedModelKey.value = value
     try {
       localStorage.setItem(MODEL_STORAGE_KEY, value)
+    } catch {
+      // ignore storage failures
+    }
+  }
+
+  function setCrmContextEnabled(value: boolean) {
+    crmContextEnabled.value = value
+    try {
+      localStorage.setItem(CRM_CONTEXT_ENABLED_STORAGE_KEY, value ? '1' : '0')
     } catch {
       // ignore storage failures
     }
@@ -369,13 +459,23 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function loadCrmContextEnabled(): boolean {
+    try {
+      return localStorage.getItem(CRM_CONTEXT_ENABLED_STORAGE_KEY) === '1'
+    } catch {
+      return false
+    }
+  }
+
   function toModelKey(option: ChatModelOption): string {
-    return `${option.provider}::${option.modelName}`
+    return `${option.provider}:${option.modelName}`
   }
 
   return {
     sessions,
     currentSessionId,
+    composerFocusNonce,
+    requestComposerFocus,
     messages,
     messagesBySessionId,
     streamingTasks,
@@ -389,10 +489,12 @@ export const useChatStore = defineStore('chat', () => {
     selectedModelKey,
     selectedModel,
     ragEnabled,
+    crmContextEnabled,
     currentSession,
     fetchSessions,
     fetchModelOptions,
     startNewSession,
+    startNewSessionIfNeeded,
     selectSession,
     removeSession,
     sendMessage,
@@ -401,6 +503,7 @@ export const useChatStore = defineStore('chat', () => {
     setRagEnabled,
     setSelectedModelKey,
     toModelKey,
+    setCrmContextEnabled,
     isSessionStreaming
   }
 })

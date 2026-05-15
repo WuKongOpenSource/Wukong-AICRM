@@ -64,7 +64,10 @@ export interface Knowledge {
   customerId?: string
   customerName?: string
   filePath?: string
-  fileSize?: number
+  /** 文件大小，单位：字节 (B)，来自知识库列表/详情等接口 */
+  fileSize?: number | string
+  /** 后端可选返回的已格式化大小（若存在可优先展示） */
+  fileSizeFormatted?: string
   mimeType?: string
   summary?: string
   contentText?: string
@@ -225,6 +228,8 @@ export interface ChatSendBO {
   ragEnabled?: boolean
   modelProvider?: string
   modelName?: string
+  /** 知识库文档 ID，服务端按 ID 限定 RAG，不经过文件下载上传 */
+  knowledgeIds?: string[]
 }
 
 // Enum types

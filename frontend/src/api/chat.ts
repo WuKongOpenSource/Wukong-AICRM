@@ -50,7 +50,8 @@ export async function sendMessageStream(
   attachments?: ChatAttachmentDTO[],
   ragEnabled?: boolean,
   modelProvider?: string,
-  modelName?: string
+  modelName?: string,
+  knowledgeIds?: string[]
 ): Promise<void> {
   const token = getToken()
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
@@ -81,7 +82,11 @@ export async function sendMessageStream(
         attachments: attachments || undefined,
         ragEnabled,
         modelProvider: modelProvider || undefined,
-        modelName: modelName || undefined
+        modelName: modelName || undefined,
+        knowledgeIds:
+          knowledgeIds?.length && knowledgeIds.length > 0
+            ? knowledgeIds.map((id) => Number(id)).filter((n) => !Number.isNaN(n))
+            : undefined
       })
     })
 
@@ -163,20 +168,17 @@ function parseSSEEvent(event: string): string | null {
 /**
  * Send message (sync)
  */
-export function sendMessageSync(
-  sessionId: string,
-  content: string,
-  attachments?: ChatAttachmentDTO[],
-  ragEnabled?: boolean,
-  modelProvider?: string,
-  modelName?: string
-): Promise<string> {
+export function sendMessageSync(sessionId: string, content: string, attachments?: ChatAttachmentDTO[], ragEnabled?: boolean,  modelProvider?: string,modelName?: string,knowledgeIds?: string[]): Promise<string> {
   return post('/chat/sendSync', {
     sessionId,
     content,
     attachments: attachments || undefined,
     ragEnabled,
     modelProvider: modelProvider || undefined,
-    modelName: modelName || undefined
+    modelName: modelName || undefined,
+    knowledgeIds:
+      knowledgeIds?.length && knowledgeIds.length > 0
+        ? knowledgeIds.map((id) => Number(id)).filter((n) => !Number.isNaN(n))
+        : undefined
   })
 }

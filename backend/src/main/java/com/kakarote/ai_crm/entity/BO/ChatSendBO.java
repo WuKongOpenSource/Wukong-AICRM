@@ -33,6 +33,8 @@ public class ChatSendBO {
 
     @Schema(description = "本次对话选择的模型名称")
     private String modelName;
+    @Schema(description = "知识库文件 ID 列表（限定 RAG 范围等），无需上传文件本体")
+    private List<Long> knowledgeIds;
 
     @Data
     @Schema(description = "附件信息")

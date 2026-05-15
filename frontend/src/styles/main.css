@@ -14,6 +14,8 @@ html, body, #app {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  font-family: 'Microsoft YaHei', '微软雅黑', 'PingFang SC', 'Helvetica Neue', Arial, 'Noto Sans SC',
+    ui-sans-serif, system-ui, sans-serif;
 }
 
 /*
@@ -102,6 +104,14 @@ html, body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/*
+ * Prevent layout shift when vertical scrollbar appears/disappears.
+ * `scrollbar-gutter` is supported in modern Chromium/Firefox; older Safari will ignore it.
+ */
+.wk-scrollbar-gutter-stable {
+  scrollbar-gutter: stable;
 }
 
 /* Glass panel effect */
@@ -604,7 +614,7 @@ html, body {
 
 .wk-markdown th {
   background: #f8fafc;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .wk-markdown tr:last-child td {
@@ -623,5 +633,5 @@ html, body {
 }
 
 .wk-markdown strong {
-  font-weight: 700;
+  font-weight: 500;
 }
