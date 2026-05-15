@@ -19,10 +19,13 @@ export interface PageQuery {
 }
 
 // Auth types
+export type LoginType = 'PC' | 'MOBILE'
+
 export interface LoginParams {
   username: string
   password: string
   tenantId?: string
+  loginType?: LoginType
 }
 
 export interface LoginTenantOption {

@@ -6,6 +6,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.extra.servlet.JakartaServletUtil;
 import com.alibaba.fastjson.JSON;
 import com.kakarote.ai_crm.common.Const;
+import com.kakarote.ai_crm.common.enums.LoginTypeEnum;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -127,12 +128,15 @@ public class TokenService {
     public String createToken(LoginUser loginUser, String loginIp) {
         String token = IdUtil.fastUUID();
         loginUser.setToken(token);
+        LoginTypeEnum loginType = resolveLoginType(loginUser);
+        loginUser.setLoginType(loginType);
         handleSingleLogin(loginUser, token, loginIp);
         refreshToken(loginUser);
 
         Map<String, Object> claims = new HashMap<>();
         claims.put(Const.LOGIN_USER_KEY, token);
         claims.put("username", loginUser.getUsername());
+        claims.put("loginType", loginType.name());
         return createToken(claims);
     }
 
@@ -151,6 +155,8 @@ public class TokenService {
      * 刷新Token。
      */
     public void refreshToken(LoginUser loginUser) {
+        LoginTypeEnum loginType = resolveLoginType(loginUser);
+        loginUser.setLoginType(loginType);
         loginUser.setLoginTime(System.currentTimeMillis());
         loginUser.setExpireTime(loginUser.getLoginTime() + expireTime * MILLIS_MINUTE);
         redisTemplate.opsForValue().set(
@@ -162,11 +168,12 @@ public class TokenService {
 
         if (!multiLoginEnabled && loginUser.getUser() != null && loginUser.getUser().getUserId() != null) {
             redisTemplate.opsForValue().set(
-                    getUserTokenKey(loginUser.getUser().getUserId()),
+                    getUserTokenKey(loginUser.getUser().getUserId(), loginType),
                     loginUser.getToken(),
                     expireTime,
                     TimeUnit.MINUTES
             );
+            clearMatchingLegacyUserTokenMapping(loginUser.getUser().getUserId(), loginUser.getToken(), loginType);
         }
     }
 
@@ -232,7 +239,11 @@ public class TokenService {
     /**
      * 获取用户Token键。
      */
-    private String getUserTokenKey(Long userId) {
+    private String getUserTokenKey(Long userId, LoginTypeEnum loginType) {
+        return Const.LOGIN_USER_TOKEN_KEY + userId + ":" + LoginTypeEnum.resolve(loginType).name();
+    }
+
+    private String getLegacyUserTokenKey(Long userId) {
         return Const.LOGIN_USER_TOKEN_KEY + userId;
     }
 
@@ -243,6 +254,31 @@ public class TokenService {
         return Const.LOGIN_KICKOUT_KEY + token;
     }
 
+    private LoginTypeEnum resolveLoginType(LoginUser loginUser) {
+        return loginUser == null ? LoginTypeEnum.PC : LoginTypeEnum.resolve(loginUser.getLoginType());
+    }
+
+    private String getLatestUserToken(Long userId, LoginTypeEnum loginType) {
+        LoginTypeEnum resolvedLoginType = LoginTypeEnum.resolve(loginType);
+        String latestToken = redisTemplate.opsForValue().get(getUserTokenKey(userId, resolvedLoginType));
+        if (StrUtil.isBlank(latestToken) && resolvedLoginType == LoginTypeEnum.PC) {
+            return redisTemplate.opsForValue().get(getLegacyUserTokenKey(userId));
+        }
+        return latestToken;
+    }
+
+    private void clearMatchingLegacyUserTokenMapping(Long userId, String token, LoginTypeEnum loginType) {
+        if (userId == null || StrUtil.isBlank(token) || LoginTypeEnum.resolve(loginType) != LoginTypeEnum.PC) {
+            return;
+        }
+
+        String legacyUserTokenKey = getLegacyUserTokenKey(userId);
+        String legacyToken = redisTemplate.opsForValue().get(legacyUserTokenKey);
+        if (StrUtil.equals(token, legacyToken)) {
+            redisTemplate.delete(legacyUserTokenKey);
+        }
+    }
+
     /**
      * 判断是否TokenReplaced。
      */
@@ -251,7 +287,7 @@ public class TokenService {
             return false;
         }
 
-        String latestToken = redisTemplate.opsForValue().get(getUserTokenKey(loginUser.getUser().getUserId()));
+        String latestToken = getLatestUserToken(loginUser.getUser().getUserId(), resolveLoginType(loginUser));
         return StrUtil.isNotBlank(latestToken) && !StrUtil.equals(latestToken, token);
     }
 
@@ -263,7 +299,9 @@ public class TokenService {
             return;
         }
 
-        String oldToken = redisTemplate.opsForValue().get(getUserTokenKey(loginUser.getUser().getUserId()));
+        LoginTypeEnum loginType = resolveLoginType(loginUser);
+        Long userId = loginUser.getUser().getUserId();
+        String oldToken = getLatestUserToken(userId, loginType);
         if (StrUtil.isBlank(oldToken) || StrUtil.equals(oldToken, newToken)) {
             return;
         }
@@ -275,6 +313,7 @@ public class TokenService {
                 TimeUnit.MINUTES
         );
         redisTemplate.delete(getTokenKey(oldToken));
+        clearMatchingLegacyUserTokenMapping(userId, oldToken, loginType);
     }
 
     /**
@@ -285,11 +324,13 @@ public class TokenService {
             return;
         }
 
-        String userTokenKey = getUserTokenKey(loginUser.getUser().getUserId());
+        LoginTypeEnum loginType = resolveLoginType(loginUser);
+        String userTokenKey = getUserTokenKey(loginUser.getUser().getUserId(), loginType);
         String currentToken = redisTemplate.opsForValue().get(userTokenKey);
         if (StrUtil.equals(token, currentToken)) {
             redisTemplate.delete(userTokenKey);
         }
+        clearMatchingLegacyUserTokenMapping(loginUser.getUser().getUserId(), token, loginType);
     }
 
     /**

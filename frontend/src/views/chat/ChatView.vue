@@ -188,7 +188,7 @@
                   您好，{{ userStore.realname || '用户' }}。
                 </h1>
                 <p class="text-slate-400 text-base max-w-md">
-                  我是您的智能销售助手。今天想处理哪些客户或商机？
+                  有什么想聊的，或需要我帮你处理什么？
                 </p>
               </div>
             </template>
@@ -390,7 +390,7 @@
                     v-model="inputText"
                     type="text"
                     class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-slate-900 px-3 py-3 text-sm placeholder:text-slate-400"
-                    placeholder="输入指令，如：总结今天与张总的会议..."
+                    placeholder="输入问题或指令..."
                     :disabled="chatStore.isStreaming || isUploading"
                     @keydown.enter.exact.prevent="handleSend"
                     @paste="handlePaste"
@@ -714,10 +714,10 @@ const groupedSessions = computed(() => {
 })
 
 const quickActions = [
-  { label: '创建新客户', text: '帮我创建一个新客户' },
-  { label: '查询客户状态', text: '帮我查询客户列表' },
-  { label: '生成跟进任务', text: '帮我生成跟进任务' },
-  { label: '分析本月销售目标', text: '分析本月销售目标的缺口' }
+  { label: '帮我润色', text: '帮我润色这段文字' },
+  { label: '总结内容', text: '帮我总结下面这段内容' },
+  { label: '制定计划', text: '帮我制定一个今天的工作计划' },
+  { label: '翻译英文', text: '帮我把下面这段话翻译成英文' }
 ]
 
 const showUserAvatarImage = computed(() => Boolean(userStore.avatar) && !userAvatarLoadFailed.value)

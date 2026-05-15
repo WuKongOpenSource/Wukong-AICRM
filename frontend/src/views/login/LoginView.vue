@@ -548,7 +548,7 @@ import { useUserStore } from '@/stores/user'
 import logoImg from '@/assets/images/logo.png'
 import { getOidcSessionToken, register, resetPassword, sendEmailCode } from '@/api/auth'
 import SliderCaptchaDialog from '@/components/auth/SliderCaptchaDialog.vue'
-import type { LoginTenantOption } from '@/types/api'
+import type { LoginTenantOption, LoginType } from '@/types/api'
 
 const router = useRouter()
 const route = useRoute()
@@ -582,6 +582,13 @@ let forgotCountdownTimer: number | undefined
 
 const reduceMotion =
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+function resolveLoginType(): LoginType {
+  if (typeof window !== 'undefined' && window.innerWidth < 768) {
+    return 'MOBILE'
+  }
+  return 'PC'
+}
 
 /** Safari / iOS 等对 height 逐帧插值开销大，仅保留 opacity + transform 过渡更顺 */
 function isWebKitWithoutChromium(): boolean {
@@ -777,7 +784,8 @@ async function handleLogin() {
 
     const result = await userStore.login({
       username: loginForm.username,
-      password: loginForm.password
+      password: loginForm.password,
+      loginType: resolveLoginType()
     })
 
     if (result.requiresTenantSelection) {
@@ -831,7 +839,8 @@ async function handleTenantLogin(option: LoginTenantOption) {
     const result = await userStore.login({
       username: loginForm.username,
       password: loginForm.password,
-      tenantId: option.tenantId
+      tenantId: option.tenantId,
+      loginType: resolveLoginType()
     })
 
     if (result.requiresTenantSelection) {

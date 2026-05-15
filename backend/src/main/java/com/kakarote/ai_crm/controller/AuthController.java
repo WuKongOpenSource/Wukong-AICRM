@@ -3,6 +3,7 @@ package com.kakarote.ai_crm.controller;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.kakarote.ai_crm.common.exception.BusinessException;
+import com.kakarote.ai_crm.common.enums.LoginTypeEnum;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.OidcConfig;
@@ -149,7 +150,12 @@ public class AuthController {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前企业下存在重复账号，请联系管理员处理");
         }
 
-        return Result.ok(buildLoginSuccessResponse(enabledUsers.get(0), request, response));
+        return Result.ok(buildLoginSuccessResponse(
+                enabledUsers.get(0),
+                LoginTypeEnum.resolve(loginUserBO.getLoginType()),
+                request,
+                response
+        ));
     }
 
     /**
@@ -233,10 +239,12 @@ public class AuthController {
      * 构建LoginSuccess响应。
      */
     private LoginResponseVO buildLoginSuccessResponse(ManagerUser user,
+                                                      LoginTypeEnum loginType,
                                                       HttpServletRequest request,
                                                       HttpServletResponse response) {
         LoginUser loginUser = new LoginUser();
         loginUser.setUser(user);
+        loginUser.setLoginType(LoginTypeEnum.resolve(loginType));
 
         String token = tokenService.createToken(loginUser, tokenService.resolveLoginIp(request));
         String sessionId = oidcService.createSession(loginUser);

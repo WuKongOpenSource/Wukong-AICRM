@@ -1,7 +1,8 @@
 package com.kakarote.ai_crm.entity.BO;
 
-import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.kakarote.ai_crm.common.enums.LoginTypeEnum;
+import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -33,6 +34,11 @@ public class LoginUser implements UserDetails {
      * 用户信息
      */
     private ManagerUser user;
+
+    /**
+     * Login client type used for same-type single-login isolation.
+     */
+    private LoginTypeEnum loginType;
 
     /**
      * 获取Token。
@@ -153,6 +159,14 @@ public class LoginUser implements UserDetails {
      */
     public void setUser(ManagerUser user) {
         this.user = user;
+    }
+
+    public LoginTypeEnum getLoginType() {
+        return loginType;
+    }
+
+    public void setLoginType(LoginTypeEnum loginType) {
+        this.loginType = loginType;
     }
 
     /**
