@@ -26,7 +26,7 @@
           >more_horiz</span>
         </template>
         <div class="wk-chat-session-menu">
-          <!-- <button type="button" class="wk-chat-session-menu__item" @click="onShare">
+          <!-- <button type="button" class="wk-chat-session-menu__item" @click="menuVisible = false; emit('share', session)">
             <span class="material-symbols-outlined wk-chat-session-menu__icon">upload</span>
             <span class="wk-chat-session-menu__label">分享</span>
           </button> -->
@@ -86,11 +86,6 @@ const visibilityClass = computed(() =>
     ? 'pointer-events-auto opacity-100'
     : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'
 )
-
-function onShare() {
-  menuVisible.value = false
-  emit('share', props.session)
-}
 
 function onDelete() {
   menuVisible.value = false

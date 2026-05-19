@@ -30,14 +30,33 @@ interface StreamingTask {
 }
 
 export const useChatStore = defineStore('chat', () => {
-  const RAG_ENABLED_STORAGE_KEY = 'wk_ai_crm:chat_rag_enabled:v1'
   const MODEL_STORAGE_KEY = 'wk_ai_crm:chat_selected_model:v1'
-  const CRM_CONTEXT_ENABLED_STORAGE_KEY = 'wk_ai_crm:chat_crm_context_enabled:v1'
-  const APP_CODE_STORAGE_KEY = 'wk_ai_crm:chat_selected_app_code:v1'
+  /** Per-session UI app selection (follows conversation across switches / refresh). */
+  const SESSION_APP_BY_ID_STORAGE_KEY = 'wk_ai_crm:chat_session_app_by_id:v1'
   const DRAFT_SESSION_STORAGE_KEY = 'wk_ai_crm:chat_draft_session_id:v1'
   const GENERAL_APP_CODE = 'general'
   const CRM_APP_CODE = 'crm'
   const KNOWLEDGE_APP_CODE = 'knowledge'
+
+  function loadSessionAppCodeBySessionId(): Record<string, string> {
+    try {
+      const raw = localStorage.getItem(SESSION_APP_BY_ID_STORAGE_KEY)
+      if (!raw) return {}
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+      const allowed = new Set([GENERAL_APP_CODE, CRM_APP_CODE, KNOWLEDGE_APP_CODE])
+      const out: Record<string, string> = {}
+      for (const [k, v] of Object.entries(parsed)) {
+        if (typeof v === 'string' && k.length > 0) {
+          const c = v.trim().toLowerCase()
+          if (allowed.has(c)) out[k] = c
+        }
+      }
+      return out
+    } catch {
+      return {}
+    }
+  }
 
   const sessions = ref<ChatSession[]>([])
   const currentSessionId = ref<string | null>(null)
@@ -99,7 +118,8 @@ export const useChatStore = defineStore('chat', () => {
   const appOptionsLoading = ref(false)
   const modelOptions = ref<ChatModelOption[]>([])
   const appOptions = ref<ChatAppOption[]>([])
-  const selectedAppCode = ref(loadSelectedAppCode())
+  const sessionAppCodeBySessionId = ref<Record<string, string>>(loadSessionAppCodeBySessionId())
+  const selectedAppCode = ref(GENERAL_APP_CODE)
   const selectedModelKey = ref(loadSelectedModelKey())
   const ragEnabled = computed(() => selectedAppCode.value === KNOWLEDGE_APP_CODE)
   const crmContextEnabled = computed(() => selectedAppCode.value === CRM_APP_CODE)
@@ -109,6 +129,7 @@ export const useChatStore = defineStore('chat', () => {
     return messagesBySessionId.value[currentSessionId.value] || []
   })
 
+  /** True when any session has an active SSE stream (e.g. sidebar badges). */
   const isStreaming = computed(() => Object.keys(streamingTasks.value).length > 0)
   const streamingSessionIds = computed(() => Object.keys(streamingTasks.value))
   const currentSessionIsStreaming = computed(() =>
@@ -174,7 +195,7 @@ export const useChatStore = defineStore('chat', () => {
     title?: string,
     agentId?: string,
     customerId?: string,
-    appCode = selectedAppCode.value
+    appCode: string = GENERAL_APP_CODE
   ): Promise<string> {
     const normalizedAppCode = normalizeAppCode(appCode)
     const sessionId = await createSession({ title, agentId, customerId, appCode: normalizedAppCode })
@@ -190,7 +211,7 @@ export const useChatStore = defineStore('chat', () => {
     title?: string,
     agentId?: string,
     customerId?: string,
-    appCode = selectedAppCode.value
+    appCode: string = GENERAL_APP_CODE
   ): Promise<string> {
     const normalizedAppCode = normalizeAppCode(appCode)
     const id = draftSessionId.value
@@ -214,8 +235,13 @@ export const useChatStore = defineStore('chat', () => {
   async function selectSession(sessionId: string) {
     currentSessionId.value = sessionId
     const session = sessions.value.find(s => s.sessionId === sessionId)
-    if (session?.appCode) {
-      setSelectedAppCode(session.appCode)
+    const fromMap = sessionAppCodeBySessionId.value[sessionId]
+    if (fromMap !== undefined) {
+      selectedAppCode.value = normalizeAppCode(fromMap)
+    } else if (session?.appCode) {
+      selectedAppCode.value = normalizeAppCode(session.appCode)
+    } else {
+      selectedAppCode.value = GENERAL_APP_CODE
     }
     loading.value = true
     try {
@@ -232,6 +258,7 @@ export const useChatStore = defineStore('chat', () => {
     sessions.value = sessions.value.filter(s => s.sessionId !== sessionId)
     delete messagesBySessionId.value[sessionId]
     delete streamingTasks.value[sessionId]
+    deleteSessionAppCodeRecord(sessionId)
 
     if (currentSessionId.value === sessionId) {
       currentSessionId.value = null
@@ -248,8 +275,6 @@ export const useChatStore = defineStore('chat', () => {
     appCodeOrUseRag?: string | boolean,
     knowledgeIds?: string[]
   ): Promise<void> {
-    if (isStreaming.value) return
-
     const effectiveAppCode = resolveEffectiveAppCode(appCodeOrUseRag, knowledgeIds)
     if (!currentSessionId.value) {
       await startNewSession(undefined, undefined, undefined, effectiveAppCode)
@@ -258,6 +283,9 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     const sessionId = currentSessionId.value!
+    // Allow other sessions to stream concurrently; only block double-send on this session.
+    if (streamingTasks.value[sessionId]) return
+
     const userMessageId = createLocalMessageId('user')
     const assistantMessageId = createLocalMessageId('assistant')
 
@@ -315,9 +343,9 @@ export const useChatStore = defineStore('chat', () => {
         effectiveAppCode === KNOWLEDGE_APP_CODE,
         selectedModel.value?.provider,
         selectedModel.value?.modelName,
+        selectedModel.value?.modelSource,
         knowledgeIds,
-        abortController.signal,
-        selectedModel.value?.modelSource
+        abortController.signal
       )
     } catch (error) {
       console.error('sendMessage error:', error)
@@ -336,6 +364,10 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     const sessionId = currentSessionId.value!
+
+    if (streamingTasks.value[sessionId]) {
+      return ''
+    }
 
     appendSessionMessage(sessionId, {
       id: createLocalMessageId('user'),
@@ -395,15 +427,44 @@ export const useChatStore = defineStore('chat', () => {
     setSelectedAppCode(value ? CRM_APP_CODE : GENERAL_APP_CODE)
   }
 
+  function assignSessionAppCode(sessionId: string, code: string) {
+    const normalized = normalizeAppCode(code)
+    const next: Record<string, string> = { ...sessionAppCodeBySessionId.value, [sessionId]: normalized }
+    const keys = Object.keys(next)
+    if (keys.length > 200) {
+      const pruned: Record<string, string> = {}
+      for (const k of keys.slice(-200)) {
+        pruned[k] = next[k]
+      }
+      sessionAppCodeBySessionId.value = pruned
+    } else {
+      sessionAppCodeBySessionId.value = next
+    }
+    try {
+      localStorage.setItem(SESSION_APP_BY_ID_STORAGE_KEY, JSON.stringify(sessionAppCodeBySessionId.value))
+    } catch {
+      // ignore storage failures
+    }
+  }
+
+  function deleteSessionAppCodeRecord(sessionId: string) {
+    if (!(sessionId in sessionAppCodeBySessionId.value)) return
+    const next = { ...sessionAppCodeBySessionId.value }
+    delete next[sessionId]
+    sessionAppCodeBySessionId.value = next
+    try {
+      localStorage.setItem(SESSION_APP_BY_ID_STORAGE_KEY, JSON.stringify(sessionAppCodeBySessionId.value))
+    } catch {
+      // ignore storage failures
+    }
+  }
+
   function setSelectedAppCode(value: string) {
     const normalized = normalizeAppCode(value)
     selectedAppCode.value = normalized
-    try {
-      localStorage.setItem(APP_CODE_STORAGE_KEY, normalized)
-      localStorage.setItem(RAG_ENABLED_STORAGE_KEY, normalized === KNOWLEDGE_APP_CODE ? '1' : '0')
-      localStorage.setItem(CRM_CONTEXT_ENABLED_STORAGE_KEY, normalized === CRM_APP_CODE ? '1' : '0')
-    } catch {
-      // ignore storage failures
+    const sid = currentSessionId.value
+    if (sid) {
+      assignSessionAppCode(sid, normalized)
     }
   }
 
@@ -532,23 +593,6 @@ export const useChatStore = defineStore('chat', () => {
       return [GENERAL_APP_CODE, CRM_APP_CODE, KNOWLEDGE_APP_CODE].includes(code) ? code : GENERAL_APP_CODE
     }
     return knownCodes.includes(code) ? code : GENERAL_APP_CODE
-  }
-
-  function loadSelectedAppCode(): string {
-    try {
-      const saved = localStorage.getItem(APP_CODE_STORAGE_KEY)
-      if (saved) return normalizeStoredAppCode(saved)
-      if (localStorage.getItem(CRM_CONTEXT_ENABLED_STORAGE_KEY) === '1') return CRM_APP_CODE
-      if (localStorage.getItem(RAG_ENABLED_STORAGE_KEY) === '1') return KNOWLEDGE_APP_CODE
-      return GENERAL_APP_CODE
-    } catch {
-      return GENERAL_APP_CODE
-    }
-  }
-
-  function normalizeStoredAppCode(appCode: string): string {
-    const code = appCode.trim().toLowerCase()
-    return [GENERAL_APP_CODE, CRM_APP_CODE, KNOWLEDGE_APP_CODE].includes(code) ? code : GENERAL_APP_CODE
   }
 
   function loadSelectedModelKey(): string {

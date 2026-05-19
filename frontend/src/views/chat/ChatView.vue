@@ -747,7 +747,7 @@
                         width="300"
                         :show-arrow="false"
                         :teleported="true"
-                        :disabled="chatStore.isStreaming || isUploading || chatStore.modelOptionsLoading || chatStore.modelOptions.length === 0"
+                        :disabled="chatStore.currentSessionIsStreaming || isUploading || chatStore.modelOptionsLoading || chatStore.modelOptions.length === 0"
                         transition="el-zoom-in-bottom"
                         popper-class="wk-chat-model-popper"
                       >
@@ -755,7 +755,7 @@
                           <button
                             type="button"
                             class="inline-flex h-9 max-w-[220px] shrink-0 items-center gap-1.5 rounded-[18px] border border-[#ececec] bg-[#f5f5f5] pl-2 pr-2 text-left text-[13px] text-[#0d0d0d] transition-colors hover:bg-[#ececec] disabled:cursor-not-allowed disabled:opacity-50"
-                            :disabled="chatStore.isStreaming || isUploading || chatStore.modelOptionsLoading || chatStore.modelOptions.length === 0"
+                            :disabled="chatStore.currentSessionIsStreaming || isUploading || chatStore.modelOptionsLoading || chatStore.modelOptions.length === 0"
                             :title="`当前模型：${chatComposerModelLabel}`"
                           >
                             <span
@@ -1043,7 +1043,7 @@
                       v-model="chatStore.selectedModelKey"
                       class="min-w-0 flex-1"
                       size="large"
-                      :disabled="chatStore.isStreaming || isUploading || chatStore.modelOptionsLoading || chatStore.modelOptions.length === 0"
+                      :disabled="chatStore.currentSessionIsStreaming || isUploading || chatStore.modelOptionsLoading || chatStore.modelOptions.length === 0"
                       :placeholder="chatStore.modelOptionsLoading ? '加载模型...' : (chatStore.modelOptions.length > 0 ? '选择模型' : '暂无可选模型')"
                       @change="chatStore.setSelectedModelKey"
                     >
@@ -1346,6 +1346,7 @@ function modelOptionLabel(option: ChatModelOption): string {
 }
 
 const selectedChatAppLabel = computed(() => {
+  if (chatStore.selectedAppCode === 'general') return ''
   if (chatStore.selectedApp?.label) {
     return chatStore.selectedApp.label == '知识库' ? '知识库检索' : chatStore.selectedApp.label
   }
@@ -1355,6 +1356,7 @@ const selectedChatAppLabel = computed(() => {
 })
 
 const selectedChatAppIcon = computed<WkIconName>(() => {
+  if (chatStore.selectedAppCode === 'general') return 'application'
   if (chatStore.selectedApp?.iconName && isWkIconName(chatStore.selectedApp.iconName)) {
     return chatStore.selectedApp.iconName
   }
@@ -1841,7 +1843,7 @@ async function handleSend() {
   const text = inputText.value.trim()
   const hasFiles = selectedFiles.value.length > 0
   const hasKnowledge = selectedKnowledgeItems.value.length > 0
-  if ((!text && !hasFiles && !hasKnowledge) || chatStore.isStreaming || isUploading.value) return
+  if ((!text && !hasFiles && !hasKnowledge) || chatStore.currentSessionIsStreaming || isUploading.value) return
   if (!(await ensureAiAvailableForSend())) return
 
   isPinnedToBottom.value = true
