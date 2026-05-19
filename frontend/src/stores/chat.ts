@@ -33,6 +33,8 @@ export const useChatStore = defineStore('chat', () => {
   const MODEL_STORAGE_KEY = 'wk_ai_crm:chat_selected_model:v1'
   /** Per-session UI app selection (follows conversation across switches / refresh). */
   const SESSION_APP_BY_ID_STORAGE_KEY = 'wk_ai_crm:chat_session_app_by_id:v1'
+  /** Unsent composer text per session (survives refresh). */
+  const COMPOSER_DRAFT_BY_SESSION_STORAGE_KEY = 'wk_ai_crm:chat_composer_draft_by_session:v1'
   const DRAFT_SESSION_STORAGE_KEY = 'wk_ai_crm:chat_draft_session_id:v1'
   const GENERAL_APP_CODE = 'general'
   const CRM_APP_CODE = 'crm'
@@ -50,6 +52,27 @@ export const useChatStore = defineStore('chat', () => {
         if (typeof v === 'string' && k.length > 0) {
           const c = v.trim().toLowerCase()
           if (allowed.has(c)) out[k] = c
+        }
+      }
+      return out
+    } catch {
+      return {}
+    }
+  }
+
+  const MAX_COMPOSER_DRAFT_CHARS = 20000
+  const MAX_COMPOSER_DRAFT_SESSIONS = 64
+
+  function loadComposerDraftsBySessionId(): Record<string, string> {
+    try {
+      const raw = localStorage.getItem(COMPOSER_DRAFT_BY_SESSION_STORAGE_KEY)
+      if (!raw) return {}
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+      const out: Record<string, string> = {}
+      for (const [k, v] of Object.entries(parsed)) {
+        if (typeof v === 'string' && k.length > 0) {
+          out[k] = v.length > MAX_COMPOSER_DRAFT_CHARS ? v.slice(0, MAX_COMPOSER_DRAFT_CHARS) : v
         }
       }
       return out
@@ -119,6 +142,7 @@ export const useChatStore = defineStore('chat', () => {
   const modelOptions = ref<ChatModelOption[]>([])
   const appOptions = ref<ChatAppOption[]>([])
   const sessionAppCodeBySessionId = ref<Record<string, string>>(loadSessionAppCodeBySessionId())
+  const composerDraftBySessionId = ref<Record<string, string>>(loadComposerDraftsBySessionId())
   const selectedAppCode = ref(GENERAL_APP_CODE)
   const selectedModelKey = ref(loadSelectedModelKey())
   const ragEnabled = computed(() => selectedAppCode.value === KNOWLEDGE_APP_CODE)
@@ -259,6 +283,7 @@ export const useChatStore = defineStore('chat', () => {
     delete messagesBySessionId.value[sessionId]
     delete streamingTasks.value[sessionId]
     deleteSessionAppCodeRecord(sessionId)
+    deleteComposerDraftForSession(sessionId)
 
     if (currentSessionId.value === sessionId) {
       currentSessionId.value = null
@@ -459,6 +484,48 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function persistComposerDraftsBySessionId() {
+    try {
+      localStorage.setItem(COMPOSER_DRAFT_BY_SESSION_STORAGE_KEY, JSON.stringify(composerDraftBySessionId.value))
+    } catch {
+      // ignore storage failures
+    }
+  }
+
+  function setComposerDraft(sessionId: string, text: string) {
+    let t = text
+    if (t.length > MAX_COMPOSER_DRAFT_CHARS) t = t.slice(0, MAX_COMPOSER_DRAFT_CHARS)
+    const next = { ...composerDraftBySessionId.value }
+    if (!t) {
+      delete next[sessionId]
+    } else {
+      next[sessionId] = t
+    }
+    const keys = Object.keys(next)
+    if (keys.length > MAX_COMPOSER_DRAFT_SESSIONS) {
+      const pruned: Record<string, string> = {}
+      for (const k of keys.slice(-MAX_COMPOSER_DRAFT_SESSIONS)) {
+        pruned[k] = next[k]!
+      }
+      composerDraftBySessionId.value = pruned
+    } else {
+      composerDraftBySessionId.value = next
+    }
+    persistComposerDraftsBySessionId()
+  }
+
+  function getComposerDraft(sessionId: string): string {
+    return composerDraftBySessionId.value[sessionId] ?? ''
+  }
+
+  function deleteComposerDraftForSession(sessionId: string) {
+    if (!(sessionId in composerDraftBySessionId.value)) return
+    const next = { ...composerDraftBySessionId.value }
+    delete next[sessionId]
+    composerDraftBySessionId.value = next
+    persistComposerDraftsBySessionId()
+  }
+
   function setSelectedAppCode(value: string) {
     const normalized = normalizeAppCode(value)
     selectedAppCode.value = normalized
@@ -646,6 +713,8 @@ export const useChatStore = defineStore('chat', () => {
     setSelectedAppCode,
     toModelKey,
     setCrmContextEnabled,
+    setComposerDraft,
+    getComposerDraft,
     isSessionStreaming,
     stopStreaming
   }

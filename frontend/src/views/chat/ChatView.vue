@@ -320,7 +320,7 @@
                       {{ userAvatarFallback }}
                     </span>
                   </div>
-                  <div class="space-y-3 min-w-0" :class="isMobile ? 'max-w-[85%]' : 'max-w-[70%]'">
+                  <div class="space-y-3 min-w-0 min-w-[50px]" :class="isMobile ? 'max-w-[85%]' : 'max-w-[70%]'">
                     <!-- <div class="bg-primary text-white rounded-2xl rounded-tr-none p-4 shadow-lg shadow-primary/10 text-sm leading-relaxed"> -->
                     <div class="bg-[#e9e9e980] text-[#0d0d0d] rounded-[22px] px-4 py-[0.6rem] text-[16px] leading-relaxed">
                       <div class="whitespace-pre-wrap">{{ message.content || '...' }}</div>
@@ -1275,6 +1275,10 @@ import dashscopeBrandUrl from '@/assets/model-provider-brands/dashscope.svg?url'
 import openaiBrandUrl from '@/assets/model-provider-brands/openai.svg?url'
 import deepseekBrandUrl from '@/assets/model-provider-brands/deepseek.svg?url'
 import moonshotBrandUrl from '@/assets/model-provider-brands/moonshot.svg?url'
+import arkBrandUrl from '@/assets/model-provider-brands/ark.svg?url'
+import hunyuanBrandUrl from '@/assets/model-provider-brands/hunyuan.svg?url'
+import minimaxBrandUrl from '@/assets/model-provider-brands/minimax.svg?url'
+import zhipuBrandUrl from '@/assets/model-provider-brands/zhipu.svg?url'
 import defaultLogoImg from '@/assets/images/logo.png'
 
 const route = useRoute()
@@ -1393,21 +1397,24 @@ function isWkIconName(iconName: string): iconName is WkIconName {
 }
 
 /**
- * 厂商标识 SVG（与接口 `provider` 一致）。
- * dashscope → 通义 Qwen（Simple Icons）；deepseek / moonshot → Simple Icons；
- * openai → Simple Icons 历史版本中的 OpenAI 官方路径图形（当前 npm 包已移除该标，故随仓库内置）。
- * 许可：Simple Icons 为 CC0-1.0，见 https://github.com/simple-icons/simple-icons
+ * 厂商标识 SVG（与接口 `provider` / 后端 AiProviderRegistry.code 一致）。
+ * 资源位于 `src/assets/model-provider-brands/`。
  */
 const MODEL_PROVIDER_BRAND_URL: Record<string, string> = {
   dashscope: dashscopeBrandUrl,
   openai: openaiBrandUrl,
   deepseek: deepseekBrandUrl,
   moonshot: moonshotBrandUrl,
+  ark: arkBrandUrl,
+  arkl: arkBrandUrl,
+  hunyuan: hunyuanBrandUrl,
+  minimax: minimaxBrandUrl,
+  zhipu: zhipuBrandUrl,
 }
 
 function providerBrandAssetUrl(provider: string): string | undefined {
-  const id = provider?.trim()
-  if (!id || !/^[-a-zA-Z0-9._]+$/.test(id)) return undefined
+  const id = provider?.trim().toLowerCase()
+  if (!id || !/^[-a-z0-9._]+$/.test(id)) return undefined
   return MODEL_PROVIDER_BRAND_URL[id]
 }
 
@@ -1473,7 +1480,38 @@ function resizeChatTextarea() {
   el.style.height = `${Math.min(el.scrollHeight, maxH)}px`
 }
 
-watch(inputText, () => nextTick(resizeChatTextarea))
+/** Persist unsent input per session; debounced to reduce localStorage writes. */
+let composerDraftSaveTimer: ReturnType<typeof setTimeout> | null = null
+function schedulePersistComposerDraft() {
+  const sid = chatStore.currentSessionId
+  if (!sid) return
+  if (composerDraftSaveTimer != null) clearTimeout(composerDraftSaveTimer)
+  composerDraftSaveTimer = setTimeout(() => {
+    composerDraftSaveTimer = null
+    chatStore.setComposerDraft(sid, inputText.value)
+  }, 400)
+}
+
+watch(
+  () => chatStore.currentSessionId,
+  (newId, oldId) => {
+    if (composerDraftSaveTimer != null) {
+      clearTimeout(composerDraftSaveTimer)
+      composerDraftSaveTimer = null
+    }
+    if (oldId != null) {
+      chatStore.setComposerDraft(oldId, inputText.value)
+    }
+    inputText.value = newId ? chatStore.getComposerDraft(newId) : ''
+    void nextTick(() => resizeChatTextarea())
+  },
+  { flush: 'post' }
+)
+
+watch(inputText, () => {
+  void nextTick(resizeChatTextarea)
+  schedulePersistComposerDraft()
+})
 watch(isMobile, () => nextTick(resizeChatTextarea))
 const selectedFiles = ref<File[]>([])
 const selectedKnowledgeItems = ref<Knowledge[]>([])
@@ -1825,6 +1863,14 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   abortChatViewMountSequence = true
+  if (composerDraftSaveTimer != null) {
+    clearTimeout(composerDraftSaveTimer)
+    composerDraftSaveTimer = null
+  }
+  const sid = chatStore.currentSessionId
+  if (sid) {
+    chatStore.setComposerDraft(sid, inputText.value)
+  }
   abortChatVoiceRecording()
   transcriptionToken += 1
   unregisterAiQuotaResumeSendHandler()
@@ -1890,7 +1936,15 @@ async function handleSend() {
       : hasFiles
         ? '请分析这些文件'
         : '请结合选中的知识库文档回答')
+  const draftSessionId = chatStore.currentSessionId
   inputText.value = ''
+  if (draftSessionId) {
+    chatStore.setComposerDraft(draftSessionId, '')
+  }
+  if (composerDraftSaveTimer != null) {
+    clearTimeout(composerDraftSaveTimer)
+    composerDraftSaveTimer = null
+  }
 
   const knowledgeIdsPayload = hasKnowledge
     ? selectedKnowledgeItems.value.map((k) => k.knowledgeId)

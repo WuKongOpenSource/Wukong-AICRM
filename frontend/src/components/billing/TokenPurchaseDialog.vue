@@ -67,7 +67,7 @@
                 class="flex items-center justify-between gap-4 text-[14px] leading-none"
               >
                 <div class="flex min-w-0 items-center gap-1.5">
-                  <span class="truncate font-bold text-[#8d939f]">{{ item.model }}</span>
+                  <span class="truncate text-[#8d939f]">{{ item.model }}</span>
                   <span class="material-symbols-outlined shrink-0 text-[14px] leading-none text-[#c2c7d0]">info</span>
                 </div>
                 <span class="shrink-0 font-black tabular-nums text-[#8d939f]">{{ item.messages }}</span>
