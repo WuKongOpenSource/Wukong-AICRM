@@ -129,14 +129,19 @@ public class AiModelPricingService {
         vo.setProviderLabel(StrUtil.blankToDefault(seed.providerLabel(), AiProviderRegistry.get(seed.provider()).getDisplayName()));
         vo.setModelName(seed.modelName());
         vo.setModelSource(seed.modelSource());
+        boolean customModel = AiModelSource.CUSTOM.equals(AiModelSource.normalize(seed.modelSource()));
         if (pricing != null && Boolean.TRUE.equals(pricing.getEnabled())) {
             vo.setDisplayName(StrUtil.blankToDefault(pricing.getDisplayName(), seed.modelName()));
-            vo.setCreditMultiplier(pricing.getCreditMultiplier() != null ? pricing.getCreditMultiplier() : DEFAULT_MULTIPLIER);
+            vo.setCreditMultiplier(customModel ? null : resolveOptionMultiplier(pricing));
         } else {
             vo.setDisplayName(seed.modelName());
-            vo.setCreditMultiplier(DEFAULT_MULTIPLIER);
+            vo.setCreditMultiplier(customModel ? null : DEFAULT_MULTIPLIER);
         }
         return vo;
+    }
+
+    private BigDecimal resolveOptionMultiplier(AiModelPricing pricing) {
+        return pricing.getCreditMultiplier() != null ? pricing.getCreditMultiplier() : DEFAULT_MULTIPLIER;
     }
 
     private Set<String> normalizeProviders(Collection<String> providers) {

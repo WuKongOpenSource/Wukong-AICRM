@@ -837,7 +837,12 @@
                                   <div class="min-w-0 text-[14px] leading-tight text-[#0d0d0d]">
                                     {{ modelOptionLabel(option) }}
                                   </div>
-                                  <span class="shrink-0 text-xs text-slate-400">{{ formatModelMultiplier(option.creditMultiplier) }}</span>
+                                  <span
+                                    v-if="shouldShowModelMultiplier(option)"
+                                    class="shrink-0 text-xs text-slate-400"
+                                  >
+                                    {{ formatModelMultiplier(option.creditMultiplier) }}
+                                  </span>
                                 </div>
                                 <!-- <div class="mt-0.5 truncate text-[12px] leading-snug text-[#909090]">
                                   {{ option.providerLabel || option.provider }}
@@ -1079,7 +1084,12 @@
                         >
                           <div class="flex items-center justify-between gap-4">
                             <span class="truncate">{{ option.displayName || option.modelName }}</span>
-                            <span class="shrink-0 text-xs text-slate-400">{{ formatModelMultiplier(option.creditMultiplier) }}</span>
+                            <span
+                              v-if="shouldShowModelMultiplier(option)"
+                              class="shrink-0 text-xs text-slate-400"
+                            >
+                              {{ formatModelMultiplier(option.creditMultiplier) }}
+                            </span>
                           </div>
                         </el-option>
                       </el-option-group>
@@ -2211,7 +2221,11 @@ function sendQuickMessage(text: string) {
   handleSend()
 }
 
-function formatModelMultiplier(value?: number) {
+function shouldShowModelMultiplier(option: ChatModelOption): boolean {
+  return option.modelSource !== 'custom'
+}
+
+function formatModelMultiplier(value?: number | null) {
   const multiplier = Number(value || 1)
   return `${multiplier.toFixed(multiplier % 1 === 0 ? 0 : 2)}x 积分`
 }
