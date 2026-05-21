@@ -314,26 +314,7 @@ function onColumnDrop(e: DragEvent, stage: CustomerStage) {
   min-width: 0;
 }
 
-.wk-stage-board {
-  scrollbar-width: none;
-}
-
-.wk-stage-board::-webkit-scrollbar {
-  display: none;
-}
-
 .wk-stage-column-scroll {
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-}
-
-.wk-stage-column-scroll::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.wk-stage-column-scroll::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgb(148 163 184 / 0.45);
 }
 </style>

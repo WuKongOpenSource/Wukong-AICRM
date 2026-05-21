@@ -996,7 +996,8 @@ const themeButtonLabel = computed(() => (isDark.value ? '浅色模式' : '深色
  *
  * 恢复时用「收起侧栏下的主列宽度 − 侧栏宽度差」估算展开后的主列宽度，与阈值比较，避免收起后主列变宽立刻触发恢复导致抖动。
  */
-const PC_PRIMARY_SIDEBAR_AUTO_COLLAPSE_BELOW_PX = 780
+const CHAT_COMPOSER_MIN_WIDTH_PX = 468
+const PC_PRIMARY_SIDEBAR_AUTO_COLLAPSE_BELOW_PX = CHAT_COMPOSER_MIN_WIDTH_PX
 /** 与模板 `w-64` / `w-[52px]` 一致，用于主列宽度滞回 */
 const PRIMARY_SIDEBAR_WIDTH_EXPANDED_PX = 256
 const PRIMARY_SIDEBAR_WIDTH_COLLAPSED_PX = 52
@@ -1107,6 +1108,66 @@ const searchPanelRef = ref<HTMLElement | null>(null)
 let globalSearchTimer: ReturnType<typeof setTimeout> | null = null
 let sidebarCustomerSearchTimer: ReturnType<typeof setTimeout> | null = null
 let globalSearchRequestId = 0
+let removeChatComposerNarrowListener: (() => void) | null = null
+
+type ChatComposerNarrowPayload = {
+  narrow?: boolean
+  width?: number
+  minWidth?: number
+}
+
+const chatComposerNarrow = ref(false)
+const chatComposerAutoCollapseActive = ref(false)
+
+function getChatComposerWidthIfSidebarExpanded(width: number): number {
+  return primarySidebarCollapsed.value ? width - PRIMARY_SIDEBAR_WIDTH_DELTA_PX : width
+}
+
+function restorePrimarySidebarForWideComposer(width: number, minWidth: number) {
+  if (!chatComposerAutoCollapseActive.value || !primarySidebarCollapsed.value) return
+  if (getChatComposerWidthIfSidebarExpanded(width) < minWidth) return
+  runLayoutNarrowProgrammatic(() => {
+    primarySidebarCollapsed.value = false
+    chatComposerAutoCollapseActive.value = false
+  })
+}
+
+function collapsePrimarySidebarForNarrowComposer() {
+  if (isMobile.value || !chatComposerNarrow.value || primarySidebarCollapsed.value) return
+  runLayoutNarrowProgrammatic(() => {
+    chatComposerAutoCollapseActive.value = true
+    primarySidebarCollapsed.value = true
+  })
+}
+
+function handleChatComposerNarrowChange(payload?: ChatComposerNarrowPayload) {
+  const width = Number(payload?.width || 0)
+  const minWidth = Number(payload?.minWidth || CHAT_COMPOSER_MIN_WIDTH_PX)
+  chatComposerNarrow.value = Boolean(payload?.narrow)
+
+  if (width <= 0 && chatComposerAutoCollapseActive.value) {
+    runLayoutNarrowProgrammatic(() => {
+      primarySidebarCollapsed.value = false
+      chatComposerAutoCollapseActive.value = false
+    })
+    return
+  }
+
+  if (isMobile.value) {
+    chatComposerAutoCollapseActive.value = false
+    return
+  }
+
+  if (chatComposerNarrow.value) {
+    collapsePrimarySidebarForNarrowComposer()
+    return
+  }
+
+  restorePrimarySidebarForWideComposer(width, minWidth)
+  if (!primarySidebarCollapsed.value) {
+    chatComposerAutoCollapseActive.value = false
+  }
+}
 
 const showSidebarCustomers = computed(() => userStore.hasPermission('customer'))
 
@@ -1302,6 +1363,10 @@ watch(showUserMenu, open => {
   }
 })
 
+watch(primarySidebarCollapsed, collapsed => {
+  if (!collapsed) collapsePrimarySidebarForNarrowComposer()
+})
+
 watch(
   () => [isMobile.value, mainContentColumnWidth.value, mainContentColumnMeasured.value, primarySidebarCollapsed.value] as const,
   ([mobile, w, measured, collapsed]) => {
@@ -1394,6 +1459,10 @@ onMounted(() => {
     void fetchSidebarCustomers({ reset: true })
   }
   document.addEventListener('click', handleDocumentClick)
+  removeChatComposerNarrowListener = appEvents.on<ChatComposerNarrowPayload>(
+    APP_EVENT.CHAT_COMPOSER_NARROW_CHANGE,
+    handleChatComposerNarrowChange
+  )
 
   if (typeof ResizeObserver !== 'undefined') {
     primaryNavResizeObserver = new ResizeObserver(() => updatePrimaryNavScrollbar())
@@ -1424,6 +1493,8 @@ watch(
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleDocumentClick)
+  removeChatComposerNarrowListener?.()
+  removeChatComposerNarrowListener = null
   if (mainContentColumnResizeObserver) {
     mainContentColumnResizeObserver.disconnect()
     mainContentColumnResizeObserver = null

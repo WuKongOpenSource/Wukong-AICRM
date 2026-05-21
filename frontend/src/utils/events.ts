@@ -18,5 +18,5 @@ export const appEvents = new AppEventBus()
 
 export const APP_EVENT = {
   CUSTOMER_LIST_REFRESH: 'customer:list:refresh',
+  CHAT_COMPOSER_NARROW_CHANGE: 'chat:composer:narrow-change',
 } as const
-

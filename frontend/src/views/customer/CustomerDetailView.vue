@@ -516,6 +516,18 @@
                   <span :class="sectionMaterialIconClass">history</span>
                 </span>
                 <h3 class="min-w-0 truncate text-lg font-bold text-slate-900">最近活动 - AI时间轴</h3>
+                <button
+                  type="button"
+                  class="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+                  :aria-expanded="followUpTimelineExpanded"
+                  :aria-label="followUpTimelineExpanded ? '收起跟进记录' : '展开跟进记录'"
+                  :title="followUpTimelineExpanded ? '收起跟进记录' : '展开跟进记录'"
+                  @click="followUpTimelineExpanded = !followUpTimelineExpanded"
+                >
+                  <span class="material-symbols-outlined text-[16px] leading-none">
+                    {{ followUpTimelineExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
+                  </span>
+                </button>
               </div>
               <div
                 v-if="!isEmbeddedMobileLayout"
@@ -549,13 +561,13 @@
               </div>
             </div>
 
-            <div v-if="followUps.length === 0 && !followUpLoading" class="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-sm">
+            <div v-if="followUpTimelineExpanded && followUps.length === 0 && !followUpLoading" class="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-sm">
               <span class="material-symbols-outlined text-slate-300 text-4xl mb-3">event_note</span>
               <p class="text-sm text-slate-400">暂无跟进记录</p>
               <p class="text-xs text-slate-300 mt-1">点击上方按钮添加第一条跟进记录</p>
             </div>
 
-            <div v-else v-loading="followUpLoading">
+            <div v-else-if="followUpTimelineExpanded" v-loading="followUpLoading">
               <div
                 v-for="(item, followUpIndex) in followUps"
                 :key="item.followUpId"
@@ -630,7 +642,7 @@
               </div>
             </div>
 
-            <div v-if="followUpTotal > followUpPageSize" class="flex justify-center">
+            <div v-if="followUpTimelineExpanded && followUpTotal > followUpPageSize" class="flex justify-center">
               <el-pagination
                 v-model:current-page="followUpPage"
                 :page-size="followUpPageSize"
@@ -1140,6 +1152,7 @@ const followUpTotal = ref(0)
 const followUpPage = ref(1)
 const followUpPageSize = ref(5)
 const followUpLoading = ref(false)
+const followUpTimelineExpanded = ref(true)
 const selectedFollowUpType = ref('')
 const contacts = ref<Contact[]>([])
 const contactTotal = ref(0)

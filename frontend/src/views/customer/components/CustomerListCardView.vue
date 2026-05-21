@@ -144,16 +144,5 @@ function cardHotClass(row: CustomerListVO) {
 <style scoped>
 .wk-card-view-scroll {
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-}
-
-.wk-card-view-scroll::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.wk-card-view-scroll::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgb(148 163 184 / 0.55);
 }
 </style>

@@ -41,6 +41,10 @@ html, body, #app {
   --wk-text-muted: #64748b;
   --wk-text-faint: #999;
   --wk-shadow-color: 15 23 42;
+  --wk-scrollbar-size: 8px;
+  --wk-scrollbar-radius: 3px;
+  --wk-scrollbar-thumb: var(--wk-border-subtle);
+  --wk-scrollbar-thumb-hover: var(--wk-text-faint);
   --el-color-primary: #137fec;
   --el-color-primary-dark-2: #0f66bd;
   --el-color-primary-light-3: #5ba5f2;
@@ -153,24 +157,34 @@ html, body {
   }
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar: keep every native scroll area aligned with the primary sidebar nav. */
+* {
+  scrollbar-width: 8px;
+  scrollbar-color: var(--wk-scrollbar-thumb) transparent;
+}
+
+*:hover {
+  scrollbar-color: var(--wk-scrollbar-thumb-hover) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: var(--wk-scrollbar-size);
+  height: var(--wk-scrollbar-size);
 }
 
 ::-webkit-scrollbar-track {
   background: transparent;
-  border-radius: 3px;
+  border-radius: var(--wk-scrollbar-radius);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--wk-border-strong);
-  border-radius: 3px;
+  background: var(--wk-scrollbar-thumb);
+  border-radius: var(--wk-scrollbar-radius);
+  transition: background-color 150ms ease;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--wk-text-faint);
+:hover::-webkit-scrollbar-thumb {
+  background: var(--wk-scrollbar-thumb-hover);
 }
 
 /*
@@ -184,30 +198,53 @@ html, body {
 /* Primary sidebar nav — thumb:hover is unreliable in WebKit; hover the scroll area instead */
 .wk-primary-nav-scroll {
   scrollbar-width: 8px;
-  scrollbar-color: var(--wk-border-subtle) transparent;
+  scrollbar-color: var(--wk-scrollbar-thumb) transparent;
 }
 
 .wk-primary-nav-scroll:hover {
-  scrollbar-color: var(--wk-text-faint) transparent;
+  scrollbar-color: var(--wk-scrollbar-thumb-hover) transparent;
 }
 
 .wk-primary-nav-scroll::-webkit-scrollbar {
-  width: 6px;
+  width: var(--wk-scrollbar-size);
+  height: var(--wk-scrollbar-size);
 }
 
 .wk-primary-nav-scroll::-webkit-scrollbar-track {
   background: transparent;
-  border-radius: 3px;
+  border-radius: var(--wk-scrollbar-radius);
 }
 
 .wk-primary-nav-scroll::-webkit-scrollbar-thumb {
-  background: var(--wk-border-subtle);
-  border-radius: 3px;
+  background: var(--wk-scrollbar-thumb);
+  border-radius: var(--wk-scrollbar-radius);
   transition: background-color 150ms ease;
 }
 
 .wk-primary-nav-scroll:hover::-webkit-scrollbar-thumb {
-  background: var(--wk-text-faint);
+  background: var(--wk-scrollbar-thumb-hover);
+}
+
+/* Element Plus uses custom scrollbar nodes; align them with the native style above. */
+.el-scrollbar__bar.is-vertical {
+  width: var(--wk-scrollbar-size);
+}
+
+.el-scrollbar__bar.is-horizontal {
+  height: var(--wk-scrollbar-size);
+}
+
+.el-scrollbar__thumb {
+  background-color: var(--wk-scrollbar-thumb);
+  border-radius: var(--wk-scrollbar-radius);
+  opacity: 1;
+  transition: background-color 150ms ease;
+}
+
+.el-scrollbar__bar:hover .el-scrollbar__thumb,
+.el-scrollbar__wrap:hover + .el-scrollbar__bar .el-scrollbar__thumb,
+.el-scrollbar__wrap:hover + .el-scrollbar__bar + .el-scrollbar__bar .el-scrollbar__thumb {
+  background-color: var(--wk-scrollbar-thumb-hover);
 }
 
 /* Glass panel effect */

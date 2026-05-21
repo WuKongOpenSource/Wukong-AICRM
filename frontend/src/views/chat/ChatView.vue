@@ -142,6 +142,7 @@
     <!-- Main Area -->
     <div
       v-if="!isMobile || mobilePanel === 'chat'"
+      ref="chatMainAreaRef"
       class="flex-1 min-w-0 flex flex-col relative bg-white overflow-hidden"
     >
       <!-- Chat View -->
@@ -213,22 +214,28 @@
             <button
               v-if="showCustomerPanelShell && customerPanelVisible"
               type="button"
-              class="absolute right-4 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white text-[#8f8f8f] ring-1 ring-[#ececec] transition-colors hover:bg-[#f5f5f5] hover:text-[#0d0d0d] md:right-8"
+              class="group/sb-toggle absolute right-4 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef] md:right-8"
               aria-label="收起客户侧栏"
-              title="隐藏客户侧栏"
               @click="customerPanelVisible = false"
             >
-              <span class="material-symbols-outlined text-[18px] leading-none">dock_to_right</span>
+              <WkIcon name="fold" :size="18" class="shrink-0" />
+              <span
+                class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/sb-toggle:opacity-100"
+                role="tooltip"
+              >
+                收起客户侧栏
+              </span>
             </button>
           </div>
 
           <!-- Messages Area -->
           <div
             ref="messagesContainer"
-            class="wk-chat-messages px-4 md:px-8"
+            class="wk-chat-messages"
             :class="chatMessagesAreaClass"
             @scroll="handleMessagesScroll"
           >
+            <div class="wk-chat-messages__inner px-4 md:px-8">
             <!-- Welcome Section (no messages) -->
             <template v-if="chatStore.messages.length === 0 && !selectedCustomer">
               <div class="mx-auto flex max-w-3xl flex-col items-center space-y-5 py-6 text-center">
@@ -262,7 +269,6 @@
                 :key="message.id"
                 class="wk-chat-message mx-auto message-enter"
                 :class="[
-                  isMobile ? 'w-full' : 'w-[768px] max-w-[768px]',
                   message.role === 'user' ? 'wk-chat-message--user' : 'wk-chat-message--assistant'
                 ]"
               >
@@ -295,7 +301,7 @@
                 </div>
 
                 <!-- AI Message -->
-                <div v-if="message.role !== 'user'" class="group flex w-full gap-3 pb-8 md:gap-4 md:pb-10">
+                <div v-if="message.role !== 'user'" class="group flex w-full gap-3 pb-4 md:gap-4 md:pb-4">
                   <div v-if="false" class="size-9 rounded-xl bg-primary flex items-center justify-center text-white shrink-0 shadow-lg shadow-primary/20">
                     <WkIcon name="ai" class="text-lg" />
                   </div>
@@ -356,7 +362,7 @@
                 </div>
 
                 <!-- User Message -->
-                <div v-else class="group flex w-full flex-wrap flex-row-reverse pb-8">
+                <div v-else class="group flex w-full flex-wrap flex-row-reverse pb-0">
                   <div v-if="false" class="size-9 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200 flex items-center justify-center">
                     <img
                       v-if="showUserAvatarImage"
@@ -427,6 +433,7 @@
                 </div>
               </div>
             </template>
+            </div>
           </div>
 
           <Transition name="scroll-to-bottom">
@@ -443,7 +450,7 @@
 
           <!-- Input Area -->
           <div
-            class="shrink-0 pb-2 md:pb-2"
+            class="shrink-0 pb-2 md:pb-2 px-8"
             :class="isCenteredEmptyChat ? 'bg-transparent pt-0' : 'bg-gradient-to-t from-white via-white to-transparent'"
           >
             <div class="mx-auto space-y-8 w-[calc(100%-20px)] max-w-4xl md:w-full">
@@ -468,7 +475,11 @@
               </div>
 
               <!-- Input Box -->
-              <div class="relative group min-w-0" :class="isMobile ? '' : 'w-[768px] max-w-full mx-auto'">
+              <div
+                class="relative group min-w-0"
+                :class="isMobile ? '' : 'w-[768px] max-w-full mx-auto'"
+                :style="chatComposerShellStyle"
+              >
                 <!-- <div class="absolute inset-0 bg-primary/5 blur-xl rounded-2xl group-focus-within:bg-primary/10 transition-all opacity-0 group-focus-within:opacity-100"></div> -->
                 <div class="absolute inset-0 bg-primary/5 blur-xl rounded-2xl transition-all opacity-0"></div>
                 <!-- focus-within:border-primary -->
@@ -521,7 +532,7 @@
                     </button>
                     <div
                       ref="composerAttachmentScrollRef"
-                      class="flex min-h-[54px] min-w-0 w-full flex-nowrap gap-2 overflow-x-auto overflow-y-hidden scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                      class="flex min-h-[54px] min-w-0 w-full flex-nowrap gap-2 overflow-x-auto overflow-y-hidden scroll-smooth"
                       :class="composerAttachmentShowScrollArrows ? '' : ''"
                       @scroll.passive="updateComposerAttachmentScrollState"
                     >
@@ -1301,12 +1312,17 @@
     <button
       v-if="showCustomerPanelShell && !customerPanelVisible"
       type="button"
-      class="absolute right-3 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-full border border-[#ececec] bg-white text-[#6f6f6f] shadow-lg shadow-black/5 transition-colors hover:bg-[#f5f5f5] hover:text-[#0d0d0d]"
+      class="group/sb-toggle absolute right-3 top-3 z-30 flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef]"
       aria-label="展开客户侧栏"
-      title="显示客户侧栏"
       @click="customerPanelVisible = true"
     >
-      <span class="material-symbols-outlined text-[19px] leading-none">dock_to_left</span>
+      <WkIcon name="fold" :size="18" class="shrink-0" />
+      <span
+        class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/sb-toggle:opacity-100"
+        role="tooltip"
+      >
+        显示客户侧栏
+      </span>
     </button>
 
     <aside
@@ -1379,6 +1395,7 @@ import { renderMarkdown } from '@/utils/markdown'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import { formatFileSize, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
+import { appEvents, APP_EVENT } from '@/utils/events'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, ChatModelOption } from '@/types/common'
 import type { CustomerDetailVO } from '@/types/customer'
 import { wkIconNames } from '@/components/common/wkIcon'
@@ -1413,6 +1430,7 @@ const boundCustomerName = computed(() =>
 
 const inputText = ref('')
 const chatViewRef = ref<HTMLElement | null>(null)
+const chatMainAreaRef = ref<HTMLElement | null>(null)
 const messagesContainer = ref<HTMLElement | null>(null)
 const showScrollToBottomButton = ref(false)
 const mobilePanel = ref<'sessions' | 'chat'>('sessions')
@@ -1484,6 +1502,11 @@ const customerPanelResizing = ref(false)
 const CUSTOMER_PANEL_MIN_WIDTH = 280
 const CUSTOMER_PANEL_PC_DETAIL_RATIO = 0.5
 const CUSTOMER_PANEL_FULL_WIDTH_RATIO = 0.7
+const CHAT_COMPOSER_MIN_WIDTH_PX = 468
+
+const chatComposerShellStyle = computed(() => (
+  isMobile.value ? undefined : { minWidth: `${CHAT_COMPOSER_MIN_WIDTH_PX}px` }
+))
 
 const CUSTOMER_STAGE_FLOW = [
   { value: 'lead', label: '线索' },
@@ -1894,13 +1917,20 @@ const isChatEmpty = computed(() => chatStore.messages.length === 0)
 const isCustomerContextChat = computed(() => Boolean(selectedCustomerId.value || currentSessionCustomerId.value))
 const isCenteredEmptyChat = computed(() => isChatEmpty.value && !isCustomerContextChat.value)
 const chatMessagesAreaClass = computed(() => {
-  if (!isChatEmpty.value) return 'flex-1 overflow-y-auto pb-4 pt-6 md:pt-8'
+  if (!isChatEmpty.value) return 'wk-chat-messages--scrollable flex-1 overflow-y-auto pb-4 pt-6 md:pt-8'
   return isCustomerContextChat.value ? 'flex-1 overflow-hidden py-6' : 'overflow-hidden py-6'
 })
 
 const SCROLL_TO_BOTTOM_THRESHOLD_PX = 100
 /** When true, new content / streaming keeps the viewport pinned to the bottom. */
 const isPinnedToBottom = ref(true)
+
+function updateMessagesScrollbarOffset() {
+  const el = messagesContainer.value
+  if (!el) return
+  const scrollbarOffset = Math.max(0, el.offsetWidth - el.clientWidth)
+  el.style.setProperty('--wk-chat-messages-scrollbar-offset', `${scrollbarOffset}px`)
+}
 
 function getMessagesDistanceToBottom(el: HTMLElement) {
   return el.scrollHeight - (el.scrollTop + el.clientHeight)
@@ -2099,7 +2129,7 @@ async function handleSelectCustomerById(customerId: string) {
   }
 
   if (chatStore.messages.length === 0 && !inputText.value.trim()) {
-    inputText.value = `请帮我分析客户「${customerName}」的当前情况，并给出下一步建议。`
+    // inputText.value = `请帮我分析客户「${customerName}」的当前情况，并给出下一步建议。`
   }
   await nextTick()
   focusChatTextarea()
@@ -2123,15 +2153,43 @@ const userAvatarFallback = computed(() => (userStore.realname || userStore.usern
 
 let abortChatViewMountSequence = false
 let customerPanelResizeObserver: ResizeObserver | null = null
+let chatMainAreaResizeObserver: ResizeObserver | null = null
+let chatMessagesResizeObserver: ResizeObserver | null = null
+let lastChatComposerNarrow: boolean | null = null
+let lastChatComposerWidth = 0
+
+function emitChatComposerNarrowState(force = false) {
+  const width = chatMainAreaRef.value?.getBoundingClientRect().width || 0
+  const narrow = !isMobile.value && width > 0 && width < CHAT_COMPOSER_MIN_WIDTH_PX
+  const roundedWidth = Math.round(width)
+  if (!force && narrow === lastChatComposerNarrow && roundedWidth === lastChatComposerWidth) return
+  lastChatComposerNarrow = narrow
+  lastChatComposerWidth = roundedWidth
+  appEvents.emit(APP_EVENT.CHAT_COMPOSER_NARROW_CHANGE, {
+    narrow,
+    width,
+    minWidth: CHAT_COMPOSER_MIN_WIDTH_PX
+  })
+}
 
 onMounted(async () => {
   registerAiQuotaResumeSendHandler(handleSend)
   await nextTick()
   updateCustomerPanelContainerWidth()
+  updateMessagesScrollbarOffset()
   if (chatViewRef.value) {
     customerPanelResizeObserver = new ResizeObserver(updateCustomerPanelContainerWidth)
     customerPanelResizeObserver.observe(chatViewRef.value)
   }
+  if (chatMainAreaRef.value && typeof ResizeObserver !== 'undefined') {
+    chatMainAreaResizeObserver = new ResizeObserver(() => emitChatComposerNarrowState())
+    chatMainAreaResizeObserver.observe(chatMainAreaRef.value)
+  }
+  if (messagesContainer.value && typeof ResizeObserver !== 'undefined') {
+    chatMessagesResizeObserver = new ResizeObserver(updateMessagesScrollbarOffset)
+    chatMessagesResizeObserver.observe(messagesContainer.value)
+  }
+  emitChatComposerNarrowState(true)
   resizeChatTextarea()
   await Promise.all([
     chatStore.fetchSessions(),
@@ -2162,8 +2220,28 @@ onBeforeUnmount(() => {
   unregisterAiQuotaResumeSendHandler()
   customerPanelResizeObserver?.disconnect()
   customerPanelResizeObserver = null
+  chatMainAreaResizeObserver?.disconnect()
+  chatMainAreaResizeObserver = null
+  chatMessagesResizeObserver?.disconnect()
+  chatMessagesResizeObserver = null
+  appEvents.emit(APP_EVENT.CHAT_COMPOSER_NARROW_CHANGE, {
+    narrow: false,
+    width: 0,
+    minWidth: CHAT_COMPOSER_MIN_WIDTH_PX
+  })
   disconnectComposerAttachmentScrollResizeObserver()
 })
+
+watch(isMobile, () => {
+  void nextTick(() => {
+    emitChatComposerNarrowState(true)
+    updateMessagesScrollbarOffset()
+  })
+})
+
+watch(chatMessagesAreaClass, () => {
+  void nextTick(updateMessagesScrollbarOffset)
+}, { flush: 'post' })
 
 // Auto scroll to bottom when new messages arrive or during streaming (only while pinned).
 // No debounce when not streaming so session switches jump instantly (no smooth scroll).
@@ -2190,7 +2268,10 @@ watch(
     return { length: msgs.length, content: last?.content?.length ?? 0 }
   },
   () => {
-    nextTick(scrollToBottom)
+    nextTick(() => {
+      updateMessagesScrollbarOffset()
+      scrollToBottom()
+    })
   }
 )
 
@@ -2904,10 +2985,24 @@ void _formatTime
 }
 
 .wk-chat-messages {
+  --wk-chat-messages-scrollbar-offset: 0px;
   background: var(--wk-bg-surface);
+  overflow-x: hidden;
+}
+
+.wk-chat-messages__inner {
+  min-width: 0;
+  width: 100%;
+}
+
+.wk-chat-messages--scrollable .wk-chat-messages__inner {
+  width: calc(100% + var(--wk-chat-messages-scrollbar-offset));
 }
 
 .wk-chat-message {
+  width: min(100%, 768px);
+  min-width: min(100%, 468px);
+  max-width: 768px;
   overflow-wrap: anywhere;
 }
 

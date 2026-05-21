@@ -11,7 +11,7 @@
           </div>
           <div class="flex items-center justify-between gap-3">
             <!-- Segmented filter -->
-            <div class="wk-x-scroll-hidden flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm overflow-x-auto max-w-[70vw] md:max-w-none">
+            <div class="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm overflow-x-auto max-w-[70vw] md:max-w-none">
               <button
                 @click="handleValueFilter('all')"
                 :class="[
@@ -560,13 +560,3 @@ function getRelativeTime(dateStr: string): string {
   return `${diff}天后到期`
 }
 </script>
-
-<style scoped>
-.wk-x-scroll-hidden {
-  -ms-overflow-style: none; /* IE/Edge */
-  scrollbar-width: none; /* Firefox */
-}
-.wk-x-scroll-hidden::-webkit-scrollbar {
-  display: none; /* Chrome/Safari */
-}
-</style>

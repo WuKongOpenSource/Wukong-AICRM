@@ -1677,16 +1677,6 @@ async function handleImportSuccess(_result: CustomerImportResult) {
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-}
-
-.wk-cell-status-badges::-webkit-scrollbar {
-  height: 3px;
-}
-
-.wk-cell-status-badges::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgb(148 163 184 / 0.55);
 }
 
 .wk-ai-insight-text {

@@ -1430,15 +1430,6 @@ onBeforeUnmount(() => {
   background-color: #f8fafc;
 }
 
-.auth-form-scroll::-webkit-scrollbar {
-  width: 8px;
-}
-
-.auth-form-scroll::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.6);
-  border-radius: 999px;
-}
-
 @media (min-width: 1024px) {
   .auth-card {
     min-height: 620px;

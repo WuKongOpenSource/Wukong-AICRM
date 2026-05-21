@@ -115,7 +115,7 @@
           </div>
 
           <!-- Category Pills (Mobile) -->
-          <div v-if="isMobile" class="flex w-full gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div v-if="isMobile" class="flex w-full gap-2 overflow-x-auto pb-1">
             <button
               v-for="cat in categories"
               :key="'pill-' + cat.id"

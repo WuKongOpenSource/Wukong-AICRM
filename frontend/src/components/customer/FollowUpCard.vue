@@ -439,13 +439,3 @@ function formatDueBadge(value: string): string {
   return value.slice(0, 10)
 }
 </script>
-
-<style scoped>
-.wk-follow-up-card__badges {
-  scrollbar-width: none;
-}
-
-.wk-follow-up-card__badges::-webkit-scrollbar {
-  display: none;
-}
-</style>
