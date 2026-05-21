@@ -202,10 +202,10 @@
               <button
                 v-if="sidebarVisibleChatSessions.length > RECENT_CHAT_SESSION_LIMIT"
                 type="button"
-                class="group flex w-full min-w-0 items-center gap-3 rounded-[8px] pl-[10px] pr-[10px] py-[7px] mt-[1px] ml-[2px] mr-[6px] text-left text-[14px] text-[#6f6f6f] transition-all hover:bg-[#f9f9f9]"
+                class="group flex w-full min-w-0 items-center gap-2 rounded-[8px] pl-[10px] pr-[10px] py-[7px] mt-[1px] ml-[2px] mr-[6px] text-left text-[14px] text-[#0d0d0d] transition-all hover:bg-[#f9f9f9]"
                 @click="recentChatSessionsMoreVisible = true"
               >
-                <span class="material-symbols-outlined text-[20px] leading-none text-[#9a9a9a]">more_horiz</span>
+                <span class="material-symbols-outlined text-[20px] leading-none text-[#0d0d0d]">more_horiz</span>
                 <span>更多</span>
               </button>
             </template>
@@ -954,7 +954,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import defaultLogoImg from '@/assets/images/logo.png'
@@ -1065,6 +1065,18 @@ function onPrimaryNavScroll() {
     primaryNavScrollEndTimer = null
     primaryNavScrolling.value = false
   }, 400)
+}
+
+function getPrimaryNavScrollTop(): number {
+  return primaryNavRef.value?.scrollTop ?? 0
+}
+
+async function restorePrimaryNavScrollTop(scrollTop: number) {
+  await nextTick()
+  const el = primaryNavRef.value
+  if (!el) return
+  const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight)
+  el.scrollTop = Math.min(scrollTop, maxScrollTop)
 }
 /** PC 侧栏「最近」对话列表折叠 */
 const recentChatSessionsExpanded = ref(true)
@@ -1547,8 +1559,10 @@ const filteredHistorySessions = computed(() => {
   })
 })
 
-function resetSidebarCustomers() {
-  sidebarCustomers.value = []
+function resetSidebarCustomers(options: { keepItems?: boolean } = {}) {
+  if (!options.keepItems) {
+    sidebarCustomers.value = []
+  }
   sidebarCustomersPage.value = 1
   sidebarCustomersTotal.value = 0
   sidebarCustomersHasMore.value = true
@@ -1577,7 +1591,7 @@ function handleSidebarCustomerSearchInput() {
     clearTimeout(sidebarCustomerSearchTimer)
   }
   sidebarCustomerSearchTimer = setTimeout(() => {
-    void fetchSidebarCustomers({ reset: true })
+    void fetchSidebarCustomers({ reset: true, preserveScroll: true })
   }, 250)
 }
 
@@ -1588,17 +1602,21 @@ function clearSidebarCustomerSearch() {
     clearTimeout(sidebarCustomerSearchTimer)
     sidebarCustomerSearchTimer = null
   }
-  void fetchSidebarCustomers({ reset: true })
+  void fetchSidebarCustomers({ reset: true, preserveScroll: true })
 }
 
-async function fetchSidebarCustomers(options: { reset?: boolean } = {}) {
+async function fetchSidebarCustomers(options: { reset?: boolean; preserveScroll?: boolean } = {}) {
   if (sidebarCustomersLoading.value) return
+  const preservedScrollTop = options.preserveScroll ? getPrimaryNavScrollTop() : null
   if (!showSidebarCustomers.value) {
     resetSidebarCustomers()
+    if (preservedScrollTop != null) {
+      void restorePrimaryNavScrollTop(preservedScrollTop)
+    }
     return
   }
   if (options.reset) {
-    resetSidebarCustomers()
+    resetSidebarCustomers({ keepItems: options.preserveScroll })
   }
   if (!sidebarCustomersHasMore.value) return
 
@@ -1632,6 +1650,9 @@ async function fetchSidebarCustomers(options: { reset?: boolean } = {}) {
     }
   } finally {
     sidebarCustomersLoading.value = false
+    if (preservedScrollTop != null) {
+      await restorePrimaryNavScrollTop(preservedScrollTop)
+    }
     queueMicrotask(() => {
       updatePrimaryNavScrollbar()
       maybeLoadMoreSidebarCustomers()

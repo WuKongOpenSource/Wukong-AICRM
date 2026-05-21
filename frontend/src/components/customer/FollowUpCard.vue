@@ -1,40 +1,49 @@
 <template>
   <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
-    <div class="flex items-start justify-between gap-4">
-      <div class="min-w-0 flex-1">
+    <div class="relative flex items-start gap-4" :class="{ 'justify-between': !compact }">
+      <div class="min-w-0 flex-1 pt-1">
         <div class="flex items-start gap-3">
-          <div class="size-10 shrink-0 rounded-xl flex items-center justify-center text-white shadow-sm bg-primary">
+          <div
+            class="shrink-0 rounded-xl flex items-center justify-center text-white shadow-sm bg-primary"
+            :class="compact ? 'size-9' : 'size-10'"
+          >
             <span class="material-symbols-outlined text-base">{{ getFollowUpIcon(item.type) }}</span>
           </div>
           <div class="min-w-0 flex-1 flex flex-col gap-1.5">
-            <h4 class="truncate font-bold text-slate-900 text-base leading-tight">
+            <h4
+              class="truncate font-bold text-slate-900 leading-tight"
+              :class="[compact ? 'text-sm' : 'text-base', compact && (canEdit || canDelete) ? 'pr-16' : '']"
+            >
               {{ item.summary || getFollowUpTypeLabel(item.type) }}
             </h4>
-            <div class="flex flex-wrap items-center gap-2">
+            <div
+              class="wk-follow-up-card__badges flex min-w-0 max-w-full items-center gap-1.5 pb-0.5"
+              :class="compact ? 'flex-nowrap overflow-x-auto' : 'flex-wrap'"
+            >
               <span
                 v-if="item.createUserName"
-                class="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-600"
+                class="inline-flex max-w-[10rem] shrink-0 items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-600"
               >
                 <span
-                  class="material-symbols-outlined text-[13px] leading-none text-slate-400"
+                  class="material-symbols-outlined shrink-0 text-[13px] leading-none text-slate-400"
                   style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20"
                   aria-hidden="true"
                 >person</span>
-                {{ item.createUserName }}
+                <span class="min-w-0 truncate">{{ item.createUserName }}</span>
               </span>
               <span
                 v-if="item.aiGenerated"
-                class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary"
+                class="inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary"
               >
                 AI 智能生成
               </span>
               <span
                 v-if="item.sceneType"
-                class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500"
+                class="inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500"
               >
                 {{ item.sceneType }}
               </span>
-              <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+              <span class="inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
                 {{ getFollowUpTypeLabel(item.type) }}
               </span>
             </div>
@@ -42,7 +51,10 @@
         </div>
       </div>
 
-      <div class="flex shrink-0 items-start gap-1 self-start">
+      <div
+        class="flex shrink-0 items-start gap-1 self-start"
+        :class="compact ? 'absolute right-0 top-0' : ''"
+      >
         <button
           v-if="canEdit"
           type="button"
@@ -268,8 +280,10 @@ const props = withDefaults(defineProps<{
   canEdit?: boolean
   canDelete?: boolean
   canToggleTaskComplete?: boolean
+  compact?: boolean
 }>(), {
-  canToggleTaskComplete: true
+  canToggleTaskComplete: true,
+  compact: false
 })
 
 defineEmits<{
@@ -425,3 +439,13 @@ function formatDueBadge(value: string): string {
   return value.slice(0, 10)
 }
 </script>
+
+<style scoped>
+.wk-follow-up-card__badges {
+  scrollbar-width: none;
+}
+
+.wk-follow-up-card__badges::-webkit-scrollbar {
+  display: none;
+}
+</style>

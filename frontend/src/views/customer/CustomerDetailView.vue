@@ -475,6 +475,7 @@
               <AiParseInsightSidebar
                 :result="savedAiParseResult"
                 :show-tip="false"
+                :compact-score="isEmbeddedMobileLayout"
                 :empty-title="aiAnalysisEmptyTitle"
                 :empty-description="aiAnalysisEmptyDescription"
               >
@@ -501,48 +502,50 @@
             </section>
           </div>
 
-          <!-- Center Column: Follow-ups Timeline (col-span-6)；标题图标与时间轴节点共用 28px 轨宽以便纵轴对齐 -->
+          <!-- Center Column: Follow-ups Timeline (col-span-6) -->
           <div
             v-if="canViewFollowUps"
             :class="[isEmbeddedMobileLayout || detailTab === 'activity' ? 'block' : 'hidden', 'lg:block lg:col-span-6 space-y-4']"
           >
-            <div class="grid grid-cols-[1.75rem_minmax(0,1fr)] items-start gap-x-2 md:items-center">
-              <span
-                :class="sectionIconBoxClass"
-                class="justify-self-center self-start mt-0.5 md:self-center md:mt-0"
-                :style="getSectionIconStyle('recentActivity')"
+            <div class="flex min-w-0 flex-col items-start gap-2 md:flex-row md:items-center md:justify-between">
+              <div class="flex min-w-0 items-center gap-2">
+                <span
+                  :class="sectionIconBoxClass"
+                  :style="getSectionIconStyle('recentActivity')"
+                >
+                  <span :class="sectionMaterialIconClass">history</span>
+                </span>
+                <h3 class="min-w-0 truncate text-lg font-bold text-slate-900">最近活动 - AI时间轴</h3>
+              </div>
+              <div
+                v-if="!isEmbeddedMobileLayout"
+                class="flex w-full justify-start md:w-auto shrink-0 flex-wrap items-center gap-2 md:gap-3"
               >
-                <span :class="sectionMaterialIconClass">history</span>
-              </span>
-              <div class="flex min-w-0 flex-col items-start gap-2 md:flex-row md:items-center md:justify-between">
-                <h3 class="min-w-0 truncate text-lg font-bold text-slate-900 mt-[3px] md:mt-0">最近活动 - AI时间轴</h3>
-                <div class="flex w-full justify-start md:w-auto shrink-0 flex-wrap items-center gap-2 md:gap-3">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <button
-                      v-for="(option, index) in followUpTypeFilters"
-                      :key="option.value || 'all'"
-                      type="button"
-                      :class="[
-                        'rounded-full py-1.5 text-xs font-medium transition-colors md:px-3',
-                        isMobile && index === 0 ? 'pl-3 pr-3' : 'px-3',
-                        selectedFollowUpType === option.value
-                          ? 'bg-primary text-white shadow-sm'
-                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                      ]"
-                      @click="handleFollowUpTypeFilterChange(option.value)"
-                    >
-                      {{ option.label }}
-                    </button>
-                  </div>
-                  <!-- <button
-                    v-if="canCreateFollowUps"
-                    class="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-primary/20 transition-colors"
-                    @click="handleOpenFollowUpDialog"
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
+                    v-for="(option, index) in followUpTypeFilters"
+                    :key="option.value || 'all'"
+                    type="button"
+                    :class="[
+                      'rounded-full py-1.5 text-xs font-medium transition-colors md:px-3',
+                      isMobile && index === 0 ? 'pl-3 pr-3' : 'px-3',
+                      selectedFollowUpType === option.value
+                        ? 'bg-primary text-white shadow-sm'
+                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    ]"
+                    @click="handleFollowUpTypeFilterChange(option.value)"
                   >
-                    <span class="material-symbols-outlined text-sm">add</span>
-                    添加跟进
-                  </button> -->
+                    {{ option.label }}
+                  </button>
                 </div>
+                <!-- <button
+                  v-if="canCreateFollowUps"
+                  class="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-primary/20 transition-colors"
+                  @click="handleOpenFollowUpDialog"
+                >
+                  <span class="material-symbols-outlined text-sm">add</span>
+                  添加跟进
+                </button> -->
               </div>
             </div>
 
@@ -616,6 +619,7 @@
                     :can-edit="canEditFollowUps"
                     :can-delete="canDeleteFollowUps"
                     :can-toggle-task-complete="canToggleTasks"
+                    :compact="isMobile"
                     @edit="handleEditFollowUp"
                     @delete="confirmDeleteFollowUp"
                     @task-click="handleViewFollowUpTask"

@@ -1,17 +1,30 @@
 <template>
   <div class="space-y-5">
     <template v-if="result">
-      <div v-if="result.score != null" class="bg-slate-900 rounded-2xl p-6 text-white relative overflow-hidden">
+      <div
+        v-if="result.score != null"
+        class="bg-slate-900 rounded-2xl text-white relative overflow-hidden"
+        :class="compactScore ? 'p-4' : 'p-6'"
+      >
         <div class="relative z-10">
-          <div class="flex items-center justify-between mb-4">
-            <span class="text-xs font-bold text-primary uppercase tracking-widest">AI 潜力评分</span>
-            <span class="material-symbols-outlined text-primary text-lg">verified</span>
+          <div
+            class="flex items-center justify-between gap-3"
+            :class="compactScore ? 'mb-3' : 'mb-4'"
+          >
+            <div class="min-w-0 flex items-baseline gap-2">
+              <span class="shrink-0 text-xs font-bold text-primary uppercase tracking-widest">AI 潜力评分</span>
+              <div v-if="compactScore" class="flex shrink-0 items-baseline gap-1">
+                <span class="text-2xl font-black leading-none">{{ result.score }}</span>
+                <span class="text-xs text-slate-400">/ 100</span>
+              </div>
+            </div>
+            <span v-if="!compactScore" class="material-symbols-outlined text-primary text-lg">verified</span>
           </div>
-          <div class="flex items-baseline gap-2 mb-1">
+          <div v-if="!compactScore" class="flex items-baseline gap-2 mb-1">
             <span class="text-5xl font-black">{{ result.score }}</span>
             <span class="text-lg text-slate-400">/ 100</span>
           </div>
-          <p class="text-xs text-slate-400 mb-4">{{ scoreCaption }}</p>
+          <p v-if="!compactScore" class="text-xs text-slate-400 mb-4">{{ scoreCaption }}</p>
           <div v-if="result.tags?.length" class="flex flex-wrap gap-1.5">
             <span
               v-for="tag in result.tags"
@@ -23,7 +36,10 @@
         <div class="absolute -right-8 -bottom-8 size-32 bg-primary/20 rounded-full blur-3xl"></div>
       </div>
 
-      <div v-if="result.summary || result.nextStep" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+      <div
+        v-if="result.summary || (!compactScore && result.nextStep)"
+        class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4"
+      >
         <div v-if="result.summary">
           <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
             <span class="material-symbols-outlined text-sm text-primary">analytics</span>
@@ -40,7 +56,7 @@
             </li>
           </ul>
         </div>
-        <div v-if="result.nextStep" :class="{ 'pt-4 border-t border-slate-100': result.summary }">
+        <div v-if="!compactScore && result.nextStep" :class="{ 'pt-4 border-t border-slate-100': result.summary }">
           <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
             <span class="material-symbols-outlined text-sm text-primary">rocket_launch</span>
             建议下一步行动
@@ -106,6 +122,7 @@
  * - emptyTitle: 无 result 时的空状态标题，默认「等待 AI 分析」
  * - emptyDescription: 无 result 时的说明文案，支持换行（whitespace-pre-line）
  * - scoreCaption: 评分卡片下方说明，默认与客户场景一致的评估描述
+ * - compactScore: 紧凑评分模式；评分内联在标题右侧，并隐藏评分说明和下一步行动
  *
  * Slots:
  * - tip: 底部「小提示」正文，用于各业务自定义引导文案；有默认内容
@@ -122,12 +139,14 @@ const props = withDefaults(
     emptyDescription?: string
     scoreCaption?: string
     showTip?: boolean
+    compactScore?: boolean
   }>(),
   {
     emptyTitle: '等待 AI 分析',
     emptyDescription: '',
     showTip: true,
-    scoreCaption: '基于行业匹配度、需求迫切度及规模评估'
+    scoreCaption: '基于行业匹配度、需求迫切度及规模评估',
+    compactScore: false
   }
 )
 

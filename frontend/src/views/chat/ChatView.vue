@@ -1477,11 +1477,11 @@ const selectedCustomerId = ref<string | null>(null)
 const selectedCustomer = ref<CustomerDetailVO | null>(null)
 const selectedCustomerLoading = ref(false)
 const customerPanelVisible = ref(true)
-const customerPanelWidth = ref(480)
+const customerPanelWidth = ref(280)
 const customerPanelContainerWidth = ref(0)
 const customerPanelFullWidth = ref(false)
 const customerPanelResizing = ref(false)
-const CUSTOMER_PANEL_MIN_WIDTH = 480
+const CUSTOMER_PANEL_MIN_WIDTH = 280
 const CUSTOMER_PANEL_PC_DETAIL_RATIO = 0.5
 const CUSTOMER_PANEL_FULL_WIDTH_RATIO = 0.7
 
