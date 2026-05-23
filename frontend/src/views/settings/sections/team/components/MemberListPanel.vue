@@ -111,13 +111,28 @@
                       {{ (row.realname || row.username || '?').charAt(0) }}
                     </div>
                     <div class="min-w-0">
-                      <el-tooltip :content="row.realname || row.username || '-'" placement="top">
+                      <el-tooltip
+                        :key="`member-name-${row.userId}-${getMemberDisplayName(row)}`"
+                        :content="getMemberDisplayName(row)"
+                        effect="dark"
+                        placement="top"
+                        popper-class="wk-sidebar-like-tooltip"
+                        :show-arrow="false"
+                      >
                         <p class="text-sm font-bold text-slate-900 hover:text-primary transition-colors truncate">
-                          {{ row.realname || row.username }}
+                          {{ getMemberDisplayName(row) }}
                         </p>
                       </el-tooltip>
-                      <el-tooltip v-if="row.email" :content="row.email" placement="top">
-                        <p class="text-xs text-slate-400 truncate">{{ row.email }}</p>
+                      <el-tooltip
+                        v-if="getMemberEmail(row)"
+                        :key="`member-email-${row.userId}-${getMemberEmail(row)}`"
+                        :content="getMemberEmail(row)"
+                        effect="dark"
+                        placement="top"
+                        popper-class="wk-sidebar-like-tooltip"
+                        :show-arrow="false"
+                      >
+                        <p class="text-xs text-slate-400 truncate">{{ getMemberEmail(row) }}</p>
                       </el-tooltip>
                       <p v-else class="text-xs text-slate-300 truncate">-</p>
                     </div>
@@ -145,12 +160,28 @@
               <el-table-column label="联系方式" min-width="180">
                 <template #default="{ row }">
                   <div class="min-w-0">
-                    <el-tooltip v-if="row.mobile" :content="row.mobile" placement="top">
-                      <p class="text-sm text-slate-700 truncate">{{ row.mobile }}</p>
+                    <el-tooltip
+                      v-if="getMemberMobile(row)"
+                      :key="`member-mobile-${row.userId}-${getMemberMobile(row)}`"
+                      :content="getMemberMobile(row)"
+                      effect="dark"
+                      placement="top"
+                      popper-class="wk-sidebar-like-tooltip"
+                      :show-arrow="false"
+                    >
+                      <p class="text-sm text-slate-700 truncate">{{ getMemberMobile(row) }}</p>
                     </el-tooltip>
                     <p v-else class="text-sm text-slate-300 truncate">-</p>
-                    <el-tooltip v-if="row.post" :content="row.post" placement="top">
-                      <p class="text-xs text-slate-400 truncate">{{ row.post }}</p>
+                    <el-tooltip
+                      v-if="getMemberPost(row)"
+                      :key="`member-post-${row.userId}-${getMemberPost(row)}`"
+                      :content="getMemberPost(row)"
+                      effect="dark"
+                      placement="top"
+                      popper-class="wk-sidebar-like-tooltip"
+                      :show-arrow="false"
+                    >
+                      <p class="text-xs text-slate-400 truncate">{{ getMemberPost(row) }}</p>
                     </el-tooltip>
                   </div>
                 </template>
@@ -326,6 +357,22 @@ const roleFilterValue = computed({
   get: () => props.memberRoleId,
   set: (value: string) => emit('update:memberRoleId', value)
 })
+
+function getMemberDisplayName(member: any) {
+  return String(member?.realname || member?.username || '-').trim() || '-'
+}
+
+function getMemberEmail(member: any) {
+  return String(member?.email || '').trim()
+}
+
+function getMemberMobile(member: any) {
+  return String(member?.mobile || '').trim()
+}
+
+function getMemberPost(member: any) {
+  return String(member?.post || '').trim()
+}
 </script>
 
 <style scoped>
@@ -343,5 +390,16 @@ const roleFilterValue = computed({
 
 :deep(.wk-member-table .el-table__cell) {
   vertical-align: middle;
+}
+
+:deep(.wk-sidebar-like-tooltip.el-popper) {
+  border-radius: 8px;
+  background: #000;
+  padding: 6px 12px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.25;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
 </style>

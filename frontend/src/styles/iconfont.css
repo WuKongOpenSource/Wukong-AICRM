@@ -1,9 +1,9 @@
 @font-face {
   font-family: "wk"; /* Project id 5142164 */
   src:
-  url('../assets/iconfont/iconfont.woff2?t=1779502010419') format('woff2'),
-  url('../assets/iconfont/iconfont.woff?t=1779502010419') format('woff'),
-  url('../assets/iconfont/iconfont.ttf?t=1779502010419') format('truetype');
+  url('../assets/iconfont/iconfont.woff2?t=1779516547467') format('woff2'),
+  url('../assets/iconfont/iconfont.woff?t=1779516547467') format('woff'),
+  url('../assets/iconfont/iconfont.ttf?t=17795021779516547467010419') format('truetype');
   font-display: block;
 }
 
@@ -13,6 +13,10 @@
   font-style: normal;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.wk-icon-jiantou:before {
+  content: "\e6bf";
 }
 
 .wk-icon-search:before {

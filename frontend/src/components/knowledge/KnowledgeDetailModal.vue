@@ -111,6 +111,17 @@
               </div>
 
               <div
+                v-else-if="showImagePreview"
+                class="media-preview-shell media-preview-shell--image h-full overflow-auto bg-slate-950"
+              >
+                <img
+                  :src="mediaPreviewUrl || undefined"
+                  :alt="knowledge?.name"
+                  class="media-preview-image"
+                >
+              </div>
+
+              <div
                 v-else-if="showPdfPreview"
                 class="pdf-preview-shell h-full overflow-auto bg-white"
               >
@@ -380,7 +391,7 @@ import {
 import type { Knowledge, KnowledgeAiAnalyzeVO } from '@/types/common'
 import { formatFileSize as formatFileSizeBytes, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 
-type PreviewKind = 'doc' | 'docx' | 'excel' | 'pdf' | 'pptx' | 'text' | 'unsupported' | 'none'
+type PreviewKind = 'image' | 'doc' | 'docx' | 'excel' | 'pdf' | 'pptx' | 'text' | 'unsupported' | 'none'
 
 const VueOfficeDocx = defineAsyncComponent(async () => {
   await import('@vue-office/docx/lib/v3/index.css')
@@ -425,6 +436,7 @@ const knowledge = ref<Knowledge | null>(null)
 const analysis = ref<KnowledgeAiAnalyzeVO | null>(null)
 const previewBlob = ref<Blob | null>(null)
 const officePreviewSource = ref<Blob | ArrayBuffer | null>(null)
+const mediaPreviewUrl = ref('')
 const previewKind = ref<PreviewKind>('none')
 const previewNotice = ref('')
 const previewText = ref('')
@@ -454,6 +466,10 @@ const activePreviewComponent = computed(() => {
 })
 
 const previewSource = computed(() => officePreviewSource.value ?? undefined)
+
+const showImagePreview = computed(() => {
+  return previewKind.value === 'image' && Boolean(mediaPreviewUrl.value) && !previewFailed.value
+})
 
 const showPdfPreview = computed(() => {
   return previewKind.value === 'pdf' && Boolean(previewBlob.value) && !previewFailed.value
@@ -492,6 +508,11 @@ function resetPreviewState() {
   previewText.value = ''
   previewFailed.value = false
   docHtmlContent.value = ''
+
+  if (mediaPreviewUrl.value) {
+    URL.revokeObjectURL(mediaPreviewUrl.value)
+    mediaPreviewUrl.value = ''
+  }
 }
 
 function close() {
@@ -508,10 +529,17 @@ function normalizeContentType(contentType?: string): string {
   return (contentType || '').split(';', 1)[0]?.trim().toLowerCase() || ''
 }
 
+function isImageType(extension: string, mimeType: string): boolean {
+  return mimeType.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'avif'].includes(extension)
+}
+
 function resolvePreviewKind(filename?: string, mimeType?: string): PreviewKind {
   const extension = getFileExtension(filename)
   const normalizedType = normalizeContentType(mimeType)
 
+  if (isImageType(extension, normalizedType)) {
+    return 'image'
+  }
   if (extension === 'pdf' || normalizedType === 'application/pdf') {
     return 'pdf'
   }
@@ -695,6 +723,11 @@ async function loadDocument(id: string) {
       return
     }
 
+    if (kind === 'image') {
+      mediaPreviewUrl.value = URL.createObjectURL(fileBlob)
+      return
+    }
+
     previewBlob.value = kind === 'pdf' ? fileBlob : null
     officePreviewSource.value = kind === 'pdf'
       ? null
@@ -875,6 +908,24 @@ function getTypeIconColor(type?: string): string {
 .scale-fade-leave-to {
   opacity: 0;
   transform: scale(0.95);
+}
+
+.media-preview-shell {
+  overscroll-behavior: contain;
+}
+
+.media-preview-shell--image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.media-preview-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 24px;
 }
 
 .office-preview-shell {

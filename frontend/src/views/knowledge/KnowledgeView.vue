@@ -4,7 +4,7 @@
     <div class="flex min-w-0 min-h-0 flex-1 flex-col">
       <!-- Desktop Header -->
       <div v-if="!isMobile" class="wk-knowledge-desktop-header shrink-0">
-        <div class="flex min-h-[84px] items-center justify-between gap-6 px-3 py-4">
+        <div class="flex min-h-[84px] items-center justify-between gap-6 px-6 py-4">
           <div class="flex min-w-0 flex-col gap-1.5">
             <h1 class="text-[22px] font-bold leading-7 text-slate-900">知识库</h1>
             <p class="text-[13px] leading-5 text-slate-500">
@@ -14,7 +14,7 @@
 
           <div class="flex min-w-0 flex-1 items-center justify-end gap-3">
             <div
-              class="flex h-10 w-[386px] max-w-[38vw] min-w-[260px] items-center rounded-xl border border-[#dbe8f8] bg-[#f8fbff] px-1.5 shadow-[0_2px_8px_rgba(15,81,159,0.08)] transition-all focus-within:border-primary/60 focus-within:ring-4 focus-within:ring-primary/10"
+              class="flex h-10 w-[386px] max-w-[38vw] min-w-[260px] items-center rounded-xl border border-[#dbe8f8] bg-[#f8fbff] px-1.5 transition-all focus-within:border-primary/60"
             >
               <span class="material-symbols-outlined shrink-0 pl-2 pr-1 text-[22px] leading-none text-[#8fa6c5]">search</span>
               <input
@@ -26,7 +26,7 @@
               />
               <button
                 type="button"
-                class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 text-[12px] text-white shadow-[0_4px_10px_rgba(22,119,255,0.28)] transition-all hover:bg-primary/90"
+                class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 text-[12px] text-white transition-colors hover:bg-primary/90"
                 @click="handleSearch"
               >
                 <span class="material-symbols-outlined text-[17px] leading-none">auto_awesome</span>
@@ -36,7 +36,7 @@
 
             <button
               type="button"
-              class="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[#dbe8f8] bg-[#f8fbff] px-4 text-[13px] text-primary shadow-[0_2px_8px_rgba(15,81,159,0.06)] transition-all hover:border-primary/30 hover:bg-primary/5 disabled:cursor-not-allowed disabled:text-slate-400"
+              class="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[#dbe8f8] bg-[#f8fbff] px-4 text-[13px] text-primary transition-colors hover:border-primary/30 hover:bg-primary/5 disabled:cursor-not-allowed disabled:text-slate-400"
               :disabled="totalCount === 0"
               @click="openScriptGenerator"
             >
@@ -53,7 +53,7 @@
             >
               <button
                 type="button"
-                class="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-5 text-[13px] text-white shadow-[0_6px_16px_rgba(22,119,255,0.28)] transition-all hover:bg-primary/90"
+                class="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-5 text-[13px] text-white transition-colors hover:bg-primary/90"
               >
                 <span class="material-symbols-outlined text-[21px] leading-none">upload</span>
                 上传
@@ -64,7 +64,7 @@
       </div>
 
       <!-- Content Grid -->
-      <div :class="['min-h-0 flex-1', isMobile ? 'p-6' : 'overflow-y-auto px-3 py-6']">
+      <div :class="['min-h-0 flex-1', isMobile ? 'px-4 py-6' : 'overflow-y-auto px-6 pb-6 pt-2']">
         <div class="mx-auto px-[0px]">
           <!-- max-w-7xl -->
           <!-- Section Header -->
@@ -80,7 +80,7 @@
               <span class="ml-1 text-sm text-slate-400">{{ totalCount }} 项结果</span>
             </div>
             <div
-              class="flex min-w-0 w-full flex-1 items-center rounded-xl border border-slate-200 bg-white px-1 shadow-sm transition-all focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10 md:max-w-md lg:max-w-lg"
+              class="flex min-w-0 w-full flex-1 items-center rounded-xl border border-slate-200 bg-white px-1 transition-all focus-within:border-primary md:max-w-md lg:max-w-lg"
               :class="showAiSearchResult ? 'md:ml-auto' : ''"
             >
               <div class="flex shrink-0 items-center justify-center pl-3 pr-1 text-slate-400">
@@ -133,7 +133,7 @@
                   @click="setViewMode('card')"
                   :class="[
                     'rounded-md p-1.5 transition-all',
-                    viewMode === 'card' ? 'bg-white text-primary shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                    viewMode === 'card' ? 'bg-white text-primary' : 'text-slate-400 hover:text-slate-600'
                   ]"
                   title="网格视图"
                 >
@@ -144,7 +144,7 @@
                   @click="setViewMode('list')"
                   :class="[
                     'rounded-md p-1.5 transition-all',
-                    viewMode === 'list' ? 'bg-white text-primary shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                    viewMode === 'list' ? 'bg-white text-primary' : 'text-slate-400 hover:text-slate-600'
                   ]"
                   title="列表视图"
                 >
@@ -167,7 +167,7 @@
                 :class="[
                   'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-all',
                   selectedCategory === cat.id
-                    ? 'border-primary/25 bg-primary/10 text-primary shadow-[0_3px_8px_rgba(22,119,255,0.08)]'
+                    ? 'border-primary/25 bg-primary/10 text-primary'
                     : 'border-[#dce7f5] bg-white text-[#284462] hover:border-primary/25 hover:bg-primary/5 hover:text-primary'
                 ]"
               >
@@ -180,7 +180,7 @@
               <el-dropdown trigger="click">
                 <button
                   type="button"
-                  class="inline-flex size-9 items-center justify-center rounded-lg border border-[#dbe8f8] bg-[#f8fbff] text-primary shadow-[0_3px_8px_rgba(15,81,159,0.08)] transition-all hover:border-primary/30 hover:bg-primary/5"
+                  class="inline-flex size-9 items-center justify-center rounded-lg border border-[#dbe8f8] bg-[#f8fbff] text-primary transition-colors hover:border-primary/30 hover:bg-primary/5"
                   title="文件类型"
                 >
                   <span class="material-symbols-outlined text-[21px] leading-none">filter_list</span>
@@ -201,13 +201,13 @@
                 </template>
               </el-dropdown>
 
-              <div class="inline-flex h-9 items-center rounded-lg border border-[#dbe8f8] bg-[#f8fbff] p-1 shadow-[0_3px_8px_rgba(15,81,159,0.08)]">
+              <div class="inline-flex h-9 items-center rounded-lg border border-[#dbe8f8] bg-[#f8fbff] p-1">
                 <button
                   type="button"
                   @click="setViewMode('card')"
                   :class="[
                     'inline-flex size-7 items-center justify-center rounded-md transition-all',
-                    viewMode === 'card' ? 'bg-white text-primary shadow-sm' : 'text-[#8aa1c2] hover:text-primary'
+                    viewMode === 'card' ? 'bg-white text-primary' : 'text-[#8aa1c2] hover:text-primary'
                   ]"
                   title="网格视图"
                 >
@@ -218,7 +218,7 @@
                   @click="setViewMode('list')"
                   :class="[
                     'inline-flex size-7 items-center justify-center rounded-md transition-all',
-                    viewMode === 'list' ? 'bg-white text-primary shadow-sm' : 'text-[#8aa1c2] hover:text-primary'
+                    viewMode === 'list' ? 'bg-white text-primary' : 'text-[#8aa1c2] hover:text-primary'
                   ]"
                   title="列表视图"
                 >
@@ -295,19 +295,20 @@
               class="group flex cursor-pointer flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md"
               @click="openDetail(item)"
             >
-              <div class="mb-4 flex items-start justify-between">
-                <FileTypeIcon :file-name="item.name" :mime-type="item.mimeType" :knowledge-type="item.type" size="md" />
+              <div class="mb-4 flex items-start justify-between gap-3">
+                <div class="flex min-w-0 flex-1 items-start gap-3">
+                  <FileTypeIcon :file-name="item.name" :mime-type="item.mimeType" :knowledge-type="item.type" size="md" />
+                  <h4
+                    class="line-clamp-2 min-w-0 text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-primary"
+                  >
+                    {{ item.name }}
+                  </h4>
+                </div>
                 <div class="text-right">
                   <p class="mb-0.5 text-xs text-slate-400">文件大小</p>
                   <p class="text-sm font-bold text-slate-900">{{ formatFileSize(item.fileSize) }}</p>
                 </div>
               </div>
-
-              <h4
-                class="mb-3 line-clamp-2 text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-primary"
-              >
-                {{ item.name }}
-              </h4>
 
               <div class="mb-4 flex min-h-[4.5rem] flex-1 flex-col rounded-xl bg-primary/5 p-3">
                 <div class="mb-1.5 flex items-center justify-between">
@@ -386,15 +387,15 @@
           <div
             v-else
             :class="[
-              'overflow-hidden bg-white',
+              'wk-knowledge-list-shell overflow-hidden',
               isMobile
-                ? 'rounded-2xl border border-slate-200 shadow-sm'
-                : 'wk-knowledge-list-shell rounded-2xl border border-[#dbe8f8] shadow-[0_3px_10px_rgba(15,81,159,0.08)]'
+                ? 'rounded-xl border shadow-sm'
+                : 'rounded-xl border shadow-sm'
             ]"
           >
             <!-- Table Header -->
             <div
-              class="hidden border-b border-[#edf3fb] bg-[#fbfdff] px-6 py-3 text-[11px] font-bold text-[#8aa1c2] md:grid md:grid-cols-[minmax(260px,3fr)_100px_minmax(250px,3fr)_150px_130px_152px] md:items-center md:gap-4"
+              class="wk-knowledge-table-header hidden border-b px-6 py-4 text-xs font-bold md:grid md:grid-cols-[minmax(260px,3fr)_100px_minmax(250px,3fr)_150px_130px_152px] md:items-center md:gap-4"
             >
               <div>文档名称</div>
               <div>分类</div>
@@ -407,14 +408,14 @@
             <div
               v-for="item in knowledgeList"
               :key="'list-' + item.knowledgeId"
-              class="group grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-[#f2f6fb] px-4 py-4 transition-colors last:border-0 hover:bg-primary/5 md:grid-cols-[minmax(260px,3fr)_100px_minmax(250px,3fr)_150px_130px_152px] md:gap-4 md:px-6 md:py-4"
+              class="wk-knowledge-table-row group grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b px-4 py-4 transition-colors last:border-0 md:grid-cols-[minmax(260px,3fr)_100px_minmax(250px,3fr)_150px_130px_152px] md:gap-4 md:px-6 md:py-4"
               @click="openDetail(item)"
             >
               <!-- Name -->
               <div class="col-span-2 flex min-w-0 items-center gap-3 md:col-span-1">
-                <FileTypeIcon :file-name="item.name" :mime-type="item.mimeType" :knowledge-type="item.type" size="md" />
+                <FileTypeIcon :file-name="item.name" :mime-type="item.mimeType" :knowledge-type="item.type" size="sm" />
                 <span
-                  class="truncate text-sm font-bold text-slate-900 transition-colors group-hover:text-primary"
+                  class="truncate text-sm font-bold text-[var(--wk-text-primary)] transition-colors group-hover:text-primary"
                   >{{ item.name }}</span
                 >
               </div>
@@ -429,11 +430,11 @@
               </div>
               <!-- AI Summary (hidden on mobile) -->
               <div class="hidden min-w-0 items-center md:col-span-1 md:flex">
-                <p class="truncate text-xs text-[#526982]">{{ item.summary || '暂无摘要' }}</p>
+                <p class="truncate text-sm text-[var(--wk-text-secondary)]">{{ item.summary || '暂无摘要' }}</p>
               </div>
               <!-- Related Business (hidden on mobile) -->
               <div class="hidden items-center md:col-span-1 md:flex">
-                <span v-if="item.customerName" class="flex min-w-0 items-center gap-1.5 text-xs text-[#526982]">
+                <span v-if="item.customerName" class="flex min-w-0 items-center gap-1.5 text-sm text-[var(--wk-text-secondary)]">
                   <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
                     {{ item.customerName.slice(0, 1) }}
                   </span>
@@ -441,17 +442,17 @@
                   {{ item.customerName }}
                   </span>
                 </span>
-                <span v-else class="text-xs text-[#b8c5d6]">-</span>
+                <span v-else class="text-sm text-[var(--wk-text-faint)]">-</span>
               </div>
               <!-- Date -->
               <div class="hidden items-center md:col-span-1 md:flex">
-                <span class="text-xs text-[#8aa1c2]">{{ formatDate(item.createTime) }}</span>
+                <span class="text-sm text-[var(--wk-text-secondary)]">{{ formatDate(item.createTime) }}</span>
               </div>
               <!-- Actions -->
               <div class="flex flex-nowrap items-center justify-end gap-1 md:col-span-1" @click.stop>
                 <button
                   type="button"
-                  class="flex size-8 items-center justify-center rounded-lg text-[#8aa1c2] transition-all hover:bg-primary/10 hover:text-primary"
+                  class="flex size-8 items-center justify-center rounded-lg text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-bg-surface-hover)] hover:text-primary"
                   title="阅读"
                   @click.stop="openDetail(item)"
                 >
@@ -459,7 +460,7 @@
                 </button>
                 <button
                   type="button"
-                  class="flex size-8 items-center justify-center rounded-lg text-[#8aa1c2] transition-all hover:bg-primary/10 hover:text-primary"
+                  class="flex size-8 items-center justify-center rounded-lg text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-bg-surface-hover)] hover:text-primary"
                   title="下载"
                   @click.stop="handleDownload(item)"
                 >
@@ -468,7 +469,7 @@
                 <button
                   v-if="canUploadKnowledge"
                   type="button"
-                  class="flex size-8 items-center justify-center rounded-lg text-[#8aa1c2] transition-all hover:bg-primary/10 hover:text-primary"
+                  class="flex size-8 items-center justify-center rounded-lg text-[var(--wk-text-muted)] transition-all hover:bg-[var(--wk-bg-surface-hover)] hover:text-primary"
                   title="关联客户"
                   @click.stop="openAssociateDialog(item)"
                 >
@@ -476,7 +477,7 @@
                 </button>
                 <button
                   type="button"
-                  class="flex size-8 items-center justify-center rounded-lg text-[#8aa1c2] transition-all hover:bg-red-50 hover:text-red-500"
+                  class="flex size-8 items-center justify-center rounded-lg text-[var(--wk-text-muted)] transition-all hover:bg-red-50 hover:text-red-500"
                   title="删除"
                   @click.stop="handleDelete(item)"
                 >
@@ -484,11 +485,54 @@
                 </button>
               </div>
             </div>
+
+            <div
+              v-if="showPagination"
+              class="wk-knowledge-table-footer flex items-center justify-end border-t px-6 py-4"
+            >
+              <span class="text-sm text-[var(--wk-text-muted)]">
+                共 {{ totalCount }} 个文件
+                <span class="hidden md:inline">（第 {{ currentPage }} / {{ totalPages }} 页）</span>
+              </span>
+              <div class="flex items-center gap-1">
+                <button
+                  class="flex size-8 items-center justify-center rounded border border-[var(--wk-border-subtle)] bg-[var(--wk-bg-surface)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="currentPage <= 1"
+                  title="上一页"
+                  aria-label="上一页"
+                  @click="handlePageChange(currentPage - 1)"
+                >
+                  <span class="material-symbols-outlined text-lg leading-none">chevron_left</span>
+                </button>
+                <button
+                  v-for="p in visiblePages"
+                  :key="p"
+                  class="flex size-8 items-center justify-center rounded border text-xs font-bold"
+                  :class="p === currentPage
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-[var(--wk-border-subtle)] bg-[var(--wk-bg-surface)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-surface-hover)]'"
+                  :aria-current="p === currentPage ? 'page' : undefined"
+                  :aria-label="`第 ${p} 页`"
+                  @click="handlePageChange(p)"
+                >
+                  {{ p }}
+                </button>
+                <button
+                  class="flex size-8 items-center justify-center rounded border border-[var(--wk-border-subtle)] bg-[var(--wk-bg-surface)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="currentPage >= totalPages"
+                  title="下一页"
+                  aria-label="下一页"
+                  @click="handlePageChange(currentPage + 1)"
+                >
+                  <span class="material-symbols-outlined text-lg leading-none">chevron_right</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Pagination -->
           <div
-            v-if="showPagination"
+            v-if="showPagination && viewMode !== 'list'"
             :class="[
               'mt-6 flex items-center',
               isMobile ? 'justify-center' : 'justify-end'
@@ -501,7 +545,7 @@
               </p>
               <div class="flex items-center gap-2">
                 <button
-                  class="flex size-8 items-center justify-center rounded-lg border border-[#dbe8f8] bg-white text-[#8aa1c2] shadow-[0_2px_6px_rgba(15,81,159,0.06)] transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                  class="flex size-8 items-center justify-center rounded-lg border border-[#dbe8f8] bg-white text-[#8aa1c2] transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
                   :disabled="currentPage <= 1"
                   title="上一页"
                   aria-label="上一页"
@@ -516,16 +560,16 @@
                   :aria-current="p === currentPage ? 'page' : undefined"
                   :aria-label="`第 ${p} 页`"
                   :class="[
-                    'flex size-8 items-center justify-center rounded-lg text-sm font-bold shadow-[0_2px_6px_rgba(15,81,159,0.06)] transition-colors',
+                    'flex size-8 items-center justify-center rounded-lg text-sm font-bold transition-colors',
                     p === currentPage
-                      ? 'bg-primary text-white shadow-[0_6px_14px_rgba(22,119,255,0.25)]'
+                      ? 'bg-primary text-white'
                       : 'border border-[#dbe8f8] bg-white text-[#284462] hover:bg-slate-50'
                   ]"
                 >
                   {{ p }}
                 </button>
                 <button
-                  class="flex size-8 items-center justify-center rounded-lg border border-[#dbe8f8] bg-white text-[#8aa1c2] shadow-[0_2px_6px_rgba(15,81,159,0.06)] transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                  class="flex size-8 items-center justify-center rounded-lg border border-[#dbe8f8] bg-white text-[#8aa1c2] transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
                   :disabled="currentPage >= totalPages"
                   title="下一页"
                   aria-label="下一页"
@@ -694,7 +738,7 @@ const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / (quer
 const currentPage = computed(() => queryParams.page || 1)
 const showAiSearchResult = computed(() => aiSearchLoading.value || aiSearchResult.value !== null)
 const canUploadKnowledge = computed(() => userStore.hasPermission('knowledge:upload'))
-const showPagination = computed(() => totalCount.value > (queryParams.limit || DEFAULT_PAGE_SIZE))
+const showPagination = computed(() => totalCount.value > 0)
 
 const visiblePages = computed(() => {
   const total = totalPages.value
@@ -1049,6 +1093,31 @@ function getParseStatusLabel(status?: string): string {
 </script>
 
 <style scoped>
+.wk-knowledge-list-shell {
+  border-color: var(--wk-border-subtle);
+  background: var(--wk-bg-surface);
+}
+
+.wk-knowledge-table-header {
+  border-color: var(--wk-border-muted);
+  background: var(--wk-bg-surface-subtle);
+  color: var(--wk-text-muted);
+}
+
+.wk-knowledge-table-row {
+  border-color: var(--wk-border-subtle);
+  background: var(--wk-bg-surface);
+}
+
+.wk-knowledge-table-row:hover {
+  background: color-mix(in srgb, var(--wk-primary) 11%, var(--wk-bg-surface));
+}
+
+.wk-knowledge-table-footer {
+  border-color: var(--wk-border-subtle);
+  background: var(--wk-bg-surface-subtle);
+}
+
 .line-clamp-2 {
   display: -webkit-box;
   line-clamp: 2;

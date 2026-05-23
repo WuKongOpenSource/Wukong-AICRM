@@ -33,9 +33,6 @@ const visibleTabs = computed(() => {
   if (scope === 'crm') {
     return SETTINGS_MAIN_TABS.filter((tab) => tab.value !== 'team')
   }
-  if (scope === 'profile') {
-    return SETTINGS_MAIN_TABS.filter((tab) => tab.value === 'team')
-  }
   return SETTINGS_MAIN_TABS
 })
 

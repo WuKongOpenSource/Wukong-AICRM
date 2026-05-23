@@ -54,8 +54,8 @@
       <div v-else class="relative z-30 flex justify-center overflow-visible py-2 px-0 pl-[0px]">
         <button
           type="button"
-          class="relative flex size-8 items-center justify-center overflow-hidden rounded-lg bg-[#f5f5f5] text-[#0d0d0d] transition-colors hover:bg-[#ececec]"
-          aria-label="打开边栏"
+          class="group/sidebar-logo relative flex size-8 items-center justify-center overflow-visible rounded-lg bg-[#f5f5f5] text-[#0d0d0d] transition-colors hover:bg-[#ececec]"
+          aria-label="展开边栏"
           @click="primarySidebarCollapsed = false"
         >
           <span
@@ -75,11 +75,10 @@
             <WkIcon name="fold" :size="18" class="shrink-0" />
           </span>
           <span
-            class="pointer-events-none absolute left-full top-1/2 z-[200] ml-2 -translate-y-1/2 whitespace-nowrap rounded-full bg-black px-3 py-1.5 text-[13px] font-medium text-white shadow-md transition-opacity duration-150"
-            :class="collapsedSidebarAsideHovered ? 'opacity-100' : 'opacity-0'"
+            class="pointer-events-none absolute left-full top-1/2 z-[200] ml-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/sidebar-logo:opacity-100"
             role="tooltip"
           >
-            打开边栏
+            展开边栏
           </span>
         </button>
       </div>
@@ -412,8 +411,8 @@
             <span v-if="!primarySidebarContentCollapsed" class="text-xs font-semibold">{{ themeButtonLabel }}</span>
           </button>
           <div
-            class="flex cursor-pointer items-center rounded-xl bg-[#fff] transition-colors hover:bg-[#f9f9f9] dark:bg-slate-900 dark:hover:bg-slate-800"
-            :class="primarySidebarContentCollapsed ? 'justify-center' : 'gap-2 px-1.5 py-1'"
+            class="flex cursor-pointer items-center rounded-xl transition-colors hover:bg-[#f9f9f9] dark:bg-slate-900 dark:hover:bg-slate-800"
+            :class="primarySidebarContentCollapsed ? 'justify-center' : 'gap-2 px-1.5 py-2.5'"
             :title="primarySidebarContentCollapsed ? (userStore.realname || userStore.username || '用户') : undefined"
             @click="showUserMenu = !showUserMenu"
           >

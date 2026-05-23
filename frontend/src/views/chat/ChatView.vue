@@ -1279,8 +1279,8 @@
               </div>
 
               <!-- Quick Action Chips -->
-              <div v-if="chatStore.messages.length === 0" class="mt-6 min-h-[88px]">
-                <!-- <div v-if="chatStore.selectedAppCode === 'crm'" class="flex flex-wrap gap-2 justify-center" >
+              <!-- <div v-if="chatStore.messages.length === 0" class="mt-6 min-h-[88px]">
+                <div v-if="chatStore.selectedAppCode === 'crm'" class="flex flex-wrap gap-2 justify-center" >
                   <button
                     v-for="action in quickActions"
                     :key="action.label"
@@ -1289,10 +1289,11 @@
                   >
                     {{ action.label }}
                   </button>
-                </div> -->
-              </div>
+                </div>
+              </div> -->
 
-              <p v-if="chatStore.messages.length > 0" class="text-center text-xs text-[#5d5d5d] uppercase " style="margin-top: 10px !important;">内容由AI生成，请核查重要信息</p>
+              <p v-if="chatStore.messages.length > 0" class="text-center text-xs text-[#5d5d5d] uppercase !mt-[10px]">内容由AI生成，请核查重要信息</p>
+              <div v-else class="h-[16px] !mt-[10px]"></div>
             </div>
           </div>
         </div>

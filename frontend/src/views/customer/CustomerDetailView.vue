@@ -78,28 +78,60 @@
                     </div>
                     <div
                       v-if="customer.tags?.length || canEditCustomerTags"
-                      class="ml-2 flex min-w-0 flex-wrap items-center justify-end gap-2"
+                      class="ml-2 flex min-w-0 shrink items-center justify-end gap-1.5 overflow-hidden"
                     >
                       <span
-                        v-for="tag in customer.tags"
+                        v-for="tag in customerVisibleTags"
                         :key="tag.tagId"
-                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 group"
+                        class="group/tag inline-flex h-6 max-w-[88px] shrink-0 items-center gap-1 rounded-lg bg-[var(--wk-bg-surface-muted)] px-2 text-[11px] font-medium text-[var(--wk-text-secondary)]"
+                        :title="tag.tagName"
                       >
-                        {{ tag.tagName }}
-                        <span
+                        <span class="min-w-0 truncate">{{ tag.tagName }}</span>
+                        <button
                           v-if="canEditCustomerTags"
-                          class="material-symbols-outlined text-xs text-slate-400 hover:text-red-500 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-                          @click="handleRemoveTag(tag)"
-                        >close</span>
+                          type="button"
+                          class="hidden shrink-0 text-slate-400 transition-colors hover:text-red-500 group-hover/tag:inline-flex"
+                          title="删除标签"
+                          aria-label="删除标签"
+                          @click.stop="handleRemoveTag(tag)"
+                        >
+                          <span class="material-symbols-outlined text-[12px] leading-none">close</span>
+                        </button>
                       </span>
+                      <el-popover
+                        v-if="customerHiddenTags.length > 0"
+                        trigger="hover"
+                        placement="bottom-start"
+                        :width="220"
+                        popper-class="wk-customer-tags-popover"
+                      >
+                        <template #reference>
+                          <span
+                            class="inline-flex h-6 shrink-0 cursor-default items-center rounded-lg bg-[var(--wk-bg-surface-muted)] px-2 text-[11px] font-medium text-[var(--wk-text-muted)]"
+                          >
+                            +{{ customerHiddenTags.length }}
+                          </span>
+                        </template>
+                        <div class="flex max-h-48 flex-wrap gap-1.5 overflow-y-auto">
+                          <span
+                            v-for="tag in customerHiddenTags"
+                            :key="tag.tagId"
+                            class="inline-flex max-w-full items-center rounded-lg bg-[#f4f4f4] px-2 py-1 text-[12px] font-medium text-[#5f5f5f]"
+                            :title="tag.tagName"
+                          >
+                            <span class="truncate">{{ tag.tagName }}</span>
+                          </span>
+                        </div>
+                      </el-popover>
                       <button
                         v-if="canEditCustomerTags"
                         type="button"
-                        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-primary border border-dashed border-primary/30 hover:bg-primary/5 transition-colors"
+                        class="inline-flex size-6 shrink-0 items-center justify-center rounded-lg border border-dashed border-[var(--wk-border-muted)] text-[var(--wk-text-primary)] transition-colors hover:bg-[var(--wk-bg-surface-hover)]"
+                        title="添加标签"
+                        aria-label="添加标签"
                         @click="showAddTagDialog = true"
                       >
-                        <span class="wk-plus-button-mark" aria-hidden="true">+</span>
-                        <span>添加标签</span>
+                        <span class="material-symbols-outlined text-[15px] leading-none">add</span>
                       </button>
                     </div>
                   </div>
@@ -528,26 +560,34 @@
             :class="[isEmbeddedMobileLayout || detailTab === 'activity' ? 'block' : 'hidden', 'lg:block lg:col-span-6 space-y-4', isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : '']"
           >
             <div class="flex min-w-0 flex-col items-start gap-2 md:flex-row md:items-center md:justify-between">
-              <div class="flex min-w-0 items-center gap-2">
+              <div class="flex w-full min-w-0 items-center gap-2">
                 <span
                   :class="sectionIconBoxClass"
                   :style="getSectionIconStyle('recentActivity')"
                 >
                   <span :class="sectionMaterialIconClass">history</span>
                 </span>
-                <h3 class="min-w-0 flex-1 text-sm font-bold leading-snug text-slate-900 break-words">{{ isEmbeddedMobileLayout ? '活动' : '最近活动 - AI时间轴' }}</h3>
+                <h3 class="min-w-0 text-sm font-bold leading-snug text-slate-900 break-words">{{ isEmbeddedMobileLayout ? '活动' : '最近活动 - AI时间轴' }}</h3>
                 <button
-                  v-if="followUps.length > 0"
                   type="button"
-                  class="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 opacity-0 pointer-events-none transition-[opacity,background-color,color,border-color] hover:border-primary/30 hover:bg-primary/5 hover:text-primary group-hover/activity:pointer-events-auto group-hover/activity:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
+                  class="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-[background-color,color,border-color] hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
                   :aria-expanded="followUpTimelineExpanded"
-                  :aria-label="followUpTimelineExpanded ? '收起跟进记录' : '展开跟进记录'"
-                  :title="followUpTimelineExpanded ? '收起跟进记录' : '展开跟进记录'"
+                  :aria-label="followUpTimelineExpanded ? '收起活动' : '展开活动'"
+                  :title="followUpTimelineExpanded ? '收起活动' : '展开活动'"
                   @click="followUpTimelineExpanded = !followUpTimelineExpanded"
                 >
                   <span class="material-symbols-outlined text-[16px] leading-none">
                     {{ followUpTimelineExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
                   </span>
+                </button>
+                <button
+                  v-if="isEmbeddedMobileLayout && canCreateFollowUps"
+                  type="button"
+                  class="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
+                  @click="handleAiFollowUp"
+                >
+                  <WkIcon name="ai" class="text-sm" />
+                  AI 跟进
                 </button>
               </div>
               <div
@@ -590,7 +630,7 @@
             >
               <span
                 class="material-symbols-outlined"
-                :class="isEmbeddedMobileLayout ? 'text-3xl leading-none text-slate-200' : 'mb-3 text-4xl text-slate-300'"
+                :class="isEmbeddedMobileLayout ? 'text-2xl leading-none text-slate-400' : 'mb-3 text-4xl text-slate-300'"
               >event_note</span>
               <p :class="isEmbeddedMobileLayout ? 'mt-2 text-xs font-medium text-slate-400' : 'text-sm text-slate-400'">暂无跟进记录</p>
               <p v-if="!isEmbeddedMobileLayout" class="text-xs text-slate-300 mt-1">点击上方按钮添加第一条跟进记录</p>
@@ -600,21 +640,9 @@
               <div
                 v-for="(item, followUpIndex) in followUps"
                 :key="item.followUpId"
-                class="grid grid-cols-[1.75rem_minmax(0,1fr)] items-stretch gap-x-2"
+                class="flex min-w-0 flex-col"
               >
-                <!-- Timeline rail：与标题区同宽 28px，节点与 section 图标同一纵轴 -->
-                <div class="relative flex w-full shrink-0 flex-col items-center pt-1.5">
-                  <div
-                    v-if="followUps.length > 1"
-                    class="absolute left-1/2 z-0 w-px -translate-x-1/2 bg-slate-200"
-                    :class="followUpTimelineRailClass(followUpIndex)"
-                  />
-                  <div
-                    class="relative z-10 size-3.5 shrink-0 rounded-full border-2 border-primary bg-white shadow-sm ring-2 ring-slate-50"
-                    aria-hidden="true"
-                  />
-                </div>
-                <!-- flex-col + 固定高度占位：16px 间距在同行 flex 高度内，避免子项 margin 不撑开行高导致卡片贴在一起；左侧轨道 stretch 后竖线仍连续 -->
+                <!-- flex-col + 固定高度占位：16px 间距在同行 flex 高度内，避免子项 margin 不撑开行高导致卡片贴在一起。 -->
                 <div class="flex min-w-0 flex-1 flex-col">
                   <div v-if="false" class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
                     <div class="flex items-center justify-between mb-3">
@@ -707,7 +735,24 @@
                     <span :class="sectionMaterialIconClass">group</span>
                   </span>
                   联系人
-                  <span class="text-slate-400 font-normal">({{ contactTotal }})</span>
+                  <button
+                    type="button"
+                    class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-[background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d]"
+                    :aria-expanded="contactsModuleExpanded"
+                    :aria-label="contactsModuleExpanded ? '收起联系人' : '展开联系人'"
+                    @click="contactsModuleExpanded = !contactsModuleExpanded"
+                  >
+                    <span class="material-symbols-outlined text-[16px] leading-none">
+                      {{ contactsModuleExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
+                    </span>
+                    <span
+                      class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
+                      role="tooltip"
+                    >
+                      {{ contactsModuleExpanded ? '收起联系人' : '展开联系人' }}
+                    </span>
+                  </button>
+                  <!-- <span class="text-slate-400 font-normal">({{ contactTotal }})</span> -->
                 </h4>
                 <div class="flex shrink-0 items-center gap-2">
                   <button
@@ -740,28 +785,11 @@
                       新建联系人
                     </span>
                   </button>
-                  <button
-                    type="button"
-                    class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 opacity-0 pointer-events-none transition-[opacity,background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d] group-hover/contacts-module:pointer-events-auto group-hover/contacts-module:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
-                    :aria-expanded="contactsModuleExpanded"
-                    :aria-label="contactsModuleExpanded ? '收起联系人' : '展开联系人'"
-                    @click="contactsModuleExpanded = !contactsModuleExpanded"
-                  >
-                    <span class="material-symbols-outlined text-[16px] leading-none">
-                      {{ contactsModuleExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
-                    </span>
-                    <span
-                      class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                      role="tooltip"
-                    >
-                      {{ contactsModuleExpanded ? '收起联系人' : '展开联系人' }}
-                    </span>
-                  </button>
                 </div>
               </div>
               <div v-if="contactsModuleExpanded" class="space-y-4">
                 <div v-if="contacts.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
-                  <span class="material-symbols-outlined text-2xl leading-none text-slate-200">person_off</span>
+                  <span class="material-symbols-outlined text-2xl leading-none text-slate-400">person_off</span>
                   <p class="mt-2 text-xs font-medium text-slate-400">暂无关联联系人</p>
                 </div>
                 <div
@@ -884,6 +912,23 @@
                     <WkIcon name="task" :size="14" />
                   </span>
                   任务
+                  <button
+                    type="button"
+                    class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-[background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d]"
+                    :aria-expanded="tasksModuleExpanded"
+                    :aria-label="tasksModuleExpanded ? '收起任务' : '展开任务'"
+                    @click="tasksModuleExpanded = !tasksModuleExpanded"
+                  >
+                    <span class="material-symbols-outlined text-[16px] leading-none">
+                      {{ tasksModuleExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
+                    </span>
+                    <span
+                      class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
+                      role="tooltip"
+                    >
+                      {{ tasksModuleExpanded ? '收起任务' : '展开任务' }}
+                    </span>
+                  </button>
                 </h4>
                 <div class="flex shrink-0 items-center gap-2">
                   <button
@@ -901,28 +946,11 @@
                       新建任务
                     </span>
                   </button>
-                  <button
-                    type="button"
-                    class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 opacity-0 pointer-events-none transition-[opacity,background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d] group-hover/tasks-module:pointer-events-auto group-hover/tasks-module:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
-                    :aria-expanded="tasksModuleExpanded"
-                    :aria-label="tasksModuleExpanded ? '收起任务' : '展开任务'"
-                    @click="tasksModuleExpanded = !tasksModuleExpanded"
-                  >
-                    <span class="material-symbols-outlined text-[16px] leading-none">
-                      {{ tasksModuleExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
-                    </span>
-                    <span
-                      class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                      role="tooltip"
-                    >
-                      {{ tasksModuleExpanded ? '收起任务' : '展开任务' }}
-                    </span>
-                  </button>
                 </div>
               </div>
               <div v-if="tasksModuleExpanded" class="space-y-4">
                 <div v-if="!customer.tasks?.length" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
-                  <span class="material-symbols-outlined text-2xl leading-none text-slate-200">task_alt</span>
+                  <span class="material-symbols-outlined text-2xl leading-none text-slate-400">task_alt</span>
                   <p class="mt-2 text-xs font-medium text-slate-400">暂无待办任务</p>
                 </div>
                 <div
@@ -1000,7 +1028,24 @@
                     <span :class="sectionMaterialIconClass">event_note</span>
                   </span>
                   日程
-                  <span class="text-slate-400 font-normal">({{ scheduleTotal }})</span>
+                  <button
+                    type="button"
+                    class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-[background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d]"
+                    :aria-expanded="schedulesModuleExpanded"
+                    :aria-label="schedulesModuleExpanded ? '收起日程' : '展开日程'"
+                    @click="schedulesModuleExpanded = !schedulesModuleExpanded"
+                  >
+                    <span class="material-symbols-outlined text-[16px] leading-none">
+                      {{ schedulesModuleExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
+                    </span>
+                    <span
+                      class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
+                      role="tooltip"
+                    >
+                      {{ schedulesModuleExpanded ? '收起日程' : '展开日程' }}
+                    </span>
+                  </button>
+                  <!-- <span class="text-slate-400 font-normal">({{ scheduleTotal }})</span> -->
                 </h4>
                 <div class="flex shrink-0 items-center gap-2">
                   <button
@@ -1018,28 +1063,11 @@
                       新建日程
                     </span>
                   </button>
-                  <button
-                    type="button"
-                    class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 opacity-0 pointer-events-none transition-[opacity,background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d] group-hover/schedules-module:pointer-events-auto group-hover/schedules-module:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
-                    :aria-expanded="schedulesModuleExpanded"
-                    :aria-label="schedulesModuleExpanded ? '收起日程' : '展开日程'"
-                    @click="schedulesModuleExpanded = !schedulesModuleExpanded"
-                  >
-                    <span class="material-symbols-outlined text-[16px] leading-none">
-                      {{ schedulesModuleExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
-                    </span>
-                    <span
-                      class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                      role="tooltip"
-                    >
-                      {{ schedulesModuleExpanded ? '收起日程' : '展开日程' }}
-                    </span>
-                  </button>
                 </div>
               </div>
               <div v-if="schedulesModuleExpanded" class="space-y-4">
                 <div v-if="customerSchedules.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
-                  <span class="material-symbols-outlined text-2xl leading-none text-slate-200">event_busy</span>
+                  <span class="material-symbols-outlined text-2xl leading-none text-slate-400">event_busy</span>
                   <p class="mt-2 text-xs font-medium text-slate-400">暂无关联日程</p>
                 </div>
                 <div
@@ -1100,6 +1128,23 @@
                     <WkIcon name="knowledge" :size="14" />
                   </span>
                   文档
+                  <button
+                    type="button"
+                    class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-[background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d]"
+                    :aria-expanded="documentsModuleExpanded"
+                    :aria-label="documentsModuleExpanded ? '收起文档' : '展开文档'"
+                    @click="documentsModuleExpanded = !documentsModuleExpanded"
+                  >
+                    <span class="material-symbols-outlined text-[16px] leading-none">
+                      {{ documentsModuleExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
+                    </span>
+                    <span
+                      class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
+                      role="tooltip"
+                    >
+                      {{ documentsModuleExpanded ? '收起文档' : '展开文档' }}
+                    </span>
+                  </button>
                 </h4>
                 <div class="flex shrink-0 items-center gap-2">
                   <button
@@ -1117,23 +1162,6 @@
                       上传文档
                     </span>
                   </button>
-                  <button
-                    type="button"
-                    class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 opacity-0 pointer-events-none transition-[opacity,background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d] group-hover/documents-module:pointer-events-auto group-hover/documents-module:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
-                    :aria-expanded="documentsModuleExpanded"
-                    :aria-label="documentsModuleExpanded ? '收起文档' : '展开文档'"
-                    @click="documentsModuleExpanded = !documentsModuleExpanded"
-                  >
-                    <span class="material-symbols-outlined text-[16px] leading-none">
-                      {{ documentsModuleExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
-                    </span>
-                    <span
-                      class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                      role="tooltip"
-                    >
-                      {{ documentsModuleExpanded ? '收起文档' : '展开文档' }}
-                    </span>
-                  </button>
                 </div>
               </div>
               <div v-if="documentsModuleExpanded">
@@ -1141,27 +1169,33 @@
                   <span class="material-symbols-outlined text-2xl text-slate-300 animate-spin">progress_activity</span>
                 </div>
                 <div v-else-if="customerKnowledgeList.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
-                  <span class="material-symbols-outlined text-2xl leading-none text-slate-200">folder_off</span>
+                  <span class="material-symbols-outlined text-2xl leading-none text-slate-400">folder_off</span>
                   <p class="mt-2 text-xs font-medium text-slate-400">{{ getKnowledgeEmptyText() }}</p>
                 </div>
-                <div v-else class="space-y-3">
+                <div v-else class="space-y-2">
                   <div
                     v-for="item in customerKnowledgeList"
                     :key="item.knowledgeId"
-                    class="group cursor-pointer rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-white to-slate-50/80 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-slate-200/70"
+                    class="group cursor-pointer rounded-xl border border-slate-200 bg-white p-3 transition-all duration-200 hover:border-primary/30 hover:shadow-md"
                     @click="openKnowledgeDetail(item.knowledgeId)"
                   >
-                    <div class="flex items-start gap-3">
-                      <FileTypeIcon :file-name="item.name" :mime-type="item.mimeType" :knowledge-type="item.type" size="md" />
+                    <div class="flex items-start gap-2.5">
+                      <FileTypeIcon :file-name="item.name" :mime-type="item.mimeType" :knowledge-type="item.type" size="sm" />
                       <div class="min-w-0 flex-1">
                         <div class="flex items-start justify-between gap-3">
                           <div class="min-w-0 flex-1">
-                            <h5 class="truncate text-sm font-bold text-slate-900 transition-colors group-hover:text-primary">{{ item.name }}</h5>
-                            <p class="mt-1 text-[11px] font-medium text-slate-400">{{ getKnowledgeTypeLabel(item.type) }}</p>
+                            <h5 class="truncate text-sm font-bold leading-5 text-slate-900 transition-colors group-hover:text-primary">{{ item.name }}</h5>
+                            <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium leading-4 text-slate-400">
+                              <span>{{ getKnowledgeTypeLabel(item.type) }}</span>
+                              <span aria-hidden="true">·</span>
+                              <span>{{ getKnowledgeFileSizeText(item) }}</span>
+                              <span aria-hidden="true">·</span>
+                              <span>上传 {{ formatDateTime(item.createTime) }}</span>
+                            </div>
                           </div>
                           <button
                             type="button"
-                            class="group/module-action relative flex size-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-primary/10 hover:text-primary"
+                            class="group/module-action relative flex size-7 shrink-0 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-primary/10 hover:text-primary"
                             aria-label="下载文档"
                             @click.stop="handleKnowledgeDownload(item)"
                           >
@@ -1174,10 +1208,6 @@
                             </span>
                           </button>
                         </div>
-                        <p class="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500">
-                          {{ item.summary || getKnowledgeTypeLabel(item.type) + ' / linked to current customer' }}
-                        </p>
-                        <p class="mt-3 text-[11px] text-slate-400">{{ formatDate(item.createTime) }}</p>
                       </div>
                     </div>
                   </div>
@@ -1333,7 +1363,7 @@
     <ScheduleDetailDrawer
       v-model="showCustomerScheduleDetail"
       :schedule="selectedCustomerSchedule"
-      :is-mobile="isMobile"
+      :is-mobile="isMobile && !isEmbeddedMobileLayout"
       :can-edit="canEditSchedules"
       :can-delete="canDeleteSchedules"
       @edit="handleEditCustomerScheduleFromDetail"
@@ -1392,6 +1422,7 @@ import {
   CUSTOMER_LIST_PAGE_QUERY_KEY
 } from '@/views/customer/constants'
 import { appEvents, APP_EVENT } from '@/utils/events'
+import { formatFileSize as formatFileSizeBytes, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 
 const route = useRoute()
 const router = useRouter()
@@ -1581,17 +1612,6 @@ function getSectionIconStyle(key: SectionIconKey): { backgroundColor: string } {
 
 function getAiStatusMeta(value: string | undefined | null) {
   return getCustomerAiStatusMeta(value)
-}
-
-/** Vertical rail segment: line starts at first dot center, ends at last dot center; full height between. */
-function followUpTimelineRailClass(index: number): string {
-  const n = followUps.value.length
-  if (n <= 1) return ''
-  const first = index === 0
-  const last = index === n - 1
-  if (first && !last) return 'top-[calc(0.375rem+0.4375rem)] bottom-0'
-  if (!first && last) return 'top-0 h-[calc(0.375rem+0.4375rem)]'
-  return 'top-0 bottom-0'
 }
 
 function isPrimaryContact(contact?: Pick<Contact, 'isPrimary'> | null): boolean {
@@ -1843,6 +1863,8 @@ function scheduleAiAnalysisPolling(customerId?: string, resetAttempts = false) {
 
 
 const customer = computed(() => customerStore.currentCustomer)
+const customerVisibleTags = computed(() => customer.value?.tags?.slice(0, 3) || [])
+const customerHiddenTags = computed(() => customer.value?.tags?.slice(3) || [])
 const canEditCustomer = computed(() => userStore.hasPermission('customer:edit'))
 const canTransferCustomer = computed(() => userStore.hasPermission('customer:transfer'))
 const canDeleteCustomer = computed(() => userStore.hasPermission('customer:delete'))
@@ -2143,6 +2165,12 @@ function getKnowledgeTypeLabel(type?: string) {
     contract: '合同'
   }
   return labels[String(type || '').toLowerCase()] || '文档'
+}
+
+function getKnowledgeFileSizeText(item: Knowledge) {
+  const formatted = item.fileSizeFormatted?.trim()
+  if (formatted) return formatted
+  return resolveKnowledgeFileSizeBytes(item.fileSize) > 0 ? formatFileSizeBytes(item.fileSize) : '未知大小'
 }
 
 function getScheduleTypeLabel(schedule: ScheduleVO) {

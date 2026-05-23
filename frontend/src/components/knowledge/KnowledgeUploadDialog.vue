@@ -22,10 +22,10 @@
         </p>
       </div>
 
-      <div class="space-y-6">
-        <section class="space-y-3">
+      <div class="space-y-5">
+        <section class="space-y-2">
           <p class="text-xs font-bold uppercase tracking-widest text-slate-400">{{ step1Label }}</p>
-          <div class="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <div class="grid grid-cols-2 gap-2 md:grid-cols-3">
             <button
               v-for="cat in typeCategories"
               :key="cat.id"
@@ -33,15 +33,15 @@
               :disabled="uploading"
               @click="form.type = cat.id"
               :class="[
-                'flex flex-col items-center gap-2 rounded-2xl border bg-white py-4 transition-all',
+                'flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-left transition-all',
                 form.type === cat.id
-                  ? 'border-primary bg-primary/5 text-primary ring-2 ring-primary/20'
+                  ? 'border-primary bg-primary/5 text-primary'
                   : 'border-slate-100 text-slate-600 hover:border-slate-200 hover:bg-slate-50',
                 uploading ? 'cursor-not-allowed opacity-60' : ''
               ]"
             >
-              <span class="material-symbols-outlined text-xl">{{ cat.icon }}</span>
-              <span class="text-xs font-bold">{{ cat.label }}</span>
+              <span class="material-symbols-outlined shrink-0 text-lg">{{ cat.icon }}</span>
+              <span class="min-w-0 truncate text-xs font-bold">{{ cat.label }}</span>
             </button>
           </div>
         </section>
@@ -131,7 +131,7 @@
         </button>
         <button
           type="button"
-          class="flex-1 rounded-2xl bg-primary py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+          class="flex-1 rounded-2xl bg-primary py-3.5 text-sm font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="uploading || !selectedFile"
           @click="confirmUpload"
         >

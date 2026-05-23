@@ -38,6 +38,7 @@
             <el-button
               type="primary"
               plain
+              class="saved-custom-mode-button"
               :disabled="!canUseSavedCustomMode"
               :loading="switchingAiMode"
               @click="handleUseSavedCustomMode"
@@ -648,3 +649,9 @@ function inferCapabilities(provider: AiProvider | undefined, model: string | und
   }
 }
 </script>
+
+<style scoped>
+.saved-custom-mode-button:not(.is-disabled) {
+  color: #fff;
+}
+</style>
