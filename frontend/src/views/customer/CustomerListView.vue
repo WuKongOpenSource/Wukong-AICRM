@@ -601,7 +601,8 @@
       </div>
 
       <CustomerInsightSidebar
-        v-if="!isMobile && showListInsightSidebar"
+        v-if="!isMobile"
+        v-model:expanded="showListInsightSidebar"
         :negotiation-count="negotiationCount"
         :overdue-count="overdueCount"
         :closed-count="closedCount"
@@ -696,7 +697,19 @@ const listFields = ref<CustomField[]>([])
 const listViewMode = ref<'list' | 'card' | 'stage'>('list')
 const lastNonMobileListViewMode = ref<'list' | 'card' | 'stage'>('list')
 const listViewModeAutoSwitching = ref(false)
-const showListInsightSidebar = ref(true)
+const AI_SIDEBAR_STORAGE_KEY = 'wk_ai_crm:customer_ai_sidebar_expanded:v2'
+
+function getInitialListInsightSidebarExpanded() {
+  try {
+    const raw = localStorage.getItem(AI_SIDEBAR_STORAGE_KEY)
+    if (raw === null) return false
+    return raw === '1'
+  } catch {
+    return false
+  }
+}
+
+const showListInsightSidebar = ref(getInitialListInsightSidebarExpanded())
 
 const AI_CUSTOMER_LIST_FIELDS: CustomField[] = [
   {
@@ -1405,6 +1418,14 @@ watch(isMobile, (mobile) => {
     listViewModeAutoSwitching.value = true
     listViewMode.value = lastNonMobileListViewMode.value
     listViewModeAutoSwitching.value = false
+  }
+})
+
+watch(showListInsightSidebar, (value) => {
+  try {
+    localStorage.setItem(AI_SIDEBAR_STORAGE_KEY, value ? '1' : '0')
+  } catch {
+    // Ignore storage failures
   }
 })
 

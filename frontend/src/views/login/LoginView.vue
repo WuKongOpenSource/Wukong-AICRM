@@ -1386,10 +1386,12 @@ onBeforeUnmount(() => {
  */
 .auth-form :deep(.el-input.auth-el-input .el-input__wrapper) {
   min-height: 46px;
-  border-radius: 1rem !important;
-  background-color: #f8fafc !important;
+  border-radius: var(--wk-input-radius) !important;
+  background-color: var(--wk-input-bg) !important;
   border: none !important;
-  box-shadow: 0 0 0 1px #e2e8f0 inset !important;
+  box-shadow:
+    0 0 0 1px var(--wk-input-border) inset,
+    var(--wk-input-shadow) !important;
   padding-left: 12px !important;
   transition:
     box-shadow 0.2s ease,
@@ -1397,15 +1399,17 @@ onBeforeUnmount(() => {
 }
 
 .auth-form :deep(.el-input.auth-el-input .el-input__wrapper:hover) {
-  background-color: #f1f5f9 !important;
-  box-shadow: 0 0 0 1px #cbd5e1 inset !important;
+  background-color: var(--wk-input-bg) !important;
+  box-shadow:
+    0 0 0 1px var(--wk-input-border-hover) inset,
+    var(--wk-input-shadow) !important;
 }
 
 .auth-form :deep(.el-input.auth-el-input .el-input__wrapper.is-focus) {
-  background-color: #fff !important;
+  background-color: var(--wk-input-bg) !important;
   box-shadow:
-    0 0 0 4px rgba(19, 127, 236, 0.06),
-    0 0 0 1px #137fec inset !important;
+    0 0 0 1px var(--wk-input-border-focus) inset,
+    var(--wk-input-focus-shadow) !important;
 }
 
 .auth-send-code-btn {

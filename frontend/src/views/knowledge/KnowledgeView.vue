@@ -14,7 +14,7 @@
 
           <div class="flex min-w-0 flex-1 items-center justify-end gap-3">
             <div
-              class="flex h-10 w-[386px] max-w-[38vw] min-w-[260px] items-center rounded-xl border border-[#dbe8f8] bg-[#f8fbff] px-1.5 transition-all focus-within:border-primary/60"
+              class="wk-native-input-shell flex h-10 w-[386px] max-w-[38vw] min-w-[260px] items-center rounded-xl border border-[#dbe8f8] bg-[#f8fbff] px-1.5 transition-all focus-within:border-primary/60"
             >
               <span class="material-symbols-outlined shrink-0 pl-2 pr-1 text-[22px] leading-none text-[#8fa6c5]">search</span>
               <input
@@ -80,7 +80,7 @@
               <span class="ml-1 text-sm text-slate-400">{{ totalCount }} 项结果</span>
             </div>
             <div
-              class="flex min-w-0 w-full flex-1 items-center rounded-xl border border-slate-200 bg-white px-1 transition-all focus-within:border-primary md:max-w-md lg:max-w-lg"
+              class="wk-native-input-shell flex min-w-0 w-full flex-1 items-center rounded-xl border border-slate-200 bg-white px-1 transition-all focus-within:border-primary md:max-w-md lg:max-w-lg"
               :class="showAiSearchResult ? 'md:ml-auto' : ''"
             >
               <div class="flex shrink-0 items-center justify-center pl-3 pr-1 text-slate-400">

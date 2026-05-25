@@ -1,8 +1,11 @@
 <template>
   <div class="h-full flex bg-background-light overflow-hidden">
     <!-- Task List Section -->
-    <div class="flex-1 overflow-y-auto p-4 md:p-8">
-      <div class="max-w-4xl mx-auto space-y-6">
+    <div class="flex-1 overflow-y-auto px-4 py-6 md:px-6">
+      <div
+        class="space-y-6 transition-[max-width]"
+        :class="effectiveTaskViewMode === 'list' ? 'w-full' : 'mx-auto max-w-4xl'"
+      >
         <!-- Header -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -10,6 +13,26 @@
             <p class="text-sm text-slate-500 mt-1">基于客户价值与成交概率，AI 已为您自动排序今日任务。</p>
           </div>
           <div class="flex items-center justify-between gap-3">
+            <div v-if="!isMobile" class="flex bg-slate-100 p-1 rounded-lg shrink-0 border border-slate-200">
+              <button
+                type="button"
+                class="flex items-center justify-center size-8 rounded-md transition-all"
+                :class="taskViewMode === 'list' ? 'bg-white text-primary shadow-sm ring-1 ring-primary/20' : 'text-slate-400 hover:text-slate-600'"
+                title="列表视图"
+                @click="taskViewMode = 'list'"
+              >
+                <span class="material-symbols-outlined text-[20px]">list</span>
+              </button>
+              <button
+                type="button"
+                class="flex items-center justify-center size-8 rounded-md transition-all"
+                :class="taskViewMode === 'card' ? 'bg-white text-primary shadow-sm ring-1 ring-primary/20' : 'text-slate-400 hover:text-slate-600'"
+                title="卡片视图"
+                @click="taskViewMode = 'card'"
+              >
+                <span class="material-symbols-outlined text-[20px]">grid_view</span>
+              </button>
+            </div>
             <!-- Segmented filter -->
             <div class="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm overflow-x-auto max-w-[70vw] md:max-w-none">
               <button
@@ -78,6 +101,124 @@
         <div v-else-if="displayedTasks.length === 0" class="text-center py-16 text-slate-400">
           <span class="material-symbols-outlined text-5xl">task_alt</span>
           <p class="mt-4 text-sm">暂无任务</p>
+        </div>
+
+        <!-- Task List View -->
+        <div v-else-if="effectiveTaskViewMode === 'list'" class="wk-task-list-table overflow-hidden rounded-2xl border shadow-sm">
+          <div class="overflow-x-auto">
+            <div class="wk-task-list-table__header task-list-grid min-w-[1180px] px-5 py-3 text-xs font-bold">
+              <div>AI评分/任务标题</div>
+              <div>关联客户</div>
+              <div>优先级</div>
+              <div>状态</div>
+              <div>截止日期</div>
+              <div>类别</div>
+              <div>负责人</div>
+              <div class="text-right">操作</div>
+            </div>
+
+            <div
+              v-for="task in displayedTasks"
+              :key="`list-${task.taskId}`"
+              role="button"
+              tabindex="0"
+              :class="[
+                'group wk-task-list-table__row task-list-grid min-w-[1180px] cursor-pointer items-center px-5 py-4 transition-colors last:border-b-0',
+                selectedTask?.taskId === task.taskId ? 'is-selected ring-1 ring-inset ring-primary/20' : '',
+                task.status === 'COMPLETED' ? 'opacity-75' : ''
+              ]"
+              @click="handleViewDetail(task)"
+              @keyup.enter="handleViewDetail(task)"
+            >
+              <div class="flex min-w-0 items-center gap-3">
+                <div
+                  :class="[
+                    'flex h-7 min-w-9 shrink-0 items-center justify-center rounded-lg border px-2 text-sm font-black',
+                    task.status === 'COMPLETED'
+                      ? 'border-emerald-100 bg-emerald-50 text-emerald-500'
+                      : 'border-primary/10 bg-primary/5 text-primary'
+                  ]"
+                >
+                  <span v-if="task.status === 'COMPLETED'" class="material-symbols-outlined text-[18px] leading-none">check</span>
+                  <span v-else>{{ getAiScore(task) }}</span>
+                </div>
+                <div class="min-w-0">
+                  <h3
+                    :class="[
+                      'truncate text-base font-bold leading-5 transition-colors group-hover:text-primary',
+                      task.status === 'COMPLETED' ? 'text-slate-400 line-through' : 'text-slate-900'
+                    ]"
+                    :title="task.title"
+                  >
+                    {{ task.title }}
+                  </h3>
+                  <p class="mt-1 truncate text-xs leading-5 text-slate-400" :title="getAiInsight(task)">
+                    {{ getAiInsight(task) }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="min-w-0 truncate text-sm font-semibold text-slate-900" :title="task.customerName || '-'">
+                {{ task.customerName || '-' }}
+              </div>
+
+              <div>
+                <span
+                  class="inline-flex h-6 items-center rounded-full px-2.5 text-xs font-bold"
+                  :class="getPriorityBadgeClass(task.priority)"
+                >
+                  {{ getPriorityLabel(task.priority) }}
+                </span>
+              </div>
+
+              <div>
+                <span
+                  class="inline-flex h-6 items-center rounded-md px-2.5 text-xs font-bold"
+                  :class="getStatusBadgeClass(task)"
+                >
+                  {{ getStatusLabel(task) }}
+                </span>
+              </div>
+
+              <div class="whitespace-nowrap text-sm font-medium text-slate-500">
+                {{ task.dueDate ? formatDateTime(task.dueDate) : '-' }}
+              </div>
+
+              <div>
+                <span
+                  class="inline-flex h-6 max-w-full items-center rounded-md px-2.5 text-xs font-bold"
+                  :class="getTaskTypeBadgeClass(task.taskType)"
+                  :title="getTaskTypeLabel(task.taskType)"
+                >
+                  <span class="truncate">{{ getTaskTypeLabel(task.taskType) }}</span>
+                </span>
+              </div>
+
+              <div class="min-w-0 truncate text-sm font-medium text-slate-700" :title="getTaskOwnerName(task)">
+                {{ getTaskOwnerName(task) }}
+              </div>
+
+              <div class="flex items-center justify-end gap-2" @click.stop @keyup.stop>
+                <button
+                  v-if="task.status === 'PENDING'"
+                  type="button"
+                  class="inline-flex h-8 items-center rounded-lg bg-blue-50 px-3 text-xs font-bold text-blue-600 transition-colors hover:bg-blue-100"
+                  @click="handleStartTask(task)"
+                >
+                  开始处理
+                </button>
+                <button
+                  v-if="task.status !== 'COMPLETED'"
+                  type="button"
+                  class="inline-flex h-8 items-center rounded-lg bg-emerald-50 px-3 text-xs font-bold text-emerald-600 transition-colors hover:bg-emerald-100"
+                  @click="handleToggleComplete(task)"
+                >
+                  标记完成
+                </button>
+                <span v-else class="inline-flex h-8 items-center px-2 text-xs font-bold text-slate-400">已完成</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Task Cards -->
@@ -292,7 +433,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useTaskStore } from '@/stores/task'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { Task, TaskStatus } from '@/types/common'
+import type { Task, TaskPriority, TaskStatus } from '@/types/common'
 import { normalizeTaskPriority } from '@/utils/taskPriority'
 import TaskDetailDrawer from './components/TaskDetailDrawer.vue'
 import TaskEditDialog from './components/TaskEditDialog.vue'
@@ -304,27 +445,23 @@ const { isMobile } = useResponsive()
 
 const currentStatus = ref('all')
 const valueFilter = ref<'all' | 'high-impact'>('all')
+const taskViewMode = ref<'list' | 'card'>('list')
 const showAddDialog = ref(false)
 const editingTask = ref<Task | null>(null)
 const showTaskDetail = ref(false)
 const detailTask = ref<Task | null>(null)
 const selectedTask = ref<Task | null>(null)
 
+const effectiveTaskViewMode = computed(() => isMobile.value ? 'card' : taskViewMode.value)
+
 // Computed properties
 const statusTabs = computed(() => {
-  const tasks = taskStore.taskList
   const counts = taskStore.statusCounts
   return [
     { value: 'all', label: '全部', count: counts.all },
     { value: 'PENDING', label: '待处理', count: counts.PENDING },
     { value: 'IN_PROGRESS', label: '进行中', count: counts.IN_PROGRESS },
     { value: 'COMPLETED', label: '已完成', count: counts.COMPLETED }
-  ]
-  return [
-    { value: 'all', label: '全部', count: taskStore.totalCount },
-    { value: 'PENDING', label: '待处理', count: tasks.filter(t => t.status === 'PENDING').length },
-    { value: 'IN_PROGRESS', label: '进行中', count: tasks.filter(t => t.status === 'IN_PROGRESS').length },
-    { value: 'COMPLETED', label: '已完成', count: tasks.filter(t => t.status === 'COMPLETED').length }
   ]
 })
 
@@ -536,10 +673,87 @@ function getAiInsight(task: Task): string {
   return '低优先级任务，可在空闲时间处理。'
 }
 
+function getPriorityLabel(priority: TaskPriority): string {
+  const normalized = normalizeTaskPriority(priority)
+  if (normalized === 'HIGH') return '高级'
+  if (normalized === 'MEDIUM') return '中级'
+  return '低级'
+}
+
+function getPriorityBadgeClass(priority: TaskPriority): string {
+  const normalized = normalizeTaskPriority(priority)
+  if (normalized === 'HIGH') return 'bg-rose-50 text-rose-600'
+  if (normalized === 'MEDIUM') return 'bg-amber-50 text-amber-600'
+  return 'bg-slate-100 text-slate-600'
+}
+
+function getStatusLabel(task: Task): string {
+  if (isOverdue(task)) return '已延期'
+  if (task.status === 'COMPLETED') return '已完成'
+  if (task.status === 'IN_PROGRESS') return '进行中'
+  if (task.status === 'CANCELLED') return '已取消'
+  return '待处理'
+}
+
+function getStatusBadgeClass(task: Task): string {
+  if (isOverdue(task)) return 'bg-red-50 text-red-600'
+  if (task.status === 'COMPLETED') return 'bg-emerald-50 text-emerald-600'
+  if (task.status === 'IN_PROGRESS') return 'bg-blue-50 text-blue-600'
+  if (task.status === 'CANCELLED') return 'bg-slate-100 text-slate-500'
+  return 'bg-slate-100 text-slate-600'
+}
+
+function getTaskTypeLabel(taskType?: string): string {
+  const raw = taskType?.trim()
+  if (!raw) return '任务'
+  const normalized = raw.toUpperCase().replace(/[\s-]+/g, '_')
+  const labels: Record<string, string> = {
+    DOCUMENT: '文档',
+    DOC: '文档',
+    FILE: '文档',
+    RESEARCH: '调研',
+    SURVEY: '调研',
+    FOLLOW_UP: '跟进',
+    FOLLOWUP: '跟进',
+    VISIT: '拜访',
+    MEETING: '会议',
+    CALL: '电话',
+    EMAIL: '邮件',
+    CONTRACT: '合同',
+    PROPOSAL: '方案'
+  }
+  return labels[normalized] || raw
+}
+
+function getTaskTypeBadgeClass(taskType?: string): string {
+  const label = getTaskTypeLabel(taskType)
+  if (label === '调研') return 'bg-violet-50 text-violet-600'
+  if (label === '跟进') return 'bg-slate-100 text-slate-600'
+  if (label === '会议') return 'bg-amber-50 text-amber-600'
+  if (label === '电话' || label === '拜访') return 'bg-emerald-50 text-emerald-600'
+  return 'bg-blue-50 text-blue-600'
+}
+
+function getTaskOwnerName(task: Task): string {
+  return task.assignedToName || task.createUserName || '未分配'
+}
+
 // Check if task is overdue
 function isOverdue(task: Task): boolean {
   if (!task.dueDate || task.status === 'COMPLETED') return false
   return new Date(task.dueDate) < new Date()
+}
+
+function formatDateTime(dateStr: string): string {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return dateStr
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  const minute = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hour}:${minute}`
 }
 
 function formatDate(dateStr: string): string {
@@ -560,3 +774,41 @@ function getRelativeTime(dateStr: string): string {
   return `${diff}天后到期`
 }
 </script>
+
+<style scoped>
+.wk-task-list-table {
+  background: var(--wk-bg-surface);
+  border-color: var(--wk-border-subtle);
+  color: var(--wk-text-secondary);
+}
+
+.wk-task-list-table__header {
+  background: var(--wk-bg-surface-subtle);
+  color: var(--wk-text-muted);
+  border-bottom: 1px solid var(--wk-border-muted);
+}
+
+.wk-task-list-table__row {
+  background: var(--wk-bg-surface);
+  border-bottom: 1px solid var(--wk-border-subtle);
+}
+
+.wk-task-list-table__row:hover,
+.wk-task-list-table__row.is-selected {
+  background: color-mix(in srgb, var(--wk-primary) 11%, var(--wk-bg-surface));
+}
+
+.task-list-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(300px, 2.25fr)
+    minmax(170px, 1.35fr)
+    minmax(82px, 0.6fr)
+    minmax(92px, 0.65fr)
+    minmax(150px, 1fr)
+    minmax(74px, 0.55fr)
+    minmax(90px, 0.65fr)
+    minmax(150px, 1fr);
+  gap: 18px;
+}
+</style>

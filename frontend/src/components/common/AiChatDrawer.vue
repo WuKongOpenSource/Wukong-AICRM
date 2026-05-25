@@ -246,7 +246,7 @@
             </div>
 
             <!-- Input Box -->
-            <div class="flex flex-wrap items-center bg-slate-50 border border-slate-200 rounded-xl p-1 focus-within:border-primary transition-all">
+            <div class="wk-native-input-shell flex flex-wrap items-center bg-slate-50 border border-slate-200 rounded-xl p-1 focus-within:border-primary transition-all">
               <input
                 ref="fileInputRef"
                 type="file"

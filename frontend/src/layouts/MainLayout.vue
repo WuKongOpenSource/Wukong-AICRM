@@ -994,7 +994,7 @@
                 ref="customerSearchInputRef"
                 v-model="customerSearchKeyword"
                 type="text"
-                class="min-w-0 flex-1 border-none bg-transparent text-[16px] font-medium text-[#0d0d0d] outline-none placeholder:text-[#8f8f8f]"
+                class="h-12 min-w-0 flex-1 border-none bg-transparent text-[16px] font-medium text-[#0d0d0d] outline-none placeholder:text-[#8f8f8f]"
                 placeholder="搜索客户..."
                 @input="handleCustomerSearchInput"
                 @keydown.esc.prevent="closeCustomerSearchDialog"

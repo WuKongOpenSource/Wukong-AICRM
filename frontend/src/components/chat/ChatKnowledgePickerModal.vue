@@ -475,12 +475,14 @@ function handleConfirm() {
   margin: 16px 20px 12px;
   padding: 0 16px;
   height: 44px;
-  border-radius: 16px;
-  background: #F7F9FC;
-  border: 1px solid transparent;
+  border-radius: var(--wk-input-radius);
+  background: var(--wk-input-bg);
+  border: 1px solid var(--wk-input-border);
+  box-shadow: var(--wk-input-shadow);
   transition:
     border-color 0.2s ease,
-    background 0.2s ease;
+    background 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .wk-chat-knowledge-picker__search-icon {
@@ -495,10 +497,14 @@ function handleConfirm() {
     'opsz' 24;
 }
 
+.wk-chat-knowledge-picker__search:hover {
+  border-color: var(--wk-input-border-hover);
+}
+
 .wk-chat-knowledge-picker__search:focus-within {
-  border-color: rgba(22, 119, 255, 0.35);
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.08);
+  border-color: var(--wk-input-border-focus);
+  background: var(--wk-input-bg);
+  box-shadow: var(--wk-input-focus-shadow);
 }
 
 .wk-chat-knowledge-picker__search-input {

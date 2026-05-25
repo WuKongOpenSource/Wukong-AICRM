@@ -114,8 +114,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
-const AI_SIDEBAR_STORAGE_KEY = 'wk_ai_crm:customer_ai_sidebar_expanded:v1'
-
 defineProps<{
   negotiationCount: number
   overdueCount: number
@@ -123,17 +121,7 @@ defineProps<{
   conversionRate: string
 }>()
 
-function getInitialExpanded() {
-  try {
-    const raw = localStorage.getItem(AI_SIDEBAR_STORAGE_KEY)
-    if (raw === null) return true
-    return raw === '1'
-  } catch {
-    return true
-  }
-}
-
-const isExpanded = ref(getInitialExpanded())
+const isExpanded = defineModel<boolean>('expanded', { default: false })
 const sidebarRef = ref<HTMLElement | null>(null)
 const expandedPanelMaxHeight = ref<number | null>(null)
 let layoutObserver: ResizeObserver | null = null
@@ -174,12 +162,6 @@ function queueExpandedPanelMeasure() {
 }
 
 watch(isExpanded, (value) => {
-  try {
-    localStorage.setItem(AI_SIDEBAR_STORAGE_KEY, value ? '1' : '0')
-  } catch {
-    // Ignore storage failures
-  }
-
   if (value) {
     nextTick(() => {
       queueExpandedPanelMeasure()

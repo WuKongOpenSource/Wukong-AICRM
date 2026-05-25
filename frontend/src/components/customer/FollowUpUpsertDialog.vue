@@ -306,9 +306,10 @@ function handleSubmit() {
 
 .follow-up-content-input :deep(.el-textarea__inner) {
   min-height: 150px;
-  border-radius: 0.75rem;
-  border-color: rgb(226 232 240);
-  background-color: rgb(248 250 252);
+  border-radius: var(--wk-input-radius);
+  border-color: var(--wk-input-border);
+  background-color: var(--wk-input-bg);
+  box-shadow: var(--wk-input-shadow);
   padding: 1rem;
   font-size: 0.875rem;
   line-height: 1.5;
@@ -319,13 +320,13 @@ function handleSubmit() {
 }
 
 .follow-up-content-input :deep(.el-textarea__inner:hover) {
-  border-color: rgb(203 213 225);
+  border-color: var(--wk-input-border-hover);
 }
 
 .follow-up-content-input :deep(.el-textarea__inner:focus) {
-  border-color: var(--el-color-primary);
-  background-color: #fff;
-  box-shadow: 0 0 0 2px var(--el-color-primary-light-8);
+  border-color: var(--wk-input-border-focus);
+  background-color: var(--wk-input-bg);
+  box-shadow: var(--wk-input-focus-shadow);
 }
 
 /* 避免 label（默认 inline）与 date-picker 根节点同一行并排 */
@@ -337,18 +338,24 @@ function handleSubmit() {
 
 .follow-up-control :deep(.el-input__wrapper),
 .follow-up-control :deep(.el-select__wrapper) {
-  border-radius: 0.75rem;
-  background-color: rgb(248 250 252);
-  box-shadow: 0 0 0 1px rgb(226 232 240) inset;
+  border-radius: var(--wk-input-radius);
+  background-color: var(--wk-input-bg);
+  box-shadow:
+    0 0 0 1px var(--wk-input-border) inset,
+    var(--wk-input-shadow);
 }
 
 .follow-up-control :deep(.el-input__wrapper:hover),
 .follow-up-control :deep(.el-select__wrapper:hover) {
-  box-shadow: 0 0 0 1px rgb(203 213 225) inset;
+  box-shadow:
+    0 0 0 1px var(--wk-input-border-hover) inset,
+    var(--wk-input-shadow);
 }
 
 .follow-up-control :deep(.el-input__wrapper.is-focus),
 .follow-up-control :deep(.el-select__wrapper.is-focused) {
-  box-shadow: 0 0 0 1px var(--el-color-primary) inset;
+  box-shadow:
+    0 0 0 1px var(--wk-input-border-focus) inset,
+    var(--wk-input-focus-shadow);
 }
 </style>

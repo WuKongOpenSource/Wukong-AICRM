@@ -44,6 +44,13 @@ html, body, #app {
   --wk-text-muted: #777168;
   --wk-text-faint: #a39d93;
   --wk-shadow-color: 48 43 35;
+  --wk-input-radius: 1rem;
+  --wk-input-bg: var(--wk-bg-surface);
+  --wk-input-border: var(--wk-border-subtle);
+  --wk-input-border-hover: var(--wk-border-muted);
+  --wk-input-border-focus: var(--wk-border-muted);
+  --wk-input-shadow: 0 2px 8px rgb(var(--wk-shadow-color) / 0.05);
+  --wk-input-focus-shadow: 0 4px 14px rgb(var(--wk-shadow-color) / 0.08);
   --wk-scrollbar-size: 8px;
   --wk-scrollbar-radius: 3px;
   --wk-scrollbar-thumb: var(--wk-border-subtle);
@@ -135,20 +142,89 @@ body {
 }
 
 .el-input__wrapper,
-.el-textarea__inner {
-  background-color: var(--wk-bg-surface) !important;
-  border-radius: 10px;
-  box-shadow: 0 0 0 1px var(--wk-border-subtle) inset !important;
+.el-textarea__inner,
+.el-select__wrapper {
+  background-color: var(--wk-input-bg) !important;
+  border-radius: var(--wk-input-radius) !important;
+  border: none !important;
+  box-shadow:
+    0 0 0 1px var(--wk-input-border) inset,
+    var(--wk-input-shadow) !important;
+  transition:
+    box-shadow 160ms ease,
+    background-color 160ms ease !important;
 }
 
 .el-input__wrapper:hover,
-.el-textarea__inner:hover {
-  box-shadow: 0 0 0 1px var(--wk-border-muted) inset !important;
+.el-textarea__inner:hover,
+.el-select__wrapper:hover {
+  box-shadow:
+    0 0 0 1px var(--wk-input-border-hover) inset,
+    var(--wk-input-shadow) !important;
 }
 
 .el-input__wrapper.is-focus,
-.el-textarea__inner:focus {
-  box-shadow: 0 0 0 1px var(--wk-primary) inset !important;
+.el-textarea__inner:focus,
+.el-select__wrapper.is-focused {
+  background-color: var(--wk-input-bg) !important;
+  box-shadow:
+    0 0 0 1px var(--wk-input-border-focus) inset,
+    var(--wk-input-focus-shadow) !important;
+}
+
+input:not(.el-input__inner):not(.el-select__input):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]),
+textarea,
+select {
+  border-color: var(--wk-input-border) !important;
+  background-color: var(--wk-input-bg) !important;
+  border-radius: var(--wk-input-radius) !important;
+  box-shadow: var(--wk-input-shadow) !important;
+}
+
+input:not(.el-input__inner):not(.el-select__input):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]):hover,
+textarea:hover,
+select:hover {
+  border-color: var(--wk-input-border-hover) !important;
+  box-shadow: var(--wk-input-shadow) !important;
+}
+
+input:not(.el-input__inner):not(.el-select__input):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]):focus,
+textarea:focus,
+select:focus {
+  border-color: var(--wk-input-border-focus) !important;
+  outline: none !important;
+  box-shadow: var(--wk-input-focus-shadow) !important;
+}
+
+input:not(.el-input__inner):not(.el-select__input):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]).bg-transparent,
+input:not(.el-input__inner):not(.el-select__input):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]).border-none,
+textarea.bg-transparent,
+textarea.border-none,
+select.bg-transparent,
+select.border-none,
+.el-input__inner,
+.el-select__input,
+.wk-chat-composer input,
+.wk-chat-composer textarea {
+  border-color: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.wk-native-input-shell {
+  border-color: var(--wk-input-border) !important;
+  background: var(--wk-input-bg) !important;
+  border-radius: var(--wk-input-radius) !important;
+  box-shadow: var(--wk-input-shadow) !important;
+}
+
+.wk-native-input-shell:hover {
+  border-color: var(--wk-input-border-hover) !important;
+}
+
+.wk-native-input-shell:focus-within {
+  border-color: var(--wk-input-border-focus) !important;
+  box-shadow: var(--wk-input-focus-shadow) !important;
 }
 
 .el-dialog {
@@ -554,25 +630,6 @@ html.dark .via-white {
   transform: translateY(-10px);
 }
 
-.el-input__wrapper {
-  border-radius: 0.5rem !important;
-  background-color: var(--wk-bg-surface-subtle) !important;
-  box-shadow: 0 0 0 1px var(--wk-border-muted) inset !important;
-}
-
-.el-input__wrapper:hover {
-  box-shadow: 0 0 0 1px var(--wk-border-strong) inset !important;
-}
-
-.el-input__wrapper.is-focus {
-  box-shadow: 0 0 0 2px rgba(19, 127, 236, 0.3) inset !important;
-}
-
-/* el-input type="textarea" 使用 .el-textarea__inner，与单行 input 的 0.5rem 圆角对齐 */
-.el-textarea__inner {
-  border-radius: 0.5rem !important;
-}
-
 /* 带 prepend/append 时：全局圆角用了 !important，会盖掉 EP 分组规则，接缝处需重新压平 */
 .el-input-group.el-input-group--prepend > .el-input__wrapper {
   border-top-left-radius: 0 !important;
@@ -599,16 +656,22 @@ html.dark .via-white {
  * 用根节点单层外描边包一整块；wrapper 去掉 inset，保留 EP 按钮上的内侧分割线。
  */
 .el-input-number {
-  border-radius: var(--el-border-radius-base);
-  box-shadow: 0 0 0 1px var(--wk-border-muted);
+  border-radius: var(--wk-input-radius);
+  box-shadow:
+    0 0 0 1px var(--wk-input-border) inset,
+    var(--wk-input-shadow);
 }
 
 .el-input-number:hover:not(:has(.el-input__wrapper.is-focus)) {
-  box-shadow: 0 0 0 1px var(--wk-border-strong);
+  box-shadow:
+    0 0 0 1px var(--wk-input-border-hover) inset,
+    var(--wk-input-shadow);
 }
 
 .el-input-number:has(.el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 2px rgba(19, 127, 236, 0.3);
+  box-shadow:
+    0 0 0 1px var(--wk-input-border-focus) inset,
+    var(--wk-input-focus-shadow);
 }
 
 .el-input-number.is-disabled {
@@ -620,7 +683,7 @@ html.dark .via-white {
 }
 
 .el-input-number .el-input__wrapper {
-  border-radius: var(--el-border-radius-base) !important;
+  border-radius: var(--wk-input-radius) !important;
   box-shadow: none !important;
 }
 
@@ -629,9 +692,9 @@ html.dark .via-white {
   box-shadow: none !important;
 }
 
-/* 与 el-input 一致：选择框默认圆角更小，统一为 0.5rem（含 el-select / el-tree-select） */
+/* 与 el-input 一致：选择框使用聊天输入框同源圆角（含 el-select / el-tree-select） */
 .el-select__wrapper {
-  border-radius: 0.5rem !important;
+  border-radius: var(--wk-input-radius) !important;
 }
 
 .el-dialog {

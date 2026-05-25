@@ -362,13 +362,23 @@ function handleSave() {
 
 :deep(.api-key-model-select .el-select__wrapper) {
   min-height: 56px;
-  border-radius: 1rem;
-  background-color: rgb(248 250 252);
-  box-shadow: none;
+  border-radius: var(--wk-input-radius);
+  background-color: var(--wk-input-bg);
+  box-shadow:
+    0 0 0 1px var(--wk-input-border) inset,
+    var(--wk-input-shadow);
+}
+
+:deep(.api-key-model-select .el-select__wrapper:hover) {
+  box-shadow:
+    0 0 0 1px var(--wk-input-border-hover) inset,
+    var(--wk-input-shadow);
 }
 
 :deep(.api-key-model-select .el-select__wrapper.is-focused) {
-  box-shadow: 0 0 0 2px rgb(59 130 246 / 0.2);
+  box-shadow:
+    0 0 0 1px var(--wk-input-border-focus) inset,
+    var(--wk-input-focus-shadow);
 }
 
 :global(.api-key-model-select-popper .el-select-dropdown__wrap) {
