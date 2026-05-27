@@ -44,6 +44,7 @@ function createDefaultCustomerQueryParams(): CustomerQueryBO {
     createTimeEnd: undefined,
     contactCountMin: undefined,
     contactCountMax: undefined,
+    filters: undefined,
     sortBy: undefined,
     sortOrder: undefined
   }

@@ -74,6 +74,9 @@ public class CustomerQueryBO extends PageEntity {
     @Schema(description = "联系人数量上限")
     private Integer contactCountMax;
 
+    @Schema(description = "通用字段筛选条件")
+    private List<CustomerFieldFilterBO> filters;
+
     @Schema(description = "排序字段: updateTime/createTime/quotation/lastContactTime/nextFollowTime/contactCount")
     private String sortBy;
 
@@ -85,4 +88,7 @@ public class CustomerQueryBO extends PageEntity {
 
     @Schema(hidden = true)
     private List<Long> authorizedOwnerIds;
+
+    @Schema(hidden = true)
+    private List<CustomerResolvedFieldFilterBO> resolvedFieldFilters;
 }

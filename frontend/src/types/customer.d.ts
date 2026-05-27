@@ -127,6 +127,12 @@ export interface CustomerFieldUpdateBO {
   value: any
 }
 
+export interface CustomerFieldFilterBO {
+  fieldName: string
+  fieldSource?: 'system' | 'custom'
+  operator: 'isEmpty' | 'isNotEmpty'
+}
+
 export interface CustomerQueryBO {
   keyword?: string
   stage?: CustomerStage
@@ -146,6 +152,7 @@ export interface CustomerQueryBO {
   createTimeEnd?: string
   contactCountMin?: number
   contactCountMax?: number
+  filters?: CustomerFieldFilterBO[]
   sortBy?: CustomerQuerySortBy
   sortOrder?: 'asc' | 'desc'
   ownerId?: string
@@ -188,6 +195,7 @@ export interface CustomerAiSearchQuery {
   createTimeEnd?: string
   contactCountMin?: number
   contactCountMax?: number
+  filters?: CustomerFieldFilterBO[]
   sortBy?: CustomerQuerySortBy
   sortOrder?: 'asc' | 'desc'
 }

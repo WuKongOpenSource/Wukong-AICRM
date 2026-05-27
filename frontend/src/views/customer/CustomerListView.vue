@@ -929,6 +929,14 @@ async function clearAiSearch() {
 }
 
 function clearAiQueryField(query: CustomerAiSearchQuery, key: string) {
+  if (key.startsWith('filter:')) {
+    query.filters = (query.filters || []).filter(filter => buildAiFilterKey(filter) !== key)
+    if (query.filters.length === 0) {
+      delete query.filters
+    }
+    return
+  }
+
   switch (key) {
     case 'keyword':
       delete query.keyword
@@ -979,6 +987,11 @@ function clearAiQueryField(query: CustomerAiSearchQuery, key: string) {
       delete query.sortOrder
       break
   }
+}
+
+function buildAiFilterKey(filter: NonNullable<CustomerAiSearchQuery['filters']>[number]): string {
+  const fieldSource = filter.fieldSource || 'system'
+  return `filter:${fieldSource}:${filter.fieldName}:${filter.operator}`
 }
 
 async function handleRemoveAiChip(key: string) {
