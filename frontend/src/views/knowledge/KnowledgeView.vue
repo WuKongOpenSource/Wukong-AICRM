@@ -36,7 +36,7 @@
 
             <button
               type="button"
-              class="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[#dbe8f8] bg-[#f8fbff] px-4 text-[13px] text-primary transition-colors hover:border-primary/30 hover:bg-primary/5 disabled:cursor-not-allowed disabled:text-slate-400"
+              class="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] px-4 text-[13px] text-primary transition-colors hover:border-[var(--wk-input-border-hover)] disabled:cursor-not-allowed disabled:text-slate-400"
               :disabled="totalCount === 0"
               @click="openScriptGenerator"
             >
@@ -120,20 +120,20 @@
               </el-upload>
               <button
                 type="button"
-                class="inline-flex rounded-xl border border-primary/15 bg-primary/5 px-4 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 md:text-sm"
+                class="inline-flex rounded-xl border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] px-4 py-2 text-xs font-bold text-primary transition-colors hover:border-[var(--wk-input-border-hover)] disabled:cursor-not-allowed disabled:text-slate-400 md:text-sm"
                 :disabled="totalCount === 0"
                 @click="openScriptGenerator"
               >
                 AI 话术 / SOP 生成
               </button>
               <!-- View Mode Toggle -->
-              <div class="flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+              <div class="flex rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1">
                 <button
                   type="button"
                   @click="setViewMode('card')"
                   :class="[
                     'rounded-md p-1.5 transition-all',
-                    viewMode === 'card' ? 'bg-white text-primary' : 'text-slate-400 hover:text-slate-600'
+                    viewMode === 'card' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-slate-400 hover:text-slate-600'
                   ]"
                   title="网格视图"
                 >
@@ -144,7 +144,7 @@
                   @click="setViewMode('list')"
                   :class="[
                     'rounded-md p-1.5 transition-all',
-                    viewMode === 'list' ? 'bg-white text-primary' : 'text-slate-400 hover:text-slate-600'
+                    viewMode === 'list' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-slate-400 hover:text-slate-600'
                   ]"
                   title="列表视图"
                 >
@@ -168,7 +168,7 @@
                   'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-all',
                   selectedCategory === cat.id
                     ? 'border-primary/25 bg-primary/10 text-primary'
-                    : 'border-[#dce7f5] bg-white text-[#284462] hover:border-primary/25 hover:bg-primary/5 hover:text-primary'
+                    : 'border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] text-[#284462] hover:border-[var(--wk-input-border-hover)] hover:text-primary'
                 ]"
               >
                 <span class="material-symbols-outlined text-[17px] leading-none">{{ cat.icon }}</span>
@@ -180,12 +180,7 @@
               <el-dropdown trigger="click">
                 <button
                   type="button"
-                  :class="[
-                    'inline-flex size-9 items-center justify-center rounded-lg border bg-[#f8fbff] transition-colors hover:border-primary/30 hover:bg-primary/5',
-                    selectedFileType === 'all'
-                      ? 'border-[#dbe8f8] text-primary'
-                      : 'border-primary/25 text-primary bg-primary/5'
-                  ]"
+                  class="inline-flex size-9 items-center justify-center rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] text-primary transition-colors hover:border-[var(--wk-input-border-hover)]"
                   :title="selectedFileTypeLabel"
                 >
                   <span class="material-symbols-outlined text-[21px] leading-none">filter_list</span>
@@ -221,13 +216,13 @@
                 </template>
               </el-dropdown>
 
-              <div class="inline-flex h-9 items-center rounded-lg border border-[#dbe8f8] bg-[#f8fbff] p-1">
+              <div class="inline-flex h-9 items-center rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1">
                 <button
                   type="button"
                   @click="setViewMode('card')"
                   :class="[
                     'inline-flex size-7 items-center justify-center rounded-md transition-all',
-                    viewMode === 'card' ? 'bg-white text-primary' : 'text-[#8aa1c2] hover:text-primary'
+                    viewMode === 'card' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-[#8aa1c2] hover:text-primary'
                   ]"
                   title="网格视图"
                 >
@@ -238,7 +233,7 @@
                   @click="setViewMode('list')"
                   :class="[
                     'inline-flex size-7 items-center justify-center rounded-md transition-all',
-                    viewMode === 'list' ? 'bg-white text-primary' : 'text-[#8aa1c2] hover:text-primary'
+                    viewMode === 'list' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-[#8aa1c2] hover:text-primary'
                   ]"
                   title="列表视图"
                 >

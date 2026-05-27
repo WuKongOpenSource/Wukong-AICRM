@@ -1678,6 +1678,7 @@ let offSelectedCustomerDetailRefresh: (() => void) | null = null
 type CustomerDetailRefreshPayload = {
   customerId?: string | number
   source?: string
+  modules?: Array<'tasks' | 'schedules'>
 }
 
 const chatComposerShellStyle = computed(() => (
@@ -2647,19 +2648,15 @@ function getSessionCustomerId(sessionId?: string) {
 async function refreshCrmContextAfterSend(effectiveAppCode: string, completedSessionId?: string) {
   if (effectiveAppCode !== 'crm') return
 
-  appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH, { source: 'chat', preserveScroll: false })
+  appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH, { source: 'chat', preserveScroll: true })
 
   const customerId = getSessionCustomerId(completedSessionId)
   if (!customerId) return
-  appEvents.emit(APP_EVENT.CUSTOMER_DETAIL_REFRESH, { customerId, source: 'chat' })
-
-  const activeCustomerId = currentSessionCustomerId.value || selectedCustomerId.value || ''
-  if (activeCustomerId === customerId) {
-    await ensureSelectedCustomerDetail(customerId, { silent: Boolean(selectedCustomer.value) })
-  }
-  if (isCustomerAiAnalysisPending(selectedCustomer.value)) {
-    scheduleChatCustomerAiPolling(customerId, true)
-  }
+  appEvents.emit(APP_EVENT.CUSTOMER_DETAIL_REFRESH, {
+    customerId,
+    source: 'chat',
+    modules: ['tasks', 'schedules']
+  })
 }
 
 function handleSendBarClick() {

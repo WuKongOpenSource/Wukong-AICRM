@@ -18,6 +18,11 @@ type TaskStatusCounts = {
   COMPLETED: number
 }
 
+type TaskMutationOptions = {
+  refreshList?: boolean
+  refreshMyTasks?: boolean
+}
+
 export const useTaskStore = defineStore('task', () => {
   const HIGH_VALUE_FALLBACK_LIMIT = 5
 
@@ -136,17 +141,24 @@ export const useTaskStore = defineStore('task', () => {
     }
   }
 
-  async function createTask(data: TaskAddBO): Promise<string> {
+  async function refreshTaskCaches(options: TaskMutationOptions = {}) {
+    if (options.refreshList !== false) {
+      await fetchTaskList(true)
+    }
+    if (options.refreshMyTasks !== false) {
+      await fetchMyTasks()
+    }
+  }
+
+  async function createTask(data: TaskAddBO, options: TaskMutationOptions = {}): Promise<string> {
     const taskId = await addTask(data)
-    await fetchTaskList(true)
-    await fetchMyTasks()
+    await refreshTaskCaches(options)
     return taskId
   }
 
-  async function editTask(data: TaskUpdateBO): Promise<void> {
+  async function editTask(data: TaskUpdateBO, options: TaskMutationOptions = {}): Promise<void> {
     await updateTask(data)
-    await fetchTaskList(true)
-    await fetchMyTasks()
+    await refreshTaskCaches(options)
   }
 
   async function removeTask(taskId: string): Promise<void> {

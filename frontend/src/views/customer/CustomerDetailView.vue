@@ -1035,7 +1035,7 @@
                     </div>
                   </div>
                 </div>
-                <div v-else-if="!customer.tasks?.length" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
+                <div v-else-if="customerTasks.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
                   <span class="material-symbols-outlined text-2xl leading-none text-slate-400">task_alt</span>
                   <p class="mt-2 text-xs font-medium text-slate-400">暂无待办任务</p>
                 </div>
@@ -1044,7 +1044,7 @@
                   :class="embedded ? 'space-y-3' : 'ml-3 space-y-3 border-l-2 border-slate-100 pl-5'"
                 >
                   <div
-                    v-for="task in customer.tasks?.slice(0, 5)"
+                    v-for="task in customerTasks"
                     :key="task.taskId"
                     class="group relative cursor-pointer rounded-xl border border-slate-200 bg-white p-3 transition-all hover:shadow-md"
                     :class="selectedCustomerTask?.taskId === task.taskId ? 'border-primary ring-1 ring-primary/20' : ''"
@@ -1433,13 +1433,14 @@
       :can-edit="canCreateTasks"
       :can-toggle-complete="canToggleTasks"
       @edit="handleCustomerTaskEditFromDetail"
-      @mutated="refreshCustomerAfterTaskMutation"
+      @mutated="refreshCustomerTaskArea"
     />
 
     <TaskEditDialog
       v-model="showTaskEditDialog"
       :editing-task="editingCustomerTask"
       :default-customer="taskDefaultCustomer"
+      :refresh-store-after-save="false"
       @saved="handleTaskDialogSaved"
     />
 
@@ -1531,6 +1532,7 @@ const emit = defineEmits<{
 type CustomerDetailRefreshPayload = {
   customerId?: string | number
   source?: string
+  modules?: Array<'tasks' | 'schedules'>
 }
 
 const activeCustomerId = computed(() => props.customerId || String(route.params.id || ''))
@@ -1573,6 +1575,7 @@ const contactTotal = ref(0)
 const contactPage = ref(1)
 const contactPageSize = ref(5)
 const contactLoading = ref(false)
+const customerTasks = ref<Task[]>([])
 const taskLoading = ref(false)
 const customerSchedules = ref<ScheduleVO[]>([])
 const scheduleTotal = ref(0)
@@ -1821,7 +1824,7 @@ const showFollowUpTimelineToggle = computed(() => followUpLoading.value || follo
 const isFollowUpTimelineVisible = computed(() => followUpTimelineExpanded.value || !showFollowUpTimelineToggle.value)
 const showContactsModuleToggle = computed(() => contactLoading.value || contacts.value.length > 0)
 const isContactsModuleVisible = computed(() => contactsModuleExpanded.value || !showContactsModuleToggle.value)
-const showTasksModuleToggle = computed(() => taskLoading.value || (customer.value?.tasks?.length || 0) > 0)
+const showTasksModuleToggle = computed(() => taskLoading.value || customerTasks.value.length > 0)
 const isTasksModuleVisible = computed(() => tasksModuleExpanded.value || !showTasksModuleToggle.value)
 const showSchedulesModuleToggle = computed(() => scheduleLoading.value || customerSchedules.value.length > 0)
 const isSchedulesModuleVisible = computed(() => schedulesModuleExpanded.value || !showSchedulesModuleToggle.value)
@@ -1988,12 +1991,9 @@ async function refreshCustomerDetailModules(
   options: { resetRelatedPages?: boolean } = {}
 ) {
   const resetRelatedPages = Boolean(options.resetRelatedPages)
-  taskLoading.value = true
   const fetchTasks: Promise<any>[] = [
     customerStore.fetchCustomerDetail(customerId).catch(err => {
       console.error('Failed to fetch customer detail:', err)
-    }).finally(() => {
-      taskLoading.value = false
     })
   ]
 
@@ -2009,6 +2009,12 @@ async function refreshCustomerDetailModules(
   } else {
     contacts.value = []
     contactTotal.value = 0
+  }
+
+  if (canViewTasks.value) {
+    fetchTasks.push(fetchCustomerTasks(customerId))
+  } else {
+    customerTasks.value = []
   }
 
   if (canViewKnowledge.value) {
@@ -2052,6 +2058,11 @@ function handleCustomerDetailRefresh(payload?: CustomerDetailRefreshPayload) {
   const customerId = payload?.customerId ? String(payload.customerId) : ''
   if (!customerId || customerId !== String(activeCustomerId.value)) return
 
+  if (payload?.modules?.length) {
+    void refreshCustomerScopedModules(customerId, payload.modules)
+    return
+  }
+
   void refreshCustomerDetailModules(customerId, { resetRelatedPages: true })
 }
 
@@ -2063,6 +2074,24 @@ function emitCustomerActivityRefresh(customerId?: string) {
       source: 'customer-detail-activity'
     })
   }
+}
+
+async function refreshCustomerScopedModules(
+  customerId: string,
+  modules: Array<'tasks' | 'schedules'>
+) {
+  const uniqueModules = new Set(modules)
+  const requests: Promise<any>[] = []
+
+  if (uniqueModules.has('tasks')) {
+    requests.push(fetchCustomerTasks(customerId))
+  }
+
+  if (uniqueModules.has('schedules')) {
+    requests.push(fetchCustomerSchedules(customerId, true))
+  }
+
+  await Promise.all(requests)
 }
 
 let offCustomerDetailRefresh: (() => void) | null = null
@@ -2173,6 +2202,36 @@ async function fetchContacts(customerId: string, reset = false) {
 function handleContactPageChange(page: number) {
   contactPage.value = page
   if (customer.value) fetchContacts(customer.value.customerId)
+}
+
+function syncSelectedCustomerTask() {
+  const selectedTaskId = selectedCustomerTask.value?.taskId
+  if (!selectedTaskId) return
+  selectedCustomerTask.value = customerTasks.value.find(task =>
+    String(task.taskId) === String(selectedTaskId)
+  ) || selectedCustomerTask.value
+}
+
+async function fetchCustomerTasks(customerId: string) {
+  if (!canViewTasks.value) {
+    customerTasks.value = []
+    return
+  }
+  taskLoading.value = true
+  try {
+    const result = await queryTaskList({
+      customerId,
+      page: 1,
+      limit: 5
+    })
+    customerTasks.value = result.list || []
+  } catch (error) {
+    console.error('Failed to fetch customer tasks:', error)
+    customerTasks.value = []
+  } finally {
+    syncSelectedCustomerTask()
+    taskLoading.value = false
+  }
 }
 
 async function fetchCustomerSchedules(customerId: string, reset = false) {
@@ -2577,13 +2636,12 @@ async function handleSetPrimary(contactId: string) {
   }
 }
 
-async function refreshCustomerAfterTaskMutation() {
+async function refreshCustomerTaskArea() {
   if (!customer.value) return
-  await refreshFollowUpContext(customer.value.customerId)
-  emitCustomerActivityRefresh(customer.value.customerId)
+  await fetchCustomerTasks(customer.value.customerId)
   const id = selectedCustomerTask.value?.taskId
-  if (id && customer.value.tasks) {
-    selectedCustomerTask.value = customer.value.tasks.find((t: Task) => String(t.taskId) === String(id)) || null
+  if (id) {
+    selectedCustomerTask.value = customerTasks.value.find((t: Task) => String(t.taskId) === String(id)) || null
   }
 }
 
@@ -2614,7 +2672,7 @@ async function handleToggleCustomerTask(task: Task) {
   if (!canToggleTasks.value) return
   const newStatus: TaskStatus = task.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED'
   await taskStore.changeTaskStatus(task.taskId, newStatus)
-  await refreshCustomerAfterTaskMutation()
+  await refreshCustomerTaskArea()
 }
 
 function handleViewCustomerTask(task: Task) {
@@ -2624,7 +2682,7 @@ function handleViewCustomerTask(task: Task) {
 
 async function resolveCustomerTaskDetail(taskId: string): Promise<Task | null> {
   const normalizedTaskId = String(taskId)
-  const localTask = customer.value?.tasks?.find((task: Task) => String(task.taskId) === normalizedTaskId) || null
+  const localTask = customerTasks.value.find((task: Task) => String(task.taskId) === normalizedTaskId) || null
   if (localTask) {
     return localTask
   }
@@ -2661,7 +2719,7 @@ async function handleToggleFollowUpTask(task: FollowUpTask) {
 
   const newStatus: TaskStatus = detail.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED'
   await taskStore.changeTaskStatus(detail.taskId, newStatus)
-  await refreshCustomerAfterTaskMutation()
+  await refreshCustomerTaskArea()
   ElMessage.success(newStatus === 'COMPLETED' ? '任务已标记完成' : '任务已重新打开')
 }
 
@@ -2685,7 +2743,7 @@ function handleCustomerTaskEditFromDetail(task: Task) {
 
 async function handleTaskDialogSaved() {
   editingCustomerTask.value = null
-  await refreshCustomerAfterTaskMutation()
+  await refreshCustomerTaskArea()
 }
 
 function syncSelectedCustomerSchedule() {
@@ -2738,17 +2796,13 @@ async function resolveCustomerScheduleDetail(scheduleId: string): Promise<Schedu
 async function handleCustomerScheduleCreated() {
   if (!customer.value) return
   editingCustomerSchedule.value = null
-  await customerStore.fetchCustomerDetail(customer.value.customerId)
   await fetchCustomerSchedules(customer.value.customerId, true)
-  emitCustomerActivityRefresh(customer.value.customerId)
 }
 
 async function handleCustomerScheduleUpdated(scheduleId: string) {
   if (!customer.value) return
   editingCustomerSchedule.value = null
-  await customerStore.fetchCustomerDetail(customer.value.customerId)
   await fetchCustomerSchedules(customer.value.customerId)
-  emitCustomerActivityRefresh(customer.value.customerId)
   const updatedSchedule = await resolveCustomerScheduleDetail(scheduleId)
   if (updatedSchedule) {
     selectedCustomerSchedule.value = updatedSchedule
@@ -2757,9 +2811,7 @@ async function handleCustomerScheduleUpdated(scheduleId: string) {
 
 async function handleCustomerScheduleDeleted() {
   if (!customer.value) return
-  await customerStore.fetchCustomerDetail(customer.value.customerId)
   await fetchCustomerSchedules(customer.value.customerId)
-  emitCustomerActivityRefresh(customer.value.customerId)
   selectedCustomerSchedule.value = null
 }
 
