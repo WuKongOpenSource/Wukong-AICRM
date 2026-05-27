@@ -73,11 +73,15 @@
     <template v-if="currentAiMode === 'gift'">
       <div class="mb-2 min-w-0 space-y-1 text-xs">
         <p class="break-words font-medium leading-relaxed text-slate-600 dark:text-slate-300">
+          剩余
+          <span class="font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ creditRemainingWan }}</span>
+          / {{ creditTotalWan }} 积分
+        </p>
+        <p class="break-words text-slate-500 dark:text-slate-400">
           已使用
           <span class="font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ creditUsedWan }}</span>
-          / {{ creditTotalWan }}积分
+          ，剩余 {{ creditProgressPercent }}%
         </p>
-        <p class="font-semibold text-primary">剩余 {{ creditProgressPercent }}%</p>
       </div>
 
       <div class="mb-4 h-1.5 w-full min-w-0 max-w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
@@ -135,6 +139,7 @@ const {
   giftCreditProgressPercent,
   giftCreditProgressClass,
   creditUsedWan,
+  creditRemainingWan,
   creditTotalWan,
   creditRemaining,
   creditProgressPercent,

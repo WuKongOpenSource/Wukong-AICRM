@@ -18,7 +18,7 @@
       >
         <WkIcon v-if="!compact" name="ai" :size="18" class="shrink-0 leading-none text-primary" />
         <span v-if="currentAiMode === 'gift'" class="min-w-0 truncate tabular-nums" :class="compact ? 'inline text-[10px]' : 'hidden md:inline'">
-          <template v-if="compact">剩余{{ creditProgressPercent }}%</template>
+          <template v-if="compact">{{ creditRemainingWan }}积分</template>
           <template v-else><span class="hidden md:inline">已使用 </span>{{ creditUsedWan }} / {{ creditTotalWan }}积分<span class="hidden md:inline">，剩余 </span>{{ creditProgressPercent }}%</template>
         </span>
         <span v-else class="min-w-0 truncate text-slate-600 dark:text-slate-300">{{ compact ? '自定义模型' : 'AI 积分 · 点击查看' }}</span>
@@ -36,7 +36,7 @@ import { useAiQuota } from '@/composables/useAiQuota'
 
 withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
 
-const { loadAiConfig, currentAiMode, creditUsedWan, creditTotalWan, creditProgressPercent } = useAiQuota()
+const { loadAiConfig, currentAiMode, creditUsedWan, creditRemainingWan, creditTotalWan, creditProgressPercent } = useAiQuota()
 
 onMounted(() => {
   void loadAiConfig()

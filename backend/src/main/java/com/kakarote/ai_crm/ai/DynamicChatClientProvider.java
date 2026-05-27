@@ -371,7 +371,7 @@ public class DynamicChatClientProvider {
                                        String extraHeadersJson, AiModelCapabilities capabilities,
                                        boolean registerTools, String appCode) {
         OpenAiApi openAiApi = buildOpenAiApi(providerCode, baseUrl, apiKey, extraHeadersJson);
-        OpenAiChatOptions options = buildChatOptions(providerCode, model, temperature, maxTokens);
+        OpenAiChatOptions options = buildChatOptions(providerCode, baseUrl, model, temperature, maxTokens);
 
         ObservationRegistry obsRegistry = observationRegistry != null
                 ? observationRegistry : ObservationRegistry.NOOP;
@@ -389,7 +389,8 @@ public class DynamicChatClientProvider {
         return builder.build();
     }
 
-    OpenAiChatOptions buildChatOptions(String providerCode, String model, Double temperature, Integer maxTokens) {
+    OpenAiChatOptions buildChatOptions(String providerCode, String baseUrl, String model,
+                                       Double temperature, Integer maxTokens) {
         Double requestTemperature = resolveRequestTemperature(providerCode, model, temperature);
         OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder()
                 .model(model)
@@ -397,8 +398,15 @@ public class DynamicChatClientProvider {
                 .maxCompletionTokens(maxTokens)
                 .streamUsage(true);
 
+        Map<String, Object> extraBody = new LinkedHashMap<>();
         if (shouldDisableDashscopeThinking(providerCode)) {
-            builder.extraBody(Map.of("enable_thinking", Boolean.FALSE));
+            extraBody.put("enable_thinking", Boolean.FALSE);
+        }
+        if (shouldDisableDeepSeekThinking(providerCode, baseUrl)) {
+            extraBody.put("thinking", Map.of("type", "disabled"));
+        }
+        if (!extraBody.isEmpty()) {
+            builder.extraBody(extraBody);
         }
 
         return builder.build();
@@ -406,6 +414,14 @@ public class DynamicChatClientProvider {
 
     private boolean shouldDisableDashscopeThinking(String providerCode) {
         return "dashscope".equalsIgnoreCase(StrUtil.nullToEmpty(providerCode).trim());
+    }
+
+    private boolean shouldDisableDeepSeekThinking(String providerCode, String baseUrl) {
+        if ("deepseek".equalsIgnoreCase(StrUtil.nullToEmpty(providerCode).trim())) {
+            return true;
+        }
+        String normalizedBaseUrl = StrUtil.nullToEmpty(baseUrl).trim().toLowerCase();
+        return normalizedBaseUrl.contains("api.deepseek.com") || normalizedBaseUrl.contains("deepseek.com");
     }
 
     private Double resolveRequestTemperature(String providerCode, String model, Double temperature) {

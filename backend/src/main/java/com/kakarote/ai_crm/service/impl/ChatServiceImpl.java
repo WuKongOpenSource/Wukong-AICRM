@@ -19,6 +19,7 @@ import com.kakarote.ai_crm.ai.memory.CrmChatMemoryService;
 import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
 import com.kakarote.ai_crm.ai.state.PendingCustomerCreationStore;
 import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
+import com.kakarote.ai_crm.ai.tools.support.AiToolExecutionRecorder;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.ChatSendBO;
@@ -51,6 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.MimeType;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
 
 import java.io.InputStream;
@@ -126,6 +128,9 @@ public class ChatServiceImpl implements IChatService {
 
     @Autowired
     private PermissionService permissionService;
+
+    @Autowired
+    private AiToolExecutionRecorder aiToolExecutionRecorder;
 
     private static final int MAX_EXTRACTED_TEXT_LENGTH = 3000;
     private static final String CHAT_ERROR_MESSAGE = "抱歉，处理您的请求时发生错误。请稍后重试。";
@@ -530,6 +535,7 @@ public class ChatServiceImpl implements IChatService {
         AtomicReference<String> modelNameRef = new AtomicReference<>(null);
         AtomicBoolean streamFinalized = new AtomicBoolean(false);
         AtomicBoolean streamFailed = new AtomicBoolean(false);
+        AtomicBoolean suppressModelOutputForToolFailure = new AtomicBoolean(false);
 
         String unavailableTip = resolveAiUnavailableTip(currentTenantId, billingContext.runtimeConfig());
         if (unavailableTip != null) {
@@ -559,6 +565,8 @@ public class ChatServiceImpl implements IChatService {
             return Flux.just(tip);
         }
 
+        aiToolExecutionRecorder.begin(sessionId);
+
         ChatClient chatClient = chatClientProvider.getChatClient(
             billingContext.modelSource(),
             billingContext.runtimeConfig().providerCode(),
@@ -583,11 +591,12 @@ public class ChatServiceImpl implements IChatService {
                 finalContent,
                 fullResponse.toString()
             );
+            String responseText = resolveToolAwareResponse(sessionId, fullResponse.toString(), application.code());
             log.debug("AI 对话完成，响应长度: {}, tokens: prompt={}, completion={}, total={}",
                 fullResponse.length(), usage.promptTokens(), usage.completionTokens(), usage.totalTokens());
             long creditsUsed = aiQuotaService.resolveCredits(
                 usage.totalTokens(), billingContext.pricing().creditMultiplier());
-            saveMessage(sessionId, "assistant", fullResponse.toString(),
+            saveMessage(sessionId, "assistant", responseText,
                 usage.promptTokens(), usage.completionTokens(),
                 usage.totalTokens(), StrUtil.blankToDefault(modelNameRef.get(), billingContext.runtimeConfig().model()),
                 creditsUsed, billingContext.pricing().creditMultiplier(),
@@ -611,6 +620,9 @@ public class ChatServiceImpl implements IChatService {
                         log.debug("工具调用: {}", chatResponse.getResult().getOutput().getToolCalls());
                     }
                 }
+                if (aiToolExecutionRecorder.getLatestFailure(sessionId) != null) {
+                    suppressModelOutputForToolFailure.set(true);
+                }
                 // 捕获 token 用量（通常在最后一个 chunk 中携带）
                 if (chatResponse.getMetadata() != null && chatResponse.getMetadata().getUsage() != null) {
                     captureRawTokenUsage(
@@ -625,11 +637,22 @@ public class ChatServiceImpl implements IChatService {
                 }
             })
             .mapNotNull(chatResponse -> {
+                if (suppressModelOutputForToolFailure.get()) {
+                    return null;
+                }
                 if (chatResponse.getResult() != null && chatResponse.getResult().getOutput() != null) {
                     return chatResponse.getResult().getOutput().getText();
                 }
                 return null;
             })
+            .concatWith(Mono.defer(() -> {
+                String resolvedResponse = resolveToolAwareResponse(
+                    sessionId, fullResponse.toString(), application.code());
+                if (StrUtil.isBlank(resolvedResponse) || resolvedResponse.equals(fullResponse.toString())) {
+                    return Mono.empty();
+                }
+                return Mono.just(resolvedResponse);
+            }))
             .doOnComplete(finalizeSuccessfulStream)
             .onErrorResume(error -> {
                 streamFailed.set(true);
@@ -644,6 +667,7 @@ public class ChatServiceImpl implements IChatService {
                 if (signalType == SignalType.CANCEL && !streamFailed.get() && fullResponse.length() > 0) {
                     finalizeSuccessfulStream.run();
                 }
+                aiToolExecutionRecorder.finish(sessionId);
                 AiContextHolder.clear();
             });
     }
@@ -762,6 +786,8 @@ public class ChatServiceImpl implements IChatService {
                 return tip;
             }
 
+            aiToolExecutionRecorder.begin(sessionId);
+
             ChatClient chatClient = chatClientProvider.getChatClient(
                 billingContext.modelSource(),
                 billingContext.runtimeConfig().providerCode(),
@@ -776,6 +802,7 @@ public class ChatServiceImpl implements IChatService {
 
             var chatResponse = requestSpec.call().chatResponse();
             String response = chatResponse.getResult().getOutput().getText();
+            response = resolveToolAwareResponse(sessionId, response, application.code());
 
             String modelName = null;
             if (chatResponse.getMetadata() != null) {
@@ -814,6 +841,7 @@ public class ChatServiceImpl implements IChatService {
             return errorMessage;
         } finally {
             // 非流式分支在 finally 清理当前会话的 AiContextHolder。
+            aiToolExecutionRecorder.finish(sessionId);
             AiContextHolder.clear();
         }
     }
@@ -835,6 +863,44 @@ public class ChatServiceImpl implements IChatService {
         if (value != null && value > 0) {
             tokenRef.set(value);
         }
+    }
+
+    private String resolveToolAwareResponse(Long sessionId, String modelResponse, String appCode) {
+        if (!ChatApplicationCodes.CRM.equals(chatApplicationRegistry.normalize(appCode))) {
+            return modelResponse;
+        }
+
+        AiToolExecutionRecorder.ToolExecution failure = aiToolExecutionRecorder.getLatestFailure(sessionId);
+        if (failure != null) {
+            return buildToolFailureReply(failure);
+        }
+        if (looksLikeUnsupportedWriteSuccess(modelResponse)
+            && !aiToolExecutionRecorder.hasSuccessfulWrite(sessionId)) {
+            return "操作未确认成功：未检测到系统工具返回的创建、更新或删除成功结果，本次未确认写入业务数据。请重试或补充必要信息。";
+        }
+        return modelResponse;
+    }
+
+    private String buildToolFailureReply(AiToolExecutionRecorder.ToolExecution failure) {
+        String reason = failure == null ? null : failure.errorReason();
+        reason = StrUtil.blankToDefault(reason, "工具调用失败，但未返回具体错误信息。");
+        return "工具调用失败：" + reason;
+    }
+
+    private boolean looksLikeUnsupportedWriteSuccess(String response) {
+        if (StrUtil.isBlank(response)) {
+            return false;
+        }
+        return response.contains("创建成功")
+            || response.contains("已创建")
+            || response.contains("已为您创建")
+            || response.contains("新增成功")
+            || response.contains("更新成功")
+            || response.contains("已更新")
+            || response.contains("修改成功")
+            || response.contains("已修改")
+            || response.contains("删除成功")
+            || response.contains("已删除");
     }
 
     /**
