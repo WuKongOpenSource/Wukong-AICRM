@@ -66,7 +66,7 @@ public class DynamicChatClientProvider {
     private static final String AI_PROVIDER_CONFIGS_KEY = "ai_provider_configs";
     private static final String OPENAI_PUBLIC_BASE_URL = "https://api.openai.com";
     private static final String DEFAULT_OPENAI_PROXY_BASE_URL = "http://52.198.150.151";
-    private static final double MOONSHOT_K2_FIXED_TEMPERATURE = 1.0D;
+    private static final double MOONSHOT_K2_NON_THINKING_TEMPERATURE = 0.6D;
 
     private final ConcurrentHashMap<Long, ChatClient> tenantChatClients = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, ChatClient> selectedModelChatClients = new ConcurrentHashMap<>();
@@ -406,12 +406,7 @@ public class DynamicChatClientProvider {
                 .streamUsage(true);
 
         Map<String, Object> extraBody = new LinkedHashMap<>();
-        if (shouldDisableDashscopeThinking(providerCode)) {
-            extraBody.put("enable_thinking", Boolean.FALSE);
-        }
-        if (shouldDisableDeepSeekThinking(providerCode, baseUrl)) {
-            extraBody.put("thinking", Map.of("type", "disabled"));
-        }
+        applyThinkingDisabledOptions(extraBody, providerCode, baseUrl, resolvedModel);
         if (!extraBody.isEmpty()) {
             builder.extraBody(extraBody);
         }
@@ -419,38 +414,110 @@ public class DynamicChatClientProvider {
         return builder.build();
     }
 
-    private boolean shouldDisableDashscopeThinking(String providerCode) {
-        return "dashscope".equalsIgnoreCase(StrUtil.nullToEmpty(providerCode).trim());
+    private void applyThinkingDisabledOptions(Map<String, Object> extraBody,
+                                              String providerCode, String baseUrl, String model) {
+        if (shouldDisableEnableThinking(providerCode, baseUrl, model)) {
+            extraBody.put("enable_thinking", Boolean.FALSE);
+        }
+        if (shouldDisableThinkingObject(providerCode, baseUrl, model)) {
+            extraBody.put("thinking", Map.of("type", "disabled"));
+        }
+    }
+
+    private boolean shouldDisableEnableThinking(String providerCode, String baseUrl, String model) {
+        String provider = normalizeProviderCodeForThinking(providerCode);
+        String normalizedBaseUrl = normalizeForMatching(baseUrl);
+        String normalizedModel = normalizeForMatching(model);
+        return "dashscope".equals(provider)
+                || normalizedBaseUrl.contains("dashscope")
+                || normalizedModel.contains("qwen");
     }
 
     private boolean shouldDisableDeepSeekThinking(String providerCode, String baseUrl) {
-        if ("deepseek".equalsIgnoreCase(StrUtil.nullToEmpty(providerCode).trim())) {
+        if ("deepseek".equals(normalizeProviderCodeForThinking(providerCode))) {
             return true;
         }
-        String normalizedBaseUrl = StrUtil.nullToEmpty(baseUrl).trim().toLowerCase();
+        String normalizedBaseUrl = normalizeForMatching(baseUrl);
         return normalizedBaseUrl.contains("api.deepseek.com") || normalizedBaseUrl.contains("deepseek.com");
+    }
+
+    private boolean shouldDisableThinkingObject(String providerCode, String baseUrl, String model) {
+        String normalizedModel = normalizeForMatching(model);
+        return shouldDisableDeepSeekThinking(providerCode, baseUrl)
+                || isDeepSeekThinkingModel(normalizedModel)
+                || isKimiK2SwitchableThinkingModel(normalizedModel)
+                || isDoubaoThinkingModel(normalizedModel)
+                || isGlmThinkingModel(normalizedModel)
+                || isHunyuanThinkingModel(normalizedModel);
     }
 
     private Double resolveRequestTemperature(String providerCode, String model, Double temperature) {
         if (isMoonshotK2FixedTemperatureModel(providerCode, model)) {
-            if (temperature == null || Double.compare(temperature, MOONSHOT_K2_FIXED_TEMPERATURE) != 0) {
+            if (temperature == null || Double.compare(temperature, MOONSHOT_K2_NON_THINKING_TEMPERATURE) != 0) {
                 log.info("Moonshot model {} requires temperature {}, override configured temperature {}",
-                        model, MOONSHOT_K2_FIXED_TEMPERATURE, temperature);
+                        model, MOONSHOT_K2_NON_THINKING_TEMPERATURE, temperature);
             }
-            return MOONSHOT_K2_FIXED_TEMPERATURE;
+            return MOONSHOT_K2_NON_THINKING_TEMPERATURE;
         }
         return temperature;
     }
 
     private boolean isMoonshotK2FixedTemperatureModel(String providerCode, String model) {
-        if (!"moonshot".equalsIgnoreCase(StrUtil.nullToEmpty(providerCode).trim())) {
+        String provider = normalizeProviderCodeForThinking(providerCode);
+        String normalizedModel = normalizeForMatching(model);
+        if (!"moonshot".equals(provider) && !normalizedModel.contains("kimi-k2")) {
             return false;
         }
-        String normalizedModel = StrUtil.nullToEmpty(model).trim().toLowerCase();
+        return isKimiK2SwitchableThinkingModel(normalizedModel);
+    }
+
+    private boolean isKimiK2SwitchableThinkingModel(String normalizedModel) {
         return normalizedModel.startsWith("kimi-k2.5")
                 || normalizedModel.startsWith("kimi-k2.6")
                 || normalizedModel.startsWith("kimi-k2-5")
-                || normalizedModel.startsWith("kimi-k2-6") || normalizedModel.equals("gpt-5-mini") || normalizedModel.equals("gpt-5-nano");
+                || normalizedModel.startsWith("kimi-k2-6")
+                || normalizedModel.contains("/kimi-k2.5")
+                || normalizedModel.contains("/kimi-k2.6")
+                || normalizedModel.contains("/kimi-k2-5")
+                || normalizedModel.contains("/kimi-k2-6");
+    }
+
+    private boolean isDeepSeekThinkingModel(String normalizedModel) {
+        return normalizedModel.contains("deepseek");
+    }
+
+    private boolean isDoubaoThinkingModel(String normalizedModel) {
+        return normalizedModel.contains("doubao-seed");
+    }
+
+    private boolean isGlmThinkingModel(String normalizedModel) {
+        return normalizedModel.startsWith("glm-5")
+                || normalizedModel.startsWith("glm-4.7")
+                || normalizedModel.startsWith("glm-4.6")
+                || normalizedModel.contains("/glm-5")
+                || normalizedModel.contains("/glm-4.7")
+                || normalizedModel.contains("/glm-4.6");
+    }
+
+    private boolean isHunyuanThinkingModel(String normalizedModel) {
+        return normalizedModel.startsWith("hy3")
+                || normalizedModel.startsWith("hunyuan-2")
+                || normalizedModel.startsWith("hunyuan-t1")
+                || normalizedModel.contains("/hy3")
+                || normalizedModel.contains("/hunyuan-2")
+                || normalizedModel.contains("/hunyuan-t1");
+    }
+
+    private String normalizeProviderCodeForThinking(String providerCode) {
+        String normalized = normalizeForMatching(providerCode);
+        if ("kimi".equals(normalized) || "moonshot-ai".equals(normalized)) {
+            return "moonshot";
+        }
+        return normalized;
+    }
+
+    private String normalizeForMatching(String value) {
+        return StrUtil.nullToEmpty(value).trim().toLowerCase();
     }
 
     /**

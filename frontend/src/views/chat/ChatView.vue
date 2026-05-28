@@ -2513,7 +2513,7 @@ async function handleSelectCustomerById(customerId: string) {
   chatStore.setSelectedAppCode('crm')
   await ensureSelectedCustomerDetail(customerId)
   const customerName = selectedCustomer.value?.companyName || '客户'
-  if (chatStore.sessions.length === 0 && !chatStore.sessionsLoading) {
+  if (chatStore.sessions.length === 0) {
     await chatStore.fetchSessions()
   }
 

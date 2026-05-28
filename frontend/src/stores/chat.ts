@@ -105,6 +105,7 @@ export const useChatStore = defineStore('chat', () => {
   const streamingTasks = ref<Record<string, StreamingTask>>({})
   const loading = ref(false)
   const sessionsLoading = ref(false)
+  let fetchSessionsPromise: Promise<void> | null = null
   const modelOptionsLoading = ref(false)
   const appOptionsLoading = ref(false)
   const modelOptions = ref<ChatModelOption[]>([])
@@ -144,12 +145,21 @@ export const useChatStore = defineStore('chat', () => {
   )
 
   async function fetchSessions() {
-    sessionsLoading.value = true
-    try {
-      sessions.value = await getSessionList()
-    } finally {
-      sessionsLoading.value = false
+    if (fetchSessionsPromise) {
+      return fetchSessionsPromise
     }
+
+    sessionsLoading.value = true
+    fetchSessionsPromise = getSessionList()
+      .then((nextSessions) => {
+        sessions.value = nextSessions
+      })
+      .finally(() => {
+        sessionsLoading.value = false
+        fetchSessionsPromise = null
+      })
+
+    return fetchSessionsPromise
   }
 
   function getSessionSortTime(value?: string): number {
@@ -274,7 +284,7 @@ export const useChatStore = defineStore('chat', () => {
 
   async function openCustomerChat(customer: Pick<CustomerListVO, 'customerId' | 'companyName'>): Promise<string> {
     const customerId = String(customer.customerId)
-    if (sessions.value.length === 0 && !sessionsLoading.value) {
+    if (sessions.value.length === 0) {
       await fetchSessions()
     }
     const existingSession = sessions.value

@@ -45,7 +45,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import reactor.core.publisher.Flux;
 
 import java.io.InputStream;
@@ -181,11 +180,8 @@ public class KnowledgeController {
                 UserUtil.getTenantId(),
                 UserUtil.getUserId()
         );
-        String url = ServletUriComponentsBuilder.fromCurrentContextPath()
-                .path("/knowledge/preview-range/{id}")
-                .queryParam("previewToken", createdToken.token())
-                .buildAndExpand(id)
-                .toUriString();
+        String url = "/knowledge/preview-range/" + id
+                + "?previewToken=" + URLEncoder.encode(createdToken.token(), StandardCharsets.UTF_8);
 
         KnowledgePreviewTokenVO result = new KnowledgePreviewTokenVO();
         result.setUrl(url);

@@ -31,6 +31,14 @@ class DynamicChatClientProviderTest {
     }
 
     @Test
+    void buildChatOptionsDisablesThinkingForCustomQwenModel() {
+        OpenAiChatOptions options = provider.buildChatOptions(
+                "custom", "https://example.com/v1", "qwen3.5-plus", 0.7, 2048);
+
+        assertThat(options.getExtraBody()).containsEntry("enable_thinking", Boolean.FALSE);
+    }
+
+    @Test
     void buildChatOptionsDisablesThinkingForDeepSeek() {
         OpenAiChatOptions options = provider.buildChatOptions(
                 "deepseek", "https://api.deepseek.com", "deepseek-v4-pro", 0.7, 2048);
@@ -44,6 +52,37 @@ class DynamicChatClientProviderTest {
                 "custom", "https://api.deepseek.com", "deepseek-v4-pro", 0.7, 2048);
 
         assertThat(options.getExtraBody()).containsEntry("thinking", Map.of("type", "disabled"));
+    }
+
+    @Test
+    void buildChatOptionsDisablesThinkingForKimiK2AndUsesNonThinkingTemperature() {
+        OpenAiChatOptions options = provider.buildChatOptions(
+                "moonshot", "https://api.moonshot.cn", "kimi-k2.5", 1.0, 2048);
+
+        assertThat(options.getExtraBody()).containsEntry("thinking", Map.of("type", "disabled"));
+        assertThat(options.getTemperature()).isEqualTo(0.6D);
+    }
+
+    @Test
+    void buildChatOptionsDisablesThinkingForCustomKimiK2Model() {
+        OpenAiChatOptions options = provider.buildChatOptions(
+                "custom", "https://api.moonshot.ai", "moonshot/kimi-k2.6", 0.7, 2048);
+
+        assertThat(options.getExtraBody()).containsEntry("thinking", Map.of("type", "disabled"));
+        assertThat(options.getTemperature()).isEqualTo(0.6D);
+    }
+
+    @Test
+    void buildChatOptionsDisablesThinkingForKnownOpenAiCompatibleThinkingModels() {
+        assertThat(provider.buildChatOptions(
+                "ark", "https://ark.cn-beijing.volces.com/api/v3", "doubao-seed-2-0-pro-260215", 0.7, 2048)
+                .getExtraBody()).containsEntry("thinking", Map.of("type", "disabled"));
+        assertThat(provider.buildChatOptions(
+                "zhipu", "https://open.bigmodel.cn/api/paas/v4", "glm-5", 0.7, 2048)
+                .getExtraBody()).containsEntry("thinking", Map.of("type", "disabled"));
+        assertThat(provider.buildChatOptions(
+                "custom", "https://tokenhub.tencentmaas.com/v1", "hunyuan-t1-latest", 0.7, 2048)
+                .getExtraBody()).containsEntry("thinking", Map.of("type", "disabled"));
     }
 
     @Test
