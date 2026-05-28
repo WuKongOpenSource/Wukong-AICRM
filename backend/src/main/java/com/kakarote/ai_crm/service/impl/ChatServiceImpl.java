@@ -20,6 +20,7 @@ import com.kakarote.ai_crm.ai.memory.CrmChatMemoryService;
 import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
 import com.kakarote.ai_crm.ai.state.PendingCustomerCreationStore;
 import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
+import com.kakarote.ai_crm.ai.tools.support.CrmRequiredToolCallAdvisor;
 import com.kakarote.ai_crm.ai.tools.support.AiToolExecutionRecorder;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
@@ -87,6 +88,9 @@ public class ChatServiceImpl implements IChatService {
 
     @Autowired
     private CrmChatMemoryService crmChatMemoryService;
+
+    @Autowired
+    private CrmRequiredToolCallAdvisor crmRequiredToolCallAdvisor;
 
     @Autowired
     private ChatSessionMapper chatSessionMapper;
@@ -591,17 +595,13 @@ public class ChatServiceImpl implements IChatService {
 
         aiToolExecutionRecorder.begin(sessionId);
 
-        ChatClient chatClient = chatClientProvider.getChatClient(
-            billingContext.modelSource(),
-            billingContext.runtimeConfig().providerCode(),
-            billingContext.runtimeConfig().model(),
-            application.code()
-        );
+        boolean crmToolCallRequired = shouldRequireCrmToolCall(application.code(), capabilities);
+        ChatClient chatClient = resolveChatClient(billingContext, application.code());
 
         final String finalSystemPrompt = enhancedSystemPrompt;
         final String finalContent = enhancedContent;
         ChatClient.ChatClientRequestSpec requestSpec = buildChatRequestSpec(
-            chatClient, finalSystemPrompt, finalContent, mediaList, sessionId, messageId);
+            chatClient, finalSystemPrompt, finalContent, mediaList, sessionId, messageId, crmToolCallRequired);
         Runnable finalizeSuccessfulStream = () -> {
             if (!streamFinalized.compareAndSet(false, true)) {
                 return;
@@ -812,17 +812,13 @@ public class ChatServiceImpl implements IChatService {
 
             aiToolExecutionRecorder.begin(sessionId);
 
-            ChatClient chatClient = chatClientProvider.getChatClient(
-                billingContext.modelSource(),
-                billingContext.runtimeConfig().providerCode(),
-                billingContext.runtimeConfig().model(),
-                application.code()
-            );
+            boolean crmToolCallRequired = shouldRequireCrmToolCall(application.code(), capabilities);
+            ChatClient chatClient = resolveChatClient(billingContext, application.code());
 
             final String finalSystemPrompt = enhancedSystemPrompt;
             final String finalContent = enhancedContent;
             ChatClient.ChatClientRequestSpec requestSpec = buildChatRequestSpec(
-                chatClient, finalSystemPrompt, finalContent, mediaList, sessionId, messageId);
+                chatClient, finalSystemPrompt, finalContent, mediaList, sessionId, messageId, crmToolCallRequired);
 
             var chatResponse = requestSpec.call().chatResponse();
             String response = chatResponse.getResult().getOutput().getText();
@@ -898,140 +894,13 @@ public class ChatServiceImpl implements IChatService {
         if (failure != null) {
             return buildToolFailureReply(failure);
         }
-
-        List<String> unconfirmedActions = findUnconfirmedClaimedWriteActions(sessionId, modelResponse);
-        if (CollUtil.isNotEmpty(unconfirmedActions)) {
-            log.warn("AI 回复声称的 CRM 写入未被工具成功结果确认: sessionId={}, actions={}, successfulMethods={}",
-                sessionId, unconfirmedActions, aiToolExecutionRecorder.getSuccessfulWriteMethodNames(sessionId));
-            return buildUnconfirmedWriteReply(sessionId, unconfirmedActions);
-        }
         return modelResponse;
-    }
-
-    private List<String> findUnconfirmedClaimedWriteActions(Long sessionId, String response) {
-        if (StrUtil.isBlank(response)) {
-            return List.of();
-        }
-        Set<String> successfulMethods = aiToolExecutionRecorder.getSuccessfulWriteMethodNames(sessionId);
-        List<ClaimedWriteAction> claimedActions = detectClaimedWriteActions(response);
-        if (CollUtil.isEmpty(claimedActions)) {
-            if (successfulMethods.isEmpty() && looksLikeUnsupportedWriteSuccess(response)) {
-                return List.of("写入操作");
-            }
-            return List.of();
-        }
-
-        List<String> missingActions = new ArrayList<>();
-        for (ClaimedWriteAction action : claimedActions) {
-            boolean confirmed = action.successMethodNames().stream().anyMatch(successfulMethods::contains);
-            if (!confirmed) {
-                missingActions.add(action.label());
-            }
-        }
-        return missingActions.stream().distinct().toList();
-    }
-
-    private List<ClaimedWriteAction> detectClaimedWriteActions(String response) {
-        if (!looksLikeWriteCompletionClaim(response)) {
-            return List.of();
-        }
-
-        List<ClaimedWriteAction> actions = new ArrayList<>();
-        addClaimedActionIfPresent(actions, response, "客户",
-            Set.of("createCustomer", "confirmPendingCustomerCreation"),
-            "创建客户", "新增客户", "客户创建");
-        addClaimedActionIfPresent(actions, response, "联系人",
-            Set.of("createContact"),
-            "创建联系人", "新增联系人", "联系人创建");
-        addClaimedActionIfPresent(actions, response, "跟进记录",
-            Set.of("createFollowUp"),
-            "创建跟进", "创建跟进记录", "新增跟进", "记录跟进", "跟进记录创建");
-        addClaimedActionIfPresent(actions, response, "任务",
-            Set.of("createTask"),
-            "创建任务", "新增任务", "任务创建");
-        addClaimedActionIfPresent(actions, response, "日程",
-            Set.of("createSchedule"),
-            "创建日程", "新增日程", "安排日程", "日程安排", "日程创建");
-        addClaimedActionIfPresent(actions, response, "客户更新",
-            Set.of("updateCustomer"),
-            "更新客户", "修改客户", "客户更新");
-        addClaimedActionIfPresent(actions, response, "任务更新",
-            Set.of("updateTask", "updateTaskStatus"),
-            "更新任务", "修改任务", "任务状态");
-        addClaimedActionIfPresent(actions, response, "联系人更新",
-            Set.of("updateContact"),
-            "更新联系人", "修改联系人");
-        addClaimedActionIfPresent(actions, response, "联系人删除",
-            Set.of("deleteContact"),
-            "删除联系人", "联系人删除");
-        return actions;
-    }
-
-    private void addClaimedActionIfPresent(List<ClaimedWriteAction> actions,
-                                           String response,
-                                           String label,
-                                           Set<String> successMethodNames,
-                                           String... phrases) {
-        for (String phrase : phrases) {
-            if (response.contains(phrase)) {
-                actions.add(new ClaimedWriteAction(label, successMethodNames));
-                return;
-            }
-        }
-    }
-
-    private boolean looksLikeWriteCompletionClaim(String response) {
-        if (StrUtil.isBlank(response)) {
-            return false;
-        }
-        return looksLikeUnsupportedWriteSuccess(response)
-            || response.contains("已为您处理")
-            || response.contains("已为您完成")
-            || response.contains("已处理以下")
-            || response.contains("已完成以下")
-            || response.contains("已记录")
-            || response.contains("已安排")
-            || response.contains("创建任务:")
-            || response.contains("创建任务：")
-            || response.contains("创建日程:")
-            || response.contains("创建日程：")
-            || response.contains("创建跟进:")
-            || response.contains("创建跟进：")
-            || response.contains("创建跟进记录:")
-            || response.contains("创建跟进记录：");
-    }
-
-    private String buildUnconfirmedWriteReply(Long sessionId, List<String> unconfirmedActions) {
-        String prefix = aiToolExecutionRecorder.hasSuccessfulWrite(sessionId)
-            ? "部分操作未确认成功"
-            : "操作未确认成功";
-        return prefix + "：未检测到系统工具返回「" + String.join("、", unconfirmedActions)
-            + "」成功结果，本次未确认写入这些业务数据。请重试或补充必要信息。";
     }
 
     private String buildToolFailureReply(AiToolExecutionRecorder.ToolExecution failure) {
         String reason = failure == null ? null : failure.errorReason();
         reason = StrUtil.blankToDefault(reason, "工具调用失败，但未返回具体错误信息。");
         return "工具调用失败：" + reason;
-    }
-
-    private boolean looksLikeUnsupportedWriteSuccess(String response) {
-        if (StrUtil.isBlank(response)) {
-            return false;
-        }
-        return response.contains("创建成功")
-            || response.contains("已创建")
-            || response.contains("已为您创建")
-            || response.contains("新增成功")
-            || response.contains("更新成功")
-            || response.contains("已更新")
-            || response.contains("修改成功")
-            || response.contains("已修改")
-            || response.contains("删除成功")
-            || response.contains("已删除");
-    }
-
-    private record ClaimedWriteAction(String label, Set<String> successMethodNames) {
     }
 
     /**
@@ -1130,18 +999,38 @@ public class ChatServiceImpl implements IChatService {
                                                                   String content,
                                                                   List<Media> mediaList,
                                                                   Long sessionId,
-                                                                  Long messageId) {
+                                                                  Long messageId,
+                                                                  boolean crmToolCallRequired) {
         ChatClient.ChatClientRequestSpec requestSpec = chatClient.prompt()
             .system(systemPrompt)
-            .advisors(advisor -> advisor
-                .advisors(crmChatMemoryAdvisor)
-                .param(ChatMemory.CONVERSATION_ID, sessionId)
-                .param(CrmChatMemoryAdvisor.CURRENT_MESSAGE_ID, messageId));
+            .advisors(advisor -> {
+                advisor.advisors(crmChatMemoryAdvisor)
+                    .param(ChatMemory.CONVERSATION_ID, sessionId)
+                    .param(CrmChatMemoryAdvisor.CURRENT_MESSAGE_ID, messageId);
+                if (crmToolCallRequired) {
+                    advisor.advisors(crmRequiredToolCallAdvisor);
+                }
+            });
 
         if (CollUtil.isNotEmpty(mediaList)) {
             return requestSpec.user(user -> user.text(content).media(mediaList.toArray(new Media[0])));
         }
         return requestSpec.user(content);
+    }
+
+    private boolean shouldRequireCrmToolCall(String appCode, AiModelCapabilities capabilities) {
+        return capabilities != null
+            && capabilities.isSupportsToolCall()
+            && ChatApplicationCodes.CRM.equals(chatApplicationRegistry.normalize(appCode));
+    }
+
+    private ChatClient resolveChatClient(ChatBillingContext billingContext, String appCode) {
+        return chatClientProvider.getChatClient(
+            billingContext.modelSource(),
+            billingContext.runtimeConfig().providerCode(),
+            billingContext.runtimeConfig().model(),
+            appCode
+        );
     }
 
     /**

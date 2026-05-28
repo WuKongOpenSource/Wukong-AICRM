@@ -10,6 +10,7 @@ import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
 import com.kakarote.ai_crm.ai.provider.AiProviderDescriptor;
 import com.kakarote.ai_crm.ai.provider.AiProviderRegistry;
 import com.kakarote.ai_crm.ai.tools.ContactTools;
+import com.kakarote.ai_crm.ai.tools.CrmNoopTools;
 import com.kakarote.ai_crm.ai.tools.CustomerTools;
 import com.kakarote.ai_crm.ai.tools.FollowupTools;
 import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
@@ -98,6 +99,9 @@ public class DynamicChatClientProvider {
 
     @Autowired
     private ScheduleTools scheduleTools;
+
+    @Autowired
+    private CrmNoopTools crmNoopTools;
 
     @Autowired
     private ToolCallingManager toolCallingManager;
@@ -501,7 +505,7 @@ public class DynamicChatClientProvider {
             return new Object[]{knowledgeTools};
         }
         if (ChatApplicationCodes.CRM.equals(normalizedAppCode)) {
-            return new Object[]{customerTools, taskTools, knowledgeTools, contactTools, followupTools, scheduleTools};
+            return new Object[]{customerTools, taskTools, knowledgeTools, contactTools, followupTools, scheduleTools, crmNoopTools};
         }
         return new Object[0];
     }
