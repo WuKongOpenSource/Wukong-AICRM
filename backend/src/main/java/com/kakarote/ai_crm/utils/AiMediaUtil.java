@@ -22,16 +22,23 @@ public final class AiMediaUtil {
             throws IOException {
         try (InputStream inputStream = fileStorageService.getFileStream(filePath)) {
             byte[] data = inputStream.readAllBytes();
-            Resource resource = new ByteArrayResource(data) {
-                /**
-                 * 获取Filename。
-                 */
-                @Override
-                public String getFilename() {
-                    return FileUtil.getName(filePath);
-                }
-            };
-            return new Media(mimeType, resource);
+            return buildMedia(data, FileUtil.getName(filePath), mimeType);
         }
+    }
+
+    /**
+     * 构建内存媒体。
+     */
+    public static Media buildMedia(byte[] data, String filename, MimeType mimeType) {
+        Resource resource = new ByteArrayResource(data) {
+            /**
+             * 获取Filename。
+             */
+            @Override
+            public String getFilename() {
+                return filename;
+            }
+        };
+        return new Media(mimeType, resource);
     }
 }

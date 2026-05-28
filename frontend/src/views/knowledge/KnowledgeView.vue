@@ -49,7 +49,7 @@
               :show-file-list="false"
               :before-upload="onUploadTriggerBeforeUpload"
               :http-request="noopHttpRequest"
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.weba,.mp4,.webm,.mov,.m4v,.avi,.mkv,.ogv,.3gp,audio/*,video/*"
+              accept="image/*,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg,.avif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.weba,.mp4,.webm,.mov,.m4v,.avi,.mkv,.ogv,.3gp,audio/*,video/*"
             >
               <button
                 type="button"
@@ -111,7 +111,7 @@
                 :show-file-list="false"
                 :before-upload="onUploadTriggerBeforeUpload"
                 :http-request="noopHttpRequest"
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.weba,.mp4,.webm,.mov,.m4v,.avi,.mkv,.ogv,.3gp,audio/*,video/*"
+                accept="image/*,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg,.avif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.weba,.mp4,.webm,.mov,.m4v,.avi,.mkv,.ogv,.3gp,audio/*,video/*"
               >
                 <button class="flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-lg">
                   <span class="material-symbols-outlined text-sm">upload</span>

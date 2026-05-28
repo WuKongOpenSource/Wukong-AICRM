@@ -6,8 +6,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
 
 /**
  * Records AI tool executions for one chat turn so the final assistant reply can
@@ -57,6 +59,14 @@ public class AiToolExecutionRecorder {
 
     public boolean hasSuccessfulWrite(Long sessionId) {
         return getExecutions(sessionId).stream().anyMatch(ToolExecution::successfulWrite);
+    }
+
+    public Set<String> getSuccessfulWriteMethodNames(Long sessionId) {
+        return getExecutions(sessionId).stream()
+                .filter(ToolExecution::successfulWrite)
+                .map(ToolExecution::methodName)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toSet());
     }
 
     public void finish(Long sessionId) {

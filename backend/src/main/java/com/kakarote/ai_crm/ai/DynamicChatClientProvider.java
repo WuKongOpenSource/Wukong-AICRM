@@ -372,6 +372,10 @@ public class DynamicChatClientProvider {
                                        boolean registerTools, String appCode) {
         OpenAiApi openAiApi = buildOpenAiApi(providerCode, baseUrl, apiKey, extraHeadersJson);
         OpenAiChatOptions options = buildChatOptions(providerCode, baseUrl, model, temperature, maxTokens);
+        boolean toolCallingEnabled = registerTools && capabilities != null && capabilities.isSupportsToolCall();
+        if (toolCallingEnabled && supportsParallelToolCalls(providerCode, baseUrl)) {
+            options.setParallelToolCalls(Boolean.TRUE);
+        }
 
         ObservationRegistry obsRegistry = observationRegistry != null
                 ? observationRegistry : ObservationRegistry.NOOP;
@@ -380,7 +384,7 @@ public class DynamicChatClientProvider {
                 RetryTemplate.builder().build(), obsRegistry);
 
         ChatClient.Builder builder = ChatClient.builder(chatModel);
-        if (registerTools && capabilities != null && capabilities.isSupportsToolCall()) {
+        if (toolCallingEnabled) {
             Object[] tools = resolveDefaultTools(appCode);
             if (tools.length > 0) {
                 builder.defaultTools(tools);
@@ -1033,6 +1037,12 @@ public class DynamicChatClientProvider {
         } catch (NumberFormatException e) {
             return defaultValue;
         }
+    }
+
+    private boolean supportsParallelToolCalls(String providerCode, String baseUrl) {
+        String resolvedProviderCode = AiProviderRegistry.resolve(providerCode, baseUrl).getCode();
+        return "openai".equals(resolvedProviderCode)
+                || "dashscope".equals(resolvedProviderCode);
     }
 
     /**

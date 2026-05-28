@@ -148,7 +148,7 @@ import { uploadKnowledge } from '@/api/knowledge'
 import { useResponsive } from '@/composables/useResponsive'
 
 const ACCEPT =
-  '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.weba,.mp4,.webm,.mov,.m4v,.avi,.mkv,.ogv,.3gp,audio/*,video/*'
+  'image/*,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg,.avif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.weba,.mp4,.webm,.mov,.m4v,.avi,.mkv,.ogv,.3gp,audio/*,video/*'
 const typeCategories = [
   { id: 'document', label: '产品文档', icon: 'description' },
   { id: 'proposal', label: '方案资料', icon: 'lightbulb' },
@@ -180,14 +180,14 @@ const props = withDefaults(
   }>(),
   {
     headline: '上传业务知识',
-    subline: '支持 PDF、Word、PPT、Excel 或网页链接。AI 将自动解析并建立索引。',
+    subline: '支持图片、PDF、Word、PPT、Excel、音频、视频或网页链接。AI 将自动解析并建立索引。',
     step1Label: '1. 选择知识分类',
     step2Label: '2. 上传文件',
     step3Label: '3. 填写摘要（可选）',
     summaryPlaceholder: '例如：本次会议的关键结论、客户关注点、下一步行动…',
     primaryActionLabel: '开始解析',
     successMessage: '上传成功',
-    sizeHint: '支持 PDF、Word、PPT、Excel、音频、视频（最大 100MB）',
+    sizeHint: '支持图片、PDF、Word、PPT、Excel、音频、视频（最大 100MB）',
     accept: ACCEPT,
     destroyOnClose: false
   }
@@ -237,6 +237,7 @@ function resetForm() {
 function getSelectedFileIcon(fileName: string): string {
   const normalized = fileName.toLowerCase()
   if (normalized.endsWith('.pdf')) return 'picture_as_pdf'
+  if (/\.(png|jpg|jpeg|gif|webp|bmp|svg|avif)$/i.test(normalized)) return 'image'
   if (normalized.endsWith('.ppt') || normalized.endsWith('.pptx')) return 'slideshow'
   if (normalized.endsWith('.xls') || normalized.endsWith('.xlsx')) return 'table_chart'
   if (/\.(mp3|wav|m4a|aac|ogg|oga|opus|flac|weba)$/i.test(normalized)) return 'audio_file'
