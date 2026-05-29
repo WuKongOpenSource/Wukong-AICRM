@@ -244,11 +244,10 @@ const paymentChannelLogos: Record<PaymentChannel, string> = {
 }
 
 const computeEstimates = [
-  { model: 'Qwen3.6-plus', messages: '约 5000 条消息' },
-  { model: 'DeepSeek V4 Pro', messages: '约 2000 条消息' },
-  { model: 'Claude Sonnet 4.6', messages: '约 400 条消息' },
-  { model: 'Gemini 3.1 Pro', messages: '约 500 条消息' },
-  { model: 'GPT-5.5', messages: '约 200 条消息' }
+  { model: 'Qwen3.6-plus', messages: '约 1200 条消息' },
+  { model: 'DeepSeek V4 Pro', messages: '约 1100 条消息' },
+  { model: 'Kimi K2.6', messages: '约 260 条消息' },
+  { model: 'GPT-5.4', messages: '约 70 条消息' }
 ]
 
 const loadingOptions = ref(false)
@@ -384,6 +383,8 @@ async function createOrderForSelectedChannel() {
     })
     if (requestSeq !== orderRequestSeq) return
 
+    selectedPlanId.value = order.planId || selectedPlanId.value
+    selectedChannel.value = order.paymentChannel || selectedChannel.value
     currentOrder.value = order
     if (order.status === 'PENDING') {
       startPolling()
@@ -534,7 +535,7 @@ function statusTagType(status: TokenPurchaseOrder['status']) {
 .token-purchase-shell {
   overflow: hidden;
   border-radius: 18px;
-  background: #fff;
+  background: var(--wk-bg-surface);
 }
 
 .token-purchase-header {
@@ -543,7 +544,7 @@ function statusTagType(status: TokenPurchaseOrder['status']) {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  border-bottom: 1px solid #eef1f5;
+  border-bottom: 1px solid var(--wk-border-subtle);
   padding: 28px 36px;
 }
 
@@ -570,16 +571,21 @@ function statusTagType(status: TokenPurchaseOrder['status']) {
 .token-payment-pane {
   display: flex;
   flex-direction: column;
-  border-left: 1px solid #f1f3f7;
-  background: #fbfbfc;
+  border-left: 1px solid var(--wk-border-subtle);
+  background: var(--wk-bg-surface-subtle);
   padding: 38px 36px 36px;
 }
 
 .token-plan-card {
   min-height: 140px;
-  border: 1px solid #bfd7ff;
+  border: 1px solid color-mix(in srgb, var(--wk-primary) 34%, var(--wk-border-subtle));
   border-radius: 18px;
-  background: linear-gradient(180deg, #f8fbff 0%, #f3f7fc 100%);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--wk-primary) 8%, var(--wk-bg-surface)) 0%,
+      color-mix(in srgb, var(--wk-primary) 4%, var(--wk-bg-surface-subtle)) 100%
+    );
   padding: 28px 28px 24px;
 }
 
@@ -588,9 +594,9 @@ function statusTagType(status: TokenPurchaseOrder['status']) {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
   overflow: hidden;
-  border: 1px solid #e8ebf1;
+  border: 1px solid var(--wk-border-subtle);
   border-radius: 14px;
-  background: #fff;
+  background: var(--wk-bg-surface);
   padding: 4px;
 }
 
@@ -601,16 +607,16 @@ function statusTagType(status: TokenPurchaseOrder['status']) {
   justify-content: center;
   gap: 8px;
   border-radius: 8px;
-  color: #3f4652;
+  color: var(--wk-text-secondary);
   font-size: 16px;
   font-weight: 800;
   transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .token-channel-tab.is-active {
-  background: #0b5edb;
+  background: var(--wk-primary);
   color: #fff;
-  box-shadow: 0 4px 10px rgba(11, 94, 219, 0.22);
+  box-shadow: 0 4px 10px rgb(var(--wk-primary-rgb) / 0.22);
 }
 
 .token-channel-tab.is-disabled {
@@ -649,24 +655,24 @@ function statusTagType(status: TokenPurchaseOrder['status']) {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border: 10px solid #fff;
+  border: 10px solid var(--wk-bg-surface);
   border-radius: 18px;
   background:
     radial-gradient(circle, rgba(148, 163, 184, 0.18) 1px, transparent 1px) 0 0 / 10px 10px,
-    #f3f4f6;
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.14);
+    var(--wk-bg-surface-muted);
+  box-shadow: 0 10px 22px rgb(var(--wk-shadow-color) / 0.22);
 }
 
 .token-payment-code {
   display: block;
-  width: 220px;
-  height: 220px;
+  width: 205px;
+  height: 205px;
 }
 
 .token-payment-iframe {
   border: 0;
   border-radius: 10px;
-  background: #fff;
+  background: var(--wk-bg-surface);
 }
 
 .token-qr-placeholder {
@@ -678,9 +684,9 @@ function statusTagType(status: TokenPurchaseOrder['status']) {
   justify-content: center;
   gap: 10px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.78);
+  background: color-mix(in srgb, var(--wk-bg-surface) 78%, transparent);
   text-align: center;
-  color: #94a3b8;
+  color: var(--wk-text-muted);
   font-size: 12px;
   font-weight: 700;
 }
@@ -693,17 +699,17 @@ function statusTagType(status: TokenPurchaseOrder['status']) {
   justify-content: center;
   gap: 8px;
   border-radius: 13px;
-  background: #0b5edb;
+  background: var(--wk-primary);
   color: #fff;
   font-size: 18px;
   font-weight: 900;
-  box-shadow: 0 8px 16px rgba(11, 94, 219, 0.28);
+  box-shadow: 0 8px 16px rgb(var(--wk-primary-rgb) / 0.28);
   transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
 }
 
 .token-paid-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 10px 20px rgba(11, 94, 219, 0.32);
+  box-shadow: 0 10px 20px rgb(var(--wk-primary-rgb) / 0.32);
 }
 
 .token-paid-button:disabled {
@@ -729,7 +735,7 @@ function statusTagType(status: TokenPurchaseOrder['status']) {
 
   .token-payment-pane {
     border-left: 0;
-    border-top: 1px solid #f1f3f7;
+    border-top: 1px solid var(--wk-border-subtle);
   }
 
   .token-payment-stage {

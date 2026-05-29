@@ -36,7 +36,7 @@
 
             <button
               type="button"
-              class="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[#dbe8f8] bg-[#f8fbff] px-4 text-[13px] text-primary transition-colors hover:border-primary/30 hover:bg-primary/5 disabled:cursor-not-allowed disabled:text-slate-400"
+              class="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] px-4 text-[13px] text-primary transition-colors hover:border-[var(--wk-input-border-hover)] disabled:cursor-not-allowed disabled:text-slate-400"
               :disabled="totalCount === 0"
               @click="openScriptGenerator"
             >
@@ -49,7 +49,7 @@
               :show-file-list="false"
               :before-upload="onUploadTriggerBeforeUpload"
               :http-request="noopHttpRequest"
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.weba,.mp4,.webm,.mov,.m4v,.avi,.mkv,.ogv,.3gp,audio/*,video/*"
+              accept="image/*,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg,.avif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.weba,.mp4,.webm,.mov,.m4v,.avi,.mkv,.ogv,.3gp,audio/*,video/*"
             >
               <button
                 type="button"
@@ -111,7 +111,7 @@
                 :show-file-list="false"
                 :before-upload="onUploadTriggerBeforeUpload"
                 :http-request="noopHttpRequest"
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.weba,.mp4,.webm,.mov,.m4v,.avi,.mkv,.ogv,.3gp,audio/*,video/*"
+                accept="image/*,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg,.avif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.weba,.mp4,.webm,.mov,.m4v,.avi,.mkv,.ogv,.3gp,audio/*,video/*"
               >
                 <button class="flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-lg">
                   <span class="material-symbols-outlined text-sm">upload</span>
@@ -120,20 +120,20 @@
               </el-upload>
               <button
                 type="button"
-                class="inline-flex rounded-xl border border-primary/15 bg-primary/5 px-4 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 md:text-sm"
+                class="inline-flex rounded-xl border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] px-4 py-2 text-xs font-bold text-primary transition-colors hover:border-[var(--wk-input-border-hover)] disabled:cursor-not-allowed disabled:text-slate-400 md:text-sm"
                 :disabled="totalCount === 0"
                 @click="openScriptGenerator"
               >
                 AI 话术 / SOP 生成
               </button>
               <!-- View Mode Toggle -->
-              <div class="flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+              <div class="flex rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1">
                 <button
                   type="button"
                   @click="setViewMode('card')"
                   :class="[
                     'rounded-md p-1.5 transition-all',
-                    viewMode === 'card' ? 'bg-white text-primary' : 'text-slate-400 hover:text-slate-600'
+                    viewMode === 'card' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-slate-400 hover:text-slate-600'
                   ]"
                   title="网格视图"
                 >
@@ -144,7 +144,7 @@
                   @click="setViewMode('list')"
                   :class="[
                     'rounded-md p-1.5 transition-all',
-                    viewMode === 'list' ? 'bg-white text-primary' : 'text-slate-400 hover:text-slate-600'
+                    viewMode === 'list' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-slate-400 hover:text-slate-600'
                   ]"
                   title="列表视图"
                 >
@@ -168,7 +168,7 @@
                   'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-all',
                   selectedCategory === cat.id
                     ? 'border-primary/25 bg-primary/10 text-primary'
-                    : 'border-[#dce7f5] bg-white text-[#284462] hover:border-primary/25 hover:bg-primary/5 hover:text-primary'
+                    : 'border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] text-[#284462] hover:border-[var(--wk-input-border-hover)] hover:text-primary'
                 ]"
               >
                 <span class="material-symbols-outlined text-[17px] leading-none">{{ cat.icon }}</span>
@@ -180,8 +180,8 @@
               <el-dropdown trigger="click">
                 <button
                   type="button"
-                  class="inline-flex size-9 items-center justify-center rounded-lg border border-[#dbe8f8] bg-[#f8fbff] text-primary transition-colors hover:border-primary/30 hover:bg-primary/5"
-                  title="文件类型"
+                  class="inline-flex size-9 items-center justify-center rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] text-primary transition-colors hover:border-[var(--wk-input-border-hover)]"
+                  :title="selectedFileTypeLabel"
                 >
                   <span class="material-symbols-outlined text-[21px] leading-none">filter_list</span>
                 </button>
@@ -190,24 +190,39 @@
                     <div class="px-5 pb-2 pt-3 text-xs font-bold text-[#8aa1c2]">文件类型</div>
                     <el-dropdown-item
                       v-for="item in fileTypeMenuItems"
-                      :key="item.label"
+                      :key="item.id"
+                      @click="handleFileTypeFilter(item.id)"
                     >
-                      <span class="flex min-w-[130px] items-center gap-3 py-1 text-[13px] text-[#526982]">
-                        <span class="material-symbols-outlined text-[21px] leading-none text-[#8aa1c2]">{{ item.icon }}</span>
+                      <span
+                        :class="[
+                          'flex min-w-[130px] items-center gap-3 py-1 text-[13px]',
+                          selectedFileType === item.id ? 'font-semibold text-primary' : 'text-[#526982]'
+                        ]"
+                      >
+                        <span
+                          :class="[
+                            'material-symbols-outlined text-[21px] leading-none',
+                            selectedFileType === item.id ? 'text-primary' : 'text-[#8aa1c2]'
+                          ]"
+                        >{{ item.icon }}</span>
                         {{ item.label }}
+                        <span
+                          v-if="selectedFileType === item.id"
+                          class="material-symbols-outlined ml-auto text-[18px] leading-none text-primary"
+                        >check</span>
                       </span>
                     </el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
 
-              <div class="inline-flex h-9 items-center rounded-lg border border-[#dbe8f8] bg-[#f8fbff] p-1">
+              <div class="inline-flex h-9 items-center rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1">
                 <button
                   type="button"
                   @click="setViewMode('card')"
                   :class="[
                     'inline-flex size-7 items-center justify-center rounded-md transition-all',
-                    viewMode === 'card' ? 'bg-white text-primary' : 'text-[#8aa1c2] hover:text-primary'
+                    viewMode === 'card' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-[#8aa1c2] hover:text-primary'
                   ]"
                   title="网格视图"
                 >
@@ -218,7 +233,7 @@
                   @click="setViewMode('list')"
                   :class="[
                     'inline-flex size-7 items-center justify-center rounded-md transition-all',
-                    viewMode === 'list' ? 'bg-white text-primary' : 'text-[#8aa1c2] hover:text-primary'
+                    viewMode === 'list' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-[#8aa1c2] hover:text-primary'
                   ]"
                   title="列表视图"
                 >
@@ -674,7 +689,7 @@ import {
   updateKnowledgeCustomer
 } from '@/api/knowledge'
 import { ElMessage, ElMessageBox, UploadRequestOptions } from 'element-plus'
-import type { Knowledge, KnowledgeQueryBO, KnowledgeType, KnowledgeAiSearchVO } from '@/types/common'
+import type { Knowledge, KnowledgeQueryBO, KnowledgeType, KnowledgeFileType, KnowledgeAiSearchVO } from '@/types/common'
 import { formatFileSize as formatFileSizeBytes, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 import KnowledgeDetailModal from '@/components/knowledge/KnowledgeDetailModal.vue'
 import KnowledgeSearchResultPanel from '@/components/knowledge/KnowledgeSearchResultPanel.vue'
@@ -701,6 +716,7 @@ const totalCount = ref(0)
 const aiSearchLoading = ref(false)
 const aiSearchResult = ref<KnowledgeAiSearchVO | null>(null)
 const selectedCategory = ref('all')
+const selectedFileType = ref<KnowledgeFileType | 'all'>('all')
 const associateSubmitting = ref(false)
 const customerSearchLoading = ref(false)
 const associateTarget = ref<Knowledge | null>(null)
@@ -718,20 +734,22 @@ const categories = [
 ]
 
 const fileTypeMenuItems = [
-  { label: '图片', icon: 'image' },
-  { label: '文档', icon: 'description' },
-  { label: '电子表格', icon: 'table_chart' },
-  { label: '演示文稿', icon: 'slideshow' },
-  { label: 'PDF', icon: 'picture_as_pdf' },
-  { label: '音频', icon: 'audio_file' },
-  { label: '视频', icon: 'video_file' }
-]
+  { id: 'all', label: '全部类型', icon: 'filter_list' },
+  { id: 'image', label: '图片', icon: 'image' },
+  { id: 'document', label: '文档', icon: 'description' },
+  { id: 'spreadsheet', label: '电子表格', icon: 'table_chart' },
+  { id: 'presentation', label: '演示文稿', icon: 'slideshow' },
+  { id: 'pdf', label: 'PDF', icon: 'picture_as_pdf' },
+  { id: 'audio', label: '音频', icon: 'audio_file' },
+  { id: 'video', label: '视频', icon: 'video_file' }
+] as const
 
 const queryParams = reactive<KnowledgeQueryBO>({
   page: 1,
   limit: DEFAULT_PAGE_SIZE,
   keyword: '',
-  type: undefined
+  type: undefined,
+  fileType: undefined
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / (queryParams.limit || DEFAULT_PAGE_SIZE))))
@@ -739,6 +757,10 @@ const currentPage = computed(() => queryParams.page || 1)
 const showAiSearchResult = computed(() => aiSearchLoading.value || aiSearchResult.value !== null)
 const canUploadKnowledge = computed(() => userStore.hasPermission('knowledge:upload'))
 const showPagination = computed(() => totalCount.value > 0)
+const selectedFileTypeLabel = computed(() => {
+  const selected = fileTypeMenuItems.find(item => item.id === selectedFileType.value)
+  return selectedFileType.value === 'all' ? '文件类型' : `文件类型：${selected?.label || '全部类型'}`
+})
 
 const visiblePages = computed(() => {
   const total = totalPages.value
@@ -842,6 +864,13 @@ function handleCategoryFilter(categoryId: string) {
     return
   }
   fetchList()
+}
+
+function handleFileTypeFilter(fileType: KnowledgeFileType | 'all') {
+  selectedFileType.value = fileType
+  queryParams.fileType = fileType === 'all' ? undefined : fileType
+  queryParams.page = 1
+  void fetchList()
 }
 
 function handlePageChange(page: number) {

@@ -28,6 +28,60 @@
         <if test="query.type != null and query.type != ''">
             AND k.type = #{query.type}
         </if>
+        <if test="query.fileType != null and query.fileType != ''">
+            <choose>
+                <when test="query.fileType == 'image'">
+                    AND (
+                        LOWER(COALESCE(k.mime_type, '')) LIKE 'image/%'
+                        OR LOWER(COALESCE(k.name, '')) ~ '\.(png|jpg|jpeg|gif|webp|svg|bmp|avif)$'
+                    )
+                </when>
+                <when test="query.fileType == 'document'">
+                    AND (
+                        LOWER(COALESCE(k.mime_type, '')) LIKE 'text/%'
+                        OR LOWER(COALESCE(k.mime_type, '')) LIKE '%word%'
+                        OR LOWER(COALESCE(k.mime_type, '')) LIKE '%msword%'
+                        OR LOWER(COALESCE(k.name, '')) ~ '\.(doc|docx|txt|md|markdown|json|xml)$'
+                    )
+                </when>
+                <when test="query.fileType == 'spreadsheet'">
+                    AND (
+                        LOWER(COALESCE(k.mime_type, '')) LIKE '%excel%'
+                        OR LOWER(COALESCE(k.mime_type, '')) LIKE '%spreadsheet%'
+                        OR LOWER(COALESCE(k.mime_type, '')) LIKE '%csv%'
+                        OR LOWER(COALESCE(k.name, '')) ~ '\.(xls|xlsx|csv)$'
+                    )
+                </when>
+                <when test="query.fileType == 'presentation'">
+                    AND (
+                        LOWER(COALESCE(k.mime_type, '')) LIKE '%powerpoint%'
+                        OR LOWER(COALESCE(k.mime_type, '')) LIKE '%presentation%'
+                        OR LOWER(COALESCE(k.name, '')) ~ '\.(ppt|pptx)$'
+                    )
+                </when>
+                <when test="query.fileType == 'pdf'">
+                    AND (
+                        LOWER(COALESCE(k.mime_type, '')) LIKE '%pdf%'
+                        OR LOWER(COALESCE(k.name, '')) LIKE '%.pdf'
+                    )
+                </when>
+                <when test="query.fileType == 'audio'">
+                    AND (
+                        LOWER(COALESCE(k.mime_type, '')) LIKE 'audio/%'
+                        OR LOWER(COALESCE(k.name, '')) ~ '\.(mp3|wav|m4a|aac|ogg|oga|opus|flac|weba)$'
+                    )
+                </when>
+                <when test="query.fileType == 'video'">
+                    AND (
+                        LOWER(COALESCE(k.mime_type, '')) LIKE 'video/%'
+                        OR LOWER(COALESCE(k.name, '')) ~ '\.(mp4|webm|mov|m4v|avi|mkv|ogv|3gp)$'
+                    )
+                </when>
+                <otherwise>
+                    AND 1 = 0
+                </otherwise>
+            </choose>
+        </if>
         <if test="query.customerId != null">
             AND k.customer_id = #{query.customerId}
         </if>

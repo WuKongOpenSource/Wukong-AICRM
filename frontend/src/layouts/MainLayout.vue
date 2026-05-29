@@ -64,7 +64,13 @@
             aria-hidden="true"
           >
             <span class="size-7 shrink-0 overflow-hidden rounded-lg border border-[#ececec] bg-transparent">
-              <img :src="defaultLogoImg" class="h-full w-full object-cover" alt="logo" />
+              <img
+                v-if="enterpriseStore.hasLogo"
+                :src="enterpriseStore.logoUrl!"
+                class="h-full w-full object-cover"
+                alt="logo"
+              />
+              <img v-else :src="defaultLogoImg" class="h-full w-full object-cover" alt="logo" />
             </span>
           </span>
           <span
@@ -163,7 +169,7 @@
             <div class="space-y-1 pt-0">
               <button
                 type="button"
-                class="group flex shrink-0 items-center gap-1 rounded-lg pb-0 pl-3 pr-1 text-left transition-colors mt-[12px] mb-[0px]"
+                class="group flex shrink-0 items-center gap-1 rounded-lg pl-3 pr-1 text-left transition-colors mt-[12px] mb-[0px] w-full py-[6px]"
                 :title="recentChatSessionsExpanded ? '收起最近对话' : '展开最近对话'"
                 :aria-expanded="recentChatSessionsExpanded"
                 aria-controls="recent-chat-sessions-panel"
@@ -1340,9 +1346,35 @@ const PRIMARY_SIDEBAR_WIDTH_EXPANDED_PX = 256
 const PRIMARY_SIDEBAR_WIDTH_COLLAPSED_PX = 52
 const PRIMARY_SIDEBAR_WIDTH_DELTA_PX = PRIMARY_SIDEBAR_WIDTH_EXPANDED_PX - PRIMARY_SIDEBAR_WIDTH_COLLAPSED_PX
 const PRIMARY_SIDEBAR_TRANSITION_MS = 200
+const SIDEBAR_STORAGE_KEYS = {
+  primaryCollapsed: 'wk_ai_crm:main_layout:primary_sidebar_collapsed:v1',
+  recentChatExpanded: 'wk_ai_crm:main_layout:recent_chat_sessions_expanded:v1',
+  sidebarCustomersExpanded: 'wk_ai_crm:main_layout:sidebar_customers_expanded:v1'
+} as const
 
 function mainContentWidthAsIfSidebarExpanded(sidebarCollapsed: boolean, mainColumnWidth: number) {
   return sidebarCollapsed ? mainColumnWidth - PRIMARY_SIDEBAR_WIDTH_DELTA_PX : mainColumnWidth
+}
+
+function readStoredBoolean(key: string, fallback: boolean): boolean {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (raw === '1') return true
+    if (raw === '0') return false
+  } catch {
+    // Ignore storage failures.
+  }
+  return fallback
+}
+
+function writeStoredBoolean(key: string, value: boolean) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(key, value ? '1' : '0')
+  } catch {
+    // Ignore storage failures.
+  }
 }
 
 const mainContentColumnRef = ref<HTMLElement | null>(null)
@@ -1380,8 +1412,8 @@ const mobileSessionLongPressStart = ref<SwipePoint | null>(null)
 const mobileSessionLongPressConsumed = ref(false)
 let mobileSessionLongPressTimer: ReturnType<typeof setTimeout> | null = null
 /** PC：一级侧栏收起为图标栏 */
-const primarySidebarCollapsed = ref(false)
-const primarySidebarContentCollapsed = ref(false)
+const primarySidebarCollapsed = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.primaryCollapsed, false))
+const primarySidebarContentCollapsed = ref(primarySidebarCollapsed.value)
 const primarySidebarTransitioning = ref(false)
 let primarySidebarTransitionTimer: ReturnType<typeof setTimeout> | null = null
 /** 一级侧栏收起时：鼠标在整块 aside 内则顶栏 logo 区显示为折叠图标 */
@@ -1550,9 +1582,9 @@ async function restorePrimaryNavScrollTop(scrollTop: number) {
   el.scrollTop = Math.min(scrollTop, maxScrollTop)
 }
 /** PC 侧栏「最近」对话列表折叠 */
-const recentChatSessionsExpanded = ref(true)
+const recentChatSessionsExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.recentChatExpanded, true))
 const recentHistoryKeyword = ref('')
-const sidebarCustomersExpanded = ref(true)
+const sidebarCustomersExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarCustomersExpanded, true))
 const sidebarCustomerKeyword = ref('')
 const recentChatSessionsMoreVisible = ref(false)
 const RECENT_CHAT_SESSION_LIMIT = 5
@@ -1654,7 +1686,7 @@ function handleChatComposerNarrowChange(payload?: ChatComposerNarrowPayload) {
   }
 }
 
-const showSidebarCustomers = computed(() => userStore.hasPermission('customer'))
+const showSidebarCustomers = computed(() => userStore.hasPermission('customer:view'))
 
 watch(showSidebarCustomers, visible => {
   if (visible && sidebarCustomers.value.length === 0) {
@@ -1697,13 +1729,14 @@ type SecondaryNavItem = {
 const allMainNavItems: MainNavItem[] = [
   { key: 'chat', icon: 'ai', label: 'AI 助手', route: '/chat', permission: 'chat', groupTitle: 'AI 助手' },
   { key: 'knowledge', icon: 'knowledge-1', label: '知识库', route: '/knowledge', permission: 'knowledge' },
-  { key: 'customer-search', icon: 'search', label: '搜索客户', route: '', permission: 'customer', action: 'customerSearch' },
+  { key: 'customer-search', icon: 'search', label: '搜索客户', route: '', permission: 'customer:view', action: 'customerSearch' },
   { key: 'task', icon: 'task-1', label: '任务', route: '/task', permission: 'task' },
   { key: 'calendar', icon: 'event', label: '日程', route: '/calendar', permission: 'schedule' },
 ]
 
 const allConfigNavItems: ConfigNavItem[] = [
-  { icon: 'import', label: '数据同步', route: '/sync', permission: ['config'] },
+  // 暂时隐藏数据同步入口，功能页面与路由先保留便于后续恢复。
+  // { icon: 'import', label: '数据同步', route: '/sync', permission: ['config'] },
   // { icon: 'set', label: '系统设置', route: '/settings', permission: ['user', 'role', 'config', 'dept', 'customField'] },
   { icon: 'set', label: '系统设置', route: '/settings/team', permission: ['user', 'role', 'config', 'dept', 'customField'], query: { scope: 'profile' } },
 ]
@@ -1867,8 +1900,23 @@ watch(
 
 watch(showUserMenu, open => {
   if (open && !isMobile.value && primarySidebarCollapsed.value) {
-    primarySidebarCollapsed.value = false
+    runLayoutNarrowProgrammatic(() => {
+      primarySidebarCollapsed.value = false
+    })
   }
+})
+
+watch(primarySidebarCollapsed, collapsed => {
+  if (layoutNarrowProgrammatic.value) return
+  writeStoredBoolean(SIDEBAR_STORAGE_KEYS.primaryCollapsed, collapsed)
+})
+
+watch(recentChatSessionsExpanded, expanded => {
+  writeStoredBoolean(SIDEBAR_STORAGE_KEYS.recentChatExpanded, expanded)
+})
+
+watch(sidebarCustomersExpanded, expanded => {
+  writeStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarCustomersExpanded, expanded)
 })
 
 watch(primarySidebarCollapsed, collapsed => {
@@ -2219,6 +2267,7 @@ async function fetchSidebarCustomers(options: { reset?: boolean; preserveScroll?
     sidebarCustomersHasMore.value = nextCustomers.length > 0 && sidebarCustomers.value.length < sidebarCustomersTotal.value
   } catch (error) {
     console.error('Load sidebar customers failed:', error)
+    sidebarCustomersHasMore.value = false
     if (page === 1) {
       sidebarCustomers.value = []
     }
@@ -2234,9 +2283,18 @@ async function fetchSidebarCustomers(options: { reset?: boolean; preserveScroll?
   }
 }
 
-const groupedHistoryChatSessions = computed(() => groupSessionsByTime(filteredHistorySessions.value))
+const pinnedHistorySessions = computed(() =>
+  filteredHistorySessions.value.filter(session => Boolean(session.pinned))
+)
+
+const unpinnedHistorySessions = computed(() =>
+  filteredHistorySessions.value.filter(session => !session.pinned)
+)
+
+const groupedHistoryChatSessions = computed(() => groupSessionsByTime(unpinnedHistorySessions.value))
 
 const historySessionGroups = computed(() => [
+  { key: 'pinned', label: '置顶', sessions: pinnedHistorySessions.value },
   { key: 'today', label: '今天', sessions: groupedHistoryChatSessions.value.today },
   { key: 'yesterday', label: '昨天', sessions: groupedHistoryChatSessions.value.yesterday },
   { key: 'earlier', label: '更早', sessions: groupedHistoryChatSessions.value.earlier },
@@ -2317,6 +2375,7 @@ function openMobileCustomerSearchDialog() {
 }
 
 function openCustomerSearchDialog() {
+  if (!showSidebarCustomers.value) return
   const focusRequestId = ++customerSearchFocusRequestId
   selectedPrimaryKey.value = ''
   showUserMenu.value = false
@@ -2418,8 +2477,15 @@ async function handleDeleteSession(sessionId: string) {
   }
 }
 
-function handlePinChatSession(_session: ChatSession) {
-  // Reserved for the future pin-session API.
+async function handlePinChatSession(session: ChatSession) {
+  const nextPinned = !Boolean(session.pinned)
+  try {
+    await chatStore.setSessionPinned(session.sessionId, nextPinned)
+    ElMessage.success(nextPinned ? '已置顶' : '已取消置顶')
+  } catch (error) {
+    console.error('Pin chat session failed:', error)
+    ElMessage.error(nextPinned ? '置顶失败' : '取消置顶失败')
+  }
 }
 
 async function handleShareChatSession(session: ChatSession) {
@@ -2661,7 +2727,7 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
 
 .wk-primary-sidebar {
   border-color: var(--wk-border-subtle) !important;
-  background: linear-gradient(180deg, #fffefa 0%, var(--wk-bg-sidebar) 100%) !important;
+  background: linear-gradient(180deg, var(--wk-bg-surface) 0%, var(--wk-bg-sidebar) 100%) !important;
   color: var(--wk-text-primary);
 }
 
@@ -2707,7 +2773,7 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
 
 .wk-primary-sidebar :deep(input:focus) {
   border-color: var(--wk-border-muted) !important;
-  background-color: #fffefa !important;
+  background-color: var(--wk-bg-surface) !important;
 }
 
 .drawer-overlay-enter-active,

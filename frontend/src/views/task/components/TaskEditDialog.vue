@@ -244,9 +244,11 @@ const props = withDefaults(defineProps<{
   modelValue: boolean
   editingTask?: Task | null
   defaultCustomer?: DefaultCustomer
+  refreshStoreAfterSave?: boolean
 }>(), {
   editingTask: null,
-  defaultCustomer: null
+  defaultCustomer: null,
+  refreshStoreAfterSave: true
 })
 
 const emit = defineEmits<{
@@ -463,12 +465,18 @@ async function handleSubmit() {
         ...submitData,
         taskId: props.editingTask.taskId,
         status: formData.status
+      }, {
+        refreshList: props.refreshStoreAfterSave,
+        refreshMyTasks: props.refreshStoreAfterSave
       })
       ElMessage.success('更新成功')
       open.value = false
       emit('saved', { mode: 'edit', taskId: props.editingTask.taskId })
     } else {
-      const taskId = await taskStore.createTask(submitData)
+      const taskId = await taskStore.createTask(submitData, {
+        refreshList: props.refreshStoreAfterSave,
+        refreshMyTasks: props.refreshStoreAfterSave
+      })
       ElMessage.success('创建成功')
       open.value = false
       emit('saved', { mode: 'create', taskId })

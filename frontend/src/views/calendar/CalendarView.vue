@@ -47,7 +47,7 @@
                 <span class="material-symbols-outlined text-[20px]">chevron_right</span>
               </button>
             </div>
-            <div class="flex min-w-0 items-center rounded-lg border border-slate-200 bg-slate-50 p-1">
+            <div class="flex min-w-0 items-center rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1">
               <button
                 v-for="mode in viewModes"
                 :key="mode.value"
@@ -55,7 +55,7 @@
                 @click="viewMode = mode.value"
                 class="min-w-0 flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors sm:flex-none sm:px-5"
                 :class="viewMode === mode.value
-                  ? 'bg-white text-primary'
+                  ? 'bg-[var(--wk-bg-surface-hover)] text-primary'
                   : 'text-slate-600 hover:text-slate-900'"
               >{{ mode.label }}</button>
             </div>
@@ -72,26 +72,29 @@
 
         <!-- Calendar Views -->
         <div
-          class="shrink-0 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm relative"
-          :class="viewMode === 'grid'
-            ? 'min-h-0 flex flex-col sm:flex-1'
-            : viewMode === 'month'
+          class="shrink-0 bg-white border rounded-2xl overflow-hidden shadow-sm relative"
+          :class="[
+            viewMode === 'month' ? 'border-[var(--wk-input-border)]' : 'border-[var(--wk-border-subtle)]',
+            viewMode === 'grid'
               ? 'min-h-0 flex flex-col sm:flex-1'
-              : 'shrink-0'"
+              : viewMode === 'month'
+                ? 'min-h-0 flex flex-col sm:flex-1'
+                : 'shrink-0'
+          ]"
         >
           <Transition name="wk-cal-view" mode="out-in">
           <!-- Week View -->
           <div
             v-if="viewMode === 'grid'"
             key="grid"
-            class="grid h-[124px] grid-cols-7 divide-x divide-slate-200 sm:h-auto sm:min-h-[400px] sm:flex-1"
+            class="grid h-[124px] grid-cols-7 divide-x divide-[var(--wk-border-subtle)] sm:h-auto sm:min-h-[400px] sm:flex-1"
           >
             <div
               v-for="day in weekDays"
               :key="day.label"
               class="flex flex-col bg-white"
             >
-              <div class="flex flex-col items-center justify-center gap-1 border-b border-slate-100 p-1.5 sm:flex-row sm:justify-between sm:p-5">
+              <div class="flex flex-col items-center justify-center gap-1 border-b border-[var(--wk-border-subtle)] p-1.5 sm:flex-row sm:justify-between sm:p-5">
                 <div class="flex flex-col items-center sm:items-start">
                   <span class="text-[10px] font-medium sm:text-sm" :class="day.isToday ? 'text-primary' : 'text-slate-400'">
                     {{ day.label }}
@@ -138,7 +141,7 @@
                     </div>
                   </div>
                   <!-- Tasks -->
-                  <div v-if="getTasksForDate(day.fullDate).length > 0" class="space-y-2 pt-2 border-t border-slate-100">
+                  <div v-if="getTasksForDate(day.fullDate).length > 0" class="space-y-2">
                     <div
                       v-for="task in getTasksForDate(day.fullDate)"
                       :key="task.taskId"
@@ -178,7 +181,7 @@
 
           <!-- Month View -->
           <div v-else-if="viewMode === 'month'" key="month" class="flex flex-col sm:min-h-[560px] sm:flex-1">
-            <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
+            <div class="grid grid-cols-7 border-b border-[var(--wk-input-border)] bg-[var(--wk-input-bg)]">
               <div
                 v-for="dayLabel in ['周一','周二','周三','周四','周五','周六','周日']"
                 :key="dayLabel"
@@ -187,7 +190,7 @@
                 {{ dayLabel }}
               </div>
             </div>
-            <div class="grid grid-cols-7 grid-rows-5 divide-x divide-y divide-slate-100 h-[400px] sm:flex-1 sm:h-auto">
+            <div class="grid grid-cols-7 grid-rows-5 divide-x divide-y divide-[var(--wk-input-border)] h-[400px] sm:flex-1 sm:h-auto">
               <div
                 v-for="(cell, i) in monthCells"
                 :key="i"
@@ -282,11 +285,11 @@
                   <span class="text-xs font-normal text-slate-400 ml-2">农历 {{ group.lunar }}</span>
                 </h3>
 
-                <div class="space-y-4 ml-4 border-l-2 border-slate-100 pl-6">
+                <div class="space-y-4 ml-4 border-l-2 border-[var(--wk-border-subtle)] pl-6">
                   <div
                     v-for="item in group.items"
                     :key="item.key"
-                    class="relative bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-all group"
+                    class="relative bg-white border border-[var(--wk-border-subtle)] rounded-xl p-4 hover:shadow-md transition-all group"
                     :class="item.kind === 'schedule' ? 'cursor-pointer' : ''"
                     @click="item.kind === 'schedule' ? (selectedEvent = item.payload, selectedTask = null) : selectTask(item.payload)"
                   >
@@ -361,7 +364,7 @@
         <!-- Mobile Day Detail List (append below calendar views) -->
         <div
           v-if="showMobileInlineDayList"
-          class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:max-h-[60vh] sm:overflow-y-auto"
+          class="rounded-2xl border border-[var(--wk-border-subtle)] bg-white p-6 shadow-sm sm:max-h-[60vh] sm:overflow-y-auto"
         >
           <div class="max-w-3xl mx-auto space-y-8">
             <!-- <div class="flex items-center justify-between gap-3">
@@ -390,11 +393,11 @@
                 <span class="text-xs font-normal text-slate-400 ml-2">农历 {{ group.lunar }}</span>
               </h3>
 
-              <div class="space-y-4 ml-4 border-l-2 border-slate-100 pl-6">
+              <div class="space-y-4 ml-4 border-l-2 border-[var(--wk-border-subtle)] pl-6">
                 <div
                   v-for="item in group.items"
                   :key="item.key"
-                  class="relative bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-all group"
+                  class="relative bg-white border border-[var(--wk-border-subtle)] rounded-xl p-4 hover:shadow-md transition-all group"
                   :class="item.kind === 'schedule' ? 'cursor-pointer' : ''"
                   @click="item.kind === 'schedule' ? (selectedEvent = item.payload, selectedTask = null) : selectTask(item.payload)"
                 >

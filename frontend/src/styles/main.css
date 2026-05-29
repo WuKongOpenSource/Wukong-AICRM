@@ -85,16 +85,17 @@ html, body, #app {
 html.dark {
   --wk-primary-rgb: 91 165 242;
   --wk-primary: rgb(var(--wk-primary-rgb));
-  --wk-bg-page-rgb: 12 18 27;
+  --wk-bg-page-rgb: 14 16 20;
   --wk-bg-page: rgb(var(--wk-bg-page-rgb));
-  --wk-bg-surface: #111827;
-  --wk-bg-surface-subtle: #172033;
-  --wk-bg-surface-muted: #1f2937;
-  --wk-bg-surface-hover: #1b2638;
-  --wk-bg-surface-active: #22304a;
-  --wk-border-subtle: #263244;
-  --wk-border-muted: #334155;
-  --wk-border-strong: #475569;
+  --wk-bg-sidebar: #121418;
+  --wk-bg-surface: #171a20;
+  --wk-bg-surface-subtle: #1d222a;
+  --wk-bg-surface-muted: #252b35;
+  --wk-bg-surface-hover: #222832;
+  --wk-bg-surface-active: #2a3340;
+  --wk-border-subtle: #2a3039;
+  --wk-border-muted: #3a4350;
+  --wk-border-strong: #566170;
   --wk-text-primary: #f8fafc;
   --wk-text-secondary: #cbd5e1;
   --wk-text-muted: #94a3b8;
@@ -483,13 +484,29 @@ html.dark [class~="bg-[#ffffff]"] {
 }
 
 html.dark .bg-background-light,
+html.dark .bg-blue-50,
+html.dark .bg-emerald-50,
+html.dark .bg-amber-50,
+html.dark .bg-rose-50,
+html.dark .bg-red-50,
+html.dark .bg-sky-50,
 html.dark .bg-slate-50,
 html.dark .bg-slate-50\/30,
 html.dark .bg-slate-50\/50,
 html.dark .bg-slate-100,
+html.dark .bg-slate-200,
+html.dark [class~="bg-[#fbf7f4]"],
+html.dark [class~="bg-[#f7eee8]"],
+html.dark [class~="bg-[#f7faf4]"],
+html.dark [class~="bg-[#eef4e8]"],
+html.dark [class~="bg-[#f4f1ed]"],
+html.dark [class~="bg-[#eef1ea]"],
+html.dark [class~="bg-[#f4e9e2]"],
+html.dark [class~="bg-[#e8efdf]"],
 html.dark [class~="bg-[#e5e5e5]"],
 html.dark [class~="bg-[#d4d4d4]"],
 html.dark [class~="bg-[#f8fafc]"],
+html.dark [class~="bg-[#f8fbff]"],
 html.dark [class~="bg-[#f7f7f7]"],
 html.dark [class~="bg-[#f6f7f8]"],
 html.dark [class~="bg-[#f5f5f5]"],
@@ -502,6 +519,7 @@ html.dark [class~="bg-[#0d0d0d0d]"] {
 
 html.dark [class~="bg-[#f9f9f9]"],
 html.dark [class~="bg-[#f3f3f3]"],
+html.dark [class~="bg-[#f0f3ff]"],
 html.dark [class~="bg-[#efefef]"],
 html.dark [class~="bg-[#ececec]"],
 html.dark [class~="bg-[#e6e6e6]"] {
@@ -512,8 +530,11 @@ html.dark .hover\:bg-white:hover,
 html.dark .hover\:bg-slate-50:hover,
 html.dark .hover\:bg-slate-100:hover,
 html.dark .hover\:bg-slate-100\/50:hover,
+html.dark .hover\:bg-slate-200:hover,
 html.dark [class~="hover:bg-[#f9f9f9]"]:hover,
 html.dark [class~="hover:bg-[#f7f7f7]"]:hover,
+html.dark [class~="hover:bg-[#f7eee8]"]:hover,
+html.dark [class~="hover:bg-[#eef4e8]"]:hover,
 html.dark [class~="hover:bg-[#F1F1F1]"]:hover,
 html.dark [class~="hover:bg-[#f1f1f1]"]:hover,
 html.dark [class~="hover:bg-[#efefef]"]:hover,
@@ -526,6 +547,8 @@ html.dark [class~="hover:bg-[#d4d4d4]"]:hover {
 html.dark .text-slate-900,
 html.dark .text-slate-800,
 html.dark [class~="text-[#0d0d0d]"],
+html.dark [class~="text-[#171717]"],
+html.dark [class~="text-[#2c313a]"],
 html.dark [class~="text-[#051a3e]"],
 html.dark [class~="text-[#0f172a]"] {
   color: var(--wk-text-primary) !important;
@@ -535,7 +558,12 @@ html.dark .text-slate-700,
 html.dark .text-slate-600,
 html.dark [class~="text-[#334155]"],
 html.dark [class~="text-[#475569]"],
-html.dark [class~="text-[#5d5d5d]"] {
+html.dark [class~="text-[#5d5d5d]"],
+html.dark [class~="text-[#4f5665]"],
+html.dark [class~="text-[#4b5563]"],
+html.dark [class~="text-[#646a73]"],
+html.dark [class~="text-[#8d4f34]"],
+html.dark [class~="text-[#5f704a]"] {
   color: var(--wk-text-secondary) !important;
 }
 
@@ -544,14 +572,27 @@ html.dark .text-slate-400,
 html.dark .text-slate-300,
 html.dark [class~="text-[#8f8f8f]"],
 html.dark [class~="text-[#909090]"],
+html.dark [class~="text-[#8d939f]"],
+html.dark [class~="text-[#a2a8b3]"],
 html.dark [class~="text-[#b4b4b4]"],
+html.dark [class~="text-[#c2c7d0]"],
 html.dark [class~="text-[#c9c9c9]"] {
   color: var(--wk-text-muted) !important;
+}
+
+html.dark [class~="text-[#0557d8]"],
+html.dark [class~="text-[#075cdf]"],
+html.dark [class~="text-[#0b5edb]"] {
+  color: var(--wk-primary) !important;
 }
 
 html.dark .border-slate-100,
 html.dark .border-slate-200,
 html.dark .border-slate-300,
+html.dark [class~="border-[#ead8cc]"],
+html.dark [class~="border-[#dec4b5]"],
+html.dark [class~="border-[#dce5d2]"],
+html.dark [class~="border-[#cddabc]"],
 html.dark [class~="border-[#ececec]"],
 html.dark [class~="border-[#e5e5e5]"],
 html.dark [class~="border-[#0d0d0d0d]"],

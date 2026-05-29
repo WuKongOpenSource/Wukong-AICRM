@@ -3,6 +3,8 @@ package com.kakarote.ai_crm.entity.VO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import com.kakarote.ai_crm.entity.BO.CustomerFieldFilterBO;
+
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
@@ -67,6 +69,9 @@ public class CustomerAiSearchQueryVO {
 
     @Schema(description = "联系人数量上限")
     private Integer contactCountMax;
+
+    @Schema(description = "通用字段筛选条件")
+    private List<CustomerFieldFilterBO> filters;
 
     @Schema(description = "排序字段")
     private String sortBy;

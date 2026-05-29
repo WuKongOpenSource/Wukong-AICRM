@@ -28,6 +28,13 @@ export function deleteSession(id: string): Promise<void> {
 }
 
 /**
+ * Pin or unpin session
+ */
+export function setSessionPinned(id: string, pinned: boolean): Promise<void> {
+  return post(`/chat/session/pin/${id}`, { pinned })
+}
+
+/**
  * Get message list
  */
 export function getMessageList(sessionId: string): Promise<ChatMessage[]> {

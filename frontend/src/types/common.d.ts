@@ -8,6 +8,7 @@ export interface Task {
   priority: TaskPriority
   status: TaskStatus
   dueDate?: string
+  overdue?: boolean
   assignedTo?: string
   assignedToName?: string
   taskType?: string
@@ -80,6 +81,7 @@ export interface Knowledge {
 }
 
 export type KnowledgeType = 'MEETING' | 'EMAIL' | 'RECORDING' | 'DOCUMENT' | 'PROPOSAL' | 'CONTRACT'
+export type KnowledgeFileType = 'image' | 'document' | 'spreadsheet' | 'presentation' | 'pdf' | 'audio' | 'video'
 
 export interface KnowledgeAddBO {
   name: string
@@ -91,6 +93,7 @@ export interface KnowledgeAddBO {
 export interface KnowledgeQueryBO {
   keyword?: string
   type?: KnowledgeType
+  fileType?: KnowledgeFileType
   customerId?: string
   page?: number
   limit?: number
@@ -185,6 +188,8 @@ export interface ChatSession {
   customerId?: string
   customerName?: string
   customerLogoUrl?: string
+  pinned?: boolean
+  pinnedTime?: string
   createTime: string
   updateTime: string
 }

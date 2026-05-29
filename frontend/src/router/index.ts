@@ -41,13 +41,13 @@ const routes: RouteRecordRaw[] = [
         path: 'customer',
         name: 'CustomerList',
         component: () => import('@/views/customer/CustomerListView.vue'),
-        meta: { title: '客户管理', icon: 'group', permission: 'customer' }
+        meta: { title: '客户管理', icon: 'group', permission: 'customer:view' }
       },
       {
         path: 'customer/:id',
         name: 'CustomerDetail',
         component: () => import('@/views/customer/CustomerDetailView.vue'),
-        meta: { title: '客户详情', hidden: true, permission: 'customer' }
+        meta: { title: '客户详情', hidden: true, permission: 'customer:view' }
       },
       {
         path: 'task',

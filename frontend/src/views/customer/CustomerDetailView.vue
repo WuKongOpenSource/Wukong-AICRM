@@ -923,7 +923,7 @@
                         <span
                           class="min-w-0 truncate text-xs font-medium tracking-tight"
                           :class="contact.wechat ? 'text-slate-700' : 'text-slate-400'"
-                        >{{ contact.wechat ? `WeChat: ${contact.wechat}` : '-' }}</span>
+                        >{{ contact.wechat ? `${contact.wechat}` : '-' }}</span>
                       </div>
                     </div>
                   </div>
@@ -1035,7 +1035,7 @@
                     </div>
                   </div>
                 </div>
-                <div v-else-if="!customer.tasks?.length" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
+                <div v-else-if="customerTasks.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
                   <span class="material-symbols-outlined text-2xl leading-none text-slate-400">task_alt</span>
                   <p class="mt-2 text-xs font-medium text-slate-400">暂无待办任务</p>
                 </div>
@@ -1044,7 +1044,7 @@
                   :class="embedded ? 'space-y-3' : 'ml-3 space-y-3 border-l-2 border-slate-100 pl-5'"
                 >
                   <div
-                    v-for="task in customer.tasks?.slice(0, 5)"
+                    v-for="task in customerTasks"
                     :key="task.taskId"
                     class="group relative cursor-pointer rounded-xl border border-slate-200 bg-white p-3 transition-all hover:shadow-md"
                     :class="selectedCustomerTask?.taskId === task.taskId ? 'border-primary ring-1 ring-primary/20' : ''"
@@ -1419,52 +1419,6 @@
       @success="handleEditSuccess"
     />
 
-    <el-dialog
-      v-model="showAiReportDialog"
-      title="AI 分析报告"
-      :width="isMobile ? 'calc(100% - 40px)' : '680px'"
-      class="wk-dialog--flush"
-      destroy-on-close
-    >
-      <div
-        class="space-y-4"
-        :class="isMobile ? 'max-h-[calc(100vh-10rem)] overflow-y-auto pb-[env(safe-area-inset-bottom)]' : ''"
-      >
-        <section class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
-          <p class="text-xs font-bold uppercase tracking-wider text-slate-500">AI 状态探测</p>
-          <div class="mt-3">
-            <span
-              v-if="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)"
-              class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold shadow-sm"
-              :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.badgeClass"
-            >
-              <span class="size-2 rounded-full mr-1.5" :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.dotClass"></span>
-              {{ getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.label }}
-            </span>
-            <p v-else class="text-sm leading-6 text-slate-700">{{ latestAiReport?.aiStatusDetection || customer?.aiStatusDetection || '暂无 AI 状态探测' }}</p>
-          </div>
-        </section>
-        <section class="rounded-xl border border-slate-200 bg-white px-4 py-4">
-          <p class="text-xs font-bold uppercase tracking-wider text-slate-500">AI 深度分析</p>
-          <ul v-if="aiReportDialogDeepInsightSegments.length" class="mt-2 space-y-1.5">
-            <li
-              v-for="(segment, index) in aiReportDialogDeepInsightSegments"
-              :key="`${segment}-${index}`"
-              class="flex items-start gap-2 text-sm leading-6 text-slate-700"
-            >
-              <span class="mt-2 size-1 shrink-0 rounded-full bg-slate-500"></span>
-              <span class="min-w-0 break-words">{{ segment }}</span>
-            </li>
-          </ul>
-          <p v-else class="mt-2 text-sm leading-6 text-slate-700">暂无 AI 深度分析</p>
-          <div v-if="currentAiNextStep" class="mt-4 border-t border-slate-100 pt-4">
-            <p class="text-xs font-bold uppercase tracking-wider text-slate-500">建议下一步行动</p>
-            <p class="mt-2 whitespace-pre-line break-words text-sm leading-6 text-slate-700">{{ currentAiNextStep }}</p>
-          </div>
-        </section>
-      </div>
-    </el-dialog>
-
     <!-- AI Follow-up Drawer -->
     <AiFollowUpDrawer
       v-model="showAiFollowUpDrawer"
@@ -1479,13 +1433,14 @@
       :can-edit="canCreateTasks"
       :can-toggle-complete="canToggleTasks"
       @edit="handleCustomerTaskEditFromDetail"
-      @mutated="refreshCustomerAfterTaskMutation"
+      @mutated="refreshCustomerTaskArea"
     />
 
     <TaskEditDialog
       v-model="showTaskEditDialog"
       :editing-task="editingCustomerTask"
       :default-customer="taskDefaultCustomer"
+      :refresh-store-after-save="false"
       @saved="handleTaskDialogSaved"
     />
 
@@ -1529,7 +1484,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Knowledge, Task, TaskStatus } from '@/types/common'
 import type { Contact, CustomerAiReportVO, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpAttachment, FollowUpTask, FollowUpUpdateBO } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
-import { compactCustomerAiInsight, getCustomerAiStatusMeta } from '@/utils/customerAi'
+import { compactCustomerAiInsight } from '@/utils/customerAi'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
 import FollowUpUpsertDialog from '@/components/customer/FollowUpUpsertDialog.vue'
 import type { FollowUpUpsertSubmitPayload } from '@/components/customer/FollowUpUpsertDialog.vue'
@@ -1576,9 +1531,12 @@ const emit = defineEmits<{
   (e: 'quote-attachment', value: { followUp: FollowUp; attachment: FollowUpAttachment }): void
 }>()
 
+type CustomerDetailRefreshModule = 'contacts' | 'followUps' | 'tasks' | 'schedules'
+
 type CustomerDetailRefreshPayload = {
   customerId?: string | number
   source?: string
+  modules?: CustomerDetailRefreshModule[]
 }
 
 const activeCustomerId = computed(() => props.customerId || String(route.params.id || ''))
@@ -1586,6 +1544,7 @@ const embedded = computed(() => props.embedded)
 const isMobile = computed(() => props.forceMobile || responsiveIsMobile.value)
 const isEmbeddedMobileLayout = computed(() => props.embedded && props.forceMobile)
 const hideEmbeddedFollowUpAction = computed(() => props.hideEmbeddedFollowUpAction)
+const CUSTOMER_DETAIL_REQUEST_LIMIT = 100
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -1600,7 +1559,6 @@ const contactAiImagePickerToken = ref(0)
 const showEditDialog = ref(false)
 const showBasicInfoDrawer = ref(false)
 const showAiFollowUpDrawer = ref(false)
-const showAiReportDialog = ref(false)
 const showTerminalStageMenu = ref(false)
 const showTransferPopover = ref(false)
 const headerMoreButtonRef = ref<HTMLElement | null>(null)
@@ -1609,7 +1567,7 @@ const newTagName = ref('')
 const followUps = ref<FollowUp[]>([])
 const followUpTotal = ref(0)
 const followUpPage = ref(1)
-const followUpPageSize = ref(5)
+const followUpPageSize = computed(() => CUSTOMER_DETAIL_REQUEST_LIMIT)
 const followUpLoading = ref(false)
 const aiAnalysisExpanded = ref(true)
 const followUpTimelineExpanded = ref(true)
@@ -1621,13 +1579,14 @@ const selectedFollowUpType = ref('')
 const contacts = ref<Contact[]>([])
 const contactTotal = ref(0)
 const contactPage = ref(1)
-const contactPageSize = ref(5)
+const contactPageSize = computed(() => CUSTOMER_DETAIL_REQUEST_LIMIT)
 const contactLoading = ref(false)
+const customerTasks = ref<Task[]>([])
 const taskLoading = ref(false)
 const customerSchedules = ref<ScheduleVO[]>([])
 const scheduleTotal = ref(0)
 const schedulePage = ref(1)
-const schedulePageSize = ref(5)
+const schedulePageSize = computed(() => CUSTOMER_DETAIL_REQUEST_LIMIT)
 const scheduleLoading = ref(false)
 const customerKnowledgeList = ref<Knowledge[]>([])
 
@@ -1745,10 +1704,6 @@ type SectionIconKey = keyof typeof sectionIconBgColors
 
 function getSectionIconStyle(key: SectionIconKey): { backgroundColor: string } {
   return { backgroundColor: sectionIconBgColors[key] }
-}
-
-function getAiStatusMeta(value: string | undefined | null) {
-  return getCustomerAiStatusMeta(value)
 }
 
 function isPrimaryContact(contact?: Pick<Contact, 'isPrimary'> | null): boolean {
@@ -1875,15 +1830,12 @@ const showFollowUpTimelineToggle = computed(() => followUpLoading.value || follo
 const isFollowUpTimelineVisible = computed(() => followUpTimelineExpanded.value || !showFollowUpTimelineToggle.value)
 const showContactsModuleToggle = computed(() => contactLoading.value || contacts.value.length > 0)
 const isContactsModuleVisible = computed(() => contactsModuleExpanded.value || !showContactsModuleToggle.value)
-const showTasksModuleToggle = computed(() => taskLoading.value || (customer.value?.tasks?.length || 0) > 0)
+const showTasksModuleToggle = computed(() => taskLoading.value || customerTasks.value.length > 0)
 const isTasksModuleVisible = computed(() => tasksModuleExpanded.value || !showTasksModuleToggle.value)
 const showSchedulesModuleToggle = computed(() => scheduleLoading.value || customerSchedules.value.length > 0)
 const isSchedulesModuleVisible = computed(() => schedulesModuleExpanded.value || !showSchedulesModuleToggle.value)
 const showDocumentsModuleToggle = computed(() => customerKnowledgeLoading.value || customerKnowledgeList.value.length > 0)
 const isDocumentsModuleVisible = computed(() => documentsModuleExpanded.value || !showDocumentsModuleToggle.value)
-const currentAiDeepInsight = computed(() => (latestAiReport.value?.aiDeepInsight || savedAiParseResult.value?.summary || '').trim())
-const currentAiNextStep = computed(() => (latestAiReport.value?.aiNextStep || savedAiParseResult.value?.nextStep || '').trim())
-const aiReportDialogDeepInsightSegments = computed(() => splitAiInsightSegments(currentAiDeepInsight.value))
 const aiAnalysisStatus = computed(() => customer.value?.aiAnalysisStatus || '')
 const isAiAnalysisPending = computed(() => aiAnalysisStatus.value === 'pending' || aiAnalysisStatus.value === 'running')
 const isAiAnalysisFailed = computed(() => aiAnalysisStatus.value === 'failed')
@@ -1907,26 +1859,6 @@ function isSameAsListAiSummary(value?: string | null): boolean {
   const summary = String(value || '').replace(/\s+/g, ' ').trim()
   const listSummary = currentAiInsight.value.replace(/\s+/g, ' ').trim()
   return !!summary && !!listSummary && summary.length <= 90 && summary === listSummary
-}
-
-function splitAiInsightSegments(value?: string | null): string[] {
-  const normalized = String(value || '')
-    .replace(/\\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .trim()
-  if (!normalized) return []
-
-  return normalized
-    .split(/\n+/)
-    .flatMap(line => line.match(/[^。！？!?；;\n]+[。！？!?；;]?/g) || [line])
-    .map(cleanAiInsightSegment)
-    .filter(Boolean)
-}
-
-function cleanAiInsightSegment(value: string): string {
-  return value
-    .replace(/^\s*(?:[-*•·]|[0-9]+[.)、]|[一二三四五六七八九十]+[.)、]|（[一二三四五六七八九十]+）)\s*/, '')
-    .trim()
 }
 
 const aiAnalysisStatusDescription = computed(() => {
@@ -2065,12 +1997,9 @@ async function refreshCustomerDetailModules(
   options: { resetRelatedPages?: boolean } = {}
 ) {
   const resetRelatedPages = Boolean(options.resetRelatedPages)
-  taskLoading.value = true
   const fetchTasks: Promise<any>[] = [
     customerStore.fetchCustomerDetail(customerId).catch(err => {
       console.error('Failed to fetch customer detail:', err)
-    }).finally(() => {
-      taskLoading.value = false
     })
   ]
 
@@ -2086,6 +2015,12 @@ async function refreshCustomerDetailModules(
   } else {
     contacts.value = []
     contactTotal.value = 0
+  }
+
+  if (canViewTasks.value) {
+    fetchTasks.push(fetchCustomerTasks(customerId))
+  } else {
+    customerTasks.value = []
   }
 
   if (canViewKnowledge.value) {
@@ -2129,6 +2064,11 @@ function handleCustomerDetailRefresh(payload?: CustomerDetailRefreshPayload) {
   const customerId = payload?.customerId ? String(payload.customerId) : ''
   if (!customerId || customerId !== String(activeCustomerId.value)) return
 
+  if (payload?.modules?.length) {
+    void refreshCustomerScopedModules(customerId, payload.modules)
+    return
+  }
+
   void refreshCustomerDetailModules(customerId, { resetRelatedPages: true })
 }
 
@@ -2140,6 +2080,32 @@ function emitCustomerActivityRefresh(customerId?: string) {
       source: 'customer-detail-activity'
     })
   }
+}
+
+async function refreshCustomerScopedModules(
+  customerId: string,
+  modules: CustomerDetailRefreshModule[]
+) {
+  const uniqueModules = new Set(modules)
+  const requests: Promise<any>[] = []
+
+  if (uniqueModules.has('contacts')) {
+    requests.push(fetchContacts(customerId, true))
+  }
+
+  if (uniqueModules.has('followUps')) {
+    requests.push(fetchFollowUps(customerId, true))
+  }
+
+  if (uniqueModules.has('tasks')) {
+    requests.push(fetchCustomerTasks(customerId))
+  }
+
+  if (uniqueModules.has('schedules')) {
+    requests.push(fetchCustomerSchedules(customerId, true))
+  }
+
+  await Promise.all(requests)
 }
 
 let offCustomerDetailRefresh: (() => void) | null = null
@@ -2252,6 +2218,36 @@ function handleContactPageChange(page: number) {
   if (customer.value) fetchContacts(customer.value.customerId)
 }
 
+function syncSelectedCustomerTask() {
+  const selectedTaskId = selectedCustomerTask.value?.taskId
+  if (!selectedTaskId) return
+  selectedCustomerTask.value = customerTasks.value.find(task =>
+    String(task.taskId) === String(selectedTaskId)
+  ) || selectedCustomerTask.value
+}
+
+async function fetchCustomerTasks(customerId: string) {
+  if (!canViewTasks.value) {
+    customerTasks.value = []
+    return
+  }
+  taskLoading.value = true
+  try {
+    const result = await queryTaskList({
+      customerId,
+      page: 1,
+      limit: CUSTOMER_DETAIL_REQUEST_LIMIT
+    })
+    customerTasks.value = result.list || []
+  } catch (error) {
+    console.error('Failed to fetch customer tasks:', error)
+    customerTasks.value = []
+  } finally {
+    syncSelectedCustomerTask()
+    taskLoading.value = false
+  }
+}
+
 async function fetchCustomerSchedules(customerId: string, reset = false) {
   if (!canViewSchedules.value) {
     customerSchedules.value = []
@@ -2294,7 +2290,7 @@ async function fetchCustomerKnowledge(customerId: string) {
     const result = await queryKnowledgeList({
       customerId,
       page: 1,
-      limit: 8
+      limit: CUSTOMER_DETAIL_REQUEST_LIMIT
     })
     customerKnowledgeList.value = result.list || []
   } catch (error) {
@@ -2571,7 +2567,6 @@ async function handleGenerateReport() {
     latestAiReport.value = await generateCustomerAiReport(customer.value.customerId)
     await customerStore.fetchCustomerDetail(customer.value.customerId)
     appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
-    showAiReportDialog.value = true
     ElMessage.success('AI 分析报告已生成并保存')
   } catch {
     // Error handled by interceptor
@@ -2659,13 +2654,12 @@ async function handleSetPrimary(contactId: string) {
   }
 }
 
-async function refreshCustomerAfterTaskMutation() {
+async function refreshCustomerTaskArea() {
   if (!customer.value) return
-  await refreshFollowUpContext(customer.value.customerId)
-  emitCustomerActivityRefresh(customer.value.customerId)
+  await fetchCustomerTasks(customer.value.customerId)
   const id = selectedCustomerTask.value?.taskId
-  if (id && customer.value.tasks) {
-    selectedCustomerTask.value = customer.value.tasks.find((t: Task) => String(t.taskId) === String(id)) || null
+  if (id) {
+    selectedCustomerTask.value = customerTasks.value.find((t: Task) => String(t.taskId) === String(id)) || null
   }
 }
 
@@ -2696,7 +2690,7 @@ async function handleToggleCustomerTask(task: Task) {
   if (!canToggleTasks.value) return
   const newStatus: TaskStatus = task.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED'
   await taskStore.changeTaskStatus(task.taskId, newStatus)
-  await refreshCustomerAfterTaskMutation()
+  await refreshCustomerTaskArea()
 }
 
 function handleViewCustomerTask(task: Task) {
@@ -2706,7 +2700,7 @@ function handleViewCustomerTask(task: Task) {
 
 async function resolveCustomerTaskDetail(taskId: string): Promise<Task | null> {
   const normalizedTaskId = String(taskId)
-  const localTask = customer.value?.tasks?.find((task: Task) => String(task.taskId) === normalizedTaskId) || null
+  const localTask = customerTasks.value.find((task: Task) => String(task.taskId) === normalizedTaskId) || null
   if (localTask) {
     return localTask
   }
@@ -2743,7 +2737,7 @@ async function handleToggleFollowUpTask(task: FollowUpTask) {
 
   const newStatus: TaskStatus = detail.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED'
   await taskStore.changeTaskStatus(detail.taskId, newStatus)
-  await refreshCustomerAfterTaskMutation()
+  await refreshCustomerTaskArea()
   ElMessage.success(newStatus === 'COMPLETED' ? '任务已标记完成' : '任务已重新打开')
 }
 
@@ -2767,7 +2761,7 @@ function handleCustomerTaskEditFromDetail(task: Task) {
 
 async function handleTaskDialogSaved() {
   editingCustomerTask.value = null
-  await refreshCustomerAfterTaskMutation()
+  await refreshCustomerTaskArea()
 }
 
 function syncSelectedCustomerSchedule() {
@@ -2820,17 +2814,13 @@ async function resolveCustomerScheduleDetail(scheduleId: string): Promise<Schedu
 async function handleCustomerScheduleCreated() {
   if (!customer.value) return
   editingCustomerSchedule.value = null
-  await customerStore.fetchCustomerDetail(customer.value.customerId)
   await fetchCustomerSchedules(customer.value.customerId, true)
-  emitCustomerActivityRefresh(customer.value.customerId)
 }
 
 async function handleCustomerScheduleUpdated(scheduleId: string) {
   if (!customer.value) return
   editingCustomerSchedule.value = null
-  await customerStore.fetchCustomerDetail(customer.value.customerId)
   await fetchCustomerSchedules(customer.value.customerId)
-  emitCustomerActivityRefresh(customer.value.customerId)
   const updatedSchedule = await resolveCustomerScheduleDetail(scheduleId)
   if (updatedSchedule) {
     selectedCustomerSchedule.value = updatedSchedule
@@ -2839,9 +2829,7 @@ async function handleCustomerScheduleUpdated(scheduleId: string) {
 
 async function handleCustomerScheduleDeleted() {
   if (!customer.value) return
-  await customerStore.fetchCustomerDetail(customer.value.customerId)
   await fetchCustomerSchedules(customer.value.customerId)
-  emitCustomerActivityRefresh(customer.value.customerId)
   selectedCustomerSchedule.value = null
 }
 

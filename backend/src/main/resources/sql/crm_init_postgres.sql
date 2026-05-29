@@ -325,6 +325,8 @@ CREATE TABLE crm_chat_session (
     customer_id BIGINT,
     title VARCHAR(255),
     app_code VARCHAR(50) NOT NULL DEFAULT 'general',
+    pinned BOOLEAN NOT NULL DEFAULT FALSE,
+    pinned_time TIMESTAMP,
     status SMALLINT DEFAULT 1,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -335,13 +337,29 @@ CREATE INDEX idx_chat_session_user_id ON crm_chat_session (user_id);
 CREATE INDEX idx_chat_session_agent_id ON crm_chat_session (agent_id);
 CREATE INDEX idx_chat_session_customer_id ON crm_chat_session (customer_id);
 CREATE INDEX idx_chat_session_app_code ON crm_chat_session (app_code);
+CREATE INDEX idx_chat_session_user_pin ON crm_chat_session (user_id, pinned DESC, pinned_time DESC, update_time DESC);
+
+CREATE OR REPLACE FUNCTION update_chat_session_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF to_jsonb(NEW) - 'pinned' - 'pinned_time' - 'update_time'
+       IS NOT DISTINCT FROM to_jsonb(OLD) - 'pinned' - 'pinned_time' - 'update_time' THEN
+        NEW.update_time = OLD.update_time;
+    ELSE
+        NEW.update_time = CURRENT_TIMESTAMP;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_chat_session_update_time
     BEFORE UPDATE ON crm_chat_session
-    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+    FOR EACH ROW EXECUTE FUNCTION update_chat_session_timestamp();
 
 COMMENT ON TABLE crm_chat_session IS '会话表';
 COMMENT ON COLUMN crm_chat_session.status IS '状态: 0-已归档, 1-活跃';
+COMMENT ON COLUMN crm_chat_session.pinned IS 'Whether the session is pinned';
+COMMENT ON COLUMN crm_chat_session.pinned_time IS 'Last time the session was pinned';
 
 -- ============================================
 -- 12. 聊天消息表 (crm_chat_message)

@@ -1,4 +1,5 @@
-export const CHAT_ATTACHMENT_ACCEPT = 'image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.json,.xml'
+export const CHAT_ATTACHMENT_ACCEPT =
+  'image/*,audio/*,video/*,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg,.avif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.json,.xml,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.weba,.mp4,.webm,.mov,.m4v,.avi,.mkv,.ogv,.3gp'
 export const MAX_CHAT_ATTACHMENT_SIZE = 50 * 1024 * 1024
 export const MAX_CHAT_ATTACHMENT_COUNT = 5
 
@@ -12,14 +13,36 @@ const MIME_EXTENSION_MAP: Record<string, string> = {
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
   'application/xml': 'xml',
+  'audio/aac': 'aac',
+  'audio/amr': 'amr',
+  'audio/flac': 'flac',
+  'audio/mp3': 'mp3',
+  'audio/mp4': 'm4a',
+  'audio/mpeg': 'mp3',
+  'audio/ogg': 'ogg',
+  'audio/opus': 'opus',
+  'audio/wav': 'wav',
+  'audio/webm': 'weba',
+  'audio/x-wav': 'wav',
+  'image/avif': 'avif',
+  'image/bmp': 'bmp',
   'image/gif': 'gif',
   'image/jpeg': 'jpg',
   'image/png': 'png',
+  'image/svg+xml': 'svg',
   'image/webp': 'webp',
   'text/csv': 'csv',
   'text/markdown': 'md',
   'text/plain': 'txt',
-  'text/xml': 'xml'
+  'text/xml': 'xml',
+  'video/3gpp': '3gp',
+  'video/mp4': 'mp4',
+  'video/ogg': 'ogv',
+  'video/quicktime': 'mov',
+  'video/webm': 'webm',
+  'video/x-m4v': 'm4v',
+  'video/x-matroska': 'mkv',
+  'video/x-msvideo': 'avi'
 }
 
 function resolveFileExtension(file: File): string {
@@ -35,6 +58,14 @@ function resolveFileExtension(file: File): string {
     return file.type.slice('image/'.length) || 'png'
   }
 
+  if (file.type.startsWith('audio/')) {
+    return file.type.slice('audio/'.length) || 'mp3'
+  }
+
+  if (file.type.startsWith('video/')) {
+    return file.type.slice('video/'.length) || 'mp4'
+  }
+
   return 'bin'
 }
 
@@ -43,7 +74,13 @@ function normalizeChatFile(file: File): File {
     return file
   }
 
-  const prefix = file.type.startsWith('image/') ? 'clipboard-image' : 'clipboard-file'
+  const prefix = file.type.startsWith('image/')
+    ? 'clipboard-image'
+    : file.type.startsWith('audio/')
+      ? 'clipboard-audio'
+      : file.type.startsWith('video/')
+        ? 'clipboard-video'
+        : 'clipboard-file'
   const extension = resolveFileExtension(file)
 
   return new File([file], `${prefix}-${Date.now()}.${extension}`, {

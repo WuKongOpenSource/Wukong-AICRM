@@ -19,6 +19,9 @@ public class KnowledgeQueryBO extends PageEntity {
     @Schema(description = "类型")
     private String type;
 
+    @Schema(description = "文件格式: image/document/spreadsheet/presentation/pdf/audio/video")
+    private String fileType;
+
     @Schema(description = "客户ID")
     private Long customerId;
 

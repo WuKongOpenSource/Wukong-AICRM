@@ -45,7 +45,9 @@ const currentTab = computed({
 <style scoped>
 .settings-main-tabs {
   --el-tabs-header-height: auto;
-  --settings-main-tab-color: #137fec;
+  --settings-main-tab-color: var(--wk-text-primary);
+  --settings-main-tab-muted: var(--wk-text-muted);
+  --settings-main-tab-hover: var(--wk-text-secondary);
 }
 
 .settings-main-tabs :deep(.el-tabs__header) {
@@ -64,7 +66,7 @@ const currentTab = computed({
   height: auto;
   padding: 1rem 0;
   margin-right: 1rem;
-  color: rgb(148 163 184);
+  color: var(--settings-main-tab-muted);
   font-size: 0.875rem;
   font-weight: 700;
   line-height: 1.25rem;
@@ -72,7 +74,7 @@ const currentTab = computed({
 }
 
 .settings-main-tabs :deep(.el-tabs__item:hover) {
-  color: rgb(71 85 105);
+  color: var(--settings-main-tab-hover);
 }
 
 .settings-main-tabs :deep(.el-tabs__item.is-active) {

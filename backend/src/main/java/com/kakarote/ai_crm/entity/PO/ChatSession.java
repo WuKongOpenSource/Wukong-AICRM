@@ -53,6 +53,12 @@ public class ChatSession implements Serializable {
     @Schema(description = "聊天应用编码: general/crm/knowledge")
     private String appCode;
 
+    @Schema(description = "Whether the session is pinned")
+    private Boolean pinned;
+
+    @Schema(description = "Last time the session was pinned")
+    private Date pinnedTime;
+
     /**
      * 状态: 0-已归档, 1-活跃
      */

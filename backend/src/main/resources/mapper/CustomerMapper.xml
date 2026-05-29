@@ -97,6 +97,38 @@
         <if test="query.contactCountMax != null">
             AND c.contact_count <![CDATA[<=]]> #{query.contactCountMax}
         </if>
+        <if test="query.resolvedFieldFilters != null and query.resolvedFieldFilters.size() > 0">
+            <foreach collection="query.resolvedFieldFilters" item="filter">
+                <choose>
+                    <when test="filter.operator == 'isEmpty'">
+                        <choose>
+                            <when test="filter.emptyMode == 'blank'">
+                                AND (c.${filter.columnName} IS NULL OR c.${filter.columnName} = '')
+                            </when>
+                            <when test="filter.emptyMode == 'jsonArray'">
+                                AND (c.${filter.columnName} IS NULL OR c.${filter.columnName} = '' OR c.${filter.columnName} = '[]')
+                            </when>
+                            <otherwise>
+                                AND c.${filter.columnName} IS NULL
+                            </otherwise>
+                        </choose>
+                    </when>
+                    <when test="filter.operator == 'isNotEmpty'">
+                        <choose>
+                            <when test="filter.emptyMode == 'blank'">
+                                AND (c.${filter.columnName} IS NOT NULL AND c.${filter.columnName} != '')
+                            </when>
+                            <when test="filter.emptyMode == 'jsonArray'">
+                                AND (c.${filter.columnName} IS NOT NULL AND c.${filter.columnName} != '' AND c.${filter.columnName} != '[]')
+                            </when>
+                            <otherwise>
+                                AND c.${filter.columnName} IS NOT NULL
+                            </otherwise>
+                        </choose>
+                    </when>
+                </choose>
+            </foreach>
+        </if>
     </sql>
 
     <!-- 可复用的 ORDER BY 片段 -->

@@ -12,6 +12,8 @@
             c.company_name AS customer_name,
             s.title,
             s.app_code,
+            s.pinned,
+            s.pinned_time,
             s.status,
             s.create_time,
             s.update_time,
@@ -21,7 +23,7 @@
         LEFT JOIN crm_ai_agent a ON s.agent_id = a.agent_id
         LEFT JOIN crm_customer c ON s.customer_id = c.customer_id
         WHERE s.user_id = #{userId}
-        ORDER BY s.update_time DESC
+        ORDER BY s.pinned DESC, s.pinned_time DESC, s.update_time DESC
     </select>
 
     <select id="getSessionById" resultType="com.kakarote.ai_crm.entity.VO.ChatSessionVO">
@@ -34,6 +36,8 @@
             c.company_name AS customer_name,
             s.title,
             s.app_code,
+            s.pinned,
+            s.pinned_time,
             s.status,
             s.create_time,
             s.update_time

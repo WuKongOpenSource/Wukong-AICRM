@@ -30,6 +30,8 @@ public interface IChatService {
      */
     void deleteSession(Long sessionId);
 
+    void setSessionPinned(Long sessionId, Boolean pinned);
+
     /**
      * 获取会话消息历史
      */

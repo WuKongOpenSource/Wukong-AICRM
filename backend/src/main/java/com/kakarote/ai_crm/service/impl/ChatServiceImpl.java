@@ -5,6 +5,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kakarote.ai_crm.ai.AiMode;
@@ -19,6 +20,8 @@ import com.kakarote.ai_crm.ai.memory.CrmChatMemoryService;
 import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
 import com.kakarote.ai_crm.ai.state.PendingCustomerCreationStore;
 import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
+import com.kakarote.ai_crm.ai.tools.support.CrmRequiredToolCallAdvisor;
+import com.kakarote.ai_crm.ai.tools.support.AiToolExecutionRecorder;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.ChatSendBO;
@@ -51,6 +54,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.MimeType;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
 
 import java.io.InputStream;
@@ -84,6 +88,9 @@ public class ChatServiceImpl implements IChatService {
 
     @Autowired
     private CrmChatMemoryService crmChatMemoryService;
+
+    @Autowired
+    private CrmRequiredToolCallAdvisor crmRequiredToolCallAdvisor;
 
     @Autowired
     private ChatSessionMapper chatSessionMapper;
@@ -127,6 +134,9 @@ public class ChatServiceImpl implements IChatService {
     @Autowired
     private PermissionService permissionService;
 
+    @Autowired
+    private AiToolExecutionRecorder aiToolExecutionRecorder;
+
     private static final int MAX_EXTRACTED_TEXT_LENGTH = 3000;
     private static final String CHAT_ERROR_MESSAGE = "抱歉，处理您的请求时发生错误。请稍后重试。";
 
@@ -161,6 +171,8 @@ public class ChatServiceImpl implements IChatService {
         出现未来的明确时间点（"10:00""下午3点""上午9点半""明天14:00""后天早上10点"等），
         识别为日程，调用 createSchedule。
         示例："明天下午2点和XX公司开会" → createSchedule
+        即使用户没有明确说"创建/安排/新增"，只要输入是"时间 + 地点/事项"形式的短句，也视为新增日程意图，必须调用 createSchedule，禁止只在回复中整理标题、时间、地点。
+        示例："今天上午11点，在公司小会议室，公司内部预演客户方案" → createSchedule(title=公司内部预演客户方案, startTime=2026-05-27 11:00, location=公司小会议室)
 
         【规则3：任务识别 - 无具体时间的待办】
         没有具体时间点，但有"需要""要""计划""准备""安排""跟进"等待办动作词，
@@ -326,6 +338,8 @@ public class ChatServiceImpl implements IChatService {
         List<ChatSession> sessions = chatSessionMapper.selectList(
             new LambdaQueryWrapper<ChatSession>()
                 .eq(ChatSession::getUserId, userId)
+                .orderByDesc(ChatSession::getPinned)
+                .orderByDesc(ChatSession::getPinnedTime)
                 .orderByDesc(ChatSession::getUpdateTime)
         );
         List<ChatSessionVO> voList = BeanUtil.copyToList(sessions, ChatSessionVO.class);
@@ -354,6 +368,25 @@ public class ChatServiceImpl implements IChatService {
             weKnoraClient.clearConversationSession(tenantId, sessionId);
         }
         AiContextHolder.clearSession(sessionId);
+    }
+
+    @Override
+    public void setSessionPinned(Long sessionId, Boolean pinned) {
+        Long userId = UserUtil.getUserId();
+        ChatSession session = chatSessionMapper.selectById(sessionId);
+        if (ObjectUtil.isNull(session) || !Objects.equals(session.getUserId(), userId)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Session does not exist");
+        }
+
+        boolean shouldPin = Boolean.TRUE.equals(pinned);
+        chatSessionMapper.update(
+            null,
+            new LambdaUpdateWrapper<ChatSession>()
+                .eq(ChatSession::getSessionId, sessionId)
+                .eq(ChatSession::getUserId, userId)
+                .set(ChatSession::getPinned, shouldPin)
+                .set(ChatSession::getPinnedTime, shouldPin ? new Date() : null)
+        );
     }
 
     /**
@@ -530,6 +563,7 @@ public class ChatServiceImpl implements IChatService {
         AtomicReference<String> modelNameRef = new AtomicReference<>(null);
         AtomicBoolean streamFinalized = new AtomicBoolean(false);
         AtomicBoolean streamFailed = new AtomicBoolean(false);
+        AtomicBoolean suppressModelOutputForToolFailure = new AtomicBoolean(false);
 
         String unavailableTip = resolveAiUnavailableTip(currentTenantId, billingContext.runtimeConfig());
         if (unavailableTip != null) {
@@ -559,17 +593,15 @@ public class ChatServiceImpl implements IChatService {
             return Flux.just(tip);
         }
 
-        ChatClient chatClient = chatClientProvider.getChatClient(
-            billingContext.modelSource(),
-            billingContext.runtimeConfig().providerCode(),
-            billingContext.runtimeConfig().model(),
-            application.code()
-        );
+        aiToolExecutionRecorder.begin(sessionId);
+
+        boolean crmToolCallRequired = shouldRequireCrmToolCall(application.code(), capabilities);
+        ChatClient chatClient = resolveChatClient(billingContext, application.code());
 
         final String finalSystemPrompt = enhancedSystemPrompt;
         final String finalContent = enhancedContent;
         ChatClient.ChatClientRequestSpec requestSpec = buildChatRequestSpec(
-            chatClient, finalSystemPrompt, finalContent, mediaList, sessionId, messageId);
+            chatClient, finalSystemPrompt, finalContent, mediaList, sessionId, messageId, crmToolCallRequired);
         Runnable finalizeSuccessfulStream = () -> {
             if (!streamFinalized.compareAndSet(false, true)) {
                 return;
@@ -583,11 +615,12 @@ public class ChatServiceImpl implements IChatService {
                 finalContent,
                 fullResponse.toString()
             );
+            String responseText = resolveToolAwareResponse(sessionId, fullResponse.toString(), application.code());
             log.debug("AI 对话完成，响应长度: {}, tokens: prompt={}, completion={}, total={}",
                 fullResponse.length(), usage.promptTokens(), usage.completionTokens(), usage.totalTokens());
             long creditsUsed = aiQuotaService.resolveCredits(
                 usage.totalTokens(), billingContext.pricing().creditMultiplier());
-            saveMessage(sessionId, "assistant", fullResponse.toString(),
+            saveMessage(sessionId, "assistant", responseText,
                 usage.promptTokens(), usage.completionTokens(),
                 usage.totalTokens(), StrUtil.blankToDefault(modelNameRef.get(), billingContext.runtimeConfig().model()),
                 creditsUsed, billingContext.pricing().creditMultiplier(),
@@ -611,6 +644,9 @@ public class ChatServiceImpl implements IChatService {
                         log.debug("工具调用: {}", chatResponse.getResult().getOutput().getToolCalls());
                     }
                 }
+                if (aiToolExecutionRecorder.getLatestFailure(sessionId) != null) {
+                    suppressModelOutputForToolFailure.set(true);
+                }
                 // 捕获 token 用量（通常在最后一个 chunk 中携带）
                 if (chatResponse.getMetadata() != null && chatResponse.getMetadata().getUsage() != null) {
                     captureRawTokenUsage(
@@ -625,11 +661,22 @@ public class ChatServiceImpl implements IChatService {
                 }
             })
             .mapNotNull(chatResponse -> {
+                if (suppressModelOutputForToolFailure.get()) {
+                    return null;
+                }
                 if (chatResponse.getResult() != null && chatResponse.getResult().getOutput() != null) {
                     return chatResponse.getResult().getOutput().getText();
                 }
                 return null;
             })
+            .concatWith(Mono.defer(() -> {
+                String resolvedResponse = resolveToolAwareResponse(
+                    sessionId, fullResponse.toString(), application.code());
+                if (StrUtil.isBlank(resolvedResponse) || resolvedResponse.equals(fullResponse.toString())) {
+                    return Mono.empty();
+                }
+                return Mono.just(resolvedResponse);
+            }))
             .doOnComplete(finalizeSuccessfulStream)
             .onErrorResume(error -> {
                 streamFailed.set(true);
@@ -644,6 +691,7 @@ public class ChatServiceImpl implements IChatService {
                 if (signalType == SignalType.CANCEL && !streamFailed.get() && fullResponse.length() > 0) {
                     finalizeSuccessfulStream.run();
                 }
+                aiToolExecutionRecorder.finish(sessionId);
                 AiContextHolder.clear();
             });
     }
@@ -762,20 +810,19 @@ public class ChatServiceImpl implements IChatService {
                 return tip;
             }
 
-            ChatClient chatClient = chatClientProvider.getChatClient(
-                billingContext.modelSource(),
-                billingContext.runtimeConfig().providerCode(),
-                billingContext.runtimeConfig().model(),
-                application.code()
-            );
+            aiToolExecutionRecorder.begin(sessionId);
+
+            boolean crmToolCallRequired = shouldRequireCrmToolCall(application.code(), capabilities);
+            ChatClient chatClient = resolveChatClient(billingContext, application.code());
 
             final String finalSystemPrompt = enhancedSystemPrompt;
             final String finalContent = enhancedContent;
             ChatClient.ChatClientRequestSpec requestSpec = buildChatRequestSpec(
-                chatClient, finalSystemPrompt, finalContent, mediaList, sessionId, messageId);
+                chatClient, finalSystemPrompt, finalContent, mediaList, sessionId, messageId, crmToolCallRequired);
 
             var chatResponse = requestSpec.call().chatResponse();
             String response = chatResponse.getResult().getOutput().getText();
+            response = resolveToolAwareResponse(sessionId, response, application.code());
 
             String modelName = null;
             if (chatResponse.getMetadata() != null) {
@@ -814,6 +861,7 @@ public class ChatServiceImpl implements IChatService {
             return errorMessage;
         } finally {
             // 非流式分支在 finally 清理当前会话的 AiContextHolder。
+            aiToolExecutionRecorder.finish(sessionId);
             AiContextHolder.clear();
         }
     }
@@ -835,6 +883,24 @@ public class ChatServiceImpl implements IChatService {
         if (value != null && value > 0) {
             tokenRef.set(value);
         }
+    }
+
+    private String resolveToolAwareResponse(Long sessionId, String modelResponse, String appCode) {
+        if (!ChatApplicationCodes.CRM.equals(chatApplicationRegistry.normalize(appCode))) {
+            return modelResponse;
+        }
+
+        AiToolExecutionRecorder.ToolExecution failure = aiToolExecutionRecorder.getLatestFailure(sessionId);
+        if (failure != null) {
+            return buildToolFailureReply(failure);
+        }
+        return modelResponse;
+    }
+
+    private String buildToolFailureReply(AiToolExecutionRecorder.ToolExecution failure) {
+        String reason = failure == null ? null : failure.errorReason();
+        reason = StrUtil.blankToDefault(reason, "工具调用失败，但未返回具体错误信息。");
+        return "工具调用失败：" + reason;
     }
 
     /**
@@ -933,18 +999,38 @@ public class ChatServiceImpl implements IChatService {
                                                                   String content,
                                                                   List<Media> mediaList,
                                                                   Long sessionId,
-                                                                  Long messageId) {
+                                                                  Long messageId,
+                                                                  boolean crmToolCallRequired) {
         ChatClient.ChatClientRequestSpec requestSpec = chatClient.prompt()
             .system(systemPrompt)
-            .advisors(advisor -> advisor
-                .advisors(crmChatMemoryAdvisor)
-                .param(ChatMemory.CONVERSATION_ID, sessionId)
-                .param(CrmChatMemoryAdvisor.CURRENT_MESSAGE_ID, messageId));
+            .advisors(advisor -> {
+                advisor.advisors(crmChatMemoryAdvisor)
+                    .param(ChatMemory.CONVERSATION_ID, sessionId)
+                    .param(CrmChatMemoryAdvisor.CURRENT_MESSAGE_ID, messageId);
+                if (crmToolCallRequired) {
+                    advisor.advisors(crmRequiredToolCallAdvisor);
+                }
+            });
 
         if (CollUtil.isNotEmpty(mediaList)) {
             return requestSpec.user(user -> user.text(content).media(mediaList.toArray(new Media[0])));
         }
         return requestSpec.user(content);
+    }
+
+    private boolean shouldRequireCrmToolCall(String appCode, AiModelCapabilities capabilities) {
+        return capabilities != null
+            && capabilities.isSupportsToolCall()
+            && ChatApplicationCodes.CRM.equals(chatApplicationRegistry.normalize(appCode));
+    }
+
+    private ChatClient resolveChatClient(ChatBillingContext billingContext, String appCode) {
+        return chatClientProvider.getChatClient(
+            billingContext.modelSource(),
+            billingContext.runtimeConfig().providerCode(),
+            billingContext.runtimeConfig().model(),
+            appCode
+        );
     }
 
     /**
@@ -1352,7 +1438,7 @@ public class ChatServiceImpl implements IChatService {
                     attachment.getFileSize(),
                     attachment.getMimeType(),
                     session.getCustomerId(),
-                    "聊天附件自动归档，消息ID: " + messageId
+                    null
                 );
             } catch (Exception exception) {
                 log.warn("客户会话附件归档失败: sessionId={}, messageId={}, customerId={}, fileName={}, error={}",

@@ -25,7 +25,7 @@
         </div>
         <template v-else>
           <!-- Desktop table (keep PC style unchanged) -->
-          <table class="hidden md:table w-full text-left text-sm">
+          <table class="wk-role-list-table hidden md:table w-full text-left text-sm">
             <thead class="bg-slate-50/80 border-b border-slate-100 text-slate-500">
               <tr>
                 <th class="px-6 py-4 font-bold rounded-tl-xl">角色名称</th>
@@ -169,3 +169,23 @@ defineEmits<{
   (e: 'open-drawer', role: RoleVO, tab: 'members' | 'permissions'): void
 }>()
 </script>
+
+<style scoped>
+.wk-role-list-table thead {
+  border-bottom: 1px solid var(--wk-border-subtle);
+  background: var(--wk-bg-surface-subtle);
+  color: var(--wk-text-muted);
+}
+
+.wk-role-list-table tbody {
+  color: var(--wk-text-secondary);
+}
+
+.wk-role-list-table tbody tr + tr {
+  border-top: 1px solid var(--wk-border-subtle);
+}
+
+.wk-role-list-table tbody tr:hover {
+  background: var(--wk-bg-surface-hover);
+}
+</style>

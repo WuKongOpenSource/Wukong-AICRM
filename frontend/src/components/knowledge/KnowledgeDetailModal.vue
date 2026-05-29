@@ -843,10 +843,24 @@ async function handleAnalyze() {
     }
   } catch (error) {
     console.error('AI analysis failed:', error)
-    analysisError.value = 'AI 分析失败，请稍后重试。'
+    analysisError.value = resolveAnalysisErrorMessage(error)
   } finally {
     loadingAnalysis.value = false
   }
+}
+
+function resolveAnalysisErrorMessage(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const maybeError = error as { message?: unknown; response?: { data?: { msg?: unknown } } }
+    const responseMessage = maybeError.response?.data?.msg
+    if (typeof responseMessage === 'string' && responseMessage.trim()) {
+      return responseMessage.trim()
+    }
+    if (typeof maybeError.message === 'string' && maybeError.message.trim()) {
+      return maybeError.message.trim()
+    }
+  }
+  return 'AI 分析失败，请稍后重试。'
 }
 
 async function handleSendQuestion() {

@@ -72,6 +72,16 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     private static final String CUSTOMER_TABLE_NAME = "crm_customer";
     private static final String CUSTOMER_SEARCH_TEXT_COLUMN = "search_text";
     private static final Set<String> SEARCHABLE_CUSTOM_FIELD_TYPES = Set.of("text", "textarea", "select", "multiselect");
+    private static final Set<String> BLANK_EMPTY_FIELD_TYPES = Set.of("text", "textarea", "select");
+    private static final String FIELD_SOURCE_SYSTEM = "system";
+    private static final String FIELD_SOURCE_CUSTOM = "custom";
+    private static final String FILTER_OPERATOR_IS_EMPTY = "isEmpty";
+    private static final String FILTER_OPERATOR_IS_NOT_EMPTY = "isNotEmpty";
+    private static final String EMPTY_MODE_NULL_ONLY = "nullOnly";
+    private static final String EMPTY_MODE_BLANK = "blank";
+    private static final String EMPTY_MODE_JSON_ARRAY = "jsonArray";
+    private static final Pattern SAFE_SQL_COLUMN_PATTERN = Pattern.compile("^[a-z][a-z0-9_]*$");
+    private static final Map<String, CustomerFilterFieldDefinition> CUSTOMER_SYSTEM_FILTER_FIELDS = buildCustomerSystemFilterFields();
     private static final String AI_ANALYSIS_STATUS_PENDING = "pending";
     private static final String AI_ANALYSIS_STATUS_RUNNING = "running";
     private static final String AI_ANALYSIS_STATUS_SUCCESS = "success";
@@ -98,6 +108,56 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             "contactEmail",
             "contactPosition"
     );
+
+    private record CustomerFilterFieldDefinition(
+            String fieldName,
+            String fieldSource,
+            String label,
+            String columnName,
+            String fieldType
+    ) {
+    }
+
+    private static Map<String, CustomerFilterFieldDefinition> buildCustomerSystemFilterFields() {
+        Map<String, CustomerFilterFieldDefinition> fields = new LinkedHashMap<>();
+        addCustomerSystemFilterField(fields, "companyName", "公司名称", "company_name", "text");
+        addCustomerSystemFilterField(fields, "industry", "所属行业", "industry", "text");
+        addCustomerSystemFilterField(fields, "stage", "商机阶段", "stage", "select");
+        addCustomerSystemFilterField(fields, "level", "客户级别", "level", "select");
+        addCustomerSystemFilterField(fields, "source", "来源", "source", "text");
+        addCustomerSystemFilterField(fields, "website", "网站", "website", "text");
+        addCustomerSystemFilterField(fields, "logo", "公司Logo", "logo", "text");
+        addCustomerSystemFilterField(fields, "quotation", "预计成交金额", "quotation", "number");
+        addCustomerSystemFilterField(fields, "address", "地址", "address", "textarea");
+        addCustomerSystemFilterField(fields, "lastContactTime", "最后跟进", "last_contact_time", "datetime");
+        addCustomerSystemFilterField(fields, "nextFollowTime", "下次跟进时间", "next_follow_time", "datetime");
+        addCustomerSystemFilterField(fields, "remark", "备注", "remark", "textarea");
+        addCustomerSystemFilterField(fields, "aiStatusDetection", "AI状态探测", "ai_status_detection", "select");
+        addCustomerSystemFilterField(fields, "aiInsight", "AI洞察摘要", "ai_insight", "textarea");
+        addCustomerSystemFilterField(fields, "ownerId", "负责人", "owner_id", "number");
+        addCustomerSystemFilterField(fields, "primaryContactName", "主联系人姓名", "primary_contact_name", "text");
+        addCustomerSystemFilterField(fields, "primaryContactPhone", "主联系人电话", "primary_contact_phone", "text");
+        addCustomerSystemFilterField(fields, "primaryContactPosition", "主联系人职位", "primary_contact_position", "text");
+        addCustomerSystemFilterField(fields, "contactCount", "联系人数量", "contact_count", "number");
+        addCustomerSystemFilterField(fields, "tagNames", "标签", "tag_names", "text");
+        addCustomerSystemFilterField(fields, "createTime", "创建时间", "create_time", "datetime");
+        addCustomerSystemFilterField(fields, "updateTime", "更新时间", "update_time", "datetime");
+        return Collections.unmodifiableMap(fields);
+    }
+
+    private static void addCustomerSystemFilterField(Map<String, CustomerFilterFieldDefinition> fields,
+                                                     String fieldName,
+                                                     String label,
+                                                     String columnName,
+                                                     String fieldType) {
+        fields.put(fieldName, new CustomerFilterFieldDefinition(
+                fieldName,
+                FIELD_SOURCE_SYSTEM,
+                label,
+                columnName,
+                fieldType
+        ));
+    }
 
     @Autowired
     private ContactMapper contactMapper;
@@ -265,6 +325,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             "createTimeEnd": "yyyy-MM-dd HH:mm:ss",
             "contactCountMin": null,
             "contactCountMax": null,
+            "filters": [
+              {"fieldName": "字段名", "fieldSource": "system/custom", "operator": "isEmpty/isNotEmpty"}
+            ],
             "sortBy": "updateTime/createTime/quotation/lastContactTime/nextFollowTime/contactCount",
             "sortOrder": "asc/desc"
           },
@@ -281,7 +344,13 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         6. “最近一周新增客户”转成 createTimeStart，并建议按 createTime 倒序。
         7. 阶段若用户说的是中文，请映射成英文 code。
         8. level 只能是 A/B/C；sortOrder 只能是 asc/desc。
-        9. 未提及的字段留空，不要猜测。
+        9. “已跟进”“有跟进记录”“写过跟进”“已写跟进”表示最后跟进时间不为空，必须输出 filters=[{"fieldName":"lastContactTime","fieldSource":"system","operator":"isNotEmpty"}]，不要输出 lastContactStart/lastContactEnd。
+        10. “字段为空/没有填写/未填写”输出 operator=isEmpty；“字段不为空/已填写/有值”输出 operator=isNotEmpty。
+        11. filters 只能使用下方可用字段清单中的 fieldName、fieldSource、fieldType。
+        12. 未提及的字段留空，不要猜测。
+
+        可用字段清单：
+        %s
 
         只返回 JSON，不要返回解释性文字，不要使用 Markdown 代码块。
         """;
@@ -369,6 +438,10 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         } else if (websiteChanged) {
             customer.setLogo("");
         }
+        customer.setUpdateTime(analysisRequestedAt);
+        if (currentUserId != null) {
+            customer.setUpdateUserId(currentUserId);
+        }
         customer.setAiAnalysisStatus(AI_ANALYSIS_STATUS_PENDING);
         customer.setAiAnalysisRequestedAt(analysisRequestedAt);
         customFieldService.validateUniqueCustomFieldValues("customer", customer.getCustomerId(),
@@ -451,6 +524,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     @Override
     public BasePage<CustomerListVO> queryPageList(CustomerQueryBO queryBO) {
         queryBO.setKeyword(normalizeSearchTextFragment(queryBO.getKeyword()));
+        resolveCustomerFieldFilters(queryBO);
         applyCustomerQueryScope(queryBO);
         if (queryBO.getAuthorizedOwnerIds() != null && queryBO.getAuthorizedOwnerIds().isEmpty()) {
             BasePage<CustomerListVO> emptyPage = new BasePage<>(queryBO.getPage(), queryBO.getLimit());
@@ -2456,9 +2530,179 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (exportBO.getContactCountMax() != null) {
             wrapper.le(Customer::getContactCount, exportBO.getContactCountMax());
         }
+        resolveCustomerFieldFilters(exportBO);
+        applyResolvedFieldFiltersToExportWrapper(wrapper, exportBO.getResolvedFieldFilters());
 
         applyExportSort(wrapper, exportBO.getSortBy(), exportBO.getSortOrder());
         return wrapper;
+    }
+
+    /**
+     * 解析客户通用字段筛选。
+     */
+    private void resolveCustomerFieldFilters(CustomerQueryBO queryBO) {
+        if (queryBO == null) {
+            return;
+        }
+        queryBO.setResolvedFieldFilters(resolveCustomerFieldFilters(queryBO.getFilters()));
+    }
+
+    /**
+     * 解析客户通用字段筛选。
+     */
+    private List<CustomerResolvedFieldFilterBO> resolveCustomerFieldFilters(List<CustomerFieldFilterBO> filters) {
+        if (filters == null || filters.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<String, CustomFieldVO> customFieldMap = null;
+        Set<String> seen = new HashSet<>();
+        List<CustomerResolvedFieldFilterBO> resolvedFilters = new ArrayList<>();
+        for (CustomerFieldFilterBO filter : filters) {
+            if (filter == null) {
+                continue;
+            }
+
+            String operator = normalizeEmptyFilterOperator(filter.getOperator());
+            if (operator == null) {
+                continue;
+            }
+
+            String fieldName = normalizeOptionalText(filter.getFieldName());
+            if (StrUtil.isBlank(fieldName)) {
+                continue;
+            }
+
+            String fieldSource = normalizeFieldSource(filter.getFieldSource());
+            CustomerFilterFieldDefinition definition = null;
+            if (FIELD_SOURCE_CUSTOM.equals(fieldSource)) {
+                if (customFieldMap == null) {
+                    customFieldMap = getCustomerCustomFilterFieldMap();
+                }
+                CustomFieldVO customField = customFieldMap.get(fieldName);
+                if (customField == null) {
+                    continue;
+                }
+                definition = new CustomerFilterFieldDefinition(
+                        customField.getFieldName(),
+                        FIELD_SOURCE_CUSTOM,
+                        StrUtil.blankToDefault(customField.getFieldLabel(), customField.getFieldName()),
+                        customField.getColumnName(),
+                        customField.getFieldType()
+                );
+            } else {
+                definition = CUSTOMER_SYSTEM_FILTER_FIELDS.get(fieldName);
+            }
+
+            if (definition == null || !isSafeSqlColumn(definition.columnName())) {
+                continue;
+            }
+
+            String dedupeKey = definition.fieldSource() + ":" + definition.fieldName() + ":" + operator;
+            if (!seen.add(dedupeKey)) {
+                continue;
+            }
+
+            resolvedFilters.add(new CustomerResolvedFieldFilterBO(
+                    definition.columnName(),
+                    operator,
+                    resolveEmptyMode(definition.fieldType())
+            ));
+        }
+        return resolvedFilters;
+    }
+
+    /**
+     * 获取客户自定义筛选字段Map。
+     */
+    private Map<String, CustomFieldVO> getCustomerCustomFilterFieldMap() {
+        return getEnabledCustomOnlyFields("customer").stream()
+                .filter(field -> StrUtil.isNotBlank(field.getFieldName()))
+                .filter(field -> StrUtil.isNotBlank(field.getColumnName()))
+                .filter(field -> isSafeSqlColumn(field.getColumnName()))
+                .filter(field -> dynamicSchemaService.columnExists(CUSTOMER_TABLE_NAME, field.getColumnName()))
+                .collect(Collectors.toMap(CustomFieldVO::getFieldName, field -> field, (left, right) -> left));
+    }
+
+    /**
+     * 应用导出通用字段筛选。
+     */
+    private void applyResolvedFieldFiltersToExportWrapper(LambdaQueryWrapper<Customer> wrapper,
+                                                          List<CustomerResolvedFieldFilterBO> filters) {
+        if (wrapper == null || filters == null || filters.isEmpty()) {
+            return;
+        }
+        for (CustomerResolvedFieldFilterBO filter : filters) {
+            if (filter == null || !isSafeSqlColumn(filter.getColumnName())) {
+                continue;
+            }
+            wrapper.apply(buildEmptyFilterSql(filter.getColumnName(), filter.getOperator(), filter.getEmptyMode()));
+        }
+    }
+
+    /**
+     * 构建空值筛选SQL。
+     */
+    private String buildEmptyFilterSql(String columnName, String operator, String emptyMode) {
+        if (FILTER_OPERATOR_IS_NOT_EMPTY.equals(operator)) {
+            return switch (emptyMode) {
+                case EMPTY_MODE_BLANK -> "(" + columnName + " IS NOT NULL AND " + columnName + " != '')";
+                case EMPTY_MODE_JSON_ARRAY -> "(" + columnName + " IS NOT NULL AND " + columnName + " != '' AND " + columnName + " != '[]')";
+                default -> columnName + " IS NOT NULL";
+            };
+        }
+        return switch (emptyMode) {
+            case EMPTY_MODE_BLANK -> "(" + columnName + " IS NULL OR " + columnName + " = '')";
+            case EMPTY_MODE_JSON_ARRAY -> "(" + columnName + " IS NULL OR " + columnName + " = '' OR " + columnName + " = '[]')";
+            default -> columnName + " IS NULL";
+        };
+    }
+
+    /**
+     * 标准化空值筛选操作符。
+     */
+    private String normalizeEmptyFilterOperator(String operator) {
+        String normalized = normalizeOptionalText(operator);
+        if (normalized == null) {
+            return null;
+        }
+        return switch (normalized) {
+            case FILTER_OPERATOR_IS_EMPTY, "empty", "为空", "空" -> FILTER_OPERATOR_IS_EMPTY;
+            case FILTER_OPERATOR_IS_NOT_EMPTY, "notEmpty", "not_empty", "非空", "不为空", "有值" -> FILTER_OPERATOR_IS_NOT_EMPTY;
+            default -> null;
+        };
+    }
+
+    /**
+     * 标准化字段来源。
+     */
+    private String normalizeFieldSource(String fieldSource) {
+        String normalized = normalizeOptionalText(fieldSource);
+        if (FIELD_SOURCE_CUSTOM.equalsIgnoreCase(String.valueOf(normalized))) {
+            return FIELD_SOURCE_CUSTOM;
+        }
+        return FIELD_SOURCE_SYSTEM;
+    }
+
+    /**
+     * 解析空值模式。
+     */
+    private String resolveEmptyMode(String fieldType) {
+        String normalized = StrUtil.blankToDefault(fieldType, "").toLowerCase(Locale.ROOT);
+        if ("multiselect".equals(normalized)) {
+            return EMPTY_MODE_JSON_ARRAY;
+        }
+        if (BLANK_EMPTY_FIELD_TYPES.contains(normalized)) {
+            return EMPTY_MODE_BLANK;
+        }
+        return EMPTY_MODE_NULL_ONLY;
+    }
+
+    /**
+     * 判断SQL列名是否安全。
+     */
+    private boolean isSafeSqlColumn(String columnName) {
+        return StrUtil.isNotBlank(columnName) && SAFE_SQL_COLUMN_PATTERN.matcher(columnName).matches();
     }
 
     /**
@@ -3124,13 +3368,19 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 .eq(Contact::getCustomerId, customerId)
                 .eq(Contact::getStatus, 1)
         );
-        lambdaUpdate()
+        Date updateTime = new Date();
+        var update = lambdaUpdate()
             .eq(Customer::getCustomerId, customerId)
             .set(Customer::getPrimaryContactName, primary != null ? primary.getName() : null)
             .set(Customer::getPrimaryContactPhone, primary != null ? primary.getPhone() : null)
             .set(Customer::getPrimaryContactPosition, primary != null ? primary.getPosition() : null)
             .set(Customer::getContactCount, count.intValue())
-            .update();
+            .set(Customer::getUpdateTime, updateTime);
+        Long updateUserId = getCurrentUserIdOrNull();
+        if (updateUserId != null) {
+            update.set(Customer::getUpdateUserId, updateUserId);
+        }
+        update.update();
         refreshCustomerSearchText(customerId);
         globalSearchIndexService.refreshCustomerIndex(customerId);
         taskService.refreshValuePriorityByCustomerId(customerId);
@@ -3146,12 +3396,26 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         String tagNames = tags.stream()
             .map(CustomerTag::getTagName)
             .collect(Collectors.joining(","));
-        lambdaUpdate()
+        Date updateTime = new Date();
+        var update = lambdaUpdate()
             .eq(Customer::getCustomerId, customerId)
             .set(Customer::getTagNames, tagNames)
-            .update();
+            .set(Customer::getUpdateTime, updateTime);
+        Long updateUserId = getCurrentUserIdOrNull();
+        if (updateUserId != null) {
+            update.set(Customer::getUpdateUserId, updateUserId);
+        }
+        update.update();
         refreshCustomerSearchText(customerId);
         globalSearchIndexService.refreshCustomerIndex(customerId);
+    }
+
+    private Long getCurrentUserIdOrNull() {
+        try {
+            return UserUtil.getUserId();
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     // ==================== AI 智能录入 ====================
@@ -3522,7 +3786,10 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
 
         String now = LocalDateTime.now().format(AI_SEARCH_TIME_FORMATTER);
-        String prompt = String.format(AI_CUSTOMER_SEARCH_PARSE_PROMPT, now, normalizedQuery);
+        String prompt = String.format(AI_CUSTOMER_SEARCH_PARSE_PROMPT,
+                now,
+                normalizedQuery,
+                buildCustomerAiSearchFieldCatalog());
 
         try {
             aiQuotaService.ensureQuotaAvailable("customer_search_parse", null, null, prompt);
@@ -3549,6 +3816,44 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             }
             return buildFallbackSearchResult(normalizedQuery);
         }
+    }
+
+    /**
+     * 构建客户AI搜索字段清单。
+     */
+    private String buildCustomerAiSearchFieldCatalog() {
+        List<String> lines = new ArrayList<>();
+        CUSTOMER_SYSTEM_FILTER_FIELDS.values().forEach(field -> lines.add(formatAiSearchFieldCatalogLine(
+                field.label(),
+                field.fieldName(),
+                field.fieldSource(),
+                field.fieldType()
+        )));
+        try {
+            getEnabledCustomOnlyFields("customer").stream()
+                    .filter(field -> StrUtil.isNotBlank(field.getFieldName()))
+                    .filter(field -> StrUtil.isNotBlank(field.getColumnName()))
+                    .filter(field -> isSafeSqlColumn(field.getColumnName()))
+                    .forEach(field -> lines.add(formatAiSearchFieldCatalogLine(
+                            StrUtil.blankToDefault(field.getFieldLabel(), field.getFieldName()),
+                            field.getFieldName(),
+                            FIELD_SOURCE_CUSTOM,
+                            field.getFieldType()
+                    )));
+        } catch (Exception e) {
+            log.warn("构建客户AI搜索自定义字段清单失败: {}", e.getMessage());
+        }
+        return String.join("\n", lines);
+    }
+
+    /**
+     * 格式化AI搜索字段清单行。
+     */
+    private String formatAiSearchFieldCatalogLine(String label, String fieldName, String fieldSource, String fieldType) {
+        return "- label=" + label
+                + ", fieldName=" + fieldName
+                + ", fieldSource=" + fieldSource
+                + ", fieldType=" + fieldType;
     }
 
     /**
@@ -3673,6 +3978,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         query.setCreateTimeEnd(parseJsonDate(queryNode.get("createTimeEnd")));
         query.setContactCountMin(parseJsonInteger(queryNode.get("contactCountMin")));
         query.setContactCountMax(parseJsonInteger(queryNode.get("contactCountMax")));
+        query.setFilters(parseJsonCustomerFieldFilters(queryNode.get("filters")));
         query.setSortBy(normalizeSortBy(getJsonText(queryNode, "sortBy")));
         query.setSortOrder(normalizeSortOrder(getJsonText(queryNode, "sortOrder")));
         return query;
@@ -3710,6 +4016,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
         normalizeAmountRange(query, "quotation", keepZeroQuotation);
         normalizeContactCountRange(query, keepZeroContactCount);
+        normalizeAiSearchFieldFilters(query);
+        applyFollowedCustomerFilterFromQuery(query, normalizedQuery);
     }
 
     /**
@@ -3846,6 +4154,113 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
         query.setContactCountMin(max);
         query.setContactCountMax(min);
+    }
+
+    /**
+     * 标准化AI搜索通用字段筛选。
+     */
+    private void normalizeAiSearchFieldFilters(CustomerAiSearchQueryVO query) {
+        if (query == null || query.getFilters() == null || query.getFilters().isEmpty()) {
+            return;
+        }
+        List<CustomerFieldFilterBO> normalizedFilters = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (CustomerFieldFilterBO filter : query.getFilters()) {
+            if (filter == null) {
+                continue;
+            }
+            String fieldName = normalizeOptionalText(filter.getFieldName());
+            String operator = normalizeEmptyFilterOperator(filter.getOperator());
+            if (StrUtil.isBlank(fieldName) || StrUtil.isBlank(operator)) {
+                continue;
+            }
+            String fieldSource = normalizeFieldSource(filter.getFieldSource());
+            if (!isKnownCustomerFilterField(fieldName, fieldSource)) {
+                continue;
+            }
+            String dedupeKey = fieldSource + ":" + fieldName + ":" + operator;
+            if (!seen.add(dedupeKey)) {
+                continue;
+            }
+            CustomerFieldFilterBO normalizedFilter = new CustomerFieldFilterBO();
+            normalizedFilter.setFieldName(fieldName);
+            normalizedFilter.setFieldSource(fieldSource);
+            normalizedFilter.setOperator(operator);
+            normalizedFilters.add(normalizedFilter);
+        }
+        query.setFilters(normalizedFilters.isEmpty() ? null : normalizedFilters);
+    }
+
+    /**
+     * 从搜索语句应用已跟进客户筛选。
+     */
+    private void applyFollowedCustomerFilterFromQuery(CustomerAiSearchQueryVO query, String normalizedQuery) {
+        if (query == null || !isFollowedCustomerQuery(normalizedQuery)) {
+            return;
+        }
+        query.setLastContactStart(null);
+        query.setLastContactEnd(null);
+        query.setIncludeNoLastContact(null);
+        addAiSearchFieldFilter(query, "lastContactTime", FIELD_SOURCE_SYSTEM, FILTER_OPERATOR_IS_NOT_EMPTY);
+    }
+
+    /**
+     * 判断是否为已跟进客户查询。
+     */
+    private boolean isFollowedCustomerQuery(String normalizedQuery) {
+        if (StrUtil.isBlank(normalizedQuery)) {
+            return false;
+        }
+        if (containsAny(normalizedQuery, "未跟进", "无跟进", "没有跟进", "从未跟进")) {
+            return false;
+        }
+        return containsAny(
+                normalizedQuery,
+                "已跟进",
+                "已经跟进",
+                "有跟进记录",
+                "有跟进的客户",
+                "写过跟进",
+                "已写跟进",
+                "跟进不为空",
+                "跟进非空"
+        );
+    }
+
+    /**
+     * 添加AI搜索字段筛选。
+     */
+    private void addAiSearchFieldFilter(CustomerAiSearchQueryVO query,
+                                        String fieldName,
+                                        String fieldSource,
+                                        String operator) {
+        if (query == null || StrUtil.isBlank(fieldName) || StrUtil.isBlank(operator)) {
+            return;
+        }
+        List<CustomerFieldFilterBO> filters = query.getFilters() == null
+                ? new ArrayList<>()
+                : new ArrayList<>(query.getFilters());
+        String normalizedFieldSource = normalizeFieldSource(fieldSource);
+        String normalizedOperator = normalizeEmptyFilterOperator(operator);
+        if (normalizedOperator == null) {
+            return;
+        }
+        boolean exists = filters.stream().anyMatch(filter ->
+                filter != null
+                        && fieldName.equals(filter.getFieldName())
+                        && normalizedFieldSource.equals(normalizeFieldSource(filter.getFieldSource()))
+                        && normalizedOperator.equals(normalizeEmptyFilterOperator(filter.getOperator()))
+        );
+        if (exists) {
+            query.setFilters(filters);
+            return;
+        }
+        CustomerFieldFilterBO filter = new CustomerFieldFilterBO();
+        filter.setFieldName(fieldName);
+        filter.setFieldSource(normalizedFieldSource);
+        filter.setOperator(normalizedOperator);
+        filters.add(filter);
+        query.setFilters(filters);
     }
 
     /**
@@ -4039,7 +4454,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             && query.getCreateTimeStart() == null
             && query.getCreateTimeEnd() == null
             && query.getContactCountMin() == null
-            && query.getContactCountMax() == null;
+            && query.getContactCountMax() == null
+            && (query.getFilters() == null || query.getFilters().isEmpty());
     }
 
     /**
@@ -4095,10 +4511,94 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             }
             chips.add(new CustomerAiSearchDisplayChipVO("contactCount", label));
         }
+        if (query.getFilters() != null && !query.getFilters().isEmpty()) {
+            for (CustomerFieldFilterBO filter : query.getFilters()) {
+                String key = buildFieldFilterChipKey(filter);
+                String label = buildFieldFilterChipLabel(filter);
+                if (StrUtil.isNotBlank(key) && StrUtil.isNotBlank(label)) {
+                    chips.add(new CustomerAiSearchDisplayChipVO(key, label));
+                }
+            }
+        }
         if (StrUtil.isNotBlank(query.getSortBy())) {
             chips.add(new CustomerAiSearchDisplayChipVO("sort", buildSortLabel(query.getSortBy(), query.getSortOrder())));
         }
         return chips;
+    }
+
+    /**
+     * 构建字段筛选标签Key。
+     */
+    private String buildFieldFilterChipKey(CustomerFieldFilterBO filter) {
+        if (filter == null || StrUtil.isBlank(filter.getFieldName())) {
+            return null;
+        }
+        String operator = normalizeEmptyFilterOperator(filter.getOperator());
+        if (StrUtil.isBlank(operator)) {
+            return null;
+        }
+        return "filter:" + normalizeFieldSource(filter.getFieldSource())
+                + ":" + filter.getFieldName()
+                + ":" + operator;
+    }
+
+    /**
+     * 构建字段筛选标签文案。
+     */
+    private String buildFieldFilterChipLabel(CustomerFieldFilterBO filter) {
+        if (filter == null) {
+            return null;
+        }
+        String operator = normalizeEmptyFilterOperator(filter.getOperator());
+        String fieldName = normalizeOptionalText(filter.getFieldName());
+        if (StrUtil.isBlank(operator) || StrUtil.isBlank(fieldName)) {
+            return null;
+        }
+
+        String fieldLabel = resolveFilterFieldLabel(fieldName, filter.getFieldSource());
+        String operatorLabel = FILTER_OPERATOR_IS_EMPTY.equals(operator) ? "为空" : "不为空";
+        if (FILTER_OPERATOR_IS_NOT_EMPTY.equals(operator)
+                && FIELD_SOURCE_SYSTEM.equals(normalizeFieldSource(filter.getFieldSource()))
+                && "lastContactTime".equals(fieldName)) {
+            operatorLabel = "已跟进";
+        }
+        return fieldLabel + ": " + operatorLabel;
+    }
+
+    /**
+     * 解析筛选字段标签。
+     */
+    private String resolveFilterFieldLabel(String fieldName, String fieldSource) {
+        if (FIELD_SOURCE_CUSTOM.equals(normalizeFieldSource(fieldSource))) {
+            try {
+                return getCustomerCustomFilterFieldMap().values().stream()
+                        .filter(field -> fieldName.equals(field.getFieldName()))
+                        .findFirst()
+                        .map(field -> StrUtil.blankToDefault(field.getFieldLabel(), field.getFieldName()))
+                        .orElse(fieldName);
+            } catch (Exception e) {
+                return fieldName;
+            }
+        }
+        CustomerFilterFieldDefinition definition = CUSTOMER_SYSTEM_FILTER_FIELDS.get(fieldName);
+        return definition != null ? definition.label() : fieldName;
+    }
+
+    /**
+     * 判断是否为已知客户筛选字段。
+     */
+    private boolean isKnownCustomerFilterField(String fieldName, String fieldSource) {
+        if (StrUtil.isBlank(fieldName)) {
+            return false;
+        }
+        if (FIELD_SOURCE_CUSTOM.equals(normalizeFieldSource(fieldSource))) {
+            try {
+                return getCustomerCustomFilterFieldMap().containsKey(fieldName);
+            } catch (Exception e) {
+                return false;
+            }
+        }
+        return CUSTOMER_SYSTEM_FILTER_FIELDS.containsKey(fieldName);
     }
 
     /**
@@ -4352,6 +4852,30 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             return null;
         }
         return Boolean.parseBoolean(text);
+    }
+
+    /**
+     * 解析JSON客户字段筛选。
+     */
+    private List<CustomerFieldFilterBO> parseJsonCustomerFieldFilters(JsonNode node) {
+        if (node == null || node.isNull() || !node.isArray()) {
+            return Collections.emptyList();
+        }
+        List<CustomerFieldFilterBO> filters = new ArrayList<>();
+        for (JsonNode item : node) {
+            if (item == null || item.isNull()) {
+                continue;
+            }
+            CustomerFieldFilterBO filter = new CustomerFieldFilterBO();
+            filter.setFieldName(normalizeOptionalText(getJsonText(item, "fieldName")));
+            filter.setFieldSource(normalizeFieldSource(getJsonText(item, "fieldSource")));
+            filter.setOperator(normalizeEmptyFilterOperator(getJsonText(item, "operator")));
+            if (StrUtil.isBlank(filter.getFieldName()) || StrUtil.isBlank(filter.getOperator())) {
+                continue;
+            }
+            filters.add(filter);
+        }
+        return filters;
     }
 
     /**

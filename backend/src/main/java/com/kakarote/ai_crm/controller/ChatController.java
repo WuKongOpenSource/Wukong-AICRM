@@ -3,6 +3,7 @@ package com.kakarote.ai_crm.controller;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.SessionCreateBO;
+import com.kakarote.ai_crm.entity.BO.SessionPinBO;
 import com.kakarote.ai_crm.entity.VO.AiModelOptionVO;
 import com.kakarote.ai_crm.entity.VO.ChatAppOptionVO;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
@@ -49,6 +50,13 @@ public class ChatController {
     @Operation(summary = "删除会话")
     public Result<String> deleteSession(@PathVariable("id") Long id) {
         chatService.deleteSession(id);
+        return Result.ok();
+    }
+
+    @PostMapping("/session/pin/{id}")
+    @Operation(summary = "Set session pin status")
+    public Result<String> setSessionPinned(@PathVariable("id") Long id, @Valid @RequestBody SessionPinBO sessionPinBO) {
+        chatService.setSessionPinned(id, sessionPinBO.getPinned());
         return Result.ok();
     }
 

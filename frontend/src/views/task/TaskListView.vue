@@ -41,43 +41,23 @@
               :key="tab.value"
               @click="handleStatusFilter(tab.value)"
               :class="[
-                'px-4 py-1.5 text-xs font-bold rounded-full transition-all whitespace-nowrap',
+                'border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] px-4 py-1.5 text-xs font-bold rounded-full transition-all whitespace-nowrap',
                 currentStatus === tab.value
-                  ? 'bg-primary text-white'
-                  : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+                  ? 'text-primary ring-1 ring-primary/15'
+                  : 'text-slate-500 hover:border-[var(--wk-input-border-hover)] hover:text-slate-700'
               ]"
             >
               {{ tab.label }} ({{ tab.count }})
             </button>
           </div>
-          <div class="flex items-center justify-end gap-3 overflow-x-auto">
-            <div v-if="!isMobile" class="flex bg-slate-100 p-1 rounded-lg shrink-0 border border-slate-200">
-              <button
-                type="button"
-                class="flex items-center justify-center size-8 rounded-md transition-all"
-                :class="taskViewMode === 'list' ? 'bg-white text-primary shadow-sm ring-1 ring-primary/20' : 'text-slate-400 hover:text-slate-600'"
-                title="列表视图"
-                @click="taskViewMode = 'list'"
-              >
-                <span class="material-symbols-outlined text-[20px]">list</span>
-              </button>
-              <button
-                type="button"
-                class="flex items-center justify-center size-8 rounded-md transition-all"
-                :class="taskViewMode === 'card' ? 'bg-white text-primary shadow-sm ring-1 ring-primary/20' : 'text-slate-400 hover:text-slate-600'"
-                title="卡片视图"
-                @click="taskViewMode = 'card'"
-              >
-                <span class="material-symbols-outlined text-[20px]">grid_view</span>
-              </button>
-            </div>
+          <div class="flex items-center justify-end gap-3 overflow-x-auto overflow-y-hidden">
             <!-- Segmented filter -->
-            <div class="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm overflow-x-auto max-w-full md:max-w-none">
+            <div class="flex h-9 max-w-full items-center overflow-x-auto overflow-y-hidden rounded-xl border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1 md:max-w-none">
               <button
                 @click="handleValueFilter('all')"
                 :class="[
-                  'px-4 py-1.5 text-xs font-bold rounded-lg transition-all',
-                  valueFilter === 'all' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'
+                  'h-7 shrink-0 whitespace-nowrap px-4 text-xs font-bold rounded-lg transition-all',
+                  valueFilter === 'all' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-slate-500 hover:text-slate-700'
                 ]"
               >
                 全部任务
@@ -85,11 +65,31 @@
               <button
                 @click="handleValueFilter('high-impact')"
                 :class="[
-                  'px-4 py-1.5 text-xs font-bold rounded-lg transition-all',
-                  valueFilter === 'high-impact' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'
+                  'h-7 shrink-0 whitespace-nowrap px-4 text-xs font-bold rounded-lg transition-all',
+                  valueFilter === 'high-impact' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-slate-500 hover:text-slate-700'
                 ]"
               >
                 高价值优先
+              </button>
+            </div>
+            <div v-if="!isMobile" class="flex h-9 shrink-0 items-center rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1">
+              <button
+                type="button"
+                class="flex size-7 items-center justify-center rounded-md transition-all"
+                :class="taskViewMode === 'list' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-slate-400 hover:text-slate-600'"
+                title="列表视图"
+                @click="taskViewMode = 'list'"
+              >
+                <span class="material-symbols-outlined text-[20px]">list</span>
+              </button>
+              <button
+                type="button"
+                class="flex size-7 items-center justify-center rounded-md transition-all"
+                :class="taskViewMode === 'card' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-slate-400 hover:text-slate-600'"
+                title="卡片视图"
+                @click="taskViewMode = 'card'"
+              >
+                <span class="material-symbols-outlined text-[20px]">grid_view</span>
               </button>
             </div>
           </div>
@@ -499,7 +499,9 @@ const route = useRoute()
 const router = useRouter()
 const { isMobile } = useResponsive()
 
-const currentStatus = ref('all')
+type TaskStatusFilter = 'all' | TaskStatus | 'OVERDUE'
+
+const currentStatus = ref<TaskStatusFilter>('all')
 const valueFilter = ref<'all' | 'high-impact'>('all')
 const taskViewMode = ref<'list' | 'card'>('list')
 const showAddDialog = ref(false)
@@ -511,13 +513,14 @@ const selectedTask = ref<Task | null>(null)
 const effectiveTaskViewMode = computed(() => taskViewMode.value)
 
 // Computed properties
-const statusTabs = computed(() => {
+const statusTabs = computed<Array<{ value: TaskStatusFilter; label: string; count: number }>>(() => {
   const counts = taskStore.statusCounts
   return [
     { value: 'all', label: '全部', count: counts.all },
     { value: 'PENDING', label: '待处理', count: counts.PENDING },
     { value: 'IN_PROGRESS', label: '进行中', count: counts.IN_PROGRESS },
-    { value: 'COMPLETED', label: '已完成', count: counts.COMPLETED }
+    { value: 'COMPLETED', label: '已完成', count: counts.COMPLETED },
+    // { value: 'OVERDUE', label: '已延期', count: counts.OVERDUE }
   ]
 })
 
@@ -623,10 +626,16 @@ async function handleValueFilter(filter: 'all' | 'high-impact') {
   await taskStore.fetchTaskList(false)
 }
 
-function handleStatusFilter(status: string) {
+function handleStatusFilter(status: TaskStatusFilter) {
   currentStatus.value = status
   taskStore.queryParams.taskId = undefined
-  taskStore.queryParams.status = status === 'all' ? undefined : status as TaskStatus
+  if (status === 'OVERDUE') {
+    taskStore.queryParams.status = undefined
+    taskStore.queryParams.filter = 'overdue'
+  } else {
+    taskStore.queryParams.status = status === 'all' ? undefined : status
+    taskStore.queryParams.filter = 'all'
+  }
   taskStore.queryParams.page = 1
   taskStore.fetchTaskList(false)
 }
@@ -800,6 +809,7 @@ function getTaskOwnerName(task: Task): string {
 
 // Check if task is overdue
 function isOverdue(task: Task): boolean {
+  if (typeof task.overdue === 'boolean') return task.overdue
   if (!task.dueDate || task.status === 'COMPLETED') return false
   return new Date(task.dueDate) < new Date()
 }

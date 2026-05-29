@@ -636,16 +636,15 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "直属上级不能选择当前员工");
         }
 
-        Map<Long, Long> parentByUserId = lambdaQuery()
+        Map<Long, Long> parentByUserId = new HashMap<>();
+        lambdaQuery()
                 .select(ManagerUser::getUserId, ManagerUser::getParentId)
                 .list()
-                .stream()
-                .collect(Collectors.toMap(
-                        ManagerUser::getUserId,
-                        user -> normalizeParentUserId(user.getParentId()),
-                        (left, right) -> left,
-                        HashMap::new
-                ));
+                .forEach(user -> {
+                    if (user.getUserId() != null) {
+                        parentByUserId.put(user.getUserId(), normalizeParentUserId(user.getParentId()));
+                    }
+                });
 
         if (!parentByUserId.containsKey(parentId)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "直属上级不存在");

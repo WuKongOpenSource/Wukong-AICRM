@@ -34,7 +34,44 @@ export function unregisterAiQuotaResumeSendHandler() {
   resumeSendHandler = null
 }
 
+function normalizeCreditValue(value: unknown): number {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? Math.max(0, value) : 0
+  }
+
+  if (typeof value === 'string') {
+    const trimmedValue = value.trim().replace(/,/g, '')
+    if (!trimmedValue) return 0
+
+    const parsedValue = Number(trimmedValue)
+    return Number.isFinite(parsedValue) ? Math.max(0, parsedValue) : 0
+  }
+
+  return 0
+}
+
 function normalizeAiConfig(config?: Partial<AiConfig> | Partial<AiConfigUpdateBO> | null): AiConfig {
+  const creditSource = config as Record<string, unknown> | null | undefined
+  const giftCreditTotal = normalizeCreditValue(creditSource?.giftCreditTotal)
+  const giftCreditUsed = normalizeCreditValue(creditSource?.giftCreditUsed)
+  const giftCreditRemaining = creditSource?.giftCreditRemaining == null
+    ? Math.max(0, giftCreditTotal - giftCreditUsed)
+    : normalizeCreditValue(creditSource.giftCreditRemaining)
+  const purchasedCreditTotal = normalizeCreditValue(creditSource?.purchasedCreditTotal)
+  const purchasedCreditUsed = normalizeCreditValue(creditSource?.purchasedCreditUsed)
+  const purchasedCreditRemaining = creditSource?.purchasedCreditRemaining == null
+    ? Math.max(0, purchasedCreditTotal - purchasedCreditUsed)
+    : normalizeCreditValue(creditSource.purchasedCreditRemaining)
+  const creditTotal = creditSource?.creditTotal == null
+    ? giftCreditTotal + purchasedCreditTotal
+    : normalizeCreditValue(creditSource.creditTotal)
+  const creditUsed = creditSource?.creditUsed == null
+    ? giftCreditUsed + purchasedCreditUsed
+    : normalizeCreditValue(creditSource.creditUsed)
+  const creditRemaining = creditSource?.creditRemaining == null
+    ? giftCreditRemaining + purchasedCreditRemaining
+    : normalizeCreditValue(creditSource.creditRemaining)
+
   return {
     provider: config?.provider || DEFAULT_CHAT_AI_CONFIG.provider || 'dashscope',
     apiUrl: config?.apiUrl || DEFAULT_CHAT_AI_CONFIG.apiUrl,
@@ -51,30 +88,25 @@ function normalizeAiConfig(config?: Partial<AiConfig> | Partial<AiConfigUpdateBO
     mode: (config as Partial<AiConfig> | null)?.mode || 'gift',
     customConfigSaved: (config as Partial<AiConfig> | null)?.customConfigSaved ?? false,
     ready: (config as Partial<AiConfig> | null)?.ready ?? Boolean(config?.apiKey?.trim()),
-    giftCreditTotal: (config as Partial<AiConfig> | null)?.giftCreditTotal ?? 0,
-    giftCreditUsed: (config as Partial<AiConfig> | null)?.giftCreditUsed ?? 0,
-    giftCreditRemaining: (config as Partial<AiConfig> | null)?.giftCreditRemaining ?? 0,
+    giftCreditTotal,
+    giftCreditUsed,
+    giftCreditRemaining,
     giftCreditAvailable: (config as Partial<AiConfig> | null)?.giftCreditAvailable
-      ?? (((config as Partial<AiConfig> | null)?.giftCreditRemaining ?? 0) > 0),
-    purchasedCreditTotal: (config as Partial<AiConfig> | null)?.purchasedCreditTotal ?? 0,
-    purchasedCreditUsed: (config as Partial<AiConfig> | null)?.purchasedCreditUsed ?? 0,
-    purchasedCreditRemaining: (config as Partial<AiConfig> | null)?.purchasedCreditRemaining ?? 0,
-    creditTotal: (config as Partial<AiConfig> | null)?.creditTotal
-      ?? ((config as Partial<AiConfig> | null)?.giftCreditTotal ?? 0),
-    creditUsed: (config as Partial<AiConfig> | null)?.creditUsed
-      ?? ((config as Partial<AiConfig> | null)?.giftCreditUsed ?? 0),
-    creditRemaining: (config as Partial<AiConfig> | null)?.creditRemaining
-      ?? ((config as Partial<AiConfig> | null)?.giftCreditRemaining ?? 0),
+      ?? (giftCreditRemaining > 0),
+    purchasedCreditTotal,
+    purchasedCreditUsed,
+    purchasedCreditRemaining,
+    creditTotal,
+    creditUsed,
+    creditRemaining,
     creditAvailable: (config as Partial<AiConfig> | null)?.creditAvailable
-      ?? (((config as Partial<AiConfig> | null)?.creditRemaining
-        ?? (config as Partial<AiConfig> | null)?.giftCreditRemaining
-        ?? 0) > 0),
+      ?? (creditRemaining > 0),
     updateTime: config && 'updateTime' in config ? config.updateTime : undefined,
   }
 }
 
-export function formatCreditAmount(value: number): string {
-  const normalizedValue = Number.isFinite(value) ? Math.max(0, value) : 0
+export function formatCreditAmount(value: unknown): string {
+  const normalizedValue = normalizeCreditValue(value)
   if (normalizedValue >= 10000) {
     const wanValue = normalizedValue / 10000
     const formattedWan = Number.isInteger(wanValue) ? wanValue.toFixed(0) : wanValue.toFixed(1)
@@ -83,7 +115,7 @@ export function formatCreditAmount(value: number): string {
   return new Intl.NumberFormat('zh-CN').format(normalizedValue)
 }
 
-export function formatWanCredit(value: number): string {
+export function formatWanCredit(value: unknown): string {
   return formatCreditAmount(value)
 }
 
@@ -109,11 +141,19 @@ export function useAiQuota() {
   const creditRemainingWan = computed(() => formatWanCredit(creditRemaining.value))
   const creditTotalWan = computed(() => formatWanCredit(creditTotal.value))
   const creditUsedWan = computed(() => formatWanCredit(creditUsed.value))
+  const creditProgressClass = computed(() => {
+    if (creditRemaining.value <= 0) return 'bg-amber-400'
+    return currentAiMode.value === 'gift' ? 'bg-primary' : 'bg-blue-500'
+  })
 
-  const giftCreditRemaining = creditRemaining
-  const giftCreditProgressPercent = creditProgressPercent
-  const giftCreditRemainingWan = creditRemainingWan
-  const giftCreditTotalWan = creditTotalWan
+  const giftCreditTotal = computed(() => aiConfig.value?.giftCreditTotal ?? 0)
+  const giftCreditRemaining = computed(() => aiConfig.value?.giftCreditRemaining ?? 0)
+  const giftCreditProgressPercent = computed(() => {
+    if (giftCreditTotal.value <= 0) return 0
+    return Math.max(0, Math.min(100, Math.round((giftCreditRemaining.value / giftCreditTotal.value) * 100)))
+  })
+  const giftCreditRemainingWan = computed(() => formatWanCredit(giftCreditRemaining.value))
+  const giftCreditTotalWan = computed(() => formatWanCredit(giftCreditTotal.value))
 
   const aiStatusBadgeText = computed(() => {
     if (creditRemaining.value <= 0) {
@@ -339,6 +379,7 @@ export function useAiQuota() {
     creditRemaining,
     creditUsed,
     creditProgressPercent,
+    creditProgressClass,
     creditRemainingWan,
     creditTotalWan,
     creditUsedWan,
