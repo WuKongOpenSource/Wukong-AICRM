@@ -35,7 +35,32 @@
 
         <!-- Status Filter Tabs and list controls -->
         <div class="wk-task-list-toolbar flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div class="flex gap-2 overflow-x-auto">
+          <div class="flex items-center gap-2 md:hidden">
+            <el-select
+              class="wk-task-status-select min-w-0 flex-1"
+              :model-value="currentStatus"
+              size="large"
+              aria-label="任务状态筛选"
+              @change="handleStatusFilter"
+            >
+              <el-option
+                v-for="tab in statusTabs"
+                :key="tab.value"
+                :label="`${tab.label} (${tab.count})`"
+                :value="tab.value"
+              />
+            </el-select>
+            <label class="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] px-3 text-xs font-bold text-slate-600">
+              <span class="whitespace-nowrap">高价值优先</span>
+              <el-switch
+                :model-value="valueFilter === 'high-impact'"
+                size="small"
+                aria-label="高价值优先"
+                @change="handleHighValueToggle"
+              />
+            </label>
+          </div>
+          <div class="hidden gap-2 overflow-x-auto md:flex">
             <button
               v-for="tab in statusTabs"
               :key="tab.value"
@@ -50,7 +75,7 @@
               {{ tab.label }} ({{ tab.count }})
             </button>
           </div>
-          <div class="flex items-center justify-end gap-3 overflow-x-auto overflow-y-hidden">
+          <div class="hidden items-center justify-end gap-3 overflow-x-auto overflow-y-hidden md:flex">
             <!-- Segmented filter -->
             <div class="flex h-9 max-w-full items-center overflow-x-auto overflow-y-hidden rounded-xl border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1 md:max-w-none">
               <button
@@ -72,7 +97,7 @@
                 高价值优先
               </button>
             </div>
-            <div v-if="!isMobile" class="flex h-9 shrink-0 items-center rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1">
+            <div class="flex h-9 shrink-0 items-center rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1">
               <button
                 type="button"
                 class="flex size-7 items-center justify-center rounded-md transition-all"
@@ -510,7 +535,7 @@ const showTaskDetail = ref(false)
 const detailTask = ref<Task | null>(null)
 const selectedTask = ref<Task | null>(null)
 
-const effectiveTaskViewMode = computed(() => taskViewMode.value)
+const effectiveTaskViewMode = computed(() => (isMobile.value ? 'card' : taskViewMode.value))
 
 // Computed properties
 const statusTabs = computed<Array<{ value: TaskStatusFilter; label: string; count: number }>>(() => {
@@ -624,6 +649,10 @@ async function handleValueFilter(filter: 'all' | 'high-impact') {
   taskStore.queryParams.sortMode = filter === 'high-impact' ? 'value' : 'default'
   taskStore.queryParams.highValueOnly = filter === 'high-impact'
   await taskStore.fetchTaskList(false)
+}
+
+function handleHighValueToggle(enabled: string | number | boolean) {
+  void handleValueFilter(enabled ? 'high-impact' : 'all')
 }
 
 function handleStatusFilter(status: TaskStatusFilter) {

@@ -2,16 +2,6 @@
   <div ref="chatViewRef" class="flex h-full" :class="{ 'flex-col': isMobile }">
     <!-- Internal Sidebar: Chat History -->
     <aside v-if="isMobile && mobilePanel === 'sessions'" class="flex flex-1 flex-col bg-slate-50/50">
-      <div class="p-6 pb-2">
-        <button
-          class="w-full flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition-all"
-          @click="handleNewSession"
-        >
-          <span class="material-symbols-outlined wk-plus-button-icon">add</span>
-          开启新对话
-        </button>
-      </div>
-
       <!-- System Notifications Menu Item -->
       <!-- <div class="px-3 py-4">
         <button
@@ -30,11 +20,8 @@
         </button>
       </div> -->
 
-      <!-- Divider -->
-      <div class="mx-6 h-px bg-slate-100 mb-4"></div>
-
       <!-- Session List -->
-      <div class="flex-1 overflow-y-auto px-3 space-y-1">
+      <div class="flex-1 overflow-y-auto px-3 pt-4 space-y-1">
         <p class="px-3 text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">最近对话</p>
 
         <div v-if="chatStore.sessionsLoading && chatStore.sessions.length === 0" class="flex justify-center py-8">
@@ -150,61 +137,55 @@
         <!-- Mobile top bar (chat detail) -->
         <div
           v-if="isMobile"
-          class="shrink-0 sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-100 px-4 py-3"
+          class="wk-mobile-chat-floating-bar pointer-events-none absolute inset-x-0 z-30 px-4 py-3"
+          :style="{ top: mobileChatFloatingBarTop }"
         >
-          <div class="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-primary transition-colors"
-              @click="mobilePanel = 'sessions'"
-            >
-              <span class="material-symbols-outlined text-[18px] leading-none">arrow_back</span>
-              历史对话
-            </button>
-
-            <button
-              v-if="!showMobileChatTopActions"
-              type="button"
-              class="h-9 px-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition-all inline-flex items-center gap-1.5"
-              @click="handleNewSession"
-            >
-              <span class="material-symbols-outlined wk-plus-button-icon text-[18px] leading-none">add</span>
-              开启新对话
-            </button>
-            <div v-else class="wk-mobile-chat-actions" :class="{ 'wk-mobile-chat-actions--single': !showMobileCustomerSummaryAction }">
+          <button
+            type="button"
+            class="wk-mobile-chat-menu-fab pointer-events-auto"
+            aria-label="打开菜单"
+            title="打开菜单"
+            @click="openMobileMainMenu"
+          >
+            <span class="material-symbols-outlined text-[22px] leading-none">menu</span>
+          </button>
+          <div v-if="showMobileChatFloatingActions" class="pointer-events-auto flex items-center justify-end gap-3">
+            <div class="wk-mobile-chat-actions" :class="{ 'wk-mobile-chat-actions--single': mobileChatFloatingActionCount === 1 }">
               <button
+                v-if="showMobileNewSessionAction"
                 type="button"
                 class="wk-mobile-chat-actions__btn"
                 aria-label="新建会话"
                 title="新建会话"
                 @click="handleNewSession"
               >
-                <span class="material-symbols-outlined text-[23px] leading-none">edit_square</span>
+                <span class="material-symbols-outlined text-[20px] leading-none">edit_square</span>
               </button>
-              <span v-if="showMobileCustomerSummaryAction" class="wk-mobile-chat-actions__divider" aria-hidden="true"></span>
+              <span v-if="showMobileNewSessionAction && showMobileCustomerSummaryAction" class="wk-mobile-chat-actions__divider" aria-hidden="true"></span>
               <button
                 v-if="showMobileCustomerSummaryAction"
                 type="button"
                 class="wk-mobile-chat-actions__btn"
-                aria-label="展开客户摘要"
-                title="展开客户摘要"
+                aria-label="客户详情"
+                title="客户详情"
                 @click="openMobileCustomerSummary"
               >
-                <span class="material-symbols-outlined text-[25px] leading-none">more_horiz</span>
+                <span class="material-symbols-outlined text-[24px] leading-none">more_horiz</span>
               </button>
             </div>
           </div>
         </div>
 
-        <div
-          class="flex-1 flex flex-col overflow-hidden relative"
-          :class="isCenteredEmptyChat ? 'justify-center -translate-y-[100px]' : ''"
-        >
+          <div
+            class="flex-1 flex flex-col overflow-hidden relative"
+            :class="isCenteredEmptyChat && !isMobile ? 'justify-center -translate-y-[100px]' : ''"
+          >
           <div
             v-if="selectedCustomer"
-            class="wk-chat-customer-header relative shrink-0 border-b pl-4 pr-1 py-2 md:pl-8"
+            class="wk-chat-customer-header relative shrink-0 border-b py-2"
+            :class="isMobile ? 'pl-16 pr-16' : 'pl-4 pr-1 md:pl-8'"
           >
-            <div class="mx-auto flex h-9 w-full items-center justify-between gap-3 pr-20">
+            <div class="mx-auto flex h-9 w-full items-center justify-between gap-3" :class="isMobile ? '' : 'pr-20'">
               <div class="flex min-w-0 flex-1 items-center gap-2">
                 <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
                   <img
@@ -221,7 +202,7 @@
                   {{ selectedCustomer.companyName }}
                 </h2>
                 <div
-                  v-if="selectedCustomer.tags?.length || canEditSelectedCustomerTags"
+                  v-if="!isMobile && (selectedCustomer.tags?.length || canEditSelectedCustomerTags)"
                   class="flex min-w-0 shrink items-center gap-1.5 overflow-hidden"
                 >
                   <span
@@ -289,7 +270,7 @@
                   </button>
                 </div>
               </div>
-              <div class="flex shrink-0 items-center gap-2">
+              <div v-if="!isMobile" class="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
                   class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-[8px] bg-primary px-2.5 text-[12px] font-semibold text-white shadow-sm shadow-primary/20 transition-colors hover:bg-primary/90"
@@ -1094,8 +1075,8 @@
                     </div>
                   </div>
 
-                  <!-- Mobile: upload + multiline input -->
-                  <div v-else class="flex items-center w-full">
+                  <!-- Mobile: controls + input in one row -->
+                  <div v-else class="wk-mobile-composer-row flex w-full items-end gap-2">
                     <el-popover
                       v-model:visible="chatUploadMenuVisible"
                       trigger="click"
@@ -1110,10 +1091,11 @@
                       <template #reference>
                         <button
                           type="button"
-                          class="w-[20px] h-full flex items-center justify-center text-[#0d0d0d] hover:text-primary transition-colors shrink-0"
+                          class="wk-mobile-composer-icon-button"
                           :disabled="isUploading"
+                          aria-label="添加文件等"
                         >
-                          <span class="material-symbols-outlined text-[0.875rem] leading-none">add</span>
+                          <WkIcon name="add-1" :box-size="16" class="shrink-0" />
                         </button>
                       </template>
                       <div
@@ -1121,7 +1103,6 @@
                         @mouseenter="clearChatUploadMenuLeaveTimer"
                         @mouseleave="handleChatUploadMenuMouseLeave"
                       >
-                        <div class="wk-chat-upload-menu__mobile-handle" aria-hidden="true"></div>
                         <button
                           type="button"
                           class="wk-chat-upload-menu__item"
@@ -1178,109 +1159,144 @@
                         </button>
                       </div>
                     </el-popover>
+
+                    <el-popover
+                      v-model:visible="chatModelPopoverVisible"
+                      trigger="click"
+                      placement="top-start"
+                      :width="300"
+                      :show-arrow="false"
+                      :teleported="true"
+                      :disabled="chatModelPickerDisabled || showAiQuotaEmptyCta"
+                      transition="el-zoom-in-bottom"
+                      popper-class="wk-chat-model-popper wk-chat-model-popper--mobile"
+                    >
+                      <template #reference>
+                        <button
+                          type="button"
+                          class="wk-mobile-composer-icon-button wk-mobile-model-trigger--icon"
+                          :class="chatModelTriggerClass"
+                          :disabled="chatModelPickerDisabled"
+                          :title="`当前模型：${chatComposerModelLabel}`"
+                          aria-label="切换模型"
+                          @click="handleChatModelTriggerClick"
+                        >
+                          <span
+                            class="relative flex size-[22px] shrink-0 items-center justify-center overflow-hidden rounded-md"
+                            :class="showAiQuotaEmptyCta ? 'bg-red-50' : 'bg-[#ececec]'"
+                            aria-hidden="true"
+                          >
+                            <span
+                              v-if="showAiQuotaEmptyCta"
+                              class="material-symbols-outlined text-[17px] leading-none text-[#8d4f34]"
+                            >bolt</span>
+                            <template v-else-if="chatStore.selectedModel">
+                              <img
+                                v-if="chatModelShowImage(chatStore.selectedModel)"
+                                :src="chatModelIconSrc(chatStore.selectedModel)"
+                                alt=""
+                                class="size-full object-fill"
+                                @error="onChatModelImageError($event)"
+                              />
+                              <span
+                                v-else
+                                class="flex size-full items-center justify-center text-[11px] font-semibold text-[#909090]"
+                              >
+                                {{ modelOptionLabel(chatStore.selectedModel).slice(0, 1) }}
+                              </span>
+                            </template>
+                            <span
+                              v-else
+                              class="flex size-full items-center justify-center text-[11px] font-semibold text-[#909090]"
+                            >
+                              ?
+                            </span>
+                          </span>
+                        </button>
+                      </template>
+                      <div class="wk-chat-model-menu">
+                        <template v-for="group in chatModelOptionGroups" :key="group.source">
+                          <div
+                            v-if="chatModelOptionGroups.length > 1"
+                            class="wk-chat-model-menu__group-label"
+                          >
+                            {{ group.label }}
+                          </div>
+                          <button
+                            v-for="option in group.options"
+                            :key="chatStore.toModelKey(option)"
+                            type="button"
+                            class="wk-chat-model-menu__item"
+                            @click="handleChatModelChange(chatStore.toModelKey(option))"
+                          >
+                            <span
+                              class="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg"
+                              aria-hidden="true"
+                            >
+                              <img
+                                v-if="chatModelShowImage(option)"
+                                :src="chatModelIconSrc(option)"
+                                alt=""
+                                class="size-5 object-fill"
+                                @error="onChatModelImageError($event)"
+                              />
+                              <span
+                                v-else
+                                class="flex size-full items-center justify-center text-[12px] font-semibold text-[#909090]"
+                              >
+                                {{ modelOptionLabel(option).slice(0, 1) }}
+                              </span>
+                            </span>
+                            <div class="min-w-0 flex-1">
+                              <div class="flex items-center justify-start gap-2">
+                                <div class="min-w-0 text-[14px] leading-tight text-[#0d0d0d]">
+                                  {{ modelOptionLabel(option) }}
+                                </div>
+                                <span
+                                  v-if="shouldShowModelMultiplier(option)"
+                                  class="shrink-0 text-xs text-slate-400"
+                                >
+                                  {{ formatModelMultiplier(option.creditMultiplier) }}
+                                </span>
+                              </div>
+                            </div>
+                            <span
+                              class="material-symbols-outlined flex size-5 shrink-0 items-center justify-center text-[20px] leading-none"
+                              :class="chatStore.selectedModelKey === chatStore.toModelKey(option) ? 'text-primary' : 'invisible'"
+                              aria-hidden="true"
+                            >
+                              check
+                            </span>
+                          </button>
+                          <button
+                            v-if="group.source === 'custom' && canManageAiConfig"
+                            type="button"
+                            class="wk-chat-model-menu__more"
+                            @click="handleOpenMoreModels"
+                          >
+                            <span class="material-symbols-outlined text-[18px] leading-none" aria-hidden="true">
+                              add_circle
+                            </span>
+                            <span class="min-w-0 flex-1 truncate">更多模型</span>
+                            <span class="material-symbols-outlined text-[18px] leading-none text-[#8f8f8f]" aria-hidden="true">
+                              chevron_right
+                            </span>
+                          </button>
+                        </template>
+                      </div>
+                    </el-popover>
+
                     <textarea
                       ref="mobileChatInputRef"
                       v-model="inputText"
                       rows="1"
-                      class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none pl-1 pr-3 py-3 text-[#0d0d0d] text-[16px] leading-[26px] placeholder:text-[#0d0d0d] placeholder:text-[16px] resize-none overflow-x-hidden overflow-y-auto min-h-[50px]"
+                      class="wk-mobile-composer-textarea min-w-0 flex-1 bg-transparent border-none focus:ring-0 focus:outline-none px-1 py-2 text-[#0d0d0d] text-[16px] leading-[24px] placeholder:text-[#0d0d0d] placeholder:text-[16px] resize-none overflow-x-hidden overflow-y-auto"
                       :placeholder="chatInputPlaceholder"
                       :disabled="isUploading"
                       @input="resizeChatTextarea"
                       @keydown.enter.exact.prevent="handleSend"
                       @paste="handlePaste"
                     />
-                  </div>
-                  </div>
-
-                  <div v-if="isMobile" class="flex items-center justify-between gap-2">
-                    <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                      <button
-                        v-if="chatStore.selectedAppCode !== 'general'"
-                        type="button"
-                        class="group/crm-toolbar h-[36px] self-start inline-flex rounded-xl px-3.5 text-sm text-[var(--wk-text-primary)] transition-all hover:bg-[var(--wk-bg-surface-hover)]"
-                        aria-pressed="true"
-                        :title="`已启用 ${selectedChatAppLabel}，点击关闭`"
-                        @click="chatStore.setSelectedAppCode('general')"
-                      >
-                        <span class="flex items-center justify-center gap-1.5">
-                          <span class="relative flex size-[22px] shrink-0 items-center justify-center">
-                            <span
-                              class="flex size-full items-center justify-center transition-opacity duration-150 max-sm:pointer-events-none max-sm:opacity-0 group-hover/crm-toolbar:pointer-events-none group-hover/crm-toolbar:opacity-0"
-                            >
-                              <WkIcon :name="selectedChatAppIcon" :size="18" class="shrink-0" />
-                            </span>
-                            <span
-                              class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-[var(--wk-bg-surface-active)] text-[var(--wk-text-primary)] opacity-0 transition-opacity duration-150 max-sm:opacity-100 group-hover/crm-toolbar:opacity-100"
-                              aria-hidden="true"
-                            >
-                              <span class="material-symbols-outlined text-[14px] leading-none">close</span>
-                            </span>
-                          </span>
-                          <span>{{ selectedChatAppLabel }}</span>
-                        </span>
-                      </button>
-                      <!-- <button
-                        type="button"
-                        class="h-10 self-start inline-flex rounded-xl border px-3.5 text-sm shadow-sm transition-all"
-                        :class="chatStore.ragEnabled
-                          ? 'border-primary/25 bg-primary/10 text-primary shadow-primary/10'
-                          : 'border-slate-200 bg-white text-[#0d0d0d] hover:border-slate-300 hover:text-slate-700'"
-                        :aria-pressed="chatStore.ragEnabled"
-                        :title="chatStore.ragEnabled ? '已启用 知识库 检索' : '点击启用 知识库 检索'"
-                        @click="chatStore.setRagEnabled(!chatStore.ragEnabled)"
-                      >
-                        <span class="flex items-center justify-center gap-1.5">
-                          <span class="material-symbols-outlined text-[18px] leading-none">
-                            menu_book
-                          </span>
-                          <span>知识库检索</span>
-                        </span>
-                      </button> -->
-                    </div>
-
-                    <button
-                      v-if="showAiQuotaEmptyCta"
-                      type="button"
-                      class="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#ead8cc] bg-[#fbf7f4] px-3 py-2 text-sm font-semibold text-[#8d4f34] shadow-sm shadow-slate-100 transition-colors hover:border-[#dec4b5] hover:bg-[#f7eee8]"
-                      @click="openAiQuotaChoiceDialog()"
-                    >
-                      <span class="material-symbols-outlined shrink-0 text-[17px] leading-none text-[#8d4f34]">bolt</span>
-                      <span class="min-w-0 truncate">额度已用完，续费/接入模型</span>
-                      <span class="material-symbols-outlined shrink-0 text-[16px] leading-none text-[#8d4f34]">expand_more</span>
-                    </button>
-
-                    <el-select
-                      v-else
-                      v-model="chatStore.selectedModelKey"
-                      class="min-w-0 flex-1"
-                      size="large"
-                      :disabled="chatStore.currentSessionIsStreaming || isUploading || chatStore.modelOptionsLoading"
-                      :placeholder="chatStore.modelOptionsLoading ? '加载模型...' : (chatStore.modelOptions.length > 0 ? '选择模型' : '暂无可选模型')"
-                      @change="handleChatModelChange"
-                    >
-                      <el-option-group
-                        v-for="group in chatModelOptionGroups"
-                        :key="group.source"
-                        :label="group.label"
-                      >
-                        <el-option
-                          v-for="option in group.options"
-                          :key="chatStore.toModelKey(option)"
-                          :label="option.displayName || option.modelName"
-                          :value="chatStore.toModelKey(option)"
-                        >
-                          <div class="flex items-center justify-between gap-4">
-                            <span class="truncate">{{ option.displayName || option.modelName }}</span>
-                            <span
-                              v-if="shouldShowModelMultiplier(option)"
-                              class="shrink-0 text-xs text-slate-400"
-                            >
-                              {{ formatModelMultiplier(option.creditMultiplier) }}
-                            </span>
-                          </div>
-                        </el-option>
-                      </el-option-group>
-                    </el-select>
 
                     <button
                       type="button"
@@ -1318,6 +1334,34 @@
                         role="tooltip"
                       >
                         {{ sendBarActionTitle }}
+                      </span>
+                    </button>
+                  </div>
+                  </div>
+
+                  <div v-if="isMobile && chatStore.selectedAppCode !== 'general'" class="wk-mobile-selected-app-row flex min-w-0 items-center justify-start">
+                    <button
+                      type="button"
+                      class="group/crm-toolbar inline-flex h-[34px] max-w-full rounded-xl pr-3.5 text-sm text-[var(--wk-text-primary)] transition-all hover:bg-[var(--wk-bg-surface-hover)]"
+                      aria-pressed="true"
+                      :title="`已启用 ${selectedChatAppLabel}，点击关闭`"
+                      @click="chatStore.setSelectedAppCode('general')"
+                    >
+                      <span class="flex min-w-0 items-center justify-center gap-1.5">
+                        <span class="relative flex size-[22px] shrink-0 items-center justify-center">
+                          <span
+                            class="flex size-full items-center justify-center transition-opacity duration-150 max-sm:pointer-events-none max-sm:opacity-0 group-hover/crm-toolbar:pointer-events-none group-hover/crm-toolbar:opacity-0"
+                          >
+                            <WkIcon :name="selectedChatAppIcon" :size="18" class="shrink-0" />
+                          </span>
+                          <span
+                            class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-[var(--wk-bg-surface-active)] text-[var(--wk-text-primary)] opacity-0 transition-opacity duration-150 max-sm:opacity-100 group-hover/crm-toolbar:opacity-100"
+                            aria-hidden="true"
+                          >
+                            <span class="material-symbols-outlined text-[14px] leading-none">close</span>
+                          </span>
+                        </span>
+                        <span class="min-w-0 truncate">{{ selectedChatAppLabel }}</span>
                       </span>
                     </button>
                   </div>
@@ -1736,6 +1780,7 @@ import { isRequestErrorHandled } from '@/utils/requestError'
 import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import { formatFileSize, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 import { appEvents, APP_EVENT } from '@/utils/events'
+import { shouldShowMobileCustomerSummaryAction } from '@/utils/chatMobileActions'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, ChatModelOption } from '@/types/common'
 import type { Contact, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAttachment } from '@/types/customer'
 import { wkIconNames } from '@/components/common/wkIcon'
@@ -1783,7 +1828,7 @@ const chatViewRef = ref<HTMLElement | null>(null)
 const chatMainAreaRef = ref<HTMLElement | null>(null)
 const messagesContainer = ref<HTMLElement | null>(null)
 const showScrollToBottomButton = ref(false)
-const mobilePanel = ref<'sessions' | 'chat'>('sessions')
+const mobilePanel = ref<'sessions' | 'chat'>('chat')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 /** 桌面端多行输入（模板中 v-if="!isMobile" 的 textarea） */
 const pcChatInputRef = ref<HTMLTextAreaElement | null>(null)
@@ -2332,13 +2377,27 @@ const userAvatarLoadFailed = ref(false)
 const isChatEmpty = computed(() => chatStore.messages.length === 0)
 const isCustomerContextChat = computed(() => Boolean(selectedCustomerId.value || currentSessionCustomerId.value))
 const isCenteredEmptyChat = computed(() => isChatEmpty.value && !isCustomerContextChat.value)
-const showMobileChatTopActions = computed(() =>
+const mobileChatFloatingBarTop = computed(() => '0px')
+const showMobileCustomerSummaryAction = computed(() =>
+  shouldShowMobileCustomerSummaryAction({
+    isMobile: isMobile.value,
+    currentView: currentView.value,
+    mobilePanel: mobilePanel.value,
+    hasCustomerContext: isCustomerContextChat.value,
+  })
+)
+const showMobileNewSessionAction = computed(() =>
   isMobile.value
     && currentView.value === 'chat'
     && mobilePanel.value === 'chat'
-    && chatStore.messages.length > 0
+    && Boolean(chatStore.currentSessionId)
+    && !chatStore.isNewSessionPending
 )
-const showMobileCustomerSummaryAction = computed(() => showMobileChatTopActions.value && isCustomerContextChat.value)
+const mobileChatFloatingActionCount = computed(() =>
+  (showMobileNewSessionAction.value ? 1 : 0)
+  + (showMobileCustomerSummaryAction.value ? 1 : 0)
+)
+const showMobileChatFloatingActions = computed(() => mobileChatFloatingActionCount.value > 0)
 const mobileCustomerSummaryName = computed(() =>
   selectedCustomer.value?.companyName || boundCustomerName.value || '客户'
 )
@@ -2350,6 +2409,7 @@ const showMobileSummaryVoiceAction = computed(() =>
 )
 const chatMessagesAreaClass = computed(() => {
   if (!isChatEmpty.value) return 'wk-chat-messages--scrollable flex-1 overflow-y-auto pb-4 pt-6 md:pt-8'
+  if (isMobile.value) return 'flex-1 overflow-hidden py-6'
   return isCustomerContextChat.value ? 'flex-1 overflow-hidden py-6' : 'overflow-hidden py-6'
 })
 
@@ -2422,7 +2482,7 @@ function revokeAllSelectedFilePreviewUrls() {
   for (const file of selectedFiles.value) revokeSelectedFilePreviewUrl(file)
 }
 
-/** 侧栏切换会话时移动端默认停在「历史」列表，输入区未挂载，需先切到聊天主区才能 focus。 */
+/** Ensure the composer is mounted before focusing on mobile. */
 function prepareComposerForFocus() {
   currentView.value = 'chat'
   if (isMobile.value) {
@@ -2687,6 +2747,9 @@ function handleSelectedCustomerDetailRefresh(payload?: CustomerDetailRefreshPayl
 async function handleSelectCustomerById(customerId: string) {
   selectedCustomerId.value = customerId
   currentView.value = 'chat'
+  if (isMobile.value) {
+    mobilePanel.value = 'chat'
+  }
   isPinnedToBottom.value = true
   chatStore.setSelectedAppCode('crm')
   await ensureSelectedCustomerDetail(customerId)
@@ -3519,6 +3582,10 @@ function applyKnowledgeDocPrompt(text: string) {
   chatStore.requestComposerFocus()
 }
 
+function openMobileMainMenu() {
+  appEvents.emit(APP_EVENT.MOBILE_MAIN_MENU_OPEN)
+}
+
 async function handleNewSession() {
   isPinnedToBottom.value = true
   closeMobileCustomerSummary()
@@ -3538,10 +3605,10 @@ async function handleSelectSession(sessionId: string) {
   isPinnedToBottom.value = true
   closeMobileCustomerSummary()
   currentView.value = 'chat'
-  await chatStore.selectSession(sessionId)
   if (isMobile.value) {
     mobilePanel.value = 'chat'
   }
+  await chatStore.selectSession(sessionId)
   chatStore.requestComposerFocus()
 }
 
@@ -3809,16 +3876,49 @@ void sendQuickMessage
     0 0 0 1px rgb(var(--wk-primary-rgb) / 0.12);
 }
 
+.wk-mobile-chat-floating-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wk-mobile-chat-menu-fab {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(255 255 255 / 0.78);
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.72);
+  color: #0d0d0d;
+  box-shadow:
+    0 16px 42px rgb(15 23 42 / 0.14),
+    inset 0 1px 0 rgb(255 255 255 / 0.92);
+  backdrop-filter: blur(18px);
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.wk-mobile-chat-menu-fab:active {
+  transform: scale(0.94);
+}
+
+.wk-mobile-chat-menu-fab:hover {
+  background: rgb(255 255 255 / 0.88);
+}
+
 .wk-mobile-chat-actions {
   display: inline-flex;
-  height: 48px;
+  height: 42px;
   min-width: 116px;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   border: 1px solid rgb(255 255 255 / 0.75);
   border-radius: 9999px;
-  background: rgb(255 255 255 / 0.88);
+  background: rgb(255 255 255 / 0.5);
   box-shadow:
     0 18px 50px rgb(15 23 42 / 0.12),
     inset 0 1px 0 rgb(255 255 255 / 0.9);
@@ -3851,6 +3951,51 @@ void sendQuickMessage
   width: 1px;
   height: 22px;
   background: rgb(13 13 13 / 0.08);
+}
+
+.wk-mobile-composer-row {
+  min-height: 40px;
+}
+
+.wk-mobile-composer-icon-button {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: #0d0d0d;
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.wk-mobile-composer-icon-button:hover {
+  background: var(--wk-bg-surface-hover);
+}
+
+.wk-mobile-composer-icon-button:active {
+  transform: scale(0.94);
+}
+
+.wk-mobile-composer-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.wk-mobile-model-trigger--icon {
+  border-width: 1px;
+  border-style: solid;
+  padding: 0;
+}
+
+.wk-mobile-composer-textarea {
+  min-height: 40px;
+  max-height: 184px;
+  scrollbar-gutter: stable;
+}
+
+.wk-mobile-selected-app-row {
+  padding: 0 2px 2px;
 }
 
 .wk-mobile-customer-summary {
@@ -4472,7 +4617,7 @@ void sendQuickMessage
 
 .wk-chat-model-popper.el-popper {
   padding: 0 !important;
-  border-radius: 14px !important;
+  border-radius: 8px !important;
   overflow: hidden;
   border: 1px solid var(--wk-border-subtle) !important;
   background: var(--wk-bg-surface) !important;
@@ -4540,6 +4685,31 @@ void sendQuickMessage
 .wk-chat-model-menu__more:hover {
   border-color: color-mix(in srgb, var(--wk-primary) 24%, var(--wk-border-subtle));
   background: color-mix(in srgb, var(--wk-primary) 8%, var(--wk-bg-surface));
+}
+
+@media (max-width: 767px) {
+  :global(.wk-chat-model-select-popper.el-popper) {
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    border-radius: 8px !important;
+    overflow: hidden;
+  }
+
+  :global(.wk-chat-model-select-popper .el-select-dropdown) {
+    max-width: 100%;
+    border-radius: 8px;
+  }
+
+  :global(.wk-chat-model-select-popper .el-select-dropdown__item) {
+    padding-right: 12px;
+  }
+
+  :global(.wk-chat-model-select-popper .el-popper__arrow) {
+    display: none !important;
+  }
 }
 
 

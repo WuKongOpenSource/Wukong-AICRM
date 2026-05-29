@@ -76,8 +76,7 @@
               <div class="flex size-6 items-center justify-center rounded bg-primary/10 text-primary">
                 <span class="material-symbols-outlined text-sm">book</span>
               </div>
-              <h3 class="text-lg font-bold text-slate-900">{{ getCategoryLabel() }}</h3>
-              <span class="ml-1 text-sm text-slate-400">{{ totalCount }} 项结果</span>
+              <h3 class="text-lg font-bold text-slate-900">知识库</h3>
             </div>
             <div
               class="wk-native-input-shell flex min-w-0 w-full flex-1 items-center rounded-xl border border-slate-200 bg-white px-1 transition-all focus-within:border-primary md:max-w-md lg:max-w-lg"
@@ -126,31 +125,6 @@
               >
                 AI 话术 / SOP 生成
               </button>
-              <!-- View Mode Toggle -->
-              <div class="flex rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1">
-                <button
-                  type="button"
-                  @click="setViewMode('card')"
-                  :class="[
-                    'rounded-md p-1.5 transition-all',
-                    viewMode === 'card' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-slate-400 hover:text-slate-600'
-                  ]"
-                  title="网格视图"
-                >
-                  <span class="material-symbols-outlined block text-sm">grid_view</span>
-                </button>
-                <button
-                  type="button"
-                  @click="setViewMode('list')"
-                  :class="[
-                    'rounded-md p-1.5 transition-all',
-                    viewMode === 'list' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-slate-400 hover:text-slate-600'
-                  ]"
-                  title="列表视图"
-                >
-                  <span class="material-symbols-outlined block text-sm">list</span>
-                </button>
-              </div>
             </div>
           </div>
 
@@ -270,7 +244,7 @@
 
           <!-- Document Cards Grid -->
           <div
-            v-else-if="viewMode === 'card'"
+            v-else-if="resolvedViewMode === 'card'"
             class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
           >
             <!-- AI 话术生成器（首位） -->
@@ -547,7 +521,7 @@
 
           <!-- Pagination -->
           <div
-            v-if="showPagination && viewMode !== 'list'"
+            v-if="showPagination && resolvedViewMode !== 'list'"
             :class="[
               'mt-6 flex items-center',
               isMobile ? 'justify-center' : 'justify-end'
@@ -704,6 +678,7 @@ const userStore = useUserStore()
 const DEFAULT_PAGE_SIZE = 10
 const DESKTOP_LIST_PAGE_SIZE = 10
 const viewMode = ref<'card' | 'list'>('list')
+const resolvedViewMode = computed<'card' | 'list'>(() => isMobile.value ? 'list' : viewMode.value)
 const loading = ref(false)
 const showUploadDialog = ref(false)
 const knowledgeUploadDialogRef = ref<InstanceType<typeof KnowledgeUploadDialog> | null>(null)
@@ -1040,12 +1015,6 @@ function resetAiSearchView() {
 
 function setViewMode(mode: 'card' | 'list') {
   viewMode.value = mode
-}
-
-function getCategoryLabel(): string {
-  if (selectedCategory.value === 'all') return '全部知识推荐'
-  const cat = categories.find(c => c.id === selectedCategory.value)
-  return cat?.label ?? '推荐知识'
 }
 
 function getDesktopCategoryLabel(id: string, label: string): string {

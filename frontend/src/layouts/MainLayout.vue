@@ -88,26 +88,6 @@
           </span>
         </button>
       </div>
-      <!-- pl-[10px] pr-[10px] py-[6px] mt-[0px] ml-[2px] mr-[6px] -->
-      <!-- Chat: New session (fixed, not scroll with nav) -->
-      <div class="px-3 pt-1 mb-[0px] pr-[10px]" :class="primarySidebarContentCollapsed ? '!px-2' : ''">
-        <button
-          class="flex items-center rounded-lg py-2 text-sm font-normal text-[#0d0d0d] transition-colors"
-          :class="[
-            chatStore.isNewSessionPending && route.path.startsWith('/chat') ? 'bg-[#f3f3f3]' : 'hover:bg-[#f9f9f9]',
-            primarySidebarContentCollapsed
-              ? 'mx-auto w-[35px] shrink-0 justify-center px-0'
-              : 'ml-[2px] mr-[6px] w-full gap-2 pl-[10px] pr-[10px] max-w-[248px]',
-          ]"
-          :title="primarySidebarContentCollapsed ? '新对话' : undefined"
-          @click="handleNewSession"
-        >
-          <!-- <span class="material-symbols-outlined wk-plus-button-icon text-[18px] leading-none">edit_square</span> -->
-          <WkIcon name="new-chat" :size="18" class="shrink-0" />
-          <span style="margin-left: 2px;" v-if="!primarySidebarContentCollapsed">新对话</span>
-        </button>
-      </div>
-
       <div class="ml-0 h-px w-full shrink-0 transition-colors duration-150 mr-2">
         <div
           v-if="primaryNavHasScrollbar"
@@ -547,7 +527,7 @@
       </aside>
     </Transition>
 
-    <div v-if="isMobile" class="fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-2 border-b border-slate-200 bg-white px-4">
+    <div v-if="showMobileTopBar" class="fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-2 border-b border-slate-200 bg-white px-4">
       <button
         @click="drawerVisible = true"
         class="flex size-10 shrink-0 items-center justify-center rounded-lg text-[#0d0d0d] hover:bg-slate-100"
@@ -561,7 +541,7 @@
           <input
             v-model="globalSearchKeyword"
             type="text"
-            class="w-full rounded-lg border-none bg-slate-100 py-2 pl-10 pr-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/50"
+            class="wk-mobile-global-search-input w-full rounded-lg border-none bg-slate-100 py-2 pl-10 pr-4 text-sm outline-none transition-colors"
             placeholder="搜索客户、联系人、任务、日程、知识库..."
             @focus="handleGlobalSearchFocus"
             @keydown.enter.prevent="handleGlobalSearchEnter"
@@ -687,7 +667,7 @@
               </button>
             </div>
           </div>
-          <nav class="wk-scrollbar-gutter-stable flex-1 space-y-1 overflow-y-auto px-2 pb-4 pt-1">
+          <nav class="wk-scrollbar-gutter-stable flex-1 space-y-1 overflow-y-auto px-2 pb-[104px] pt-1">
             <template v-for="group in mobileMainNavGroups" :key="group.title || 'default'">
               <div v-if="group.title" class="pb-2 pt-4">
                 <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">{{ group.title }}</p>
@@ -836,23 +816,13 @@
               </template>
             </div>
 
-            <div v-if="showConfigSection" class="pb-2 pt-2">
-              <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">配置与服务</p>
-            </div>
-
-            <template v-if="showConfigSection">
-              <button
-                v-for="item in configNavItems"
-                :key="item.route"
-                @click="mobileNavigate(item.route, item.query)"
-                class="flex w-full items-center gap-3 rounded-lg px-3 py-[1px] transition-colors"
-                :class="isActive(item.route, item.query) ? 'bg-primary/10 text-primary' : 'text-[#0d0d0d] hover:bg-slate-100'"
-              >
-                <WkIcon :name="item.icon" :size="20" class="shrink-0" />
-                <span class="text-sm font-medium">{{ item.label }}</span>
-              </button>
-            </template>
           </nav>
+
+          <FloatingActionButton
+            v-if="showMobileDrawerNewChatButton"
+            placement="menu"
+            @new-chat="handleFloatingNewChat"
+          />
 
           <Transition name="mobile-session-menu-backdrop">
             <div
@@ -877,78 +847,61 @@
             >
               <button
                 type="button"
-                class="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[16px] font-medium text-[#0d0d0d] transition-colors active:bg-[#f3f3f3]"
+                class="flex w-full items-center gap-3 rounded-[8px] px-3 py-3 text-left text-[14px] font-medium text-[#0d0d0d] transition-colors active:bg-[#f3f3f3]"
                 role="menuitem"
                 @click="handleMobileSessionPin"
               >
-                <span class="material-symbols-outlined inline-flex size-6 shrink-0 items-center justify-center text-[24px] leading-none">vertical_align_top</span>
+                <span class="material-symbols-outlined inline-flex size-4 shrink-0 items-center justify-center text-[20px] leading-none">vertical_align_top</span>
                 <span class="min-w-0 flex-1">置顶</span>
               </button>
               <div class="mx-2 my-1 h-px bg-slate-200/80" role="separator" />
               <button
                 type="button"
-                class="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[16px] font-medium text-[#c2403f] transition-colors active:bg-[#ffe1e0]"
+                class="flex w-full items-center gap-3 rounded-[8px] px-3 py-3 text-left text-[14px] font-medium text-[#c2403f] transition-colors active:bg-[#ffe1e0]"
                 role="menuitem"
                 @click="handleMobileSessionDelete"
               >
-                <span class="material-symbols-outlined inline-flex size-6 shrink-0 items-center justify-center text-[24px] leading-none">delete</span>
+                <span class="material-symbols-outlined inline-flex size-4 shrink-0 items-center justify-center text-[20px] leading-none">delete</span>
                 <span class="min-w-0 flex-1">删除</span>
               </button>
             </div>
           </Transition>
 
-          <div class="border-t border-slate-200 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-            <button
-            v-if="false"
-              type="button"
-              class="mb-2 flex w-full items-center gap-3 rounded-xl bg-slate-50 p-3 text-slate-600 transition-colors hover:bg-slate-100 hover:text-primary"
-              @click="toggleTheme"
-            >
-              <span class="material-symbols-outlined text-[20px] leading-none">{{ themeIcon }}</span>
-              <span class="text-sm font-semibold">{{ themeButtonLabel }}</span>
-            </button>
-            <div class="flex cursor-pointer items-center gap-3 rounded-xl bg-slate-50 p-3" @click="showUserMenu = !showUserMenu">
-              <div v-if="userStore.avatar" class="size-9 overflow-hidden rounded-full">
-                <img :src="userStore.avatar" class="h-full w-full object-cover" alt="avatar" />
-              </div>
-              <div v-else class="flex size-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
-                {{ userStore.realname?.charAt(0) || 'U' }}
-              </div>
-              <div class="min-w-0 flex-1">
-                <p class="truncate text-sm font-semibold text-slate-900">{{ userStore.realname || userStore.username }}</p>
-                <p class="truncate text-xs text-slate-500">{{ userStore.userInfo?.deptName || '用户' }}</p>
-              </div>
-              <span class="material-symbols-outlined text-base text-slate-400">unfold_more</span>
-            </div>
-          </div>
+          <Transition name="drawer-overlay">
+            <div
+              v-if="isMobile && drawerVisible && showUserMenu"
+              class="absolute inset-0 z-10 bg-slate-900/35 backdrop-blur-[2px]"
+              @click="showUserMenu = false"
+            />
+          </Transition>
 
           <Transition name="profile-drawer">
             <div
               v-if="isMobile && drawerVisible && showUserMenu"
-              class="absolute bottom-0 left-0 right-0 z-20 flex h-[80%] w-full flex-col overflow-hidden bg-[#f4f4f7]"
+              class="absolute bottom-0 left-0 right-0 z-20 flex h-[80%] w-full flex-col overflow-hidden rounded-t-[34px] border-t border-white/70 bg-[#f4f4f7] text-[14px] shadow-[0_-18px_50px_rgba(15,23,42,0.18)]"
             >
-              <div class="relative flex h-16 shrink-0 items-center justify-center px-4 pt-2">
-                <h2 class="text-[18px] font-bold text-[#0d0d0d]">设置</h2>
+              <div class="relative flex h-14 shrink-0 items-center justify-center px-4 pt-2">
+                <h2 class="text-[16px] font-bold text-[#0d0d0d]">设置</h2>
                 <button
                   type="button"
-                  class="absolute right-4 top-4 flex size-10 items-center justify-center rounded-full bg-white text-[#0d0d0d] shadow-[0_8px_22px_rgba(15,23,42,0.08)] transition-colors active:bg-slate-50"
+                  class="absolute right-4 top-3.5 flex size-9 items-center justify-center rounded-full bg-white text-[#0d0d0d] shadow-[0_8px_22px_rgba(15,23,42,0.08)] transition-colors active:bg-slate-50"
                   aria-label="关闭个人账户"
                   @click="showUserMenu = false"
                 >
-                  <span class="material-symbols-outlined text-[30px] leading-none">close</span>
+                  <span class="material-symbols-outlined text-[24px] leading-none">close</span>
                 </button>
               </div>
 
               <div class="flex-1 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-                <section class="flex flex-col items-center pb-8 pt-6 text-center">
-                  <div class="flex size-24 items-center justify-center overflow-hidden rounded-full bg-[#a5ab87] text-[34px] font-medium text-white">
+                <section class="flex flex-col items-center pb-6 pt-5 text-center">
+                  <div class="flex size-20 items-center justify-center overflow-hidden rounded-full bg-[#a5ab87] text-[28px] font-medium text-white">
                     <img v-if="userStore.avatar" :src="userStore.avatar" class="h-full w-full object-cover" alt="avatar" />
                     <span v-else>{{ userAvatarInitials }}</span>
                   </div>
-                  <h3 class="mt-4 max-w-full truncate text-[24px] font-bold leading-tight text-[#0d0d0d]">
+                  <h3 class="mt-3 max-w-full truncate text-[20px] font-bold leading-tight text-[#0d0d0d]">
                     {{ userDisplayName }}
                   </h3>
-                  <p class="mt-1 max-w-full truncate text-[16px] text-[#6b6b6b]">
+                  <p class="mt-1 max-w-full truncate text-[14px] text-[#6b6b6b]">
                     {{ userAccountName }}
                   </p>
                   <button
@@ -960,28 +913,28 @@
                   </button>
                 </section>
 
-                <section class="space-y-3">
-                  <p class="px-2 text-[18px] font-bold text-[#8a8a92]">账户</p>
-                  <div class="overflow-hidden rounded-[26px] bg-white px-5">
+                <section class="space-y-2.5">
+                  <p class="px-2 text-[14px] font-semibold text-[#8a8a92]">账户</p>
+                  <div class="overflow-hidden rounded-[22px] bg-white px-4">
                     <button
-                      v-for="item in configNavItems"
+                      v-for="item in mobileProfileSettingsItems"
                       :key="item.route"
                       type="button"
-                      class="flex w-full items-center gap-4 border-b border-[#ededed] py-4 text-left text-[#0d0d0d] last:border-b-0"
-                      @click="mobileProfileNavigate(item.route, item.query)"
+                      class="flex w-full items-center gap-3 border-b border-[#ededed] py-3.5 text-left text-[#0d0d0d] last:border-b-0"
+                      @click="mobileNavigate(item.route, item.query)"
                     >
-                      <WkIcon :name="item.icon" :box-size="22" class="shrink-0" />
-                      <span class="min-w-0 flex-1 truncate text-[17px] font-medium">{{ item.label }}</span>
-                      <span class="material-symbols-outlined shrink-0 text-[24px] leading-none text-[#c7c7cc]">chevron_right</span>
+                      <WkIcon :name="item.icon" :box-size="20" class="shrink-0" />
+                      <span class="min-w-0 flex-1 truncate text-[14px] font-medium">{{ item.label }}</span>
+                      <span class="material-symbols-outlined shrink-0 text-[20px] leading-none text-[#c7c7cc]">chevron_right</span>
                     </button>
 
                     <button
                       type="button"
-                      class="flex w-full items-center gap-4 py-4 text-left text-rose-600"
+                      class="flex w-full items-center gap-3 py-3.5 text-left text-rose-600"
                       @click="handleLogout"
                     >
-                      <span class="material-symbols-outlined inline-flex size-[22px] shrink-0 items-center justify-center text-[22px] leading-none">logout</span>
-                      <span class="min-w-0 flex-1 truncate text-[17px] font-medium">退出登录</span>
+                      <span class="material-symbols-outlined inline-flex size-5 shrink-0 items-center justify-center text-[20px] leading-none">logout</span>
+                      <span class="min-w-0 flex-1 truncate text-[14px] font-medium">退出登录</span>
                     </button>
                   </div>
                 </section>
@@ -1036,11 +989,11 @@
               </button>
 
               <button
-                v-for="item in configNavItems"
+                v-for="item in mobileProfileSettingsItems"
                 :key="item.route"
                 class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
                 :class="isActive(item.route, item.query) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
-                @click="navigateTo(item.route, item.query)"
+                @click="mobileNavigate(item.route, item.query)"
               >
                 <WkIcon
                   :name="item.icon"
@@ -1067,7 +1020,7 @@
     <div
       ref="mainContentColumnRef"
       class="flex flex-1 flex-col overflow-hidden"
-      :class="{ 'pt-14': isMobile }"
+      :class="{ 'pt-14': showMobileTopBar }"
     >
       <header
         v-if="showDesktopHeader"
@@ -1149,7 +1102,10 @@
         </template>
       </header>
 
-      <main class="flex-1 overflow-y-auto wk-safe-bottom">
+      <main
+        class="flex-1 wk-safe-bottom"
+        :class="isChatRoute ? 'overflow-hidden' : 'overflow-y-auto'"
+      >
         <router-view v-slot="{ Component }">
           <Transition name="page-fade" mode="out-in">
             <component :is="Component" />
@@ -1160,6 +1116,7 @@
 
     <CustomerUpsertDialog v-model="showCreateCustomer" mode="create" @success="handleCreateCustomerSuccess" />
     <AccountSettingsModal v-model="showAccountSettingsModal" />
+    <ProfileEditBottomSheet v-model="showProfileEditSheet" />
     <Teleport to="body">
       <Transition name="customer-search-dialog">
         <div
@@ -1183,12 +1140,12 @@
               class="flex shrink-0 items-center gap-3 px-4 pb-2 pt-[calc(1rem+env(safe-area-inset-top))]"
             >
               <div class="flex h-10 min-w-0 flex-1 items-center gap-3 rounded-full bg-white px-4 shadow-[0_10px_28px_rgba(15,23,42,0.12)]">
-                <span class="material-symbols-outlined shrink-0 text-[30px] leading-none text-[#0d0d0d]">search</span>
+                <span class="material-symbols-outlined shrink-0 text-[20px] leading-none text-[#0d0d0d]">search</span>
                 <input
                   ref="customerSearchInputRef"
                   v-model="customerSearchKeyword"
                   type="search"
-                  class="h-8 min-w-0 flex-1 border-none bg-transparent text-[16px] font-medium text-[#0d0d0d] outline-none placeholder:text-[#8f8f8f]"
+                  class="h-8 min-w-0 flex-1 border-none bg-transparent text-[14px] font-medium text-[#0d0d0d] outline-none placeholder:text-[#8f8f8f]"
                   placeholder="搜索客户"
                   autocomplete="off"
                   autocapitalize="off"
@@ -1208,12 +1165,12 @@
               </div>
               <button
                 type="button"
-                class="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-[#0d0d0d] shadow-[0_10px_28px_rgba(15,23,42,0.10)] transition-colors active:bg-slate-50"
+                class="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-[#0d0d0d] shadow-[0_10px_28px_rgba(15,23,42,0.10)] transition-colors active:bg-slate-50"
                 aria-label="关闭搜索"
                 title="关闭搜索"
                 @click="closeCustomerSearchDialog"
               >
-                <span class="material-symbols-outlined text-[28px] leading-none">close</span>
+                <span class="material-symbols-outlined text-[22px] leading-none">close</span>
               </button>
             </div>
             <div v-else class="flex h-16 shrink-0 items-center gap-3 border-b border-[#ececec] px-6">
@@ -1288,7 +1245,6 @@
         </div>
       </Transition>
     </Teleport>
-    <FloatingActionButton v-if="route.path !== '/chat' && !chatDrawerOpen" />
     <AiChatDrawer />
     <AiQuotaModals />
   </div>
@@ -1304,6 +1260,7 @@ import AiChatDrawer from '@/components/common/AiChatDrawer.vue'
 import AiQuotaHeaderPopover from '@/components/layout/AiQuotaHeaderPopover.vue'
 import AiQuotaModals from '@/components/layout/AiQuotaModals.vue'
 import AccountSettingsModal from '@/views/profile/components/AccountSettingsModal.vue'
+import ProfileEditBottomSheet from '@/views/profile/components/ProfileEditBottomSheet.vue'
 import ChatSessionActionsPopover from '@/components/layout/ChatSessionActionsPopover.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import type { WkIconName } from '@/components/common/wkIcon'
@@ -1434,6 +1391,7 @@ function onCollapsedPrimarySidebarLeave() {
 function closeMobileDrawer() {
   drawerVisible.value = false
   showUserMenu.value = false
+  showProfileEditSheet.value = false
   closeMobileSessionActionMenu()
   clearMobileSessionLongPressTimer()
   resetMobileDrawerSwipe()
@@ -1599,6 +1557,7 @@ const sidebarCustomersTotal = ref(0)
 const sidebarCustomersHasMore = ref(true)
 const showUserMenu = ref(false)
 const showAccountSettingsModal = ref(false)
+const showProfileEditSheet = ref(false)
 const showCreateCustomer = ref(false)
 const customerSearchDialogVisible = ref(false)
 const customerSearchKeyword = ref('')
@@ -1622,6 +1581,7 @@ let customerSearchRequestId = 0
 let customerSearchFocusRequestId = 0
 let removeChatComposerNarrowListener: (() => void) | null = null
 let removeCustomerListRefreshListener: (() => void) | null = null
+let removeMobileMainMenuOpenListener: (() => void) | null = null
 
 type ChatComposerNarrowPayload = {
   narrow?: boolean
@@ -1635,6 +1595,8 @@ type CustomerListRefreshPayload = {
 
 const chatComposerNarrow = ref(false)
 const chatComposerAutoCollapseActive = ref(false)
+const isChatRoute = computed(() => route.path.startsWith('/chat'))
+const showMobileTopBar = computed(() => isMobile.value && !isChatRoute.value)
 
 function getChatComposerWidthIfSidebarExpanded(width: number): number {
   return primarySidebarCollapsed.value ? width - PRIMARY_SIDEBAR_WIDTH_DELTA_PX : width
@@ -1684,6 +1646,11 @@ function handleChatComposerNarrowChange(payload?: ChatComposerNarrowPayload) {
   if (!primarySidebarCollapsed.value) {
     chatComposerAutoCollapseActive.value = false
   }
+}
+
+function openMobileMainMenuFromChat() {
+  if (!isMobile.value) return
+  drawerVisible.value = true
 }
 
 const showSidebarCustomers = computed(() => userStore.hasPermission('customer:view'))
@@ -1769,16 +1736,7 @@ function groupMainNavItems(items: MainNavItem[]): MainNavGroup[] {
 const pcMainNavGroups = computed(() => groupMainNavItems(pcMainNavItems.value))
 const mobilePrimaryNavItems = computed<MainNavItem[]>(() =>
   mainNavItems.value
-    .filter(item => item.key !== 'customer-search')
-    .map(item => {
-      if (item.key !== 'chat') return item
-      return {
-        ...item,
-        icon: 'new-chat',
-        label: '新对话',
-        groupTitle: undefined,
-      }
-    })
+    .filter(item => item.key !== 'customer-search' && item.key !== 'chat')
 )
 const mobileMainNavGroups = computed(() => groupMainNavItems(mobilePrimaryNavItems.value))
 
@@ -1786,7 +1744,19 @@ const configNavItems = computed(() =>
   allConfigNavItems.filter(item => item.permission.some(permission => userStore.hasPermission(permission)))
 )
 
+const mobileProfileSettingsItems = computed(() =>
+  configNavItems.value.filter(item => item.route.startsWith('/settings'))
+)
+
 const showConfigSection = computed(() => configNavItems.value.length > 0)
+const showMobileDrawerNewChatButton = computed(() =>
+  isMobile.value
+    && drawerVisible.value
+    && !chatDrawerOpen.value
+    && !customerSearchDialogVisible.value
+    && !showUserMenu.value
+    && !mobileSessionActionMenuSession.value
+)
 const userDisplayName = computed(() => userStore.realname || userStore.username || '用户')
 const userAccountName = computed(() => userStore.username || userStore.userInfo?.email || userStore.userInfo?.mobile || '用户')
 const userAvatarInitials = computed(() => userDisplayName.value.trim().slice(0, 2).toUpperCase() || 'U')
@@ -1873,6 +1843,7 @@ watch(
   () => route.fullPath,
   () => {
     showUserMenu.value = false
+    showProfileEditSheet.value = false
     closeMobileSessionActionMenu()
     closeGlobalSearchDropdown()
     if (selectedPrimaryKey.value && !selectedPrimaryItem.value) {
@@ -1891,6 +1862,7 @@ watch(
   isOpen => {
     if (!isOpen) {
       showUserMenu.value = false
+      showProfileEditSheet.value = false
       closeMobileSessionActionMenu()
       clearMobileSessionLongPressTimer()
       mobileSessionLongPressConsumed.value = false
@@ -1899,6 +1871,9 @@ watch(
 )
 
 watch(showUserMenu, open => {
+  if (!open) {
+    showProfileEditSheet.value = false
+  }
   if (open && !isMobile.value && primarySidebarCollapsed.value) {
     runLayoutNarrowProgrammatic(() => {
       primarySidebarCollapsed.value = false
@@ -2022,6 +1997,7 @@ onMounted(() => {
   removeCustomerListRefreshListener = appEvents.on<CustomerListRefreshPayload>(APP_EVENT.CUSTOMER_LIST_REFRESH, (payload) => {
     void fetchSidebarCustomers({ reset: true, preserveScroll: payload?.preserveScroll !== false })
   })
+  removeMobileMainMenuOpenListener = appEvents.on(APP_EVENT.MOBILE_MAIN_MENU_OPEN, openMobileMainMenuFromChat)
 
   if (typeof ResizeObserver !== 'undefined') {
     primaryNavResizeObserver = new ResizeObserver(() => updatePrimaryNavScrollbar())
@@ -2056,6 +2032,8 @@ onBeforeUnmount(() => {
   removeChatComposerNarrowListener = null
   removeCustomerListRefreshListener?.()
   removeCustomerListRefreshListener = null
+  removeMobileMainMenuOpenListener?.()
+  removeMobileMainMenuOpenListener = null
   if (mainContentColumnResizeObserver) {
     mainContentColumnResizeObserver.disconnect()
     mainContentColumnResizeObserver = null
@@ -2319,6 +2297,13 @@ async function handleNewSession() {
   chatStore.requestComposerFocus()
 }
 
+async function handleFloatingNewChat() {
+  if (isMobile.value) {
+    closeMobileDrawer()
+  }
+  await handleNewSession()
+}
+
 async function handleSelectSession(sessionId: string) {
   selectedPrimaryKey.value = ''
   await router.push('/chat')
@@ -2533,11 +2518,11 @@ function handleMobileCreateCustomer() {
   showCreateCustomer.value = true
 }
 
-function mobileProfileNavigate(path: string, query?: Record<string, string>) {
-  mobileNavigate(path, query)
-}
-
 function handleOpenAccountSettings() {
+  if (isMobile.value) {
+    showProfileEditSheet.value = true
+    return
+  }
   showUserMenu.value = false
   showAccountSettingsModal.value = true
 }
@@ -2723,6 +2708,26 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
   font-size: 16px;
   pointer-events: none;
   outline: none;
+}
+
+.wk-mobile-global-search-input {
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  background-color: rgb(241 245 249) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  transition-property: background-color, color;
+}
+
+.wk-mobile-global-search-input:hover,
+.wk-mobile-global-search-input:focus,
+.wk-mobile-global-search-input:focus-visible,
+.wk-mobile-global-search-input:active {
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 .wk-primary-sidebar {
