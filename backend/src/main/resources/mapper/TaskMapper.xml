@@ -13,8 +13,10 @@
             t.assigned_to,
             u.realname AS assigned_to_name,
             t.customer_id,
+            t.relation_id,
             t.source_follow_up_id,
             c.company_name AS customer_name,
+            r.name AS relation_name,
             t.generated_by_ai,
             t.completed_time,
             t.create_user_id,
@@ -29,6 +31,7 @@
         FROM crm_task t
         LEFT JOIN manager_user u ON t.assigned_to = u.user_id
         LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
+        LEFT JOIN crm_relation r ON t.relation_id = r.relation_id
         LEFT JOIN manager_user cu ON t.create_user_id = cu.user_id
         WHERE 1=1
         <if test="query.taskId != null">
@@ -52,6 +55,9 @@
         </if>
         <if test="query.customerId != null">
             AND t.customer_id = #{query.customerId}
+        </if>
+        <if test="query.relationId != null">
+            AND t.relation_id = #{query.relationId}
         </if>
         <if test="query.generatedByAi != null">
             AND t.generated_by_ai = #{query.generatedByAi}
@@ -90,8 +96,10 @@
             t.assigned_to,
             u.realname AS assigned_to_name,
             t.customer_id,
+            t.relation_id,
             t.source_follow_up_id,
             c.company_name AS customer_name,
+            r.name AS relation_name,
             t.generated_by_ai,
             t.completed_time,
             t.create_user_id,
@@ -106,6 +114,7 @@
         FROM crm_task t
         LEFT JOIN manager_user u ON t.assigned_to = u.user_id
         LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
+        LEFT JOIN crm_relation r ON t.relation_id = r.relation_id
         LEFT JOIN manager_user cu ON t.create_user_id = cu.user_id
         WHERE 1=1
         <if test="query.taskId != null">
@@ -129,6 +138,9 @@
         </if>
         <if test="query.customerId != null">
             AND t.customer_id = #{query.customerId}
+        </if>
+        <if test="query.relationId != null">
+            AND t.relation_id = #{query.relationId}
         </if>
         <if test="query.generatedByAi != null">
             AND t.generated_by_ai = #{query.generatedByAi}
@@ -163,8 +175,10 @@
             t.assigned_to,
             u.realname AS assigned_to_name,
             t.customer_id,
+            t.relation_id,
             t.source_follow_up_id,
             c.company_name AS customer_name,
+            r.name AS relation_name,
             t.generated_by_ai,
             t.create_user_id,
             cu.realname AS create_user_name,
@@ -178,6 +192,7 @@
         FROM crm_task t
         LEFT JOIN manager_user u ON t.assigned_to = u.user_id
         LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
+        LEFT JOIN crm_relation r ON t.relation_id = r.relation_id
         LEFT JOIN manager_user cu ON t.create_user_id = cu.user_id
         WHERE t.assigned_to = #{userId} AND LOWER(t.status) != 'completed'
         ORDER BY
@@ -197,8 +212,10 @@
             t.assigned_to,
             u.realname AS assigned_to_name,
             t.customer_id,
+            t.relation_id,
             t.source_follow_up_id,
             c.company_name AS customer_name,
+            r.name AS relation_name,
             t.generated_by_ai,
             t.create_user_id,
             cu.realname AS create_user_name,
@@ -212,6 +229,7 @@
         FROM crm_task t
         LEFT JOIN manager_user u ON t.assigned_to = u.user_id
         LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
+        LEFT JOIN crm_relation r ON t.relation_id = r.relation_id
         LEFT JOIN manager_user cu ON t.create_user_id = cu.user_id
         WHERE t.assigned_to = #{userId}
         <if test="filter == 'today'">

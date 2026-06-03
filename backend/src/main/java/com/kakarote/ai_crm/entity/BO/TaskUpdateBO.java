@@ -38,6 +38,9 @@ public class TaskUpdateBO {
     @Schema(description = "客户ID")
     private Long customerId;
 
+    @Schema(description = "关系人ID")
+    private Long relationId;
+
     @Schema(description = "任务类型")
     private String taskType;
 

@@ -2,9 +2,12 @@ package com.kakarote.ai_crm.ai.tools;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.kakarote.ai_crm.ai.context.AiContextHolder;
 import com.kakarote.ai_crm.ai.tools.support.AiToolCustomerResolver;
 import com.kakarote.ai_crm.ai.tools.support.AiToolPermission;
+import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.FollowUpAddBO;
+import com.kakarote.ai_crm.entity.BO.FollowUpQueryBO;
 import com.kakarote.ai_crm.entity.PO.Contact;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.VO.FollowUpVO;
@@ -68,6 +71,14 @@ public class FollowupTools {
             customerName, type, content, followTime, contactName, nextFollowTime);
 
         try {
+            Long currentRelationId = AiContextHolder.getCurrentRelationId();
+            boolean useRelationContext = currentRelationId != null
+                && isBlankToolValue(customerIdStr)
+                && isBlankToolValue(customerName);
+            if (useRelationContext) {
+                return createFollowUpForRelation(currentRelationId, type, content, followTime, nextFollowTime);
+            }
+
             AiToolCustomerResolver.CustomerResolveResult customerResolve = customerResolver.resolveForCreate(
                 customerIdStr, customerName, "创建跟进记录", "创建跟进失败", "创建跟进记录");
             if (customerResolve.errorMessage() != null) {
@@ -93,6 +104,15 @@ public class FollowupTools {
 
         try {
             if (StrUtil.isBlank(customerName) || "null".equalsIgnoreCase(customerName)) {
+                Long currentRelationId = AiContextHolder.getCurrentRelationId();
+                if (currentRelationId != null) {
+                    FollowUpQueryBO queryBO = new FollowUpQueryBO();
+                    queryBO.setRelationId(currentRelationId);
+                    queryBO.setPage(1);
+                    queryBO.setLimit(20);
+                    BasePage<FollowUpVO> page = followUpService.queryPageList(queryBO);
+                    return formatFollowUpList("当前关系人", page.getList());
+                }
                 AiToolCustomerResolver.CustomerResolveResult boundCustomerResolve =
                     customerResolver.resolveBoundCustomer("查看跟进记录");
                 if (boundCustomerResolve.errorMessage() != null) {
@@ -208,6 +228,33 @@ public class FollowupTools {
             result.append("\n- 下次跟进时间: ").append(formatDateTime(bo.getNextFollowTime()));
         }
         result.append("\n\n跟进ID: ").append(followUpId);
+        return result.toString();
+    }
+
+    private String createFollowUpForRelation(Long relationId,
+                                             String type,
+                                             String content,
+                                             String followTime,
+                                             String nextFollowTime) {
+        FollowUpAddBO bo = new FollowUpAddBO();
+        bo.setRelationId(relationId);
+        bo.setType(resolveFollowUpType(type, content));
+        bo.setContent(content);
+        bo.setFollowTime(parseFollowUpTime(followTime, new Date()));
+        bo.setNextFollowTime(parseOptionalTime(nextFollowTime));
+
+        Long followUpId = followUpService.addFollowUp(bo);
+
+        StringBuilder result = new StringBuilder();
+        result.append("历史记录创建成功。\n\n");
+        result.append("- relationId: ").append(relationId);
+        result.append("\n- 类型: ").append(getTypeName(bo.getType()));
+        result.append("\n- 内容: ").append(content);
+        result.append("\n- 记录时间: ").append(formatDateTime(bo.getFollowTime()));
+        if (bo.getNextFollowTime() != null) {
+            result.append("\n- 下次跟进时间: ").append(formatDateTime(bo.getNextFollowTime()));
+        }
+        result.append("\n\n历史记录ID: ").append(followUpId);
         return result.toString();
     }
 
@@ -330,6 +377,10 @@ public class FollowupTools {
             }
         }
         return false;
+    }
+
+    private boolean isBlankToolValue(String value) {
+        return StrUtil.isBlank(value) || "null".equalsIgnoreCase(value.trim());
     }
 
     /**

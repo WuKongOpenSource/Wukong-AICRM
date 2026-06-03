@@ -1,7 +1,7 @@
 import { post } from '@/utils/request'
 import type { PageResult } from '@/types/api'
 
-export type GlobalSearchEntityType = 'customer' | 'contact' | 'task' | 'schedule' | 'knowledge'
+export type GlobalSearchEntityType = 'customer' | 'contact' | 'relation' | 'task' | 'schedule' | 'knowledge'
 
 export interface GlobalSearchQueryBO {
   keyword?: string

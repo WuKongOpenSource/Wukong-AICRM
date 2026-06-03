@@ -13,6 +13,8 @@
             c.company_name AS customer_name,
             k.employee_id,
             e.realname AS employee_name,
+            k.relation_id,
+            r.name AS relation_name,
             k.summary,
             k.content_text,
             k.status,
@@ -23,6 +25,7 @@
         FROM crm_knowledge k
         LEFT JOIN crm_customer c ON k.customer_id = c.customer_id
         LEFT JOIN manager_user e ON k.employee_id = e.user_id
+        LEFT JOIN crm_relation r ON k.relation_id = r.relation_id
         LEFT JOIN manager_user u ON k.upload_user_id = u.user_id
         WHERE k.status != 2
         <if test="query.keyword != null and query.keyword != ''">
@@ -91,6 +94,9 @@
         <if test="query.employeeId != null">
             AND k.employee_id = #{query.employeeId}
         </if>
+        <if test="query.relationId != null">
+            AND k.relation_id = #{query.relationId}
+        </if>
         <if test="query.uploadUserId != null">
             AND k.upload_user_id = #{query.uploadUserId}
         </if>
@@ -111,6 +117,8 @@
             c.company_name AS customer_name,
             k.employee_id,
             e.realname AS employee_name,
+            k.relation_id,
+            r.name AS relation_name,
             k.summary,
             k.status,
             k.weknora_parse_status,
@@ -120,6 +128,7 @@
         FROM crm_knowledge k
         LEFT JOIN crm_customer c ON k.customer_id = c.customer_id
         LEFT JOIN manager_user e ON k.employee_id = e.user_id
+        LEFT JOIN crm_relation r ON k.relation_id = r.relation_id
         LEFT JOIN manager_user u ON k.upload_user_id = u.user_id
         WHERE k.knowledge_id = #{knowledgeId}
     </select>

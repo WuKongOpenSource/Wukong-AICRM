@@ -31,6 +31,7 @@ import com.kakarote.ai_crm.entity.PO.ChatMessage;
 import com.kakarote.ai_crm.entity.PO.ChatSession;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
+import com.kakarote.ai_crm.entity.PO.Relation;
 import com.kakarote.ai_crm.entity.VO.ChatAppOptionVO;
 import com.kakarote.ai_crm.entity.VO.AiModelOptionVO;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
@@ -40,6 +41,7 @@ import com.kakarote.ai_crm.mapper.ChatMessageMapper;
 import com.kakarote.ai_crm.mapper.ChatSessionMapper;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.ManageUserMapper;
+import com.kakarote.ai_crm.mapper.RelationMapper;
 import com.kakarote.ai_crm.service.*;
 import com.kakarote.ai_crm.utils.AiMediaUtil;
 import com.kakarote.ai_crm.utils.DocumentTextExtractor;
@@ -102,6 +104,9 @@ public class ChatServiceImpl implements IChatService {
 
     @Autowired
     private ManageUserMapper manageUserMapper;
+
+    @Autowired
+    private RelationMapper relationMapper;
 
     @Autowired
     private ChatMessageMapper chatMessageMapper;
@@ -323,7 +328,18 @@ public class ChatServiceImpl implements IChatService {
     public Long createSession(SessionCreateBO sessionCreateBO) {
         Customer boundCustomer = validateVisibleCustomer(sessionCreateBO.getCustomerId());
         ManagerUser boundEmployee = validateVisibleEmployee(sessionCreateBO.getEmployeeId());
-        if (boundCustomer != null && boundEmployee != null) {
+        Relation boundRelation = validateVisibleRelation(sessionCreateBO.getRelationId());
+        int boundObjectCount = 0;
+        if (boundCustomer != null) {
+            boundObjectCount++;
+        }
+        if (boundEmployee != null) {
+            boundObjectCount++;
+        }
+        if (boundRelation != null) {
+            boundObjectCount++;
+        }
+        if (boundObjectCount > 1) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "一个会话只能绑定一个业务对象");
         }
         String appCode = sessionCreateBO.getAppCode();
@@ -333,15 +349,20 @@ public class ChatServiceImpl implements IChatService {
         if (boundEmployee != null && StrUtil.isBlank(appCode)) {
             appCode = ChatApplicationCodes.ADDRESS_BOOK;
         }
+        if (boundRelation != null && StrUtil.isBlank(appCode)) {
+            appCode = ChatApplicationCodes.RELATION;
+        }
 
         ChatSession session = new ChatSession();
         session.setTitle(StrUtil.blankToDefault(sessionCreateBO.getTitle(),
             boundCustomer != null ? boundCustomer.getCompanyName()
                 : boundEmployee != null ? StrUtil.blankToDefault(boundEmployee.getRealname(), boundEmployee.getUsername())
+                : boundRelation != null ? boundRelation.getName()
                 : sessionCreateBO.getTitle()));
         session.setAgentId(sessionCreateBO.getAgentId());
         session.setCustomerId(sessionCreateBO.getCustomerId());
         session.setEmployeeId(sessionCreateBO.getEmployeeId());
+        session.setRelationId(sessionCreateBO.getRelationId());
         session.setAppCode(chatApplicationRegistry.normalize(appCode));
         session.setUserId(UserUtil.getUserId());
         session.setCreateTime(new Date());
@@ -366,6 +387,7 @@ public class ChatServiceImpl implements IChatService {
         List<ChatSessionVO> voList = BeanUtil.copyToList(sessions, ChatSessionVO.class);
         populateSessionCustomerFields(voList);
         populateSessionEmployeeFields(voList);
+        populateSessionRelationFields(voList);
         return voList;
     }
 
@@ -503,11 +525,13 @@ public class ChatServiceImpl implements IChatService {
         persistSessionAppCodeIfNeeded(session, application.code());
         Customer boundCustomer = resolveSessionCustomer(session);
         ManagerUser boundEmployee = resolveSessionEmployee(session);
+        Relation boundRelation = resolveSessionRelation(session);
         if (currentUserId != null) {
             // Spring Security 上下文不会自动透传到 Reactor 线程，这里先把会话级上下文放进自定义 Holder 供工具调用读取。
-            AiContextHolder.setContext(sessionId, currentUserId, currentTenantId, session.getCustomerId(), session.getEmployeeId());
-            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}",
-                sessionId, currentUserId, currentTenantId, session.getCustomerId(), session.getEmployeeId());
+            AiContextHolder.setContext(sessionId, currentUserId, currentTenantId,
+                session.getCustomerId(), session.getEmployeeId(), session.getRelationId());
+            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}, relationId={}",
+                sessionId, currentUserId, currentTenantId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId());
         }
 
         Long messageId = saveMessage(sessionId, "user", content);
@@ -556,6 +580,10 @@ public class ChatServiceImpl implements IChatService {
         String employeeContext = buildBoundEmployeeContext(boundEmployee);
         if (StrUtil.isNotBlank(employeeContext)) {
             enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + employeeContext;
+        }
+        String relationContext = buildBoundRelationContext(boundRelation);
+        if (StrUtil.isNotBlank(relationContext)) {
+            enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + relationContext;
         }
 
         String enhancedContent = content;
@@ -742,10 +770,12 @@ public class ChatServiceImpl implements IChatService {
         persistSessionAppCodeIfNeeded(session, application.code());
         Customer boundCustomer = resolveSessionCustomer(session);
         ManagerUser boundEmployee = resolveSessionEmployee(session);
+        Relation boundRelation = resolveSessionRelation(session);
         if (currentUserId != null) {
-            AiContextHolder.setContext(sessionId, currentUserId, currentTenantId, session.getCustomerId(), session.getEmployeeId());
-            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}",
-                sessionId, currentUserId, currentTenantId, session.getCustomerId(), session.getEmployeeId());
+            AiContextHolder.setContext(sessionId, currentUserId, currentTenantId,
+                session.getCustomerId(), session.getEmployeeId(), session.getRelationId());
+            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}, relationId={}",
+                sessionId, currentUserId, currentTenantId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId());
         }
 
         Long messageId = saveMessage(sessionId, "user", content);
@@ -790,6 +820,10 @@ public class ChatServiceImpl implements IChatService {
         String employeeContext = buildBoundEmployeeContext(boundEmployee);
         if (StrUtil.isNotBlank(employeeContext)) {
             enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + employeeContext;
+        }
+        String relationContext = buildBoundRelationContext(boundRelation);
+        if (StrUtil.isNotBlank(relationContext)) {
+            enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + relationContext;
         }
 
         String enhancedContent = content;
@@ -1415,6 +1449,24 @@ public class ChatServiceImpl implements IChatService {
         return session == null ? null : validateVisibleEmployee(session.getEmployeeId());
     }
 
+    private Relation validateVisibleRelation(Long relationId) {
+        if (relationId == null) {
+            return null;
+        }
+        Relation relation = relationMapper.selectById(relationId);
+        Long userId = UserUtil.getUserId();
+        if (relation == null
+            || Integer.valueOf(0).equals(relation.getStatus())
+            || !Objects.equals(relation.getCreateUserId(), userId)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "关系人不存在或无权限访问");
+        }
+        return relation;
+    }
+
+    private Relation resolveSessionRelation(ChatSession session) {
+        return session == null ? null : validateVisibleRelation(session.getRelationId());
+    }
+
     private void populateSessionCustomerFields(List<ChatSessionVO> sessions) {
         if (CollUtil.isEmpty(sessions)) {
             return;
@@ -1468,6 +1520,46 @@ public class ChatServiceImpl implements IChatService {
         }
     }
 
+    private void populateSessionRelationFields(List<ChatSessionVO> sessions) {
+        if (CollUtil.isEmpty(sessions)) {
+            return;
+        }
+        Set<Long> relationIds = sessions.stream()
+            .map(ChatSessionVO::getRelationId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        if (relationIds.isEmpty()) {
+            return;
+        }
+
+        Map<Long, Relation> relationMap = relationMapper.selectBatchIds(relationIds).stream()
+            .collect(Collectors.toMap(Relation::getRelationId, relation -> relation, (left, right) -> left));
+        for (ChatSessionVO session : sessions) {
+            Relation relation = relationMap.get(session.getRelationId());
+            if (relation == null) {
+                continue;
+            }
+            session.setRelationName(relation.getName());
+            session.setRelationAvatarUrl(resolveRelationAvatarUrl(relation.getAvatar()));
+        }
+    }
+
+    private String resolveRelationAvatarUrl(String avatar) {
+        if (StrUtil.isBlank(avatar)) {
+            return null;
+        }
+        String normalized = avatar.trim();
+        String lower = normalized.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("data:")) {
+            return normalized;
+        }
+        try {
+            return fileStorageService.getUrl(normalized);
+        } catch (Exception ignored) {
+            return normalized;
+        }
+    }
+
     private String buildBoundCustomerContext(Customer customer) {
         if (customer == null) {
             return "";
@@ -1511,6 +1603,31 @@ public class ChatServiceImpl implements IChatService {
         return builder.toString();
     }
 
+    private String buildBoundRelationContext(Relation relation) {
+        if (relation == null) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        builder.append("[当前绑定关系人]\n")
+            .append("- relationId: ").append(relation.getRelationId()).append("\n")
+            .append("- 姓名: ").append(StrUtil.blankToDefault(relation.getName(), "未命名关系人")).append("\n");
+        appendCustomerContextLine(builder, "关系类型", relation.getRelationType());
+        appendCustomerContextLine(builder, "所属公司", relation.getCompany());
+        appendCustomerContextLine(builder, "手机号", relation.getPhone());
+        appendCustomerContextLine(builder, "微信号", relation.getWechat());
+        appendCustomerContextLine(builder, "邮箱", relation.getEmail());
+        appendCustomerContextLine(builder, "备注", relation.getRemark());
+        if (relation.getSourceCustomerId() != null) {
+            builder.append("- 来源客户ID: ").append(relation.getSourceCustomerId()).append("\n");
+        }
+        if (relation.getSourceContactId() != null) {
+            builder.append("- 来源客户联系人ID: ").append(relation.getSourceContactId()).append("\n");
+        }
+        builder.append("当用户未显式指定其他客户时，任务、日程、历史记录和附件默认围绕该 relationId 执行。")
+            .append("用户说“记录一下/帮我记一下”时默认创建历史记录，不要直接改备注。");
+        return builder.toString();
+    }
+
     private void appendCustomerContextLine(StringBuilder builder, String label, String value) {
         if (StrUtil.isNotBlank(value)) {
             builder.append("- ").append(label).append(": ").append(value).append("\n");
@@ -1519,20 +1636,20 @@ public class ChatServiceImpl implements IChatService {
 
     private void archiveChatAttachments(ChatSession session, Long messageId, List<ChatSendBO.AttachmentDTO> attachments) {
         if (session == null || CollUtil.isEmpty(attachments)
-            || (session.getCustomerId() == null && session.getEmployeeId() == null)) {
+            || (session.getCustomerId() == null && session.getEmployeeId() == null && session.getRelationId() == null)) {
             return;
         }
         boolean canArchive;
         try {
             canArchive = permissionService.hasPermission("knowledge:upload");
         } catch (Exception exception) {
-            log.info("检查知识库上传权限失败，跳过会话附件归档: sessionId={}, messageId={}, customerId={}, employeeId={}, error={}",
-                session.getSessionId(), messageId, session.getCustomerId(), session.getEmployeeId(), exception.getMessage());
+            log.info("检查知识库上传权限失败，跳过会话附件归档: sessionId={}, messageId={}, customerId={}, employeeId={}, relationId={}, error={}",
+                session.getSessionId(), messageId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId(), exception.getMessage());
             return;
         }
         if (!canArchive) {
-            log.info("用户无知识库上传权限，跳过会话附件归档: sessionId={}, messageId={}, customerId={}, employeeId={}",
-                session.getSessionId(), messageId, session.getCustomerId(), session.getEmployeeId());
+            log.info("用户无知识库上传权限，跳过会话附件归档: sessionId={}, messageId={}, customerId={}, employeeId={}, relationId={}",
+                session.getSessionId(), messageId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId());
             return;
         }
 
@@ -1550,6 +1667,15 @@ public class ChatServiceImpl implements IChatService {
                         session.getEmployeeId(),
                         null
                     );
+                } else if (session.getRelationId() != null) {
+                    knowledgeService.archiveExistingRelationFile(
+                        attachment.getFileName(),
+                        attachment.getFilePath(),
+                        attachment.getFileSize(),
+                        attachment.getMimeType(),
+                        session.getRelationId(),
+                        null
+                    );
                 } else {
                     knowledgeService.archiveExistingFile(
                         attachment.getFileName(),
@@ -1561,8 +1687,8 @@ public class ChatServiceImpl implements IChatService {
                     );
                 }
             } catch (Exception exception) {
-                log.warn("会话附件归档失败: sessionId={}, messageId={}, customerId={}, employeeId={}, fileName={}, error={}",
-                    session.getSessionId(), messageId, session.getCustomerId(), session.getEmployeeId(), attachment.getFileName(),
+                log.warn("会话附件归档失败: sessionId={}, messageId={}, customerId={}, employeeId={}, relationId={}, fileName={}, error={}",
+                    session.getSessionId(), messageId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId(), attachment.getFileName(),
                     exception.getMessage(), exception);
             }
         }
@@ -1581,6 +1707,9 @@ public class ChatServiceImpl implements IChatService {
         }
         if (StrUtil.isBlank(requestedAppCode) && session != null && session.getEmployeeId() != null) {
             requestedAppCode = ChatApplicationCodes.ADDRESS_BOOK;
+        }
+        if (StrUtil.isBlank(requestedAppCode) && session != null && session.getRelationId() != null) {
+            requestedAppCode = ChatApplicationCodes.RELATION;
         }
         return chatApplicationRegistry.resolve(requestedAppCode);
     }

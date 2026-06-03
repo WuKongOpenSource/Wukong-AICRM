@@ -889,6 +889,21 @@
                                 设为主要联系人
                               </span>
                             </button>
+                            <button
+                              v-if="canCreateRelation"
+                              type="button"
+                              class="group/module-action relative flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-50 text-slate-500 opacity-0 pointer-events-none transition-all hover:bg-primary/10 hover:text-primary group-hover:opacity-100 group-hover:pointer-events-auto"
+                              aria-label="添加到关系"
+                              @click.stop="handleAddContactToRelation(contact)"
+                            >
+                              <span class="material-symbols-outlined text-[18px] leading-none">diversity_3</span>
+                              <span
+                                class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
+                                role="tooltip"
+                              >
+                                添加到关系
+                              </span>
+                            </button>
                           </div>
                           <p class="mt-0.5 truncate text-[11px] font-medium text-slate-500">{{ contact.position || '-' }}</p>
                         </div>
@@ -1478,6 +1493,7 @@ import type { CustomerAiParseVO } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
 import { addFollowUp, deleteFollowUp, queryFollowUpPageList, updateFollowUp } from '@/api/followup'
 import { deleteContact, queryContactPageList, queryContactsByCustomer, setPrimaryContact } from '@/api/contact'
+import { addRelationFromContact } from '@/api/relation'
 import { getEnabledFieldsByEntity } from '@/api/customField'
 import { downloadKnowledge, queryKnowledgeList } from '@/api/knowledge'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -1507,6 +1523,7 @@ import {
 } from '@/views/customer/constants'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { formatFileSize as formatFileSizeBytes, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
+import { isRequestErrorHandled } from '@/utils/requestError'
 
 const route = useRoute()
 const router = useRouter()
@@ -1953,6 +1970,7 @@ const canCreateContacts = computed(() => userStore.hasPermission('contact:create
 const canEditContacts = computed(() => userStore.hasPermission('contact:edit'))
 const canDeleteContacts = computed(() => userStore.hasPermission('contact:delete'))
 const canSetPrimaryContacts = computed(() => userStore.hasPermission('contact:set_primary'))
+const canCreateRelation = computed(() => userStore.hasPermission('relation:create'))
 const canViewFollowUps = computed(() => userStore.hasPermission('followup:view'))
 const canCreateFollowUps = computed(() => userStore.hasPermission('followup:create'))
 const canEditFollowUps = computed(() => userStore.hasPermission('followup:edit'))
@@ -2656,6 +2674,18 @@ async function handleSetPrimary(contactId: string) {
   } catch {
     contacts.value = previousContacts
     currentContact.value = previousCurrentContact
+  }
+}
+
+async function handleAddContactToRelation(contact: Contact) {
+  if (!canCreateRelation.value) return
+  try {
+    await addRelationFromContact(contact.contactId)
+    ElMessage.success('已添加到关系')
+  } catch (error) {
+    if (!isRequestErrorHandled(error)) {
+      ElMessage.error('添加到关系失败')
+    }
   }
 }
 

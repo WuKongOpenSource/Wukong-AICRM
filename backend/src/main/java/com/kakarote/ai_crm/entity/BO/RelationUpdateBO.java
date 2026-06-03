@@ -1,0 +1,48 @@
+package com.kakarote.ai_crm.entity.BO;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+
+import java.util.Map;
+
+/**
+ * 关系人更新参数。
+ */
+@Data
+@Schema(name = "RelationUpdateBO", description = "关系人更新参数")
+public class RelationUpdateBO {
+
+    @NotNull(message = "关系人ID不能为空")
+    @Schema(description = "关系人ID", requiredMode = Schema.RequiredMode.REQUIRED)
+    private Long relationId;
+
+    @NotBlank(message = "姓名不能为空")
+    @Schema(description = "姓名", requiredMode = Schema.RequiredMode.REQUIRED)
+    private String name;
+
+    @Schema(description = "头像")
+    private String avatar;
+
+    @Schema(description = "手机号")
+    private String phone;
+
+    @Schema(description = "微信号")
+    private String wechat;
+
+    @Schema(description = "邮箱")
+    private String email;
+
+    @Schema(description = "关系类型")
+    private String relationType;
+
+    @Schema(description = "所属公司")
+    private String company;
+
+    @Schema(description = "备注")
+    private String remark;
+
+    @Schema(description = "自定义字段值")
+    private Map<String, Object> customFields;
+}

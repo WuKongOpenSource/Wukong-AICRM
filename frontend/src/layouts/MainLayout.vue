@@ -406,6 +406,180 @@
               </template>
             </div>
           </div>
+
+          <div v-if="showSidebarAddressBook" class="space-y-1 pt-1">
+            <div
+              class="wk-customer-header-row group/address-book-header flex w-full items-center gap-2 rounded-lg pl-3 pr-1 py-[6px] mt-[12px] mb-[0px] hover:!bg-[#f9f9f9]"
+              :style="{ backgroundColor: addressBookHeaderHovered ? '#f9f9f9' : 'transparent' }"
+              :title="sidebarAddressBookExpanded ? '收起通讯录' : '展开通讯录'"
+              @mouseenter="addressBookHeaderHovered = true"
+              @mouseleave="addressBookHeaderHovered = false"
+            >
+              <button
+                type="button"
+                class="wk-customer-header-toggle group flex min-w-0 flex-1 items-center gap-1 text-left"
+                :aria-expanded="sidebarAddressBookExpanded"
+                aria-controls="sidebar-address-book-panel"
+                @click="sidebarAddressBookExpanded = !sidebarAddressBookExpanded"
+              >
+                <span class="min-w-0 truncate text-[14px] font-semibold uppercase tracking-tight text-[#0d0d0d]">通讯录</span>
+                <span class="flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition-all duration-150" aria-hidden="true">
+                  <span class="material-symbols-outlined inline-flex h-5 shrink-0 items-center justify-center self-center text-[18px] leading-none text-[#c9c9c9]">
+                    {{ sidebarAddressBookExpanded ? 'keyboard_arrow_down' : 'chevron_right' }}
+                  </span>
+                </span>
+              </button>
+              <div class="ml-auto flex shrink-0 items-center justify-end gap-1">
+                <button
+                  type="button"
+                  class="wk-customer-header-action group/address-book-action relative flex size-6 items-center justify-center rounded-md text-[#8f8f8f] transition-colors hover:text-[#0d0d0d]"
+                  aria-label="查看通讯录"
+                  @click.stop="navigateTo('/address-book')"
+                >
+                  <span class="material-symbols-outlined text-[18px] leading-none">format_list_bulleted</span>
+                  <span
+                    class="pointer-events-none absolute right-0 top-full z-[200] mt-2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/address-book-action:opacity-100"
+                    role="tooltip"
+                  >
+                    查看通讯录
+                  </span>
+                </button>
+              </div>
+            </div>
+            <div id="sidebar-address-book-panel" v-show="sidebarAddressBookExpanded">
+              <div v-if="sidebarEmployeesLoading && sidebarEmployees.length === 0" class="flex justify-center py-6">
+                <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+              </div>
+              <div v-else-if="sidebarEmployees.length === 0" class="px-3 py-6 text-center text-xs text-slate-400">
+                暂无员工数据
+              </div>
+              <template v-else>
+                <button
+                  v-for="employee in sidebarEmployees"
+                  :key="employee.userId"
+                  type="button"
+                  class="group w-full min-w-0 overflow-hidden rounded-[8px] pl-[10px] pr-[10px] py-[6px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
+                  :class="isEmployeeActive(employee.userId) ? 'bg-[#f3f3f3]' : 'hover:bg-[#f9f9f9]'"
+                  @click="handleSelectEmployeeChat(employee)"
+                >
+                  <div class="flex min-w-0 w-full items-center gap-2" style="height: 24px !important">
+                    <div class="flex size-[20px] shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-white">
+                      <img
+                        v-if="employeeAvatarUrl(employee)"
+                        :src="employeeAvatarUrl(employee)"
+                        :alt="employeeName(employee)"
+                        class="size-full object-cover"
+                      />
+                      <span v-else class="flex size-full items-center justify-center bg-emerald-50 text-xs font-bold text-emerald-600">
+                        {{ employeeInitial(employee) }}
+                      </span>
+                    </div>
+                    <span class="block min-w-0 flex-1 truncate text-sm leading-5 text-[#0d0d0d]" :title="employeeName(employee)">
+                      {{ employeeName(employee) }}
+                    </span>
+                  </div>
+                </button>
+                <div v-if="sidebarEmployeesLoading" class="flex justify-center py-3">
+                  <span class="material-symbols-outlined animate-spin text-[18px] leading-none text-slate-300">progress_activity</span>
+                </div>
+                <button
+                  v-else-if="sidebarEmployeesHasMore"
+                  type="button"
+                  class="group flex w-full min-w-0 items-center justify-center rounded-[8px] py-[7px] text-left text-[13px] text-[#8f8f8f] transition-all hover:bg-[#f9f9f9] hover:text-[#5f5f5f]"
+                  @click="loadMoreSidebarEmployees"
+                >
+                  加载更多
+                </button>
+              </template>
+            </div>
+          </div>
+
+          <div v-if="showSidebarRelations" class="space-y-1 pt-1">
+            <div
+              class="wk-customer-header-row group/relation-header flex w-full items-center gap-2 rounded-lg pl-3 pr-1 py-[6px] mt-[12px] mb-[0px] hover:!bg-[#f9f9f9]"
+              :style="{ backgroundColor: relationHeaderHovered ? '#f9f9f9' : 'transparent' }"
+              :title="sidebarRelationsExpanded ? '收起关系' : '展开关系'"
+              @mouseenter="relationHeaderHovered = true"
+              @mouseleave="relationHeaderHovered = false"
+            >
+              <button
+                type="button"
+                class="wk-customer-header-toggle group flex min-w-0 flex-1 items-center gap-1 text-left"
+                :aria-expanded="sidebarRelationsExpanded"
+                aria-controls="sidebar-relations-panel"
+                @click="sidebarRelationsExpanded = !sidebarRelationsExpanded"
+              >
+                <span class="min-w-0 truncate text-[14px] font-semibold uppercase tracking-tight text-[#0d0d0d]">关系</span>
+                <span class="flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition-all duration-150" aria-hidden="true">
+                  <span class="material-symbols-outlined inline-flex h-5 shrink-0 items-center justify-center self-center text-[18px] leading-none text-[#c9c9c9]">
+                    {{ sidebarRelationsExpanded ? 'keyboard_arrow_down' : 'chevron_right' }}
+                  </span>
+                </span>
+              </button>
+              <div class="ml-auto flex shrink-0 items-center justify-end gap-1">
+                <button
+                  type="button"
+                  class="wk-customer-header-action group/relation-action relative flex size-6 items-center justify-center rounded-md text-[#8f8f8f] transition-colors hover:text-[#0d0d0d]"
+                  aria-label="查看关系列表"
+                  @click.stop="navigateTo('/relation')"
+                >
+                  <span class="material-symbols-outlined text-[18px] leading-none">format_list_bulleted</span>
+                  <span
+                    class="pointer-events-none absolute right-0 top-full z-[200] mt-2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/relation-action:opacity-100"
+                    role="tooltip"
+                  >
+                    查看关系列表
+                  </span>
+                </button>
+              </div>
+            </div>
+            <div id="sidebar-relations-panel" v-show="sidebarRelationsExpanded">
+              <div v-if="sidebarRelationsLoading && sidebarRelations.length === 0" class="flex justify-center py-6">
+                <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+              </div>
+              <div v-else-if="sidebarRelations.length === 0" class="px-3 py-6 text-center text-xs text-slate-400">
+                暂无关系数据
+              </div>
+              <template v-else>
+                <button
+                  v-for="relation in sidebarRelations"
+                  :key="relation.relationId"
+                  type="button"
+                  class="group w-full min-w-0 overflow-hidden rounded-[8px] pl-[10px] pr-[10px] py-[6px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
+                  :class="isRelationActive(relation.relationId) ? 'bg-[#f3f3f3]' : 'hover:bg-[#f9f9f9]'"
+                  @click="handleSelectRelationChat(relation)"
+                >
+                  <div class="flex min-w-0 w-full items-center gap-2" style="height: 24px !important">
+                    <div class="flex size-[20px] shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-white">
+                      <img
+                        v-if="relationAvatarUrl(relation)"
+                        :src="relationAvatarUrl(relation)"
+                        :alt="relationName(relation)"
+                        class="size-full object-cover"
+                      />
+                      <span v-else class="flex size-full items-center justify-center bg-indigo-50 text-xs font-bold text-indigo-600">
+                        {{ relationInitial(relation) }}
+                      </span>
+                    </div>
+                    <span class="block min-w-0 flex-1 truncate text-sm leading-5 text-[#0d0d0d]" :title="relationName(relation)">
+                      {{ relationName(relation) }}
+                    </span>
+                  </div>
+                </button>
+                <div v-if="sidebarRelationsLoading" class="flex justify-center py-3">
+                  <span class="material-symbols-outlined animate-spin text-[18px] leading-none text-slate-300">progress_activity</span>
+                </div>
+                <button
+                  v-else-if="sidebarRelationsHasMore"
+                  type="button"
+                  class="group flex w-full min-w-0 items-center justify-center rounded-[8px] py-[7px] text-left text-[13px] text-[#8f8f8f] transition-all hover:bg-[#f9f9f9] hover:text-[#5f5f5f]"
+                  @click="loadMoreSidebarRelations"
+                >
+                  加载更多
+                </button>
+              </template>
+            </div>
+          </div>
           </template>
 
         </div>
@@ -644,7 +818,7 @@
             v-model="globalSearchKeyword"
             type="text"
             class="w-full rounded-lg border-none bg-slate-100 py-2 pl-10 pr-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/50"
-            placeholder="搜索客户、联系人、任务、日程、知识库..."
+            placeholder="搜索客户、关系、任务、日程、知识库..."
             @focus="handleGlobalSearchFocus"
             @keydown.enter.prevent="handleGlobalSearchEnter"
             @keydown.down.prevent="handleGlobalSearchArrow(1)"
@@ -922,6 +1096,90 @@
               </template>
             </div>
 
+            <div v-if="showSidebarAddressBook" class="pt-2">
+              <p class="px-3 pb-2 text-[14px] font-bold leading-7 text-[#0d0d0d]">通讯录</p>
+              <div v-if="sidebarEmployeesLoading && sidebarEmployees.length === 0" class="flex justify-center py-6">
+                <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+              </div>
+              <div v-else-if="sidebarEmployees.length === 0" class="px-3 py-[6px] text-sm text-slate-400">
+                暂无员工数据
+              </div>
+              <template v-else>
+                <button
+                  v-for="employee in sidebarEmployees"
+                  :key="employee.userId"
+                  type="button"
+                  class="group flex w-full min-w-0 items-center gap-3 rounded-[8px] px-3 py-[6px] text-left transition-colors"
+                  :class="isEmployeeActive(employee.userId) ? 'bg-[#f3f3f3]' : 'text-[#0d0d0d] active:bg-slate-100'"
+                  @click="handleMobileSelectEmployeeChat(employee)"
+                >
+                  <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <img
+                      v-if="employeeAvatarUrl(employee)"
+                      :src="employeeAvatarUrl(employee)"
+                      :alt="employeeName(employee)"
+                      class="size-full object-cover"
+                    />
+                    <span v-else class="flex size-full items-center justify-center bg-emerald-50 text-xs font-bold text-emerald-600">
+                      {{ employeeInitial(employee) }}
+                    </span>
+                  </div>
+                  <span class="block min-w-0 flex-1 truncate text-[14px] leading-6">{{ employeeName(employee) }}</span>
+                </button>
+                <button
+                  v-if="sidebarEmployeesHasMore"
+                  type="button"
+                  class="mt-1 flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-sm font-medium text-[#8f8f8f] transition-colors active:bg-slate-100"
+                  :disabled="sidebarEmployeesLoading"
+                  @click="loadMoreSidebarEmployees"
+                >
+                  {{ sidebarEmployeesLoading ? '加载中...' : '加载更多员工' }}
+                </button>
+              </template>
+            </div>
+
+            <div v-if="showSidebarRelations" class="pt-2">
+              <p class="px-3 pb-2 text-[14px] font-bold leading-7 text-[#0d0d0d]">关系</p>
+              <div v-if="sidebarRelationsLoading && sidebarRelations.length === 0" class="flex justify-center py-6">
+                <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+              </div>
+              <div v-else-if="sidebarRelations.length === 0" class="px-3 py-[6px] text-sm text-slate-400">
+                暂无关系数据
+              </div>
+              <template v-else>
+                <button
+                  v-for="relation in sidebarRelations"
+                  :key="relation.relationId"
+                  type="button"
+                  class="group flex w-full min-w-0 items-center gap-3 rounded-[8px] px-3 py-[6px] text-left transition-colors"
+                  :class="isRelationActive(relation.relationId) ? 'bg-[#f3f3f3]' : 'text-[#0d0d0d] active:bg-slate-100'"
+                  @click="handleMobileSelectRelationChat(relation)"
+                >
+                  <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <img
+                      v-if="relationAvatarUrl(relation)"
+                      :src="relationAvatarUrl(relation)"
+                      :alt="relationName(relation)"
+                      class="size-full object-cover"
+                    />
+                    <span v-else class="flex size-full items-center justify-center bg-indigo-50 text-xs font-bold text-indigo-600">
+                      {{ relationInitial(relation) }}
+                    </span>
+                  </div>
+                  <span class="block min-w-0 flex-1 truncate text-[14px] leading-6">{{ relationName(relation) }}</span>
+                </button>
+                <button
+                  v-if="sidebarRelationsHasMore"
+                  type="button"
+                  class="mt-1 flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-sm font-medium text-[#8f8f8f] transition-colors active:bg-slate-100"
+                  :disabled="sidebarRelationsLoading"
+                  @click="loadMoreSidebarRelations"
+                >
+                  {{ sidebarRelationsLoading ? '加载中...' : '加载更多关系' }}
+                </button>
+              </template>
+            </div>
+
             <div v-if="showConfigSection" class="pb-2 pt-2">
               <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">配置与服务</p>
             </div>
@@ -1125,7 +1383,7 @@
               v-model="globalSearchKeyword"
               type="text"
               class="w-full rounded-lg border-none bg-slate-100 py-2 pl-10 pr-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/50"
-              placeholder="搜索客户、联系人、任务、日程、知识库..."
+              placeholder="搜索客户、关系、任务、日程、知识库..."
               @focus="handleGlobalSearchFocus"
               @keydown.enter.prevent="handleGlobalSearchEnter"
               @keydown.down.prevent="handleGlobalSearchArrow(1)"
@@ -1358,6 +1616,8 @@ import ProjectUpsertDialog from '@/views/project/components/ProjectUpsertDialog.
 import type { WkIconName } from '@/components/common/wkIcon'
 import { queryGlobalSearch, type GlobalSearchResult } from '@/api/search'
 import { queryCustomerList } from '@/api/customer'
+import { queryAddressBook } from '@/api/addressBook'
+import { queryRelationList } from '@/api/relation'
 import { useChatDrawer } from '@/composables/useChatDrawer'
 import { useEnterpriseStore } from '@/stores/enterprise'
 import { useResponsive } from '@/composables/useResponsive'
@@ -1370,6 +1630,8 @@ import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import type { ChatSession } from '@/types/common'
 import type { CustomerListVO } from '@/types/customer'
 import type { ProjectEntity } from '@/types/project'
+import type { AddressBookEmployee } from '@/types/addressBook'
+import type { RelationVO } from '@/types/relation'
 
 const route = useRoute()
 const router = useRouter()
@@ -1400,7 +1662,8 @@ const SIDEBAR_STORAGE_KEYS = {
   primaryCollapsed: 'wk_ai_crm:main_layout:primary_sidebar_collapsed:v1',
   recentChatExpanded: 'wk_ai_crm:main_layout:recent_chat_sessions_expanded:v1',
   sidebarCustomersExpanded: 'wk_ai_crm:main_layout:sidebar_customers_expanded:v1',
-  sidebarProjectsExpanded: 'wk_ai_crm:main_layout:sidebar_projects_expanded:v1'
+  sidebarAddressBookExpanded: 'wk_ai_crm:main_layout:sidebar_address_book_expanded:v1',
+  sidebarRelationsExpanded: 'wk_ai_crm:main_layout:sidebar_relations_expanded:v1'
 } as const
 
 function mainContentWidthAsIfSidebarExpanded(sidebarCollapsed: boolean, mainColumnWidth: number) {
@@ -1478,7 +1741,7 @@ const primaryNavScrolling = ref(false)
 let primaryNavScrollEndTimer: ReturnType<typeof setTimeout> | null = null
 
 function onPrimaryNavScroll() {
-  maybeLoadMoreSidebarCustomers()
+  maybeLoadMoreSidebarObjects()
   if (!primaryNavHasScrollbar.value) return
   primaryNavScrolling.value = true
   if (primaryNavScrollEndTimer) clearTimeout(primaryNavScrollEndTimer)
@@ -1505,12 +1768,18 @@ const recentHistoryKeyword = ref('')
 const sidebarProjectsExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarProjectsExpanded, true))
 const sidebarCustomersExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarCustomersExpanded, true))
 const projectHeaderHovered = ref(false)
+const sidebarAddressBookExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarAddressBookExpanded, true))
+const sidebarRelationsExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarRelationsExpanded, true))
 const customerHeaderHovered = ref(false)
+const addressBookHeaderHovered = ref(false)
+const relationHeaderHovered = ref(false)
 const sidebarCustomerKeyword = ref('')
 const recentChatSessionsMoreVisible = ref(false)
 const RECENT_CHAT_SESSION_LIMIT = 5
 const MOBILE_RECENT_CHAT_SESSION_LIMIT = 8
 const SIDEBAR_CUSTOMER_LIMIT = 10
+const SIDEBAR_EMPLOYEE_LIMIT = 10
+const SIDEBAR_RELATION_LIMIT = 10
 const CUSTOMER_SEARCH_LIMIT = 10
 const SIDEBAR_CUSTOMER_SCROLL_THRESHOLD_PX = 120
 const sidebarCustomers = ref<CustomerListVO[]>([])
@@ -1518,6 +1787,16 @@ const sidebarCustomersLoading = ref(false)
 const sidebarCustomersPage = ref(1)
 const sidebarCustomersTotal = ref(0)
 const sidebarCustomersHasMore = ref(true)
+const sidebarEmployees = ref<AddressBookEmployee[]>([])
+const sidebarEmployeesLoading = ref(false)
+const sidebarEmployeesPage = ref(1)
+const sidebarEmployeesTotal = ref(0)
+const sidebarEmployeesHasMore = ref(true)
+const sidebarRelations = ref<RelationVO[]>([])
+const sidebarRelationsLoading = ref(false)
+const sidebarRelationsPage = ref(1)
+const sidebarRelationsTotal = ref(0)
+const sidebarRelationsHasMore = ref(true)
 const showUserMenu = ref(false)
 const showAccountSettingsModal = ref(false)
 const showCreateCustomer = ref(false)
@@ -1616,6 +1895,8 @@ function handleChatComposerNarrowChange(payload?: ChatComposerNarrowPayload) {
 const showSidebarProjects = computed(() => userStore.hasPermission('task'))
 const sidebarProjects = computed(() => projectStore.accessibleProjectSummaries.slice(0, 12))
 const showSidebarCustomers = computed(() => userStore.hasPermission('customer:view'))
+const showSidebarAddressBook = computed(() => true)
+const showSidebarRelations = computed(() => true)
 
 watch(showSidebarProjects, visible => {
   if (visible) {
@@ -1629,6 +1910,24 @@ watch(showSidebarCustomers, visible => {
   }
   if (!visible) {
     resetSidebarCustomers()
+  }
+})
+
+watch(showSidebarAddressBook, visible => {
+  if (visible && sidebarEmployees.value.length === 0) {
+    void fetchSidebarEmployees({ reset: true })
+  }
+  if (!visible) {
+    resetSidebarEmployees()
+  }
+})
+
+watch(showSidebarRelations, visible => {
+  if (visible && sidebarRelations.value.length === 0) {
+    void fetchSidebarRelations({ reset: true })
+  }
+  if (!visible) {
+    resetSidebarRelations()
   }
 })
 
@@ -1667,7 +1966,6 @@ const allMainNavItems: MainNavItem[] = [
   { key: 'customer-search', icon: 'search', label: '搜索客户', route: '', permission: 'customer:view', action: 'customerSearch' },
   { key: 'task', icon: 'task-1', label: '项目', route: '/project', permission: 'task' },
   { key: 'calendar', icon: 'event', label: '日程', route: '/calendar', permission: 'schedule' },
-  { key: 'address-book', icon: 'customer', materialIcon: 'contacts', label: '通讯录', route: '/address-book', permission: 'addressBook:list' },
   { key: 'mail', icon: 'event', materialIcon: 'mail', label: '邮箱', route: '/mail', permission: 'mail:view' },
 ]
 
@@ -1735,6 +2033,7 @@ const activeMenu = computed(() => {
   if (path.startsWith('/customer')) return '/customer'
   if (path.startsWith('/address-book')) return '/address-book'
   if (path.startsWith('/project')) return '/project'
+  if (path.startsWith('/relation')) return '/relation'
   if (path.startsWith('/sync')) return '/sync'
   if (path.startsWith('/settings')) return '/settings'
   return path
@@ -1860,6 +2159,14 @@ watch(sidebarCustomersExpanded, expanded => {
   writeStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarCustomersExpanded, expanded)
 })
 
+watch(sidebarAddressBookExpanded, expanded => {
+  writeStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarAddressBookExpanded, expanded)
+})
+
+watch(sidebarRelationsExpanded, expanded => {
+  writeStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarRelationsExpanded, expanded)
+})
+
 watch(primarySidebarCollapsed, collapsed => {
   if (!collapsed) collapsePrimarySidebarForNarrowComposer()
 })
@@ -1955,6 +2262,12 @@ onMounted(() => {
   if (showSidebarCustomers.value) {
     void fetchSidebarCustomers({ reset: true })
   }
+  if (showSidebarAddressBook.value) {
+    void fetchSidebarEmployees({ reset: true })
+  }
+  if (showSidebarRelations.value) {
+    void fetchSidebarRelations({ reset: true })
+  }
   document.addEventListener('click', handleDocumentClick)
   removeChatComposerNarrowListener = appEvents.on<ChatComposerNarrowPayload>(
     APP_EVENT.CHAT_COMPOSER_NARROW_CHANGE,
@@ -2036,15 +2349,21 @@ watch(
     primarySidebarCollapsed.value,
     recentChatSessionsExpanded.value,
     sidebarCustomersExpanded.value,
+    sidebarAddressBookExpanded.value,
+    sidebarRelationsExpanded.value,
     pcMainNavGroups.value.length,
     chatStore.sessions.length,
     chatStore.sessionsLoading,
     sidebarCustomers.value.length,
     sidebarCustomersLoading.value,
+    sidebarEmployees.value.length,
+    sidebarEmployeesLoading.value,
+    sidebarRelations.value.length,
+    sidebarRelationsLoading.value,
   ],
   () => {
     queueMicrotask(() => updatePrimaryNavScrollbar())
-    queueMicrotask(() => maybeLoadMoreSidebarCustomers())
+    queueMicrotask(() => maybeLoadMoreSidebarObjects())
   },
   { flush: 'post' }
 )
@@ -2124,7 +2443,9 @@ function groupSessionsByTime(sessions: ChatSession[]): ChatSessionGroups {
 }
 
 function isUnboundChatSession(session: ChatSession): boolean {
-  return !String(session.customerId || '').trim() && !String(session.employeeId || '').trim()
+  return !String(session.customerId || '').trim()
+    && !String(session.employeeId || '').trim()
+    && !String(session.relationId || '').trim()
 }
 
 const sidebarVisibleChatSessions = computed(() =>
@@ -2145,7 +2466,8 @@ const filteredHistorySessions = computed(() => {
   return sidebarVisibleChatSessions.value.filter(session => {
     const title = (session.title || '').toLowerCase()
     const customerName = (session.customerName || '').toLowerCase()
-    return title.includes(keyword) || customerName.includes(keyword)
+    const relationName = (session.relationName || '').toLowerCase()
+    return title.includes(keyword) || customerName.includes(keyword) || relationName.includes(keyword)
   })
 })
 
@@ -2158,11 +2480,35 @@ function resetSidebarCustomers(options: { keepItems?: boolean } = {}) {
   sidebarCustomersHasMore.value = true
 }
 
+function resetSidebarEmployees(options: { keepItems?: boolean } = {}) {
+  if (!options.keepItems) {
+    sidebarEmployees.value = []
+  }
+  sidebarEmployeesPage.value = 1
+  sidebarEmployeesTotal.value = 0
+  sidebarEmployeesHasMore.value = true
+}
+
+function resetSidebarRelations(options: { keepItems?: boolean } = {}) {
+  if (!options.keepItems) {
+    sidebarRelations.value = []
+  }
+  sidebarRelationsPage.value = 1
+  sidebarRelationsTotal.value = 0
+  sidebarRelationsHasMore.value = true
+}
+
 function shouldLoadMoreSidebarCustomers(): boolean {
   const el = primaryNavRef.value
   if (!el) return false
   const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight
   return distanceToBottom <= SIDEBAR_CUSTOMER_SCROLL_THRESHOLD_PX
+}
+
+function maybeLoadMoreSidebarObjects() {
+  maybeLoadMoreSidebarCustomers()
+  maybeLoadMoreSidebarEmployees()
+  maybeLoadMoreSidebarRelations()
 }
 
 function maybeLoadMoreSidebarCustomers() {
@@ -2172,8 +2518,30 @@ function maybeLoadMoreSidebarCustomers() {
   void fetchSidebarCustomers()
 }
 
+function maybeLoadMoreSidebarEmployees() {
+  if (!showSidebarAddressBook.value || !sidebarAddressBookExpanded.value || primarySidebarContentCollapsed.value) return
+  if (sidebarEmployeesLoading.value || !sidebarEmployeesHasMore.value) return
+  if (!shouldLoadMoreSidebarCustomers()) return
+  void fetchSidebarEmployees()
+}
+
+function maybeLoadMoreSidebarRelations() {
+  if (!showSidebarRelations.value || !sidebarRelationsExpanded.value || primarySidebarContentCollapsed.value) return
+  if (sidebarRelationsLoading.value || !sidebarRelationsHasMore.value) return
+  if (!shouldLoadMoreSidebarCustomers()) return
+  void fetchSidebarRelations()
+}
+
 function loadMoreSidebarCustomers() {
   void fetchSidebarCustomers()
+}
+
+function loadMoreSidebarEmployees() {
+  void fetchSidebarEmployees()
+}
+
+function loadMoreSidebarRelations() {
+  void fetchSidebarRelations()
 }
 
 async function fetchSidebarCustomers(options: { reset?: boolean; preserveScroll?: boolean } = {}) {
@@ -2226,6 +2594,112 @@ async function fetchSidebarCustomers(options: { reset?: boolean; preserveScroll?
     queueMicrotask(() => {
       updatePrimaryNavScrollbar()
       maybeLoadMoreSidebarCustomers()
+    })
+  }
+}
+
+async function fetchSidebarEmployees(options: { reset?: boolean; preserveScroll?: boolean } = {}) {
+  if (sidebarEmployeesLoading.value) return
+  const preservedScrollTop = options.preserveScroll ? getPrimaryNavScrollTop() : null
+  if (!showSidebarAddressBook.value) {
+    resetSidebarEmployees()
+    if (preservedScrollTop != null) {
+      void restorePrimaryNavScrollTop(preservedScrollTop)
+    }
+    return
+  }
+  if (options.reset) {
+    resetSidebarEmployees({ keepItems: options.preserveScroll })
+  }
+  if (!sidebarEmployeesHasMore.value) return
+
+  const page = sidebarEmployeesPage.value
+  sidebarEmployeesLoading.value = true
+  try {
+    const result = await queryAddressBook({
+      page,
+      limit: SIDEBAR_EMPLOYEE_LIMIT
+    })
+    const nextEmployees = result.list || []
+    if (page === 1) {
+      sidebarEmployees.value = nextEmployees
+    } else {
+      const existingIds = new Set(sidebarEmployees.value.map(employee => String(employee.userId)))
+      sidebarEmployees.value = [
+        ...sidebarEmployees.value,
+        ...nextEmployees.filter(employee => !existingIds.has(String(employee.userId))),
+      ]
+    }
+    sidebarEmployeesTotal.value = result.totalRow || sidebarEmployees.value.length
+    sidebarEmployeesPage.value = page + 1
+    sidebarEmployeesHasMore.value = nextEmployees.length > 0 && sidebarEmployees.value.length < sidebarEmployeesTotal.value
+  } catch (error) {
+    console.error('Load sidebar employees failed:', error)
+    sidebarEmployeesHasMore.value = false
+    if (page === 1) {
+      sidebarEmployees.value = []
+    }
+  } finally {
+    sidebarEmployeesLoading.value = false
+    if (preservedScrollTop != null) {
+      await restorePrimaryNavScrollTop(preservedScrollTop)
+    }
+    queueMicrotask(() => {
+      updatePrimaryNavScrollbar()
+      maybeLoadMoreSidebarObjects()
+    })
+  }
+}
+
+async function fetchSidebarRelations(options: { reset?: boolean; preserveScroll?: boolean } = {}) {
+  if (sidebarRelationsLoading.value) return
+  const preservedScrollTop = options.preserveScroll ? getPrimaryNavScrollTop() : null
+  if (!showSidebarRelations.value) {
+    resetSidebarRelations()
+    if (preservedScrollTop != null) {
+      void restorePrimaryNavScrollTop(preservedScrollTop)
+    }
+    return
+  }
+  if (options.reset) {
+    resetSidebarRelations({ keepItems: options.preserveScroll })
+  }
+  if (!sidebarRelationsHasMore.value) return
+
+  const page = sidebarRelationsPage.value
+  sidebarRelationsLoading.value = true
+  try {
+    const result = await queryRelationList({
+      page,
+      limit: SIDEBAR_RELATION_LIMIT
+    })
+    const nextRelations = result.list || []
+    if (page === 1) {
+      sidebarRelations.value = nextRelations
+    } else {
+      const existingIds = new Set(sidebarRelations.value.map(relation => String(relation.relationId)))
+      sidebarRelations.value = [
+        ...sidebarRelations.value,
+        ...nextRelations.filter(relation => !existingIds.has(String(relation.relationId))),
+      ]
+    }
+    sidebarRelationsTotal.value = result.totalRow || sidebarRelations.value.length
+    sidebarRelationsPage.value = page + 1
+    sidebarRelationsHasMore.value = nextRelations.length > 0 && sidebarRelations.value.length < sidebarRelationsTotal.value
+  } catch (error) {
+    console.error('Load sidebar relations failed:', error)
+    sidebarRelationsHasMore.value = false
+    if (page === 1) {
+      sidebarRelations.value = []
+    }
+  } finally {
+    sidebarRelationsLoading.value = false
+    if (preservedScrollTop != null) {
+      await restorePrimaryNavScrollTop(preservedScrollTop)
+    }
+    queueMicrotask(() => {
+      updatePrimaryNavScrollbar()
+      maybeLoadMoreSidebarObjects()
     })
   }
 }
@@ -2315,6 +2789,16 @@ async function handleMobileSelectProjectBoard(projectId: string) {
 async function handleMobileStartProjectConversation(projectId: string) {
   drawerVisible.value = false
   await handleStartProjectConversation(projectId)
+function isEmployeeActive(employeeId: string): boolean {
+  const raw = route.query.employeeId
+  const current = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : ''
+  return route.path.startsWith('/chat') && String(current) === String(employeeId)
+}
+
+function isRelationActive(relationId: string): boolean {
+  const raw = route.query.relationId
+  const current = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : ''
+  return route.path.startsWith('/chat') && String(current) === String(relationId)
 }
 
 async function handleSelectCustomerChat(customer: CustomerListVO) {
@@ -2326,6 +2810,52 @@ async function handleSelectCustomerChat(customer: CustomerListVO) {
 async function handleMobileSelectCustomerChat(customer: CustomerListVO) {
   drawerVisible.value = false
   await handleSelectCustomerChat(customer)
+}
+
+async function handleSelectEmployeeChat(employee: AddressBookEmployee) {
+  selectedPrimaryKey.value = ''
+  await router.push({ path: '/chat', query: { employeeId: employee.userId } })
+  chatStore.requestComposerFocus()
+}
+
+async function handleMobileSelectEmployeeChat(employee: AddressBookEmployee) {
+  drawerVisible.value = false
+  await handleSelectEmployeeChat(employee)
+}
+
+async function handleSelectRelationChat(relation: RelationVO) {
+  selectedPrimaryKey.value = ''
+  await router.push({ path: '/chat', query: { relationId: relation.relationId } })
+  chatStore.requestComposerFocus()
+}
+
+async function handleMobileSelectRelationChat(relation: RelationVO) {
+  drawerVisible.value = false
+  await handleSelectRelationChat(relation)
+}
+
+function employeeName(employee: AddressBookEmployee): string {
+  return employee.realname || '未命名员工'
+}
+
+function employeeInitial(employee: AddressBookEmployee): string {
+  return employeeName(employee).trim().charAt(0) || '?'
+}
+
+function employeeAvatarUrl(employee: AddressBookEmployee): string {
+  return employee.imgUrl || employee.img || ''
+}
+
+function relationName(relation: RelationVO): string {
+  return relation.name || '未命名关系'
+}
+
+function relationInitial(relation: RelationVO): string {
+  return relationName(relation).trim().charAt(0) || '?'
+}
+
+function relationAvatarUrl(relation: RelationVO): string {
+  return relation.avatarUrl || relation.avatar || ''
 }
 
 function focusCustomerSearchInput() {
@@ -2637,6 +3167,8 @@ function getSearchResultIcon(entityType: GlobalSearchResult['entityType']): WkIc
       return 'customer'
     case 'contact':
       return 'profile'
+    case 'relation':
+      return 'customer'
     case 'task':
       return 'task'
     case 'schedule':

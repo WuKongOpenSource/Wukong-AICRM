@@ -19,9 +19,12 @@ public class SessionCreateBO {
     @Schema(description = "关联员工ID")
     private Long employeeId;
 
+    @Schema(description = "关联关系人ID")
+    private Long relationId;
+
     @Schema(description = "会话标题")
     private String title;
 
-    @Schema(description = "聊天应用编码: general/crm/knowledge/address_book")
+    @Schema(description = "聊天应用编码: general/crm/knowledge/address_book/relation")
     private String appCode;
 }

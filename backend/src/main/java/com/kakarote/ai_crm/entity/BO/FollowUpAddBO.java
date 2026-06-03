@@ -15,9 +15,11 @@ import java.util.List;
 @Schema(name = "FollowUpAddBO", description = "跟进记录新增参数")
 public class FollowUpAddBO {
 
-    @NotNull(message = "客户ID不能为空")
-    @Schema(description = "客户ID", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "客户ID")
     private Long customerId;
+
+    @Schema(description = "关系人ID")
+    private Long relationId;
 
     @Schema(description = "联系人ID")
     private Long contactId;

@@ -29,6 +29,11 @@ public interface IGlobalSearchIndexService extends IService<GlobalSearchIndex> {
     void refreshContactIndex(Long contactId);
 
     /**
+     * 刷新关系人索引。
+     */
+    void refreshRelationIndex(Long relationId);
+
+    /**
      * 刷新任务索引。
      */
     void refreshTaskIndex(Long taskId);

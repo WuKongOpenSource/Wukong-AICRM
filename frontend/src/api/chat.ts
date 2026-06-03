@@ -9,6 +9,7 @@ export function createSession(data: {
   agentId?: string
   customerId?: string
   employeeId?: string
+  relationId?: string
   appCode?: string
 }): Promise<string> {
   return post('/chat/session/create', data)

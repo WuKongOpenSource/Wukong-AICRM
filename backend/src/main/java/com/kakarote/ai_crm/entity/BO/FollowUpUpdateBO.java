@@ -18,6 +18,9 @@ public class FollowUpUpdateBO {
     @Schema(description = "Contact ID")
     private Long contactId;
 
+    @Schema(description = "Relation ID")
+    private Long relationId;
+
     @NotBlank(message = "类型不能为空")
     @Schema(description = "Type: call, meeting, email, visit, other", requiredMode = Schema.RequiredMode.REQUIRED)
     private String type;

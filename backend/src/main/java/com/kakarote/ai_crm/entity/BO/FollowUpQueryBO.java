@@ -18,6 +18,9 @@ public class FollowUpQueryBO extends PageEntity {
     @Schema(description = "客户ID")
     private Long customerId;
 
+    @Schema(description = "关系人ID")
+    private Long relationId;
+
     @Schema(description = "联系人ID")
     private Long contactId;
 

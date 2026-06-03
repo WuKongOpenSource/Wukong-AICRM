@@ -56,6 +56,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '通讯录', icon: 'contacts', permission: 'addressBook:list' }
       },
       {
+        path: 'relation',
+        name: 'RelationList',
+        component: () => import('@/views/relation/RelationListView.vue'),
+        meta: { title: '关系', icon: 'contacts', permission: 'relation:view' }
+      },
+      {
         path: 'task',
         redirect: '/project'
       },

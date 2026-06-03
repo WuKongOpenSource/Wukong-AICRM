@@ -89,6 +89,29 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
                     systemField("wechat", "微信", "text", "wechat", "VARCHAR(100)", null, "请输入微信号", false, true, false, null, 50),
                     systemField("isPrimary", "主联系人", "checkbox", "is_primary", "SMALLINT", "0", null, false, false, true, null, 60),
                     systemField("notes", "备注", "textarea", "notes", "TEXT", null, "请输入备注", false, false, false, null, 70)
+            ),
+            "relation", List.of(
+                    systemField("name", "姓名", "text", "name", "VARCHAR(100)", null, "请输入姓名", true, true, true, null, 10),
+                    systemField("avatar", "头像", "text", "avatar", "VARCHAR(500)", null, "请输入头像地址", false, false, false, null, 20),
+                    systemField("phone", "手机号", "text", "phone", "VARCHAR(50)", null, "请输入手机号", false, true, true, null, 30),
+                    systemField("wechat", "微信号", "text", "wechat", "VARCHAR(100)", null, "请输入微信号", false, true, true, null, 40),
+                    systemField("email", "邮箱", "text", "email", "VARCHAR(100)", null, "请输入邮箱", false, true, true, null, 50),
+                    systemField("relationType", "关系类型", "select", "relation_type", "VARCHAR(50)", "other", null, false, true, true, List.of(
+                            option("friend", "朋友"),
+                            option("family", "家人"),
+                            option("relative", "亲戚"),
+                            option("partner", "合作伙伴"),
+                            option("customer_contact", "客户联系人"),
+                            option("supplier", "供应商"),
+                            option("investor", "投资人"),
+                            option("other", "其他")
+                    ), 60),
+                    systemField("company", "所属公司", "text", "company", "VARCHAR(255)", null, "请输入所属公司", false, true, true, null, 70),
+                    systemField("remark", "备注", "textarea", "remark", "TEXT", null, "请输入备注", false, false, false, null, 80),
+                    systemField("source", "来源", "select", "source", "VARCHAR(50)", "manual", null, false, false, true, List.of(
+                            option("manual", "手动创建"),
+                            option("customer_contact", "客户联系人")
+                    ), 90)
             )
     );
     /*

@@ -33,6 +33,12 @@ public class FollowUp implements Serializable {
     private Long customerId;
 
     /**
+     * 关系人ID
+     */
+    @Schema(description = "关系人ID")
+    private Long relationId;
+
+    /**
      * 联系人ID
      */
     @Schema(description = "联系人ID")

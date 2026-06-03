@@ -15,6 +15,7 @@ import com.kakarote.ai_crm.ai.tools.CustomerTools;
 import com.kakarote.ai_crm.ai.tools.FollowupTools;
 import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
 import com.kakarote.ai_crm.ai.tools.MailTools;
+import com.kakarote.ai_crm.ai.tools.RelationTools;
 import com.kakarote.ai_crm.ai.tools.ScheduleTools;
 import com.kakarote.ai_crm.ai.tools.TaskTools;
 import com.kakarote.ai_crm.common.exception.BusinessException;
@@ -100,6 +101,9 @@ public class DynamicChatClientProvider {
 
     @Autowired
     private ScheduleTools scheduleTools;
+
+    @Autowired
+    private RelationTools relationTools;
 
     @Autowired
     private MailTools mailTools;
@@ -570,11 +574,13 @@ public class DynamicChatClientProvider {
 
     private Object[] resolveDefaultTools(String appCode) {
         String normalizedAppCode = chatApplicationRegistry.normalize(appCode);
-        if (ChatApplicationCodes.KNOWLEDGE.equals(normalizedAppCode)) {
-            return new Object[]{knowledgeTools};
+        boolean crmEnabled = chatApplicationRegistry.hasToolGroup(normalizedAppCode, ChatApplicationRegistry.TOOL_GROUP_CRM);
+        boolean knowledgeEnabled = chatApplicationRegistry.hasToolGroup(normalizedAppCode, ChatApplicationRegistry.TOOL_GROUP_KNOWLEDGE);
+        if (crmEnabled) {
+            return new Object[]{customerTools, taskTools, knowledgeTools, contactTools, followupTools, scheduleTools, relationTools, mailTools, crmNoopTools};
         }
-        if (ChatApplicationCodes.CRM.equals(normalizedAppCode)) {
-            return new Object[]{customerTools, taskTools, knowledgeTools, contactTools, followupTools, scheduleTools, mailTools, crmNoopTools};
+        if (knowledgeEnabled) {
+            return new Object[]{knowledgeTools};
         }
         return new Object[0];
     }

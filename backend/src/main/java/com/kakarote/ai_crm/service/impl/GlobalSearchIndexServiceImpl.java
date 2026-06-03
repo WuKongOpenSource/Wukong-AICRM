@@ -15,6 +15,7 @@ import com.kakarote.ai_crm.entity.PO.GlobalSearchIndex;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.PO.KnowledgeTag;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
+import com.kakarote.ai_crm.entity.PO.Relation;
 import com.kakarote.ai_crm.entity.PO.Schedule;
 import com.kakarote.ai_crm.entity.PO.Task;
 import com.kakarote.ai_crm.entity.VO.CustomFieldVO;
@@ -27,6 +28,7 @@ import com.kakarote.ai_crm.mapper.GlobalSearchIndexMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeTagMapper;
 import com.kakarote.ai_crm.mapper.ManageUserMapper;
+import com.kakarote.ai_crm.mapper.RelationMapper;
 import com.kakarote.ai_crm.mapper.ScheduleMapper;
 import com.kakarote.ai_crm.mapper.TaskMapper;
 import com.kakarote.ai_crm.service.DataPermissionService;
@@ -58,6 +60,7 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
 
     private static final String ENTITY_CUSTOMER = "customer";
     private static final String ENTITY_CONTACT = "contact";
+    private static final String ENTITY_RELATION = "relation";
     private static final String ENTITY_TASK = "task";
     private static final String ENTITY_SCHEDULE = "schedule";
     private static final String ENTITY_KNOWLEDGE = "knowledge";
@@ -77,6 +80,9 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
 
     @Autowired
     private ContactTagMapper contactTagMapper;
+
+    @Autowired
+    private RelationMapper relationMapper;
 
     @Autowired
     private TaskMapper taskMapper;
@@ -253,6 +259,54 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
     }
 
     /**
+     * 刷新关系人索引。
+     */
+    @Override
+    public void refreshRelationIndex(Long relationId) {
+        if (relationId == null) {
+            return;
+        }
+
+        Relation relation = relationMapper.selectById(relationId);
+        if (relation == null || !Objects.equals(relation.getStatus(), 1)) {
+            deleteByEntity(ENTITY_RELATION, relationId);
+            return;
+        }
+
+        Customer sourceCustomer = relation.getSourceCustomerId() == null
+                ? null
+                : customerMapper.selectByIdIgnoreDataPermission(relation.getSourceCustomerId());
+        Map<String, Object> customFields = customFieldService.getCustomFieldValues(ENTITY_RELATION, relationId);
+
+        GlobalSearchIndex index = new GlobalSearchIndex();
+        index.setTenantId(relation.getTenantId());
+        index.setEntityType(ENTITY_RELATION);
+        index.setEntityId(relation.getRelationId());
+        index.setTitle(relation.getName());
+        index.setSubtitle(buildSubtitle("关系", firstNonBlank(relation.getCompany(), sourceCustomer != null ? sourceCustomer.getCompanyName() : null)));
+        index.setSummary(truncateSummary(firstNonBlank(relation.getRemark(), relation.getPhone(), relation.getEmail())));
+        index.setCustomerId(relation.getSourceCustomerId());
+        index.setCustomerName(sourceCustomer != null ? sourceCustomer.getCompanyName() : null);
+        index.setOwnerUserId(relation.getCreateUserId());
+        index.setCreateUserId(relation.getCreateUserId());
+        index.setRoutePath("/relation?openRelationId=" + relation.getRelationId());
+        index.setSortTime(firstNonNull(relation.getUpdateTime(), relation.getCreateTime()));
+        index.setSearchText(normalizeSearchText(joinFragments(
+                relation.getName(),
+                relation.getPhone(),
+                relation.getWechat(),
+                relation.getEmail(),
+                relation.getCompany(),
+                relation.getRelationType(),
+                relation.getSource(),
+                sourceCustomer != null ? sourceCustomer.getCompanyName() : null,
+                extractSearchableCustomFieldText(ENTITY_RELATION, customFields),
+                relation.getRemark()
+        )));
+        baseMapper.upsert(fillSearchFallback(index));
+    }
+
+    /**
      * 刷新任务索引。
      */
     @Override
@@ -268,6 +322,7 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
         }
 
         Customer customer = customerMapper.selectByIdIgnoreDataPermission(task.getCustomerId());
+        Relation relation = task.getRelationId() == null ? null : relationMapper.selectById(task.getRelationId());
         Map<Long, String> userNameMap = getUserDisplayNames(collectUserIds(task.getAssignedTo(), task.getCreateUserId()));
 
         GlobalSearchIndex index = new GlobalSearchIndex();
@@ -275,12 +330,13 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
         index.setEntityType(ENTITY_TASK);
         index.setEntityId(task.getTaskId());
         index.setTitle(task.getTitle());
-        index.setSubtitle(buildSubtitle("任务", customer != null ? customer.getCompanyName() : null));
+        index.setSubtitle(buildSubtitle("任务", firstNonBlank(customer != null ? customer.getCompanyName() : null, relation != null ? relation.getName() : null)));
         index.setSummary(truncateSummary(firstNonBlank(task.getDescription(), task.getParticipantNames(), task.getTaskType())));
         index.setCustomerId(task.getCustomerId());
         index.setCustomerName(customer != null ? customer.getCompanyName() : null);
         index.setCustomerOwnerId(customer != null ? customer.getOwnerId() : null);
         index.setAssignedUserId(task.getAssignedTo());
+        index.setOwnerUserId(relation != null ? relation.getCreateUserId() : null);
         index.setRoutePath("/task?openTaskId=" + task.getTaskId());
         index.setSortTime(firstNonNull(task.getDueDate(), task.getUpdateTime(), task.getCreateTime()));
         index.setSearchText(normalizeSearchText(joinFragments(
@@ -291,6 +347,7 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
                 getTaskPriorityLabel(task.getPriority()),
                 getTaskStatusLabel(task.getStatus()),
                 customer != null ? customer.getCompanyName() : null,
+                relation != null ? relation.getName() : null,
                 userNameMap.get(task.getAssignedTo()),
                 userNameMap.get(task.getCreateUserId())
         )));
@@ -313,6 +370,7 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
         }
 
         Customer customer = customerMapper.selectByIdIgnoreDataPermission(schedule.getCustomerId());
+        Relation relation = schedule.getRelationId() == null ? null : relationMapper.selectById(schedule.getRelationId());
         Contact contact = schedule.getContactId() == null
                 ? null
                 : contactMapper.selectByIdIgnoreDataPermission(schedule.getContactId());
@@ -330,12 +388,13 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
         index.setEntityType(ENTITY_SCHEDULE);
         index.setEntityId(schedule.getScheduleId());
         index.setTitle(schedule.getTitle());
-        index.setSubtitle(buildSubtitle("日程", customer != null ? customer.getCompanyName() : getScheduleTypeLabel(schedule.getType())));
+        index.setSubtitle(buildSubtitle("日程", firstNonBlank(customer != null ? customer.getCompanyName() : null, relation != null ? relation.getName() : null, getScheduleTypeLabel(schedule.getType()))));
         index.setSummary(truncateSummary(firstNonBlank(schedule.getLocation(), schedule.getDescription(), participantNames)));
         index.setCustomerId(schedule.getCustomerId());
         index.setCustomerName(customer != null ? customer.getCompanyName() : null);
         index.setCustomerOwnerId(customer != null ? customer.getOwnerId() : null);
         index.setCreateUserId(schedule.getCreateUserId());
+        index.setOwnerUserId(relation != null ? relation.getCreateUserId() : null);
         index.setParticipantUserIds(schedule.getParticipantUserIds());
         index.setRoutePath("/calendar?openScheduleId=" + schedule.getScheduleId());
         index.setSortTime(firstNonNull(schedule.getStartTime(), schedule.getUpdateTime(), schedule.getCreateTime()));
@@ -345,6 +404,7 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
                 schedule.getLocation(),
                 getScheduleTypeLabel(schedule.getType()),
                 customer != null ? customer.getCompanyName() : null,
+                relation != null ? relation.getName() : null,
                 contact != null ? contact.getName() : null,
                 participantNames,
                 userNameMap.get(schedule.getCreateUserId())
@@ -368,6 +428,7 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
         }
 
         Customer customer = customerMapper.selectByIdIgnoreDataPermission(knowledge.getCustomerId());
+        Relation relation = knowledge.getRelationId() == null ? null : relationMapper.selectById(knowledge.getRelationId());
         Map<Long, String> userNameMap = getUserDisplayNames(collectUserIds(knowledge.getUploadUserId()));
         List<String> tags = knowledgeTagMapper.getTagsByKnowledgeId(knowledgeId);
 
@@ -376,11 +437,12 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
         index.setEntityType(ENTITY_KNOWLEDGE);
         index.setEntityId(knowledge.getKnowledgeId());
         index.setTitle(knowledge.getName());
-        index.setSubtitle(buildSubtitle("知识库", customer != null ? customer.getCompanyName() : getKnowledgeTypeLabel(knowledge.getType())));
+        index.setSubtitle(buildSubtitle("知识库", firstNonBlank(customer != null ? customer.getCompanyName() : null, relation != null ? relation.getName() : null, getKnowledgeTypeLabel(knowledge.getType()))));
         index.setSummary(truncateSummary(firstNonBlank(knowledge.getSummary(), knowledge.getContentText())));
         index.setCustomerId(knowledge.getCustomerId());
         index.setCustomerName(customer != null ? customer.getCompanyName() : null);
         index.setCustomerOwnerId(customer != null ? customer.getOwnerId() : null);
+        index.setOwnerUserId(relation != null ? relation.getCreateUserId() : null);
         index.setUploadUserId(knowledge.getUploadUserId());
         index.setRoutePath("/knowledge?openKnowledgeId=" + knowledge.getKnowledgeId());
         index.setSortTime(firstNonNull(knowledge.getUpdateTime(), knowledge.getCreateTime()));
@@ -388,6 +450,7 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
                 knowledge.getName(),
                 getKnowledgeTypeLabel(knowledge.getType()),
                 customer != null ? customer.getCompanyName() : null,
+                relation != null ? relation.getName() : null,
                 userNameMap.get(knowledge.getUploadUserId()),
                 tags,
                 knowledge.getSummary(),
@@ -424,6 +487,7 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
     private void applyPermissionScope(GlobalSearchQueryBO queryBO) {
         applyScopedModule(queryBO, ENTITY_CUSTOMER, "customer:view");
         applyScopedModule(queryBO, ENTITY_CONTACT, "contact:view");
+        applyRelationScope(queryBO);
         applyScopedModule(queryBO, ENTITY_TASK, "task:view");
         applyScheduleScope(queryBO);
         applyScopedModule(queryBO, ENTITY_KNOWLEDGE, "knowledge:view");
@@ -475,12 +539,17 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
         queryBO.setScheduleUserIds(enabled && context.getUserIds() != null ? context.getUserIds() : Collections.emptyList());
     }
 
+    private void applyRelationScope(GlobalSearchQueryBO queryBO) {
+        queryBO.setRelationEnabled(permissionService.hasPermission("relation:view"));
+    }
+
     /**
      * 判断是否存在ANY启用项模块。
      */
     private boolean hasAnyEnabledModule(GlobalSearchQueryBO queryBO) {
         return Boolean.TRUE.equals(queryBO.getCustomerEnabled())
                 || Boolean.TRUE.equals(queryBO.getContactEnabled())
+                || Boolean.TRUE.equals(queryBO.getRelationEnabled())
                 || Boolean.TRUE.equals(queryBO.getTaskEnabled())
                 || Boolean.TRUE.equals(queryBO.getScheduleEnabled())
                 || Boolean.TRUE.equals(queryBO.getKnowledgeEnabled());
@@ -496,6 +565,7 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
         return switch (queryBO.getEntityType()) {
             case ENTITY_CUSTOMER -> !Boolean.TRUE.equals(queryBO.getCustomerEnabled());
             case ENTITY_CONTACT -> !Boolean.TRUE.equals(queryBO.getContactEnabled());
+            case ENTITY_RELATION -> !Boolean.TRUE.equals(queryBO.getRelationEnabled());
             case ENTITY_TASK -> !Boolean.TRUE.equals(queryBO.getTaskEnabled());
             case ENTITY_SCHEDULE -> !Boolean.TRUE.equals(queryBO.getScheduleEnabled());
             case ENTITY_KNOWLEDGE -> !Boolean.TRUE.equals(queryBO.getKnowledgeEnabled());

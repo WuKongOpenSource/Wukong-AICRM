@@ -45,11 +45,17 @@ public class TaskVO {
     @Schema(description = "客户ID")
     private Long customerId;
 
+    @Schema(description = "关系人ID")
+    private Long relationId;
+
     @Schema(description = "Source follow-up ID")
     private Long sourceFollowUpId;
 
     @Schema(description = "客户名称")
     private String customerName;
+
+    @Schema(description = "关系人姓名")
+    private String relationName;
 
     @Schema(description = "是否AI生成")
     private Integer generatedByAi;

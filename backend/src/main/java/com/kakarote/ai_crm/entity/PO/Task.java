@@ -69,6 +69,12 @@ public class Task implements Serializable {
     private Long customerId;
 
     /**
+     * 关联关系人ID
+     */
+    @Schema(description = "关联关系人ID")
+    private Long relationId;
+
+    /**
      * 来源跟进ID
      */
     @Schema(description = "Source follow-up ID")

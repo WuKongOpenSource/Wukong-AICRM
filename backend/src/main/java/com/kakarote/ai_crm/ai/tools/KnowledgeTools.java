@@ -57,6 +57,7 @@ public class KnowledgeTools {
 
         try {
             Long customerId = null;
+            Long relationId = null;
             if (StrUtil.isNotBlank(customerIdStr) && !"null".equalsIgnoreCase(customerIdStr)) {
                 try {
                     customerId = Long.parseLong(customerIdStr);
@@ -65,12 +66,16 @@ public class KnowledgeTools {
                 }
             } else {
                 customerId = AiContextHolder.getCurrentCustomerId();
+                if (customerId == null) {
+                    relationId = AiContextHolder.getCurrentRelationId();
+                }
             }
 
             KnowledgeQueryBO queryBO = new KnowledgeQueryBO();
             queryBO.setKeyword(keyword);
             queryBO.setType(type);
             queryBO.setCustomerId(customerId);
+            queryBO.setRelationId(relationId);
             queryBO.setPage(1);
             queryBO.setLimit(10);
 
@@ -87,6 +92,9 @@ public class KnowledgeTools {
 
                 if (knowledge.getCustomerName() != null) {
                     sb.append(String.format("，客户：%s", knowledge.getCustomerName()));
+                }
+                if (knowledge.getRelationName() != null) {
+                    sb.append(String.format("，关系人：%s", knowledge.getRelationName()));
                 }
                 if (knowledge.getCreateTime() != null) {
                     sb.append(String.format("，上传于：%s", dateFormat.format(knowledge.getCreateTime())));
@@ -125,6 +133,9 @@ public class KnowledgeTools {
 
             if (knowledge.getCustomerName() != null) {
                 sb.append(String.format("- **关联客户**: %s\n", knowledge.getCustomerName()));
+            }
+            if (knowledge.getRelationName() != null) {
+                sb.append(String.format("- **关联关系人**: %s\n", knowledge.getRelationName()));
             }
             if (knowledge.getFileSize() != null) {
                 sb.append(String.format("- **文件大小**: %s\n", formatFileSize(knowledge.getFileSize())));

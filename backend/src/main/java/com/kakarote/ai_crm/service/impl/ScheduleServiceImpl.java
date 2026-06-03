@@ -17,11 +17,13 @@ import com.kakarote.ai_crm.entity.BO.ScheduleAiParseBO;
 import com.kakarote.ai_crm.entity.BO.ScheduleQueryBO;
 import com.kakarote.ai_crm.entity.BO.ScheduleUpdateBO;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
+import com.kakarote.ai_crm.entity.PO.Relation;
 import com.kakarote.ai_crm.entity.PO.Schedule;
 import com.kakarote.ai_crm.entity.VO.ScheduleAiParseVO;
 import com.kakarote.ai_crm.entity.VO.ScheduleParticipantUserVO;
 import com.kakarote.ai_crm.entity.VO.ScheduleVO;
 import com.kakarote.ai_crm.mapper.ScheduleMapper;
+import com.kakarote.ai_crm.mapper.RelationMapper;
 import com.kakarote.ai_crm.service.DataPermissionService;
 import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
@@ -61,6 +63,9 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
 
     @Autowired
     private ManageUserService manageUserService;
+
+    @Autowired
+    private RelationMapper relationMapper;
 
     @Autowired
     private IGlobalSearchIndexService globalSearchIndexService;
@@ -122,6 +127,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
      */
     @Override
     public Long addSchedule(ScheduleAddBO scheduleAddBO) {
+        validateOwnedRelation(scheduleAddBO.getRelationId());
         Schedule schedule = new Schedule();
         schedule.setTitle(StrUtil.trim(scheduleAddBO.getTitle()));
         schedule.setDescription(StrUtil.emptyToNull(StrUtil.trim(scheduleAddBO.getDescription())));
@@ -129,6 +135,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         schedule.setEndTime(scheduleAddBO.getEndTime());
         schedule.setType(normalizeType(scheduleAddBO.getType()));
         schedule.setCustomerId(scheduleAddBO.getCustomerId());
+        schedule.setRelationId(scheduleAddBO.getRelationId());
         schedule.setContactId(scheduleAddBO.getContactId());
         schedule.setLocation(StrUtil.emptyToNull(StrUtil.trim(scheduleAddBO.getLocation())));
         schedule.setParticipantUserIds(joinParticipantUserIds(scheduleAddBO.getParticipantUserIds()));
@@ -153,6 +160,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "日程不存在");
         }
         dataPermissionService.assertUserDataAccessByPermission("schedule:edit", schedule.getCreateUserId());
+        validateOwnedRelation(scheduleUpdateBO.getRelationId());
 
         Long previousCustomerId = schedule.getCustomerId();
 
@@ -162,6 +170,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         schedule.setEndTime(scheduleUpdateBO.getEndTime());
         schedule.setType(normalizeType(scheduleUpdateBO.getType()));
         schedule.setCustomerId(scheduleUpdateBO.getCustomerId());
+        schedule.setRelationId(scheduleUpdateBO.getRelationId());
         schedule.setContactId(scheduleUpdateBO.getContactId());
         schedule.setLocation(StrUtil.emptyToNull(StrUtil.trim(scheduleUpdateBO.getLocation())));
         schedule.setParticipantUserIds(joinParticipantUserIds(scheduleUpdateBO.getParticipantUserIds()));
@@ -207,6 +216,17 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         refreshCustomerActivity(previousCustomerId);
         if (!Objects.equals(previousCustomerId, currentCustomerId)) {
             refreshCustomerActivity(currentCustomerId);
+        }
+    }
+
+    private void validateOwnedRelation(Long relationId) {
+        if (relationId == null) {
+            return;
+        }
+        Relation relation = relationMapper.selectById(relationId);
+        if (relation == null || Integer.valueOf(0).equals(relation.getStatus())
+                || !UserUtil.getUserId().equals(relation.getCreateUserId())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "关系人不存在或无权限访问");
         }
     }
 

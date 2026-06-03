@@ -24,6 +24,7 @@ import com.kakarote.ai_crm.entity.BO.TaskAddBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.FollowUp;
 import com.kakarote.ai_crm.entity.PO.FollowUpAttachment;
+import com.kakarote.ai_crm.entity.PO.Relation;
 import com.kakarote.ai_crm.entity.PO.Task;
 import com.kakarote.ai_crm.entity.VO.FollowUpAttachmentVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpAiParseVO;
@@ -32,6 +33,7 @@ import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.FollowUpAttachmentMapper;
 import com.kakarote.ai_crm.mapper.FollowUpMapper;
+import com.kakarote.ai_crm.mapper.RelationMapper;
 import com.kakarote.ai_crm.service.AiAudioTranscriptionService;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.ICustomerService;
@@ -39,6 +41,7 @@ import com.kakarote.ai_crm.service.IFollowUpService;
 import com.kakarote.ai_crm.service.ITaskService;
 import com.kakarote.ai_crm.utils.AiMediaUtil;
 import com.kakarote.ai_crm.utils.DocumentTextExtractor;
+import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.openai.OpenAiChatOptions;
@@ -133,6 +136,9 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     private FollowUpAttachmentMapper followUpAttachmentMapper;
 
     @Autowired
+    private RelationMapper relationMapper;
+
+    @Autowired
     private ITaskService taskService;
 
     @Autowired
@@ -157,10 +163,16 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long addFollowUp(FollowUpAddBO followUpAddBO) {
-        Customer customer = customerMapper.selectById(followUpAddBO.getCustomerId());
-        if (ObjectUtil.isNull(customer)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Customer does not exist or is not accessible");
+        if (followUpAddBO.getCustomerId() == null && followUpAddBO.getRelationId() == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户或关系人不能为空");
         }
+        if (followUpAddBO.getCustomerId() != null) {
+            Customer customer = customerMapper.selectById(followUpAddBO.getCustomerId());
+            if (ObjectUtil.isNull(customer)) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Customer does not exist or is not accessible");
+            }
+        }
+        validateOwnedRelation(followUpAddBO.getRelationId());
 
         FollowUp followUp = BeanUtil.copyProperties(followUpAddBO, FollowUp.class);
         if (followUp.getFollowTime() == null) {
@@ -188,6 +200,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         if (ObjectUtil.isNull(followUp)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Follow-up record does not exist");
         }
+        validateOwnedRelation(followUpUpdateBO.getRelationId());
 
         BeanUtil.copyProperties(
             followUpUpdateBO,
@@ -811,7 +824,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
      * 创建Suggested任务。
      */
     private void createSuggestedTasks(FollowUp followUp, List<FollowUpSuggestedTaskBO> suggestedTasks) {
-        if (followUp == null || followUp.getCustomerId() == null || CollUtil.isEmpty(suggestedTasks)) {
+        if (followUp == null || (followUp.getCustomerId() == null && followUp.getRelationId() == null) || CollUtil.isEmpty(suggestedTasks)) {
             return;
         }
 
@@ -827,6 +840,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             taskAddBO.setPriority("medium");
             taskAddBO.setTaskType(StrUtil.blankToDefault(suggestedTask.getTaskType(), "跟进"));
             taskAddBO.setCustomerId(followUp.getCustomerId());
+            taskAddBO.setRelationId(followUp.getRelationId());
             taskAddBO.setGeneratedByAi(1);
             taskAddBO.setAiContext("Generated from follow-up " + followUp.getFollowUpId());
             taskAddBO.setSourceFollowUpId(followUp.getFollowUpId());
@@ -1252,5 +1266,16 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             .set(Customer::getNextFollowTime, latestFollowUp != null ? latestFollowUp.getNextFollowTime() : null);
         customerMapper.update(null, updateWrapper);
         customerService.refreshCustomerActivity(customerId);
+    }
+
+    private void validateOwnedRelation(Long relationId) {
+        if (relationId == null) {
+            return;
+        }
+        Relation relation = relationMapper.selectById(relationId);
+        if (relation == null || Integer.valueOf(0).equals(relation.getStatus())
+                || !UserUtil.getUserId().equals(relation.getCreateUserId())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "关系人不存在或无权限访问");
+        }
     }
 }

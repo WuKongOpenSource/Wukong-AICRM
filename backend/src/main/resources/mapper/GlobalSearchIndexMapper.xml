@@ -41,9 +41,16 @@
                         </choose>
                     ) OR
                 </if>
+                <if test="query.relationEnabled != null and query.relationEnabled and query.currentUserId != null">
+                    (
+                        g.entity_type = 'relation'
+                        AND g.owner_user_id = #{query.currentUserId}
+                    ) OR
+                </if>
                 <if test="query.taskEnabled != null and query.taskEnabled">
                     (
                         g.entity_type = 'task'
+                        AND (g.owner_user_id IS NULL OR g.owner_user_id = #{query.currentUserId})
                         <choose>
                             <when test="query.taskAllData != null and query.taskAllData">
                             </when>
@@ -63,27 +70,34 @@
                     (
                         g.entity_type = 'schedule'
                         AND (
-                            <choose>
-                                <when test="query.scheduleAllData != null and query.scheduleAllData">
-                                    1 = 1
-                                </when>
-                                <when test="query.scheduleUserIds != null and query.scheduleUserIds.size() > 0">
-                                    g.create_user_id IN
-                                    <foreach collection="query.scheduleUserIds" item="userId" open="(" separator="," close=")">
-                                        #{userId}
-                                    </foreach>
-                                </when>
-                                <otherwise>
-                                    1 = 0
-                                </otherwise>
-                            </choose>
-                            OR (',' || COALESCE(g.participant_user_ids, '') || ',') LIKE ('%,' || CAST(#{query.currentUserId} AS TEXT) || ',%')
+                            (
+                                g.owner_user_id IS NULL
+                                AND (
+                                    <choose>
+                                        <when test="query.scheduleAllData != null and query.scheduleAllData">
+                                            1 = 1
+                                        </when>
+                                        <when test="query.scheduleUserIds != null and query.scheduleUserIds.size() > 0">
+                                            g.create_user_id IN
+                                            <foreach collection="query.scheduleUserIds" item="userId" open="(" separator="," close=")">
+                                                #{userId}
+                                            </foreach>
+                                        </when>
+                                        <otherwise>
+                                            1 = 0
+                                        </otherwise>
+                                    </choose>
+                                    OR (',' || COALESCE(g.participant_user_ids, '') || ',') LIKE ('%,' || CAST(#{query.currentUserId} AS TEXT) || ',%')
+                                )
+                            )
+                            OR (g.owner_user_id = #{query.currentUserId})
                         )
                     ) OR
                 </if>
                 <if test="query.knowledgeEnabled != null and query.knowledgeEnabled">
                     (
                         g.entity_type = 'knowledge'
+                        AND (g.owner_user_id IS NULL OR g.owner_user_id = #{query.currentUserId})
                         AND (
                             (
                                 g.customer_id IS NOT NULL

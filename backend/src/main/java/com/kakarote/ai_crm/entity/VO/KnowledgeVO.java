@@ -49,6 +49,12 @@ public class KnowledgeVO {
     @Schema(description = "关联员工名称")
     private String employeeName;
 
+    @Schema(description = "关联关系人ID")
+    private Long relationId;
+
+    @Schema(description = "关联关系人姓名")
+    private String relationName;
+
     @Schema(description = "AI摘要")
     private String summary;
 

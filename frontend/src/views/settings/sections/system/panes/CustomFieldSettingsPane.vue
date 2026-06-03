@@ -13,6 +13,7 @@
     <el-tabs v-model="activeEntityType" class="mb-4" @tab-change="loadCustomFields">
       <el-tab-pane label="客户字段" name="customer" />
       <el-tab-pane label="联系人字段" name="contact" />
+      <el-tab-pane label="关系字段" name="relation" />
     </el-tabs>
 
     <div v-if="loadingFields" class="text-center py-8">

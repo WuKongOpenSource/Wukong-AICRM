@@ -17,10 +17,12 @@ import com.kakarote.ai_crm.entity.BO.TaskAiParseBO;
 import com.kakarote.ai_crm.entity.BO.TaskQueryBO;
 import com.kakarote.ai_crm.entity.BO.TaskUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
+import com.kakarote.ai_crm.entity.PO.Relation;
 import com.kakarote.ai_crm.entity.PO.Task;
 import com.kakarote.ai_crm.entity.VO.TaskAiParseVO;
 import com.kakarote.ai_crm.entity.VO.TaskVO;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
+import com.kakarote.ai_crm.mapper.RelationMapper;
 import com.kakarote.ai_crm.mapper.TaskMapper;
 import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
@@ -64,6 +66,9 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
     private CustomerMapper customerMapper;
 
     @Autowired
+    private RelationMapper relationMapper;
+
+    @Autowired
     @Lazy
     private ICustomerService customerService;
 
@@ -102,6 +107,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
      */
     @Override
     public Long addTask(TaskAddBO taskAddBO) {
+        validateOwnedRelation(taskAddBO.getRelationId());
         Task task = BeanUtil.copyProperties(taskAddBO, Task.class);
         if (StrUtil.isEmpty(task.getStatus())) {
             task.setStatus("pending");
@@ -131,6 +137,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         if (ObjectUtil.isNull(task)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "任务不存在");
         }
+        validateOwnedRelation(taskUpdateBO.getRelationId());
         Long previousCustomerId = task.getCustomerId();
         BeanUtil.copyProperties(taskUpdateBO, task, "taskId", "createUserId", "createTime");
         updateById(task);
@@ -238,6 +245,17 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         }
         Customer customer = task.getCustomerId() == null ? null : customerMapper.selectByIdIgnoreDataPermission(task.getCustomerId());
         persistValuePriority(task, customer);
+    }
+
+    private void validateOwnedRelation(Long relationId) {
+        if (relationId == null) {
+            return;
+        }
+        Relation relation = relationMapper.selectById(relationId);
+        if (relation == null || Integer.valueOf(0).equals(relation.getStatus())
+                || !UserUtil.getUserId().equals(relation.getCreateUserId())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "关系人不存在或无权限访问");
+        }
     }
 
     /**

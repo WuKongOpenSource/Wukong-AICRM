@@ -87,18 +87,26 @@ public class ScheduleTools {
 
             String matchedCompanyName = null;
             Long customerId = null;
-            AiToolCustomerResolver.CustomerResolveResult customerResolve = customerResolver.resolveForCreate(
-                customerIdStr, customerName, "关联该客户创建日程", "创建日程失败", "创建日程");
-            if (customerResolve.errorMessage() != null) {
-                return customerResolve.errorMessage();
-            }
-            if (customerResolve.customer() != null) {
-                customerId = customerResolve.customer().getCustomerId();
-                matchedCompanyName = customerResolve.customer().getCompanyName();
-                bo.setCustomerId(customerId);
+            Long currentRelationId = AiContextHolder.getCurrentRelationId();
+            boolean useRelationContext = currentRelationId != null
+                && !hasTextValue(customerIdStr)
+                && !hasTextValue(customerName);
+            if (useRelationContext) {
+                bo.setRelationId(currentRelationId);
+            } else {
+                AiToolCustomerResolver.CustomerResolveResult customerResolve = customerResolver.resolveForCreate(
+                    customerIdStr, customerName, "关联该客户创建日程", "创建日程失败", "创建日程");
+                if (customerResolve.errorMessage() != null) {
+                    return customerResolve.errorMessage();
+                }
+                if (customerResolve.customer() != null) {
+                    customerId = customerResolve.customer().getCustomerId();
+                    matchedCompanyName = customerResolve.customer().getCompanyName();
+                    bo.setCustomerId(customerId);
+                }
             }
 
-            if (hasTextValue(contactName)) {
+            if (hasTextValue(contactName) && customerId != null) {
                 Long contactId = findContactIdByName(contactName, customerId);
                 if (contactId == null) {
                     log.info("未找到联系人「{}」，将不关联联系人", contactName);
@@ -120,6 +128,9 @@ public class ScheduleTools {
             }
             if (customerId != null) {
                 result.append("\n- customerId: ").append(customerId);
+            }
+            if (useRelationContext) {
+                result.append("\n- relationId: ").append(currentRelationId);
             }
             if (currentEmployeeId != null) {
                 result.append("\n- employeeId: ").append(currentEmployeeId);
@@ -172,6 +183,9 @@ public class ScheduleTools {
                 }
                 if (vo.getCustomerName() != null) {
                     sb.append(String.format("，客户: %s", vo.getCustomerName()));
+                }
+                if (vo.getRelationName() != null) {
+                    sb.append(String.format("，关系人: %s", vo.getRelationName()));
                 }
                 if (StrUtil.isNotBlank(vo.getLocation())) {
                     sb.append(String.format("，地点: %s", vo.getLocation()));

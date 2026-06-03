@@ -3,6 +3,7 @@ package com.kakarote.ai_crm.config.auth;
 import com.baomidou.mybatisplus.extension.plugins.handler.MultiDataPermissionHandler;
 import com.kakarote.ai_crm.common.auth.DataPermissionContext;
 import com.kakarote.ai_crm.service.DataPermissionService;
+import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.expression.Alias;
@@ -25,6 +26,7 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
     private static final Map<String, String> MODULE_BY_MAPPER = Map.of(
             "CustomerMapper", "customer",
             "ContactMapper", "contact",
+            "RelationMapper", "relation",
             "TaskMapper", "task",
             "FollowUpMapper", "followup",
             "KnowledgeMapper", "knowledge"
@@ -49,13 +51,17 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
             return null;
         }
 
+        Long currentUserId = resolveCurrentUserId();
         DataPermissionContext context = dataPermissionService.createContext(module);
-        if (context.isAllData()) {
-            return null;
-        }
 
         // MyBatis-Plus 会按 SQL 中出现的表逐个回调这里，因此需要先把 mapper 映射成模块，再按具体表名生成过滤片段。
-        String sqlSegment = buildSqlSegment(module, table, context.getUserIds());
+        String sqlSegment = buildSqlSegment(module, table, context);
+        String relationPrivacySegment = buildRelationPrivacySegment(module, table, currentUserId);
+        if (sqlSegment != null && relationPrivacySegment != null) {
+            sqlSegment = "(" + sqlSegment + ") AND (" + relationPrivacySegment + ")";
+        } else if (relationPrivacySegment != null) {
+            sqlSegment = relationPrivacySegment;
+        }
         if (sqlSegment == null) {
             return null;
         }
@@ -83,7 +89,14 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
     /**
      * 构建SQLSegment。
      */
-    private String buildSqlSegment(String module, Table table, List<Long> userIds) {
+    private String buildSqlSegment(String module, Table table, DataPermissionContext context) {
+        if ("relation".equals(module)) {
+            return null;
+        }
+        if (context != null && context.isAllData()) {
+            return null;
+        }
+        List<Long> userIds = context == null ? null : context.getUserIds();
         if (userIds == null || userIds.isEmpty()) {
             // 无可见用户时返回恒假表达式，显式拒绝访问，避免因为 null 片段而误放行整表数据。
             return "1 = 0";
@@ -101,11 +114,16 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
                     + " IN (SELECT customer_id FROM crm_customer WHERE owner_id IN (" + inClause + "))"
                     : null;
             case "task" -> "crm_task".equals(tableName)
-                    ? qualifiedColumn(table, "assigned_to") + " IN (" + inClause + ")"
+                    ? "((" + qualifiedColumn(table, "relation_id") + " IS NULL AND "
+                    + qualifiedColumn(table, "assigned_to") + " IN (" + inClause + "))"
+                    + " OR (" + qualifiedColumn(table, "relation_id") + " IS NOT NULL AND "
+                    + qualifiedColumn(table, "create_user_id") + " IN (" + inClause + ")))"
                     : null;
             case "followup" -> "crm_follow_up".equals(tableName)
-                    ? qualifiedColumn(table, "customer_id")
-                    + " IN (SELECT customer_id FROM crm_customer WHERE owner_id IN (" + inClause + "))"
+                    ? "((" + qualifiedColumn(table, "customer_id")
+                    + " IN (SELECT customer_id FROM crm_customer WHERE owner_id IN (" + inClause + ")))"
+                    + " OR (" + qualifiedColumn(table, "relation_id") + " IS NOT NULL AND "
+                    + qualifiedColumn(table, "create_user_id") + " IN (" + inClause + ")))"
                     : null;
             case "knowledge" -> "crm_knowledge".equals(tableName)
                     ? "((" + qualifiedColumn(table, "customer_id") + " IS NOT NULL AND "
@@ -119,6 +137,42 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
                     : null;
             default -> null;
         };
+    }
+
+    /**
+     * 关系模块及关系挂载数据始终按当前创建人私有，不受角色“全部数据”范围放大。
+     */
+    private String buildRelationPrivacySegment(String module, Table table, Long currentUserId) {
+        if (currentUserId == null) {
+            return null;
+        }
+        String tableName = normalizeTableName(table.getName());
+        return switch (module) {
+            case "relation" -> "crm_relation".equals(tableName)
+                    ? qualifiedColumn(table, "create_user_id") + " = " + currentUserId
+                    : null;
+            case "task" -> "crm_task".equals(tableName)
+                    ? "(" + qualifiedColumn(table, "relation_id") + " IS NULL OR "
+                    + qualifiedColumn(table, "create_user_id") + " = " + currentUserId + ")"
+                    : null;
+            case "followup" -> "crm_follow_up".equals(tableName)
+                    ? "(" + qualifiedColumn(table, "relation_id") + " IS NULL OR "
+                    + qualifiedColumn(table, "create_user_id") + " = " + currentUserId + ")"
+                    : null;
+            case "knowledge" -> "crm_knowledge".equals(tableName)
+                    ? "(" + qualifiedColumn(table, "relation_id") + " IS NULL OR "
+                    + qualifiedColumn(table, "upload_user_id") + " = " + currentUserId + ")"
+                    : null;
+            default -> null;
+        };
+    }
+
+    private Long resolveCurrentUserId() {
+        try {
+            return UserUtil.getUserId();
+        } catch (Exception exception) {
+            return null;
+        }
     }
 
     /**

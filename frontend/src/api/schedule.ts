@@ -17,6 +17,8 @@ export interface ScheduleVO {
   typeName: string
   customerId: string
   customerName: string
+  relationId?: string
+  relationName?: string
   contactId: string
   contactName: string
   location: string
@@ -34,6 +36,7 @@ export interface ScheduleAddBO {
   endTime?: string
   type?: string
   customerId?: string
+  relationId?: string
   contactId?: string
   location?: string
   description?: string
@@ -48,6 +51,7 @@ export interface ScheduleQueryBO {
   scheduleId?: string
   keyword?: string
   customerId?: string
+  relationId?: string
   type?: string
   startDate?: string
   endDate?: string

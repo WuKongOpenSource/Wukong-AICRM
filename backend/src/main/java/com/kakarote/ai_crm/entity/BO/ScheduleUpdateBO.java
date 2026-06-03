@@ -39,6 +39,9 @@ public class ScheduleUpdateBO {
     @Schema(description = "关联客户ID")
     private Long customerId;
 
+    @Schema(description = "关系人ID")
+    private Long relationId;
+
     @Schema(description = "联系人ID")
     private Long contactId;
 

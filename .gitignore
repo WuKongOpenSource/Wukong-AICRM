@@ -20,3 +20,4 @@ mcp_server/dist
 uploads/**
 backend/src/main/resources/public/
 backend/src/main/resources/cert/**
+Scripts/

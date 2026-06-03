@@ -75,6 +75,23 @@ public class ChatApplicationRegistry {
                 List.of(TOOL_GROUP_CRM, TOOL_GROUP_KNOWLEDGE),
                 List.of("明天下午让他完成客户资料整理", "下周一上午和他开项目复盘会", "总结这个员工最近的任务和附件")
         ));
+        register(new ChatApplicationDefinition(
+                ChatApplicationCodes.RELATION,
+                "关系",
+                "contacts",
+                "围绕外部关系人创建任务、日程、历史记录、附件归档和知识库检索。",
+                """
+                当前应用是关系人对象助手。你是在围绕当前关系人做任务、日程、历史记录和附件归档。
+                当用户说“他/她/这个人/这个关系人/该关系人”且当前会话绑定了关系人时，默认指当前关系人。
+                没有具体执行时间点、只有截止或待办语义时创建任务；出现具体执行时间点时创建日程。
+                当用户说“记录一下”“帮我记一下”或描述已经发生的偏好、兴趣、沟通结论时，默认调用 createFollowUp 创建历史记录，不要直接修改备注；只有用户明确要求“更新备注/改备注/写到备注”时才更新备注。
+                关系人附件默认归档到该关系人的知识库资料。
+                只有在工具结果确认成功后，才能说数据已创建、更新或关联成功。
+                """,
+                false,
+                List.of(TOOL_GROUP_CRM, TOOL_GROUP_KNOWLEDGE),
+                List.of("下周三提醒我去拜访他", "记录一下，他对我们的新产品比较感兴趣", "总结这个关系人的任务和附件")
+        ));
     }
 
     public ChatApplicationDefinition resolve(String appCode) {
