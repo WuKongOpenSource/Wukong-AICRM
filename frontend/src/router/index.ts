@@ -1,7 +1,7 @@
-import { createRouter, createWebHashHistory, RouteRecordRaw } from 'vue-router'
-import { getToken } from '@/utils/request'
+import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
 import { getOidcSessionToken } from '@/api/auth'
 import { useUserStore } from '@/stores/user'
+import { getToken } from '@/utils/request'
 
 const settingsComponent = () => import('@/views/settings/SettingsView.vue')
 const settingsMeta = {
@@ -57,9 +57,19 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'task',
-        name: 'TaskList',
-        component: () => import('@/views/task/TaskListView.vue'),
-        meta: { title: '任务管理', icon: 'task_alt', permission: 'task' }
+        redirect: '/project'
+      },
+      {
+        path: 'project',
+        name: 'ProjectList',
+        component: () => import('@/views/project/ProjectListView.vue'),
+        meta: { title: '项目管理', icon: 'task_alt', permission: 'task' }
+      },
+      {
+        path: 'project/:id',
+        name: 'ProjectDetail',
+        component: () => import('@/views/project/ProjectDetailView.vue'),
+        meta: { title: '项目详情', hidden: true, permission: 'task' }
       },
       {
         path: 'calendar',
@@ -128,7 +138,6 @@ const router = createRouter({
   routes
 })
 
-// Navigation guard
 router.beforeEach(async (to, _from, next) => {
   const token = getToken()
   const requiresAuth = to.meta.requiresAuth !== false
@@ -136,54 +145,51 @@ router.beforeEach(async (to, _from, next) => {
   if (requiresAuth && !token) {
     next({ name: 'Login', query: { redirect: to.fullPath } })
   } else if ((to.name === 'Login' || to.name === 'Register') && token) {
-    // 用户已登录访问登录页，检查是否有 redirect 参数
     let redirect = to.query.redirect as string
     if (redirect) {
-      // 如果是 OIDC 授权 URL，需要先获取 session_token
       if (redirect.includes('/oauth2/authorize')) {
         try {
           const { sessionToken } = await getOidcSessionToken()
           const url = new URL(redirect)
           url.searchParams.set('session_token', sessionToken)
           redirect = url.toString()
-        } catch (e) {
-          console.error('Failed to get OIDC session token:', e)
+        } catch (error) {
+          console.error('Failed to get OIDC session token:', error)
         }
       }
-      // 如果是外部 URL，直接跳转
+
       if (redirect.startsWith('http://') || redirect.startsWith('https://')) {
         window.location.href = redirect
         return
       }
+
       next(redirect)
     } else {
       next({ name: 'Chat' })
     }
   } else if (requiresAuth && token) {
-    // 有 token 但可能没有用户信息，需要获取
     const userStore = useUserStore()
     if (!userStore.userInfo || !userStore.permissionsLoaded) {
       try {
         await userStore.fetchUserInfo()
-      } catch (e) {
-        // token 失效，跳转登录页
-        console.error('Failed to fetch user info:', e)
+      } catch (error) {
+        console.error('Failed to fetch user info:', error)
         next({ name: 'Login', query: { redirect: to.fullPath } })
         return
       }
     }
-    // 权限检查
+
     const permission = to.meta.permission as string | string[] | undefined
     if (permission) {
       const hasAccess = Array.isArray(permission)
         ? permission.some(p => userStore.hasPermission(p))
         : (permission === 'chat' || permission === 'addressBook:list' || userStore.hasPermission(permission))
       if (!hasAccess) {
-        // 无权限，重定向到 AI 助手
         next({ name: 'Chat' })
         return
       }
     }
+
     next()
   } else {
     next()

@@ -110,6 +110,27 @@ public class Task implements Serializable {
     @Schema(description = "Whether this task belongs to the high-value priority bucket")
     private Boolean highValue;
 
+    @Schema(description = "所属项目ID")
+    private Long projectId;
+
+    @Schema(description = "所属项目泳道ID")
+    private Long laneId;
+
+    @Schema(description = "任务参与人ID列表(JSON)")
+    private String participantUserIds;
+
+    @Schema(description = "任务来源: manual/ai")
+    private String source;
+
+    @Schema(description = "AI创建来源文本")
+    private String aiSourceText;
+
+    @Schema(description = "是否有关联附件")
+    private Boolean hasAttachments;
+
+    @Schema(description = "是否有关联日程")
+    private Boolean hasSchedule;
+
     /**
      * 完成时间
      */

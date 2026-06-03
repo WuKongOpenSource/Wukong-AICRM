@@ -162,6 +162,81 @@
             </button>
           </template>
 
+          <div v-if="!primarySidebarContentCollapsed && showSidebarProjects" class="space-y-1 pt-1">
+            <div
+              class="wk-project-header-row group/project-header flex w-full items-center gap-2 rounded-lg pl-3 pr-1 py-[6px] mt-[12px] mb-[0px] hover:!bg-[#f9f9f9]"
+              :style="{ backgroundColor: projectHeaderHovered ? '#f9f9f9' : 'transparent' }"
+              :title="sidebarProjectsExpanded ? '收起项目列表' : '展开项目列表'"
+              @mouseenter="projectHeaderHovered = true"
+              @mouseleave="projectHeaderHovered = false"
+            >
+              <button
+                type="button"
+                class="wk-project-header-toggle group flex min-w-0 flex-1 items-center gap-1 text-left"
+                :aria-expanded="sidebarProjectsExpanded"
+                aria-controls="sidebar-projects-panel"
+                @click="sidebarProjectsExpanded = !sidebarProjectsExpanded"
+              >
+                <span class="min-w-0 truncate text-[14px] font-semibold uppercase tracking-tight text-[#0d0d0d]">项目</span>
+                <span class="flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition-all duration-150" aria-hidden="true">
+                  <span class="material-symbols-outlined inline-flex h-5 shrink-0 items-center justify-center self-center text-[18px] leading-none text-[#c9c9c9]">
+                    {{ sidebarProjectsExpanded ? 'keyboard_arrow_down' : 'chevron_right' }}
+                  </span>
+                </span>
+              </button>
+              <div class="ml-auto flex shrink-0 items-center justify-end gap-1 opacity-0 transition-opacity duration-150 group-hover/project-header:opacity-100">
+                <button
+                  type="button"
+                  class="wk-project-header-action group/project-action relative flex size-6 items-center justify-center rounded-md text-[#8f8f8f] transition-colors hover:text-[#0d0d0d]"
+                  aria-label="新增项目"
+                  @click.stop="openCreateProjectDialog"
+                >
+                  <span class="material-symbols-outlined text-[18px] leading-none">add</span>
+                  <span
+                    class="pointer-events-none absolute right-0 top-full z-[200] mt-2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/project-action:opacity-100"
+                    role="tooltip"
+                  >
+                    新增项目
+                  </span>
+                </button>
+              </div>
+            </div>
+            <div id="sidebar-projects-panel" v-show="sidebarProjectsExpanded">
+              <div v-if="projectStore.loading && sidebarProjects.length === 0" class="flex justify-center py-6">
+                <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+              </div>
+              <div v-else-if="sidebarProjects.length === 0" class="px-3 py-6 text-center text-xs text-slate-400">
+                暂无项目数据
+              </div>
+              <template v-else>
+                <button
+                  v-for="project in sidebarProjects"
+                  :key="project.projectId"
+                  type="button"
+                  class="group/project-row flex w-full min-w-0 items-center gap-2 overflow-hidden rounded-[8px] pl-[10px] pr-[8px] py-[6px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
+                  :class="isProjectActive(project.projectId) ? 'bg-[#f3f3f3]' : 'hover:bg-[#f9f9f9]'"
+                  @click="handleSelectProjectBoard(project.projectId)"
+                >
+                  <span class="material-symbols-outlined flex size-[20px] shrink-0 items-center justify-center text-[18px] leading-none text-[#8f8f8f]">
+                    folder
+                  </span>
+                  <span class="block min-w-0 flex-1 truncate text-sm leading-5 text-[#0d0d0d]" :title="project.name">
+                    {{ project.name }}
+                  </span>
+                  <button
+                    type="button"
+                    class="relative flex size-6 shrink-0 items-center justify-center rounded-md text-[#8f8f8f] opacity-0 transition-all hover:text-[#0d0d0d] group-hover/project-row:opacity-100"
+                    aria-label="在项目中开始对话"
+                    title="在项目中开始对话"
+                    @click.stop="handleStartProjectConversation(project.projectId)"
+                  >
+                    <span class="material-symbols-outlined text-[17px] leading-none">chat_bubble</span>
+                  </button>
+                </button>
+              </template>
+            </div>
+          </div>
+
           <!-- Chat: recent sessions under Knowledge menu -->
           <template v-if="!primarySidebarContentCollapsed">
             <!-- <div class="pt-2" /> -->
@@ -740,6 +815,49 @@
               </div>
             </template>
 
+            <div v-if="showSidebarProjects" class="pt-2">
+              <div class="flex items-center justify-between px-3 pb-2">
+                <p class="text-[14px] font-bold leading-7 text-[#0d0d0d]">项目</p>
+                <button
+                  type="button"
+                  class="flex size-7 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors active:bg-slate-100"
+                  aria-label="新增项目"
+                  @click="openMobileCreateProjectDialog"
+                >
+                  <span class="material-symbols-outlined text-[18px] leading-none">add</span>
+                </button>
+              </div>
+              <div v-if="projectStore.loading && sidebarProjects.length === 0" class="flex justify-center py-6">
+                <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+              </div>
+              <div v-else-if="sidebarProjects.length === 0" class="px-3 py-[6px] text-sm text-slate-400">
+                暂无项目数据
+              </div>
+              <template v-else>
+                <button
+                  v-for="project in sidebarProjects"
+                  :key="project.projectId"
+                  type="button"
+                  class="group flex w-full min-w-0 items-center gap-3 rounded-[8px] px-3 py-[6px] text-left transition-colors"
+                  :class="isProjectActive(project.projectId) ? 'bg-[#f3f3f3]' : 'text-[#0d0d0d] active:bg-slate-100'"
+                  @click="handleMobileSelectProjectBoard(project.projectId)"
+                >
+                  <span class="material-symbols-outlined flex size-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-[18px] leading-none text-[#8f8f8f]">
+                    folder
+                  </span>
+                  <span class="block min-w-0 flex-1 truncate text-[14px] leading-6">{{ project.name }}</span>
+                  <button
+                    type="button"
+                    class="flex size-7 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f]"
+                    aria-label="在项目中开始对话"
+                    @click.stop="handleMobileStartProjectConversation(project.projectId)"
+                  >
+                    <span class="material-symbols-outlined text-[17px] leading-none">chat_bubble</span>
+                  </button>
+                </button>
+              </template>
+            </div>
+
             <div class="pt-2">
               <p class="px-3 pb-2 text-[14px] font-bold leading-7 text-[#0d0d0d]">最近</p>
               <div v-if="chatStore.sessionsLoading && mobileRecentChatSessions.length === 0" class="flex justify-center py-6">
@@ -1084,6 +1202,11 @@
     </div>
 
     <CustomerUpsertDialog v-model="showCreateCustomer" mode="create" @success="handleCreateCustomerSuccess" />
+    <ProjectUpsertDialog
+      v-model="showCreateProject"
+      :editing-project="null"
+      @submit="handleCreateProject"
+    />
     <AccountSettingsModal v-model="showAccountSettingsModal" />
     <Teleport to="body">
       <Transition name="customer-search-dialog">
@@ -1231,6 +1354,7 @@ import AiQuotaModals from '@/components/layout/AiQuotaModals.vue'
 import AccountSettingsModal from '@/views/profile/components/AccountSettingsModal.vue'
 import ChatSessionActionsPopover from '@/components/layout/ChatSessionActionsPopover.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
+import ProjectUpsertDialog from '@/views/project/components/ProjectUpsertDialog.vue'
 import type { WkIconName } from '@/components/common/wkIcon'
 import { queryGlobalSearch, type GlobalSearchResult } from '@/api/search'
 import { queryCustomerList } from '@/api/customer'
@@ -1239,17 +1363,20 @@ import { useEnterpriseStore } from '@/stores/enterprise'
 import { useResponsive } from '@/composables/useResponsive'
 import { useTheme } from '@/composables/useTheme'
 import { useChatStore } from '@/stores/chat'
+import { useProjectStore } from '@/stores/project'
 import { useUserStore } from '@/stores/user'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import type { ChatSession } from '@/types/common'
 import type { CustomerListVO } from '@/types/customer'
+import type { ProjectEntity } from '@/types/project'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const enterpriseStore = useEnterpriseStore()
 const chatStore = useChatStore()
+const projectStore = useProjectStore()
 const { isMobile } = useResponsive()
 const { isOpen: chatDrawerOpen } = useChatDrawer()
 const { isDark, toggleTheme } = useTheme()
@@ -1272,7 +1399,8 @@ const PRIMARY_SIDEBAR_TRANSITION_MS = 200
 const SIDEBAR_STORAGE_KEYS = {
   primaryCollapsed: 'wk_ai_crm:main_layout:primary_sidebar_collapsed:v1',
   recentChatExpanded: 'wk_ai_crm:main_layout:recent_chat_sessions_expanded:v1',
-  sidebarCustomersExpanded: 'wk_ai_crm:main_layout:sidebar_customers_expanded:v1'
+  sidebarCustomersExpanded: 'wk_ai_crm:main_layout:sidebar_customers_expanded:v1',
+  sidebarProjectsExpanded: 'wk_ai_crm:main_layout:sidebar_projects_expanded:v1'
 } as const
 
 function mainContentWidthAsIfSidebarExpanded(sidebarCollapsed: boolean, mainColumnWidth: number) {
@@ -1374,7 +1502,9 @@ async function restorePrimaryNavScrollTop(scrollTop: number) {
 /** PC 侧栏「最近」对话列表折叠 */
 const recentChatSessionsExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.recentChatExpanded, true))
 const recentHistoryKeyword = ref('')
+const sidebarProjectsExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarProjectsExpanded, true))
 const sidebarCustomersExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarCustomersExpanded, true))
+const projectHeaderHovered = ref(false)
 const customerHeaderHovered = ref(false)
 const sidebarCustomerKeyword = ref('')
 const recentChatSessionsMoreVisible = ref(false)
@@ -1391,6 +1521,7 @@ const sidebarCustomersHasMore = ref(true)
 const showUserMenu = ref(false)
 const showAccountSettingsModal = ref(false)
 const showCreateCustomer = ref(false)
+const showCreateProject = ref(false)
 const customerSearchDialogVisible = ref(false)
 const customerSearchKeyword = ref('')
 const customerSearchCustomers = ref<CustomerListVO[]>([])
@@ -1482,7 +1613,15 @@ function handleChatComposerNarrowChange(payload?: ChatComposerNarrowPayload) {
   }
 }
 
+const showSidebarProjects = computed(() => userStore.hasPermission('task'))
+const sidebarProjects = computed(() => projectStore.accessibleProjectSummaries.slice(0, 12))
 const showSidebarCustomers = computed(() => userStore.hasPermission('customer:view'))
+
+watch(showSidebarProjects, visible => {
+  if (visible) {
+    void projectStore.ensureInitialized()
+  }
+}, { immediate: true })
 
 watch(showSidebarCustomers, visible => {
   if (visible && sidebarCustomers.value.length === 0) {
@@ -1526,7 +1665,7 @@ const allMainNavItems: MainNavItem[] = [
   { key: 'chat', icon: 'ai', label: 'AI 助手', route: '/chat', permission: 'chat', groupTitle: 'AI 助手' },
   { key: 'knowledge', icon: 'knowledge-1', label: '知识库', route: '/knowledge', permission: 'knowledge' },
   { key: 'customer-search', icon: 'search', label: '搜索客户', route: '', permission: 'customer:view', action: 'customerSearch' },
-  { key: 'task', icon: 'task-1', label: '任务', route: '/task', permission: 'task' },
+  { key: 'task', icon: 'task-1', label: '项目', route: '/project', permission: 'task' },
   { key: 'calendar', icon: 'event', label: '日程', route: '/calendar', permission: 'schedule' },
   { key: 'address-book', icon: 'customer', materialIcon: 'contacts', label: '通讯录', route: '/address-book', permission: 'addressBook:list' },
   { key: 'mail', icon: 'event', materialIcon: 'mail', label: '邮箱', route: '/mail', permission: 'mail:view' },
@@ -1543,7 +1682,9 @@ const mainNavItems = computed(() =>
   allMainNavItems.filter(item => item.permission === 'chat' || item.key === 'address-book' || userStore.hasPermission(item.permission))
 )
 
-const pcMainNavItems = computed(() => mainNavItems.value.filter(item => item.key !== 'chat'))
+const pcMainNavItems = computed(() =>
+  mainNavItems.value.filter(item => item.key !== 'chat' && (primarySidebarContentCollapsed.value || item.key !== 'task'))
+)
 
 type MainNavGroup = {
   title?: string
@@ -1593,6 +1734,7 @@ const activeMenu = computed(() => {
   const path = route.path
   if (path.startsWith('/customer')) return '/customer'
   if (path.startsWith('/address-book')) return '/address-book'
+  if (path.startsWith('/project')) return '/project'
   if (path.startsWith('/sync')) return '/sync'
   if (path.startsWith('/settings')) return '/settings'
   return path
@@ -1708,6 +1850,10 @@ watch(primarySidebarCollapsed, collapsed => {
 
 watch(recentChatSessionsExpanded, expanded => {
   writeStoredBoolean(SIDEBAR_STORAGE_KEYS.recentChatExpanded, expanded)
+})
+
+watch(sidebarProjectsExpanded, expanded => {
+  writeStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarProjectsExpanded, expanded)
 })
 
 watch(sidebarCustomersExpanded, expanded => {
@@ -2147,6 +2293,30 @@ function isCustomerActive(customerId: string): boolean {
   return route.path.startsWith('/chat') && String(current) === String(customerId)
 }
 
+function isProjectActive(projectId: string): boolean {
+  return route.path.startsWith('/project') && String(route.params.id || '') === String(projectId)
+}
+
+async function handleSelectProjectBoard(projectId: string) {
+  selectedPrimaryKey.value = ''
+  await router.push({ name: 'ProjectDetail', params: { id: projectId }, query: { view: 'board' } })
+}
+
+async function handleStartProjectConversation(projectId: string) {
+  selectedPrimaryKey.value = ''
+  await router.push({ name: 'ProjectDetail', params: { id: projectId }, query: { view: 'ai' } })
+}
+
+async function handleMobileSelectProjectBoard(projectId: string) {
+  drawerVisible.value = false
+  await handleSelectProjectBoard(projectId)
+}
+
+async function handleMobileStartProjectConversation(projectId: string) {
+  drawerVisible.value = false
+  await handleStartProjectConversation(projectId)
+}
+
 async function handleSelectCustomerChat(customer: CustomerListVO) {
   selectedPrimaryKey.value = ''
   await router.push({ path: '/chat', query: { customerId: customer.customerId } })
@@ -2499,6 +2669,32 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
     void router.push(`/customer/${payload.customerId}`)
   }
 }
+
+function openCreateProjectDialog() {
+  showCreateProject.value = true
+}
+
+function openMobileCreateProjectDialog() {
+  drawerVisible.value = false
+  openCreateProjectDialog()
+}
+
+async function handleCreateProject(payload: {
+  name: string
+  description?: string
+  customerId?: string
+  customerName?: string
+  ownerId?: string
+  ownerName?: string
+  startDate?: string
+  dueDate?: string
+  status: ProjectEntity['status']
+}) {
+  const project = await projectStore.createProject(payload)
+  showCreateProject.value = false
+  ElMessage.success('项目创建成功')
+  await router.push({ name: 'ProjectDetail', params: { id: project.projectId }, query: { view: 'board' } })
+}
 </script>
 
 <style scoped>
@@ -2534,20 +2730,25 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
   background-color: var(--wk-bg-surface-hover) !important;
 }
 
-.wk-primary-sidebar .wk-customer-header-row:hover {
+.wk-primary-sidebar .wk-customer-header-row:hover,
+.wk-primary-sidebar .wk-project-header-row:hover {
   background: #f9f9f9 !important;
 }
 
-.wk-primary-sidebar .wk-customer-header-row :deep(button:hover) {
+.wk-primary-sidebar .wk-customer-header-row :deep(button:hover),
+.wk-primary-sidebar .wk-project-header-row :deep(button:hover) {
   background: transparent !important;
 }
 
 .wk-primary-sidebar .wk-customer-header-row .wk-customer-header-toggle:hover,
-.wk-primary-sidebar .wk-customer-header-row .wk-customer-header-action:hover {
+.wk-primary-sidebar .wk-customer-header-row .wk-customer-header-action:hover,
+.wk-primary-sidebar .wk-project-header-row .wk-project-header-toggle:hover,
+.wk-primary-sidebar .wk-project-header-row .wk-project-header-action:hover {
   background: transparent !important;
 }
 
-.wk-primary-sidebar :deep(.wk-customer-header-toggle:hover) {
+.wk-primary-sidebar :deep(.wk-customer-header-toggle:hover),
+.wk-primary-sidebar :deep(.wk-project-header-toggle:hover) {
   background: transparent !important;
 }
 

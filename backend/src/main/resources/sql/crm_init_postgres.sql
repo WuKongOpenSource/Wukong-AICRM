@@ -34,6 +34,7 @@ CREATE TABLE crm_customer (
     last_contact_time TIMESTAMP,
     next_follow_time TIMESTAMP,
     remark TEXT,
+    search_text TEXT NOT NULL DEFAULT '',
     status SMALLINT DEFAULT 1,
     create_user_id BIGINT,
     update_user_id BIGINT,
@@ -46,6 +47,7 @@ CREATE INDEX idx_customer_owner_id ON crm_customer (owner_id);
 CREATE INDEX idx_customer_stage ON crm_customer (stage);
 CREATE INDEX idx_customer_level ON crm_customer (level);
 CREATE INDEX idx_customer_create_time ON crm_customer (create_time);
+CREATE INDEX idx_customer_search_text_trgm ON crm_customer USING GIN (search_text gin_trgm_ops);
 
 CREATE TRIGGER trg_customer_update_time
     BEFORE UPDATE ON crm_customer
