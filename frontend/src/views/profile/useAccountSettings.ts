@@ -127,7 +127,7 @@ export function useAccountSettings() {
     }
   }
 
-  async function handleSaveProfile() {
+  async function handleSaveProfile(): Promise<boolean> {
     savingProfile.value = true
     try {
       await updateProfile({
@@ -143,8 +143,10 @@ export function useAccountSettings() {
       profileForm.imgUrl = userStore.userInfo?.imgUrl || ''
       profileForm.department = userStore.userInfo?.deptName || profileForm.department
       ElMessage.success('个人资料保存成功')
+      return true
     } catch {
       // Error handled by interceptor
+      return false
     } finally {
       savingProfile.value = false
     }

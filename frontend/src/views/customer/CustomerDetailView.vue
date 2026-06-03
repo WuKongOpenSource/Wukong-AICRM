@@ -292,7 +292,7 @@
               </span>
               <h3 class="text-sm font-bold text-slate-900">客户阶段</h3>
             </div> -->
-            <div class="relative overflow-visible overflow-x-auto overflow-y-visible md:overflow-visible">
+            <div class="wk-customer-stage-scroll relative overflow-visible overflow-x-auto overflow-y-visible md:overflow-visible">
               <!-- Chevron segments (mobile: no wrap + horizontal scroll; desktop: wrap) -->
               <div class="relative flex flex-nowrap md:flex-wrap items-stretch gap-x-2 md:gap-x-0 gap-y-2 min-w-max">
                 <template v-for="(stage, idx) in stageFlow" :key="stage">
@@ -594,7 +594,7 @@
                   </span>
                 </button>
                 <button
-                  v-if="isEmbeddedMobileLayout && canCreateFollowUps"
+                  v-if="isEmbeddedMobileLayout && canCreateFollowUps && !hideEmbeddedFollowUpAction"
                   type="button"
                   class="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
                   @click="handleAiFollowUp"
@@ -1626,10 +1626,12 @@ const props = withDefaults(defineProps<{
   customerId?: string
   embedded?: boolean
   forceMobile?: boolean
+  hideEmbeddedFollowUpAction?: boolean
 }>(), {
   customerId: '',
   embedded: false,
-  forceMobile: false
+  forceMobile: false,
+  hideEmbeddedFollowUpAction: false
 })
 
 const emit = defineEmits<{
@@ -1648,6 +1650,7 @@ const activeCustomerId = computed(() => props.customerId || String(route.params.
 const embedded = computed(() => props.embedded)
 const isMobile = computed(() => props.forceMobile || responsiveIsMobile.value)
 const isEmbeddedMobileLayout = computed(() => props.embedded && props.forceMobile)
+const hideEmbeddedFollowUpAction = computed(() => props.hideEmbeddedFollowUpAction)
 const CUSTOMER_DETAIL_REQUEST_LIMIT = 100
 
 const loading = ref(false)
@@ -2739,6 +2742,10 @@ function handleAiFollowUp() {
   showAiFollowUpDrawer.value = true
 }
 
+defineExpose({
+  openAiFollowUp: handleAiFollowUp
+})
+
 async function handleAiFollowUpSaved() {
   if (!customer.value) return
   await refreshFollowUpContext(customer.value.customerId, { resetFollowUps: true })
@@ -3509,6 +3516,17 @@ function formatCustomFieldValue(field: CustomField, value: any): string {
 .wk-customer-detail-mobile .md\:overflow-visible {
   overflow-x: auto !important;
   overflow-y: visible !important;
+}
+
+.wk-customer-stage-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.wk-customer-stage-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .wk-customer-detail-mobile .md\:w-auto {

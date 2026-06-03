@@ -3,6 +3,7 @@
     :model-value="modelValue"
     direction="rtl"
     :size="isMobile ? '100%' : '420px'"
+    :z-index="isMobile ? 3500 : undefined"
     :with-header="false"
     destroy-on-close
     class="customer-basic-info-drawer"

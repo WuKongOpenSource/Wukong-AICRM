@@ -1,5 +1,5 @@
 <template>
-  <div class="max-w-4xl mx-auto space-y-8">
+  <div class="enterprise-settings-pane max-w-4xl mx-auto space-y-8">
     <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
       <h3 class="text-base font-bold mb-6 flex items-center gap-2">
         <span class="w-1 h-4 bg-primary rounded-full"></span>
@@ -182,3 +182,9 @@ async function saveEnterpriseConfig() {
   }
 }
 </script>
+
+<style scoped>
+.enterprise-settings-pane :deep(.el-input__inner::placeholder) {
+  font-size: 12px;
+}
+</style>

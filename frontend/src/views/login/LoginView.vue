@@ -82,7 +82,7 @@
                   alt="悟空AI CRM"
                   class="size-10 rounded-xl bg-white object-contain p-1 shadow-lg shadow-slate-300/40 ring-1 ring-slate-200/80"
                 />
-                <span class="text-lg font-bold text-slate-900">悟空AI CRM</span>
+                <span class="text-[1.5rem] font-bold text-slate-900">悟空AI CRM</span>
               </div>
 
               <!-- 双层叠放 + 高度过渡；WebKit 上高度改为瞬时更新，避免布局动画卡顿 -->
@@ -149,7 +149,7 @@
                       <div class="flex justify-end">
                         <button
                           type="button"
-                          class="text-sm font-medium text-primary transition-colors hover:text-primary/80 hover:underline"
+                          class="text-[1rem] font-medium text-primary transition-colors hover:text-primary/80 hover:underline"
                           @click="openForgotPasswordDialog"
                         >
                           忘记密码？
@@ -159,12 +159,12 @@
                       <el-form-item class="!mb-0">
                         <button
                           type="submit"
-                          class="group flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                          class="auth-login-submit group flex w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[1rem] font-bold text-white transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                           :disabled="loading"
                         >
                           <span
                             v-if="loading"
-                            class="size-5 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                            class="inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-white"
                           />
                           <template v-else>
                             立即登录
@@ -418,7 +418,7 @@
                     返回登录
                   </button>
                 </p>
-                <p v-else class="text-sm text-slate-500">
+                <p v-else class="text-[1rem] text-slate-500">
                   {{ isLogin ? '还没有账号？' : '已经有账号了？' }}
                   <button
                     type="button"
@@ -665,6 +665,27 @@ const externalRegisterTicket = ref('')
 let countdownTimer: number | undefined
 let forgotCountdownTimer: number | undefined
 
+const LAST_LOGIN_USERNAME_STORAGE_KEY = 'wk_ai_crm:last_login_username:v1'
+
+function readLastLoginUsername(): string {
+  if (typeof window === 'undefined') return ''
+  try {
+    return window.localStorage.getItem(LAST_LOGIN_USERNAME_STORAGE_KEY)?.trim() || ''
+  } catch {
+    return ''
+  }
+}
+
+function rememberSuccessfulLoginUsername() {
+  const username = loginForm.username.trim()
+  if (!username || typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(LAST_LOGIN_USERNAME_STORAGE_KEY, username)
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
 const reduceMotion =
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -724,7 +745,7 @@ function snapStageHeightForResize() {
 }
 
 const loginForm = reactive({
-  username: '',
+  username: readLastLoginUsername(),
   password: ''
 })
 
@@ -1092,6 +1113,7 @@ async function handleTenantLogin(option: LoginTenantOption) {
 }
 
 async function completeLoginRedirect() {
+  rememberSuccessfulLoginUsername()
   ElMessage.success('登录成功')
 
   let redirect = (route.query.redirect as string) || '/'
@@ -1413,7 +1435,7 @@ onBeforeUnmount(() => {
 }
 
 .label-upper {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -1427,6 +1449,14 @@ onBeforeUnmount(() => {
 .auth-form :deep(.el-form-item__label) {
   margin-bottom: 4px;
   line-height: 1.2;
+}
+
+.auth-login-submit {
+  box-sizing: border-box;
+  height: 48px;
+  min-height: 48px;
+  padding: 0;
+  line-height: 1;
 }
 
 .tenant-selection {
@@ -1618,7 +1648,9 @@ onBeforeUnmount(() => {
  * 这里统一改为：细 inset 描边 + 大圆角 + focus 外环（与设计稿 rounded-2xl + ring-primary/5 一致）
  */
 .auth-form :deep(.el-input.auth-el-input .el-input__wrapper) {
+  height: 46px;
   min-height: 46px;
+  align-items: center;
   border-radius: var(--wk-input-radius) !important;
   background-color: var(--wk-input-bg) !important;
   border: none !important;
@@ -1643,6 +1675,17 @@ onBeforeUnmount(() => {
   box-shadow:
     0 0 0 1px var(--wk-input-border-focus) inset,
     var(--wk-input-focus-shadow) !important;
+}
+
+.auth-form :deep(.el-input.auth-el-input .el-input__inner) {
+  height: 46px !important;
+  line-height: 46px !important;
+}
+
+.auth-form :deep(.el-input.auth-el-input .el-input__prefix),
+.auth-form :deep(.el-input.auth-el-input .el-input__suffix) {
+  min-height: 46px;
+  align-items: center;
 }
 
 .auth-send-code-btn {

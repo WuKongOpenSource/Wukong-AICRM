@@ -3,7 +3,7 @@
     <Transition name="wk-follow-up-modal">
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-[100] flex items-center justify-center p-4"
+        class="fixed inset-0 z-[3500] flex items-center justify-center p-4"
         role="dialog"
         aria-modal="true"
         @keydown.esc="handleClose"
@@ -56,7 +56,7 @@
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div class="flex flex-col gap-1.5">
                 <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">跟进类型</label>
-                <el-select v-model="form.type" class="follow-up-control block w-full" placeholder="选择类型">
+                <el-select v-model="form.type" class="follow-up-control block w-full" placeholder="选择类型" popper-class="wk-follow-up-popper">
                   <el-option label="电话" value="call" />
                   <el-option label="会议" value="meeting" />
                   <el-option label="邮件" value="email" />
@@ -71,6 +71,7 @@
                   type="datetime"
                   class="follow-up-control block w-full"
                   placeholder="选择跟进时间"
+                  popper-class="wk-follow-up-popper"
                   value-format="YYYY-MM-DD HH:mm:ss"
                 />
               </div>
@@ -83,6 +84,7 @@
                 type="datetime"
                 class="follow-up-control block w-full"
                 placeholder="选择下次联系时间"
+                popper-class="wk-follow-up-popper"
                 value-format="YYYY-MM-DD HH:mm:ss"
                 clearable
               />
@@ -357,5 +359,11 @@ function handleSubmit() {
   box-shadow:
     0 0 0 1px var(--wk-input-border-focus) inset,
     var(--wk-input-focus-shadow);
+}
+</style>
+
+<style>
+.wk-follow-up-popper {
+  z-index: 3510 !important;
 }
 </style>

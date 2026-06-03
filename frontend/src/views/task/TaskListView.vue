@@ -7,24 +7,60 @@
         :class="effectiveTaskViewMode === 'list' ? 'w-full' : 'mx-auto max-w-4xl'"
       >
         <!-- Header -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 class="text-xl md:text-[22px] font-bold text-slate-900">AI 优先行动中心</h2>
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div class="min-w-0">
+            <div class="flex items-center justify-between gap-3 md:block">
+              <h2 class="min-w-0 text-xl font-bold text-slate-900 md:text-[22px]">AI 优先行动中心</h2>
+              <button
+                class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-lg shadow-primary/20 transition-colors hover:bg-primary/90 md:hidden"
+                type="button"
+                aria-label="新建任务"
+                @click="handleAddTask"
+              >
+                <span class="material-symbols-outlined wk-plus-button-icon">add</span>
+              </button>
+            </div>
             <p class="text-[13px] text-slate-500 mt-1">基于客户价值与成交概率，AI 已为您自动排序今日任务。</p>
           </div>
           <!-- Add task button -->
           <button
-            class="flex items-center gap-1.5 self-start px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 md:self-auto"
+            class="hidden items-center gap-1.5 self-start rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white shadow-lg shadow-primary/20 transition-colors hover:bg-primary/90 md:flex md:self-auto"
+            type="button"
             @click="handleAddTask"
           >
             <span class="material-symbols-outlined wk-plus-button-icon">add</span>
-            <span>{{ isMobile ? '新建' : '新建任务' }}</span>
+            <span>新建任务</span>
           </button>
         </div>
 
         <!-- Status Filter Tabs and list controls -->
         <div class="wk-task-list-toolbar flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div class="flex gap-2 overflow-x-auto">
+          <div class="flex items-center gap-2 md:hidden">
+            <el-select
+              class="wk-task-status-select min-w-0 flex-1"
+              :model-value="currentStatus"
+              size="large"
+              aria-label="任务状态筛选"
+              @change="handleStatusFilter"
+            >
+              <el-option
+                v-for="tab in statusTabs"
+                :key="tab.value"
+                :label="`${tab.label} (${tab.count})`"
+                :value="tab.value"
+              />
+            </el-select>
+            <label class="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] px-3 text-xs font-bold text-slate-600">
+              <span class="whitespace-nowrap">高价值优先</span>
+              <el-switch
+                :model-value="valueFilter === 'high-impact'"
+                size="small"
+                aria-label="高价值优先"
+                @change="handleHighValueToggle"
+              />
+            </label>
+          </div>
+          <div class="hidden gap-2 overflow-x-auto md:flex">
             <button
               v-for="tab in statusTabs"
               :key="tab.value"
@@ -39,7 +75,7 @@
               {{ tab.label }} ({{ tab.count }})
             </button>
           </div>
-          <div class="flex items-center justify-end gap-3 overflow-x-auto overflow-y-hidden">
+          <div class="hidden items-center justify-end gap-3 overflow-x-auto overflow-y-hidden md:flex">
             <!-- Segmented filter -->
             <div class="flex h-9 max-w-full items-center overflow-x-auto overflow-y-hidden rounded-xl border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1 md:max-w-none">
               <button
@@ -61,7 +97,7 @@
                 高价值优先
               </button>
             </div>
-            <div v-if="!isMobile" class="flex h-9 shrink-0 items-center rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1">
+            <div class="flex h-9 shrink-0 items-center rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1">
               <button
                 type="button"
                 class="flex size-7 items-center justify-center rounded-md transition-all"
@@ -499,7 +535,7 @@ const showTaskDetail = ref(false)
 const detailTask = ref<Task | null>(null)
 const selectedTask = ref<Task | null>(null)
 
-const effectiveTaskViewMode = computed(() => taskViewMode.value)
+const effectiveTaskViewMode = computed(() => (isMobile.value ? 'card' : taskViewMode.value))
 
 // Computed properties
 const statusTabs = computed<Array<{ value: TaskStatusFilter; label: string; count: number }>>(() => {
@@ -613,6 +649,10 @@ async function handleValueFilter(filter: 'all' | 'high-impact') {
   taskStore.queryParams.sortMode = filter === 'high-impact' ? 'value' : 'default'
   taskStore.queryParams.highValueOnly = filter === 'high-impact'
   await taskStore.fetchTaskList(false)
+}
+
+function handleHighValueToggle(enabled: string | number | boolean) {
+  void handleValueFilter(enabled ? 'high-impact' : 'all')
 }
 
 function handleStatusFilter(status: TaskStatusFilter) {

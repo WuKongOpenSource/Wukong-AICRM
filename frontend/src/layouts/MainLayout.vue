@@ -88,26 +88,6 @@
           </span>
         </button>
       </div>
-      <!-- pl-[10px] pr-[10px] py-[6px] mt-[0px] ml-[2px] mr-[6px] -->
-      <!-- Chat: New session (fixed, not scroll with nav) -->
-      <div class="px-3 pt-1 mb-[0px] pr-[10px]" :class="primarySidebarContentCollapsed ? '!px-2' : ''">
-        <button
-          class="flex items-center rounded-lg py-2 text-sm font-normal text-[#0d0d0d] transition-colors"
-          :class="[
-            chatStore.isNewSessionPending && route.path.startsWith('/chat') ? 'bg-[#f3f3f3]' : 'hover:bg-[#f9f9f9]',
-            primarySidebarContentCollapsed
-              ? 'mx-auto w-[35px] shrink-0 justify-center px-0'
-              : 'ml-[2px] mr-[6px] w-full gap-2 pl-[10px] pr-[10px] max-w-[248px]',
-          ]"
-          :title="primarySidebarContentCollapsed ? '新对话' : undefined"
-          @click="handleNewSession"
-        >
-          <!-- <span class="material-symbols-outlined wk-plus-button-icon text-[18px] leading-none">edit_square</span> -->
-          <WkIcon name="new-chat" :size="18" class="shrink-0" />
-          <span style="margin-left: 2px;" v-if="!primarySidebarContentCollapsed">新对话</span>
-        </button>
-      </div>
-
       <div class="ml-0 h-px w-full shrink-0 transition-colors duration-150 mr-2">
         <div
           v-if="primaryNavHasScrollbar"
@@ -312,7 +292,7 @@
                         {{ customer.companyName?.charAt(0) || '?' }}
                       </span>
                     </div>
-                    <span class="block min-w-0 flex-1 truncate text-sm leading-5 text-[#0d0d0d]" :title="customer.companyName">
+                    <span class="block min-w-0 flex-1 truncate text-[1rem] leading-5 text-[#0d0d0d]" :title="customer.companyName">
                       {{ customer.companyName }}
                     </span>
                   </div>
@@ -554,7 +534,7 @@
       </aside>
     </Transition>
 
-    <div v-if="isMobile" class="fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-2 border-b border-slate-200 bg-white px-4">
+    <div v-if="showMobileTopBar" class="fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-2 border-b border-slate-200 bg-white px-4">
       <button
         @click="drawerVisible = true"
         class="flex size-10 shrink-0 items-center justify-center rounded-lg text-[#0d0d0d] hover:bg-slate-100"
@@ -568,7 +548,7 @@
           <input
             v-model="globalSearchKeyword"
             type="text"
-            class="w-full rounded-lg border-none bg-slate-100 py-2 pl-10 pr-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/50"
+            class="wk-mobile-global-search-input w-full rounded-lg border-none bg-slate-100 py-2 pl-10 pr-4 text-sm outline-none transition-colors"
             placeholder="搜索客户、联系人、任务、日程、知识库..."
             @focus="handleGlobalSearchFocus"
             @keydown.enter.prevent="handleGlobalSearchEnter"
@@ -652,10 +632,22 @@
         aria-hidden="true"
       />
       <Transition name="drawer-overlay">
-        <div v-if="isMobile && drawerVisible" class="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm" @click="drawerVisible = false"></div>
+        <div
+          v-if="mobileDrawerRendered"
+          class="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm"
+          :style="mobileDrawerOverlayStyle"
+          @click="closeMobileDrawer"
+        ></div>
       </Transition>
       <Transition name="drawer-panel">
-        <aside v-if="isMobile && drawerVisible" class="fixed bottom-0 left-0 top-0 z-[101] flex w-[calc(100vw-56px)] max-w-[380px] flex-col bg-white shadow-2xl">
+        <aside
+          v-if="mobileDrawerRendered"
+          class="fixed inset-y-0 left-0 right-0 z-[101] flex w-screen max-w-none touch-pan-y flex-col bg-white shadow-2xl"
+          :style="mobileDrawerPanelStyle"
+          @touchstart.passive="handleMobileDrawerTouchStart"
+          @touchend.passive="handleMobileDrawerTouchEnd"
+          @touchcancel.passive="resetMobileDrawerSwipe"
+        >
           <div class="flex items-center justify-between gap-4 px-4 pb-4 pt-8">
             <div class="flex min-w-0 flex-1 items-center gap-3">
               <div v-if="enterpriseStore.hasLogo" class="size-9 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-transparent">
@@ -666,7 +658,7 @@
               </div>
               <h1 class="min-w-0 truncate text-[22px] font-bold leading-tight text-[#0d0d0d]">{{ enterpriseStore.displayName }}</h1>
             </div>
-            <div class="flex h-10 shrink-0 items-center gap-1 rounded-full bg-white px-1 shadow-[0_12px_34px_rgba(15,23,42,0.12)]">
+            <div class="flex h-10 shrink-0 items-center gap-6 rounded-full bg-white px-1.5 shadow-[0_12px_34px_rgba(15,23,42,0.12)]">
               <button
                 type="button"
                 class="flex size-8 items-center justify-center rounded-full text-[#0d0d0d] transition-colors active:bg-slate-50"
@@ -688,25 +680,25 @@
               </button>
             </div>
           </div>
-          <nav class="wk-scrollbar-gutter-stable flex-1 space-y-1 overflow-y-auto px-2 pb-4 pt-1">
+          <nav class="wk-scrollbar-gutter-stable flex-1 space-y-2 overflow-y-auto px-3 pb-[112px] pt-2">
             <template v-for="group in mobileMainNavGroups" :key="group.title || 'default'">
-              <div v-if="group.title" class="pb-2 pt-4">
+              <div v-if="group.title" class="pb-2.5 pt-5">
                 <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">{{ group.title }}</p>
               </div>
-              <div v-for="item in group.items" :key="item.key" class="space-y-1">
+              <div v-for="item in group.items" :key="item.key" class="space-y-1.5">
                 <button
-                  class="flex w-full items-center gap-4 rounded-[8px] px-3 py-[6px] text-left transition-colors"
+                  class="flex w-full items-center gap-4 rounded-[8px] px-3 py-[9px] text-left transition-colors"
                   :class="isPrimaryActive(item) ? 'bg-primary/10 text-primary' : 'text-[#0d0d0d] hover:bg-slate-100'"
                   @click="handleMobilePrimaryNavClick(item)"
                 >
                   <span
                     v-if="item.materialIcon"
-                    class="material-symbols-outlined inline-flex size-5 shrink-0 items-center justify-center text-[20px] leading-none"
+                    class="material-symbols-outlined inline-flex size-6 shrink-0 items-center justify-center text-[20px] leading-none"
                   >
                     {{ item.materialIcon }}
                   </span>
-                  <WkIcon v-else :name="item.icon" :box-size="20" class="shrink-0" />
-                  <span class="truncate text-[14px] h-[20px] font-semibold">{{ item.label }}</span>
+                  <WkIcon v-else :name="item.icon" :box-size="20" class="shrink-0 self-center" />
+                  <span class="inline-flex min-w-0 flex-1 items-center truncate text-[1rem] font-semibold leading-6">{{ item.label }}</span>
                   <span
                     v-if="item.children?.length"
                     class="material-symbols-outlined ml-auto shrink-0 text-base transition-transform"
@@ -716,11 +708,11 @@
                   </span>
                 </button>
 
-                <div v-if="item.children?.length && isMobilePrimaryExpanded(item.key)" class="ml-3 border-l border-slate-100 pl-3">
+                <div v-if="item.children?.length && isMobilePrimaryExpanded(item.key)" class="ml-3 space-y-1 border-l border-slate-100 pl-3">
                   <button
                     v-for="child in item.children"
                     :key="child.key"
-                    class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
+                    class="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors"
                     :class="isActive(child.route, child.query) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
                     @click="mobileNavigate(child.route, child.query)"
                   >
@@ -740,8 +732,8 @@
               </div>
             </template>
 
-            <div class="pt-2">
-              <p class="px-3 pb-2 text-[14px] font-bold leading-7 text-[#0d0d0d]">最近</p>
+            <div class="pt-3">
+              <p class="px-3 pb-2.5 text-[1rem] font-bold leading-7 text-[#0d0d0d]">最近</p>
               <div v-if="chatStore.sessionsLoading && mobileRecentChatSessions.length === 0" class="flex justify-center py-6">
                 <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
               </div>
@@ -753,17 +745,59 @@
                   v-for="session in mobileRecentChatSessions"
                   :key="session.sessionId"
                   type="button"
-                  class="group flex w-full min-w-0 items-center rounded-xl px-3 py-[6px] text-left transition-colors"
+                  class="mobileRecentChatSessionRow group flex w-full min-w-0 select-none items-center rounded-xl px-3 py-[9px] text-left transition-colors"
                   :class="isSessionActive(session.sessionId) ? 'bg-[#f3f3f3]' : 'text-[#0d0d0d] active:bg-slate-100'"
-                  @click="handleMobileSelectSession(session.sessionId)"
+                  @click="handleMobileRecentSessionClick(session.sessionId)"
+                  @touchstart.passive="handleMobileSessionTouchStart(session, $event)"
+                  @touchmove.passive="handleMobileSessionTouchMove"
+                  @touchend.passive="handleMobileSessionTouchEnd"
+                  @touchcancel.passive="handleMobileSessionTouchEnd"
+                  @contextmenu.prevent="handleMobileSessionContextMenu(session, $event)"
                 >
-                  <span class="block min-w-0 flex-1 truncate text-[14px] leading-6">{{ session.title || '新对话' }}</span>
+                  <ChatSessionActionsPopover
+                    :session="session"
+                    :active="isSessionActive(session.sessionId)"
+                    always-visible
+                    :menu-shift-x="0"
+                    @pin="handlePinChatSession"
+                    @share="handleShareChatSession"
+                    @delete="handleDeleteSession"
+                  />
+                </button>
+                <button
+                  v-if="sidebarVisibleChatSessions.length > MOBILE_RECENT_CHAT_SESSION_LIMIT"
+                  type="button"
+                  class="mt-1 flex w-full min-w-0 items-center gap-2 rounded-[8px] px-3 py-[9px] text-left text-[1rem] text-[#0d0d0d] transition-colors active:bg-slate-100"
+                  @click="recentChatSessionsMoreVisible = true"
+                >
+                  <span class="material-symbols-outlined text-[22px] leading-none text-[#0d0d0d]">more_horiz</span>
+                  <span class="min-w-0 flex-1 truncate leading-6">更多</span>
                 </button>
               </template>
             </div>
 
-            <div v-if="showSidebarCustomers" class="pt-2">
-              <p class="px-3 pb-2 text-[14px] font-bold leading-7 text-[#0d0d0d]">客户列表</p>
+            <div v-if="showSidebarCustomers" class="pt-3">
+              <div class="flex items-center gap-3 px-3 pb-2.5">
+                <p class="min-w-0 flex-1 text-[1rem] font-bold leading-7 text-[#0d0d0d]">客户列表</p>
+                <button
+                  type="button"
+                  class="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors active:bg-slate-100 active:text-[#0d0d0d]"
+                  aria-label="移动端新建客户"
+                  title="新建客户"
+                  @click.stop="handleMobileCreateCustomer"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">person_add</span>
+                </button>
+                <button
+                  type="button"
+                  class="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors active:bg-slate-100 active:text-[#0d0d0d]"
+                  aria-label="移动端查看客户列表"
+                  title="查看客户列表"
+                  @click.stop="mobileNavigate('/customer')"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">format_list_bulleted</span>
+                </button>
+              </div>
               <div v-if="sidebarCustomersLoading && sidebarCustomers.length === 0" class="flex justify-center py-6">
                 <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
               </div>
@@ -775,7 +809,7 @@
                   v-for="customer in sidebarCustomers"
                   :key="customer.customerId"
                   type="button"
-                  class="group flex w-full min-w-0 items-center gap-3 rounded-[8px] px-3 py-[6px] text-left transition-colors"
+                  class="group flex w-full min-w-0 items-center gap-3 rounded-[8px] px-3 py-[9px] text-left transition-colors"
                   :class="isCustomerActive(customer.customerId) ? 'bg-[#f3f3f3]' : 'text-[#0d0d0d] active:bg-slate-100'"
                   @click="handleMobileSelectCustomerChat(customer)"
                 >
@@ -790,7 +824,7 @@
                       {{ customer.companyName?.charAt(0) || '?' }}
                     </span>
                   </div>
-                  <span class="block min-w-0 flex-1 truncate text-[14px] leading-6">{{ customer.companyName }}</span>
+                  <span class="block min-w-0 flex-1 truncate text-[1rem] leading-6">{{ customer.companyName }}</span>
                 </button>
                 <button
                   v-if="sidebarCustomersHasMore"
@@ -804,76 +838,158 @@
               </template>
             </div>
 
-            <div v-if="showConfigSection" class="pb-2 pt-2">
-              <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">配置与服务</p>
-            </div>
-
-            <template v-if="showConfigSection">
-              <button
-                v-for="item in configNavItems"
-                :key="item.route"
-                @click="mobileNavigate(item.route, item.query)"
-                class="flex w-full items-center gap-3 rounded-lg px-3 py-[1px] transition-colors"
-                :class="isActive(item.route, item.query) ? 'bg-primary/10 text-primary' : 'text-[#0d0d0d] hover:bg-slate-100'"
-              >
-                <WkIcon :name="item.icon" :size="20" class="shrink-0" />
-                <span class="text-sm font-medium">{{ item.label }}</span>
-              </button>
-            </template>
           </nav>
 
-          <div class="border-t border-slate-200 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-            <button
-            v-if="false"
-              type="button"
-              class="mb-2 flex w-full items-center gap-3 rounded-xl bg-slate-50 p-3 text-slate-600 transition-colors hover:bg-slate-100 hover:text-primary"
-              @click="toggleTheme"
+          <Transition name="drawer-panel">
+            <div
+              v-if="recentChatSessionsMoreVisible"
+              class="absolute inset-0 z-50 flex flex-col bg-white"
             >
-              <span class="material-symbols-outlined text-[20px] leading-none">{{ themeIcon }}</span>
-              <span class="text-sm font-semibold">{{ themeButtonLabel }}</span>
-            </button>
-            <div class="flex cursor-pointer items-center gap-3 rounded-xl bg-slate-50 p-3" @click="showUserMenu = !showUserMenu">
-              <div v-if="userStore.avatar" class="size-9 overflow-hidden rounded-full">
-                <img :src="userStore.avatar" class="h-full w-full object-cover" alt="avatar" />
+              <div class="flex min-h-[calc(56px_+_env(safe-area-inset-top))] shrink-0 items-center justify-between border-b border-[#ececec] px-4 pt-[env(safe-area-inset-top)]">
+                <button
+                  type="button"
+                  class="flex items-center gap-2 rounded-lg px-2 py-2 text-[15px] font-semibold text-[#0d0d0d] transition-colors active:bg-[#f5f5f5]"
+                  @click="recentChatSessionsMoreVisible = false"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none text-[#8f8f8f]">arrow_back</span>
+                  最近
+                </button>
+                <button
+                  type="button"
+                  class="flex size-9 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors active:bg-[#f5f5f5] active:text-[#0d0d0d]"
+                  aria-label="关闭对话历史"
+                  @click="recentChatSessionsMoreVisible = false"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">close</span>
+                </button>
               </div>
-              <div v-else class="flex size-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
-                {{ userStore.realname?.charAt(0) || 'U' }}
+              <div class="shrink-0 px-4 py-3">
+                <el-input
+                  v-model="recentHistoryKeyword"
+                  clearable
+                  class="wk-mobile-recent-history-input"
+                  placeholder="搜索对话"
+                />
               </div>
-              <div class="min-w-0 flex-1">
-                <p class="truncate text-sm font-semibold text-slate-900">{{ userStore.realname || userStore.username }}</p>
-                <p class="truncate text-xs text-slate-500">{{ userStore.userInfo?.deptName || '用户' }}</p>
+              <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(18px_+_env(safe-area-inset-bottom))]">
+                <div v-if="filteredHistorySessions.length === 0" class="px-3 py-8 text-center text-sm text-slate-400">
+                  暂无匹配对话
+                </div>
+                <template v-else>
+                  <template v-for="group in historySessionGroups" :key="group.key">
+                    <div v-if="group.sessions.length > 0" class="mb-4">
+                      <p class="px-1 pb-1.5 text-xs font-semibold text-slate-400">{{ group.label }}</p>
+                      <button
+                        v-for="session in group.sessions"
+                        :key="session.sessionId"
+                        type="button"
+                        class="group w-full min-w-0 overflow-hidden rounded-[8px] px-3 py-[9px] text-left transition-colors"
+                        :class="isSessionActive(session.sessionId)
+                          ? 'bg-[#f3f3f3]'
+                          : 'active:bg-[#f9f9f9]'"
+                        @click="handleMobileSelectSessionFromMore(session.sessionId)"
+                      >
+                        <ChatSessionActionsPopover
+                          :session="session"
+                          :active="isSessionActive(session.sessionId)"
+                          always-visible
+                          :menu-shift-x="0"
+                          @pin="handlePinChatSession"
+                          @share="handleShareChatSession"
+                          @delete="handleDeleteSession"
+                        />
+                      </button>
+                    </div>
+                  </template>
+                </template>
               </div>
-              <span class="material-symbols-outlined text-base text-slate-400">unfold_more</span>
             </div>
-          </div>
+          </Transition>
+
+          <FloatingActionButton
+            v-if="showMobileDrawerNewChatButton"
+            placement="menu"
+            @new-chat="handleFloatingNewChat"
+          />
+
+          <Transition name="mobile-session-menu-backdrop">
+            <div
+              v-if="mobileSessionActionMenuSession"
+              class="fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-[1px]"
+              @click="closeMobileSessionActionMenu"
+              @touchstart.stop
+              @touchmove.stop
+              @touchend.stop
+            />
+          </Transition>
+          <Transition name="mobile-session-action-menu">
+            <div
+              v-if="mobileSessionActionMenuSession"
+              class="fixed z-40 w-[180px] rounded-[22px] bg-white/95 p-2 shadow-[0_20px_60px_rgba(15,23,42,0.22),0_1px_2px_rgba(15,23,42,0.18)] backdrop-blur-xl"
+              :style="mobileSessionActionMenuStyle"
+              role="menu"
+              @click.stop
+              @touchstart.stop
+              @touchmove.stop
+              @touchend.stop
+            >
+              <button
+                type="button"
+                class="flex w-full items-center gap-3 rounded-[8px] px-3 py-3 text-left text-[14px] font-medium text-[#0d0d0d] transition-colors active:bg-[#f3f3f3]"
+                role="menuitem"
+                @click="handleMobileSessionPin"
+              >
+                <span class="material-symbols-outlined inline-flex size-4 shrink-0 items-center justify-center text-[20px] leading-none">vertical_align_top</span>
+                <span class="min-w-0 flex-1">置顶</span>
+              </button>
+              <div class="mx-2 my-1 h-px bg-slate-200/80" role="separator" />
+              <button
+                type="button"
+                class="flex w-full items-center gap-3 rounded-[8px] px-3 py-3 text-left text-[14px] font-medium text-[#c2403f] transition-colors active:bg-[#ffe1e0]"
+                role="menuitem"
+                @click="handleMobileSessionDelete"
+              >
+                <span class="material-symbols-outlined inline-flex size-4 shrink-0 items-center justify-center text-[20px] leading-none">delete</span>
+                <span class="min-w-0 flex-1">删除</span>
+              </button>
+            </div>
+          </Transition>
+
+          <Transition name="drawer-overlay">
+            <div
+              v-if="isMobile && drawerVisible && showUserMenu"
+              class="absolute inset-0 z-10 bg-slate-900/35 backdrop-blur-[2px]"
+              @click="showUserMenu = false"
+            />
+          </Transition>
 
           <Transition name="profile-drawer">
             <div
               v-if="isMobile && drawerVisible && showUserMenu"
-              class="absolute inset-0 z-20 flex flex-col overflow-hidden bg-[#f4f4f7]"
+              class="absolute bottom-0 left-0 right-0 z-20 flex h-[80%] w-full flex-col overflow-hidden rounded-t-[34px] border-t border-white/70 bg-[#f4f4f7] text-[14px] shadow-[0_-18px_50px_rgba(15,23,42,0.18)]"
             >
-              <div class="relative flex h-16 shrink-0 items-center justify-center px-4 pt-2">
-                <h2 class="text-[18px] font-bold text-[#0d0d0d]">设置</h2>
+              <div class="relative flex h-14 shrink-0 items-center justify-center px-4 pt-2">
+                <h2 class="text-[16px] font-bold text-[#0d0d0d]">设置</h2>
                 <button
                   type="button"
-                  class="absolute right-4 top-4 flex size-10 items-center justify-center rounded-full bg-white text-[#0d0d0d] shadow-[0_8px_22px_rgba(15,23,42,0.08)] transition-colors active:bg-slate-50"
+                  class="absolute right-4 top-3.5 flex size-9 items-center justify-center rounded-full bg-white text-[#0d0d0d] shadow-[0_8px_22px_rgba(15,23,42,0.08)] transition-colors active:bg-slate-50"
                   aria-label="关闭个人账户"
                   @click="showUserMenu = false"
                 >
-                  <span class="material-symbols-outlined text-[30px] leading-none">close</span>
+                  <span class="material-symbols-outlined text-[24px] leading-none">close</span>
                 </button>
               </div>
 
               <div class="flex-1 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-                <section class="flex flex-col items-center pb-8 pt-6 text-center">
-                  <div class="flex size-24 items-center justify-center overflow-hidden rounded-full bg-[#a5ab87] text-[34px] font-medium text-white">
+                <section class="flex flex-col items-center pb-6 pt-5 text-center">
+                  <div class="flex size-20 items-center justify-center overflow-hidden rounded-full bg-[#a5ab87] text-[28px] font-medium text-white">
                     <img v-if="userStore.avatar" :src="userStore.avatar" class="h-full w-full object-cover" alt="avatar" />
                     <span v-else>{{ userAvatarInitials }}</span>
                   </div>
-                  <h3 class="mt-4 max-w-full truncate text-[24px] font-bold leading-tight text-[#0d0d0d]">
+                  <h3 class="mt-3 max-w-full truncate text-[20px] font-bold leading-tight text-[#0d0d0d]">
                     {{ userDisplayName }}
                   </h3>
-                  <p class="mt-1 max-w-full truncate text-[16px] text-[#6b6b6b]">
+                  <p class="mt-1 max-w-full truncate text-[14px] text-[#6b6b6b]">
                     {{ userAccountName }}
                   </p>
                   <button
@@ -885,28 +1001,28 @@
                   </button>
                 </section>
 
-                <section class="space-y-3">
-                  <p class="px-2 text-[18px] font-bold text-[#8a8a92]">账户</p>
-                  <div class="overflow-hidden rounded-[26px] bg-white px-5">
+                <section class="space-y-2.5">
+                  <p class="px-2 text-[14px] font-semibold text-[#8a8a92]">账户</p>
+                  <div class="overflow-hidden rounded-[22px] bg-white px-4">
                     <button
-                      v-for="item in configNavItems"
+                      v-for="item in mobileProfileSettingsItems"
                       :key="item.route"
                       type="button"
-                      class="flex w-full items-center gap-4 border-b border-[#ededed] py-4 text-left text-[#0d0d0d] last:border-b-0"
-                      @click="mobileProfileNavigate(item.route, item.query)"
+                      class="flex w-full items-center gap-3 border-b border-[#ededed] py-3.5 text-left text-[#0d0d0d] last:border-b-0"
+                      @click="mobileNavigate(item.route, item.query)"
                     >
-                      <WkIcon :name="item.icon" :box-size="22" class="shrink-0" />
-                      <span class="min-w-0 flex-1 truncate text-[17px] font-medium">{{ item.label }}</span>
-                      <span class="material-symbols-outlined shrink-0 text-[24px] leading-none text-[#c7c7cc]">chevron_right</span>
+                      <WkIcon :name="item.icon" :box-size="20" class="shrink-0" />
+                      <span class="min-w-0 flex-1 truncate text-[1rem] font-medium">{{ item.label }}</span>
+                      <span class="material-symbols-outlined shrink-0 text-[20px] leading-none text-[#c7c7cc]">chevron_right</span>
                     </button>
 
                     <button
                       type="button"
-                      class="flex w-full items-center gap-4 py-4 text-left text-rose-600"
+                      class="flex w-full items-center gap-3 py-3.5 text-left text-rose-600"
                       @click="handleLogout"
                     >
-                      <span class="material-symbols-outlined inline-flex size-[22px] shrink-0 items-center justify-center text-[22px] leading-none">logout</span>
-                      <span class="min-w-0 flex-1 truncate text-[17px] font-medium">退出登录</span>
+                      <span class="material-symbols-outlined inline-flex size-5 shrink-0 items-center justify-center text-[20px] leading-none">logout</span>
+                      <span class="min-w-0 flex-1 truncate text-[1rem] font-medium">退出登录</span>
                     </button>
                   </div>
                 </section>
@@ -961,11 +1077,11 @@
               </button>
 
               <button
-                v-for="item in configNavItems"
+                v-for="item in mobileProfileSettingsItems"
                 :key="item.route"
                 class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
                 :class="isActive(item.route, item.query) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
-                @click="navigateTo(item.route, item.query)"
+                @click="mobileNavigate(item.route, item.query)"
               >
                 <WkIcon
                   :name="item.icon"
@@ -992,7 +1108,7 @@
     <div
       ref="mainContentColumnRef"
       class="flex flex-1 flex-col overflow-hidden"
-      :class="{ 'pt-14': isMobile }"
+      :class="{ 'pt-14': showMobileTopBar }"
     >
       <header
         v-if="showDesktopHeader"
@@ -1074,7 +1190,10 @@
         </template>
       </header>
 
-      <main class="flex-1 overflow-y-auto wk-safe-bottom">
+      <main
+        class="flex-1 wk-safe-bottom"
+        :class="isChatRoute ? 'overflow-hidden' : 'overflow-y-auto'"
+      >
         <router-view v-slot="{ Component }">
           <Transition name="page-fade" mode="out-in">
             <component :is="Component" />
@@ -1085,6 +1204,7 @@
 
     <CustomerUpsertDialog v-model="showCreateCustomer" mode="create" @success="handleCreateCustomerSuccess" />
     <AccountSettingsModal v-model="showAccountSettingsModal" />
+    <ProfileEditBottomSheet v-model="showProfileEditSheet" />
     <Teleport to="body">
       <Transition name="customer-search-dialog">
         <div
@@ -1108,12 +1228,12 @@
               class="flex shrink-0 items-center gap-3 px-4 pb-2 pt-[calc(1rem+env(safe-area-inset-top))]"
             >
               <div class="flex h-10 min-w-0 flex-1 items-center gap-3 rounded-full bg-white px-4 shadow-[0_10px_28px_rgba(15,23,42,0.12)]">
-                <span class="material-symbols-outlined shrink-0 text-[30px] leading-none text-[#0d0d0d]">search</span>
+                <span class="material-symbols-outlined shrink-0 text-[20px] leading-none text-[#0d0d0d]">search</span>
                 <input
                   ref="customerSearchInputRef"
                   v-model="customerSearchKeyword"
                   type="search"
-                  class="h-8 min-w-0 flex-1 border-none bg-transparent text-[16px] font-medium text-[#0d0d0d] outline-none placeholder:text-[#8f8f8f]"
+                  class="h-8 min-w-0 flex-1 border-none bg-transparent text-[14px] font-medium text-[#0d0d0d] outline-none placeholder:text-[#8f8f8f]"
                   placeholder="搜索客户"
                   autocomplete="off"
                   autocapitalize="off"
@@ -1133,12 +1253,12 @@
               </div>
               <button
                 type="button"
-                class="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-[#0d0d0d] shadow-[0_10px_28px_rgba(15,23,42,0.10)] transition-colors active:bg-slate-50"
+                class="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-[#0d0d0d] shadow-[0_10px_28px_rgba(15,23,42,0.10)] transition-colors active:bg-slate-50"
                 aria-label="关闭搜索"
                 title="关闭搜索"
                 @click="closeCustomerSearchDialog"
               >
-                <span class="material-symbols-outlined text-[28px] leading-none">close</span>
+                <span class="material-symbols-outlined text-[22px] leading-none">close</span>
               </button>
             </div>
             <div v-else class="flex h-16 shrink-0 items-center gap-3 border-b border-[#ececec] px-6">
@@ -1213,7 +1333,6 @@
         </div>
       </Transition>
     </Teleport>
-    <FloatingActionButton v-if="route.path !== '/chat' && !chatDrawerOpen" />
     <AiChatDrawer />
     <AiQuotaModals />
   </div>
@@ -1229,6 +1348,7 @@ import AiChatDrawer from '@/components/common/AiChatDrawer.vue'
 import AiQuotaHeaderPopover from '@/components/layout/AiQuotaHeaderPopover.vue'
 import AiQuotaModals from '@/components/layout/AiQuotaModals.vue'
 import AccountSettingsModal from '@/views/profile/components/AccountSettingsModal.vue'
+import ProfileEditBottomSheet from '@/views/profile/components/ProfileEditBottomSheet.vue'
 import ChatSessionActionsPopover from '@/components/layout/ChatSessionActionsPopover.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import type { WkIconName } from '@/components/common/wkIcon'
@@ -1242,6 +1362,8 @@ import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
+import { shouldCloseMobileDrawerFromSwipe, type SwipePoint } from '@/utils/mobileDrawerSwipe'
+import { getMobileSessionMenuPosition, type MobileSessionMenuPosition } from '@/utils/mobileSessionActions'
 import type { ChatSession } from '@/types/common'
 import type { CustomerListVO } from '@/types/customer'
 
@@ -1328,6 +1450,16 @@ function runLayoutNarrowProgrammatic(fn: () => void) {
 }
 
 const drawerVisible = ref(false)
+const mobileDrawerDragProgress = ref(0)
+const mobileDrawerDragActive = ref(false)
+const mobileDrawerDragSettling = ref(false)
+const mobileMainMenuGlobalSwipeStart = ref<SwipePoint | null>(null)
+const mobileDrawerTouchStart = ref<SwipePoint | null>(null)
+const mobileSessionActionMenuSession = ref<ChatSession | null>(null)
+const mobileSessionActionMenuPosition = ref<MobileSessionMenuPosition>({ left: 12, top: 12 })
+const mobileSessionLongPressStart = ref<SwipePoint | null>(null)
+const mobileSessionLongPressConsumed = ref(false)
+let mobileSessionLongPressTimer: ReturnType<typeof setTimeout> | null = null
 /** PC：一级侧栏收起为图标栏 */
 const primarySidebarCollapsed = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.primaryCollapsed, false))
 const primarySidebarContentCollapsed = ref(primarySidebarCollapsed.value)
@@ -1335,6 +1467,15 @@ const primarySidebarTransitioning = ref(false)
 let primarySidebarTransitionTimer: ReturnType<typeof setTimeout> | null = null
 /** 一级侧栏收起时：鼠标在整块 aside 内则顶栏 logo 区显示为折叠图标 */
 const collapsedSidebarAsideHovered = ref(false)
+const MOBILE_SESSION_LONG_PRESS_MS = 520
+const MOBILE_SESSION_LONG_PRESS_MOVE_CANCEL_PX = 12
+const MOBILE_SESSION_MENU_WIDTH_PX = 180
+const MOBILE_SESSION_MENU_HEIGHT_PX = 116
+const MOBILE_MAIN_MENU_TOUCH_WIDTH_PX = 28
+const MOBILE_MAIN_MENU_MIN_SWIPE_PX = 64
+const MOBILE_MAIN_MENU_MAX_VERTICAL_PX = 88
+const MOBILE_MAIN_MENU_DIRECTION_RATIO = 1.25
+const MOBILE_MAIN_MENU_MIN_PREVIEW_PX = 6
 
 function onCollapsedPrimarySidebarEnter() {
   if (primarySidebarCollapsed.value) collapsedSidebarAsideHovered.value = true
@@ -1342,6 +1483,287 @@ function onCollapsedPrimarySidebarEnter() {
 
 function onCollapsedPrimarySidebarLeave() {
   collapsedSidebarAsideHovered.value = false
+}
+
+function closeMobileDrawer() {
+  drawerVisible.value = false
+  recentChatSessionsMoreVisible.value = false
+  showUserMenu.value = false
+  showProfileEditSheet.value = false
+  closeMobileSessionActionMenu()
+  clearMobileSessionLongPressTimer()
+  resetMobileDrawerSwipe()
+}
+
+const mobileDrawerRendered = computed(() =>
+  isMobile.value && (drawerVisible.value || mobileDrawerDragActive.value || mobileDrawerDragSettling.value)
+)
+
+const mobileDrawerResolvedProgress = computed(() =>
+  drawerVisible.value ? 1 : Math.min(Math.max(mobileDrawerDragProgress.value, 0), 1)
+)
+
+const mobileDrawerOverlayStyle = computed(() => ({
+  opacity: mobileDrawerResolvedProgress.value,
+  transition: mobileDrawerDragActive.value ? 'none' : 'opacity 0.18s ease',
+}))
+
+const mobileDrawerPanelStyle = computed(() => ({
+  transform: `translate3d(${(mobileDrawerResolvedProgress.value - 1) * 100}%, 0, 0)`,
+  transition: mobileDrawerDragActive.value ? 'none' : 'transform 0.18s ease',
+}))
+
+function clearMobileDrawerDragSettleTimer() {
+  if (mobileDrawerDragSettleTimer) {
+    clearTimeout(mobileDrawerDragSettleTimer)
+    mobileDrawerDragSettleTimer = null
+  }
+}
+
+function settleMobileDrawerDragClosed() {
+  clearMobileDrawerDragSettleTimer()
+  mobileDrawerDragActive.value = false
+  mobileDrawerDragSettling.value = true
+  mobileDrawerDragProgress.value = 0
+  mobileDrawerDragSettleTimer = setTimeout(() => {
+    mobileDrawerDragSettling.value = false
+    mobileDrawerDragSettleTimer = null
+  }, 180)
+}
+
+function resetMobileDrawerDragPreview() {
+  clearMobileDrawerDragSettleTimer()
+  mobileDrawerDragActive.value = false
+  mobileDrawerDragSettling.value = false
+  mobileDrawerDragProgress.value = 0
+}
+
+function handleMobileMainMenuDrag(payload?: MobileMainMenuDragPayload) {
+  if (!isMobile.value) return
+  const progress = Math.min(Math.max(Number(payload?.progress ?? 0), 0), 1)
+  if (payload?.phase === 'end') {
+    if (payload.open) {
+      resetMobileDrawerDragPreview()
+      drawerVisible.value = true
+      return
+    }
+    settleMobileDrawerDragClosed()
+    return
+  }
+
+  if (drawerVisible.value) return
+  clearMobileDrawerDragSettleTimer()
+  mobileDrawerDragActive.value = true
+  mobileDrawerDragSettling.value = false
+  mobileDrawerDragProgress.value = progress
+}
+
+function resetGlobalMobileMainMenuSwipe() {
+  mobileMainMenuGlobalSwipeStart.value = null
+}
+
+function canStartGlobalMobileMainMenuSwipe(target: EventTarget | null) {
+  if (!isMobile.value || drawerVisible.value || showUserMenu.value || customerSearchDialogVisible.value) return false
+  if (mobileSessionActionMenuSession.value || chatDrawerOpen.value) return false
+  if (!(target instanceof Element)) return true
+  return !target.closest('textarea, input, select, button, a, [role="button"], .el-overlay, .el-popper, .el-message, .el-message-box')
+}
+
+function getGlobalMobileMainMenuSwipeProgress(start: SwipePoint, point: SwipePoint) {
+  const deltaX = Math.max(0, point.clientX - start.clientX)
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 360
+  return Math.min(deltaX / Math.max(viewportWidth, 1), 1)
+}
+
+function shouldOpenGlobalMobileMainMenu(start: SwipePoint, end: SwipePoint) {
+  if (start.clientX > MOBILE_MAIN_MENU_TOUCH_WIDTH_PX) return false
+  const deltaX = end.clientX - start.clientX
+  const deltaY = end.clientY - start.clientY
+  const horizontalDistance = Math.abs(deltaX)
+  const verticalDistance = Math.abs(deltaY)
+
+  return deltaX >= MOBILE_MAIN_MENU_MIN_SWIPE_PX
+    && verticalDistance <= MOBILE_MAIN_MENU_MAX_VERTICAL_PX
+    && horizontalDistance >= verticalDistance * MOBILE_MAIN_MENU_DIRECTION_RATIO
+}
+
+function handleGlobalMobileMainMenuTouchStart(event: TouchEvent) {
+  const point = getTouchPoint(event.touches[0])
+  if (!point || point.clientX > MOBILE_MAIN_MENU_TOUCH_WIDTH_PX || !canStartGlobalMobileMainMenuSwipe(event.target)) {
+    resetGlobalMobileMainMenuSwipe()
+    return
+  }
+  mobileMainMenuGlobalSwipeStart.value = point
+}
+
+function handleGlobalMobileMainMenuTouchMove(event: TouchEvent) {
+  const start = mobileMainMenuGlobalSwipeStart.value
+  const point = getTouchPoint(event.touches[0])
+  if (!start || !point) return
+
+  const deltaX = point.clientX - start.clientX
+  const deltaY = point.clientY - start.clientY
+  const horizontalDistance = Math.abs(deltaX)
+  const verticalDistance = Math.abs(deltaY)
+
+  if (deltaX <= 0) {
+    handleMobileMainMenuDrag({ progress: 0, phase: 'move' })
+    return
+  }
+  if (
+    verticalDistance > MOBILE_MAIN_MENU_MAX_VERTICAL_PX
+    || (verticalDistance > MOBILE_MAIN_MENU_MIN_PREVIEW_PX && verticalDistance > horizontalDistance)
+  ) {
+    handleMobileMainMenuDrag({ progress: 0, phase: 'end' })
+    resetGlobalMobileMainMenuSwipe()
+    return
+  }
+  if (horizontalDistance < MOBILE_MAIN_MENU_MIN_PREVIEW_PX) return
+  if (horizontalDistance < verticalDistance * MOBILE_MAIN_MENU_DIRECTION_RATIO) return
+
+  if (event.cancelable) {
+    event.preventDefault()
+  }
+  handleMobileMainMenuDrag({
+    progress: getGlobalMobileMainMenuSwipeProgress(start, point),
+    phase: 'move'
+  })
+}
+
+function handleGlobalMobileMainMenuTouchEnd(event: TouchEvent) {
+  const start = mobileMainMenuGlobalSwipeStart.value
+  const end = getTouchPoint(event.changedTouches[0])
+  resetGlobalMobileMainMenuSwipe()
+  if (!start || !end) return
+
+  const shouldOpen = shouldOpenGlobalMobileMainMenu(start, end)
+  handleMobileMainMenuDrag({
+    progress: shouldOpen ? 1 : 0,
+    phase: 'end',
+    open: shouldOpen
+  })
+}
+
+function handleGlobalMobileMainMenuTouchCancel() {
+  if (mobileMainMenuGlobalSwipeStart.value) {
+    handleMobileMainMenuDrag({ progress: 0, phase: 'end' })
+  }
+  resetGlobalMobileMainMenuSwipe()
+}
+
+function getTouchPoint(touch: Touch | undefined): SwipePoint | null {
+  if (!touch) return null
+  return {
+    clientX: touch.clientX,
+    clientY: touch.clientY,
+  }
+}
+
+function resetMobileDrawerSwipe() {
+  mobileDrawerTouchStart.value = null
+}
+
+function handleMobileDrawerTouchStart(event: TouchEvent) {
+  mobileDrawerTouchStart.value = getTouchPoint(event.touches[0])
+}
+
+function handleMobileDrawerTouchEnd(event: TouchEvent) {
+  const start = mobileDrawerTouchStart.value
+  const end = getTouchPoint(event.changedTouches[0])
+  resetMobileDrawerSwipe()
+  if (!start || !end) return
+
+  if (shouldCloseMobileDrawerFromSwipe({ start, end })) {
+    closeMobileDrawer()
+  }
+}
+
+const mobileSessionActionMenuStyle = computed(() => ({
+  left: `${mobileSessionActionMenuPosition.value.left}px`,
+  top: `${mobileSessionActionMenuPosition.value.top}px`,
+}))
+
+function clearMobileSessionLongPressTimer() {
+  if (mobileSessionLongPressTimer) {
+    clearTimeout(mobileSessionLongPressTimer)
+    mobileSessionLongPressTimer = null
+  }
+  mobileSessionLongPressStart.value = null
+}
+
+function closeMobileSessionActionMenu() {
+  mobileSessionActionMenuSession.value = null
+  mobileSessionLongPressConsumed.value = false
+}
+
+function openMobileSessionActionMenu(session: ChatSession, point: SwipePoint) {
+  clearMobileSessionLongPressTimer()
+  showUserMenu.value = false
+  mobileSessionLongPressConsumed.value = true
+  mobileSessionActionMenuPosition.value = getMobileSessionMenuPosition({
+    clientX: point.clientX,
+    clientY: point.clientY,
+    viewportWidth: window.innerWidth || document.documentElement.clientWidth,
+    viewportHeight: window.innerHeight || document.documentElement.clientHeight,
+    menuWidth: MOBILE_SESSION_MENU_WIDTH_PX,
+    menuHeight: MOBILE_SESSION_MENU_HEIGHT_PX,
+  })
+  mobileSessionActionMenuSession.value = session
+}
+
+function handleMobileSessionTouchStart(session: ChatSession, event: TouchEvent) {
+  const point = getTouchPoint(event.touches[0])
+  if (!point) return
+  clearMobileSessionLongPressTimer()
+  mobileSessionLongPressStart.value = point
+  mobileSessionLongPressTimer = setTimeout(() => {
+    openMobileSessionActionMenu(session, point)
+  }, MOBILE_SESSION_LONG_PRESS_MS)
+}
+
+function handleMobileSessionTouchMove(event: TouchEvent) {
+  const start = mobileSessionLongPressStart.value
+  const point = getTouchPoint(event.touches[0])
+  if (!start || !point) return
+  const deltaX = point.clientX - start.clientX
+  const deltaY = point.clientY - start.clientY
+  if (Math.hypot(deltaX, deltaY) > MOBILE_SESSION_LONG_PRESS_MOVE_CANCEL_PX) {
+    clearMobileSessionLongPressTimer()
+  }
+}
+
+function handleMobileSessionTouchEnd() {
+  clearMobileSessionLongPressTimer()
+}
+
+function handleMobileSessionContextMenu(session: ChatSession, event: MouseEvent) {
+  openMobileSessionActionMenu(session, {
+    clientX: event.clientX,
+    clientY: event.clientY,
+  })
+}
+
+function handleMobileRecentSessionClick(sessionId: string) {
+  if (mobileSessionLongPressConsumed.value) {
+    mobileSessionLongPressConsumed.value = false
+    return
+  }
+  closeMobileSessionActionMenu()
+  void handleMobileSelectSession(sessionId)
+}
+
+function handleMobileSessionPin() {
+  const session = mobileSessionActionMenuSession.value
+  if (!session) return
+  closeMobileSessionActionMenu()
+  handlePinChatSession(session)
+}
+
+function handleMobileSessionDelete() {
+  const session = mobileSessionActionMenuSession.value
+  if (!session) return
+  closeMobileSessionActionMenu()
+  void handleDeleteSession(session.sessionId)
 }
 
 const primaryNavRef = ref<HTMLElement | null>(null)
@@ -1390,6 +1812,7 @@ const sidebarCustomersTotal = ref(0)
 const sidebarCustomersHasMore = ref(true)
 const showUserMenu = ref(false)
 const showAccountSettingsModal = ref(false)
+const showProfileEditSheet = ref(false)
 const showCreateCustomer = ref(false)
 const customerSearchDialogVisible = ref(false)
 const customerSearchKeyword = ref('')
@@ -1413,7 +1836,10 @@ let customerSearchRequestId = 0
 let customerSearchFocusRequestId = 0
 let removeChatComposerNarrowListener: (() => void) | null = null
 let removeCustomerListRefreshListener: (() => void) | null = null
+let removeMobileMainMenuOpenListener: (() => void) | null = null
+let removeMobileMainMenuDragListener: (() => void) | null = null
 let removeCustomerSidebarRefreshListener: (() => void) | null = null
+let mobileDrawerDragSettleTimer: ReturnType<typeof setTimeout> | null = null
 
 type ChatComposerNarrowPayload = {
   narrow?: boolean
@@ -1425,12 +1851,20 @@ type CustomerListRefreshPayload = {
   preserveScroll?: boolean
 }
 
+type MobileMainMenuDragPayload = {
+  progress?: number
+  phase?: 'move' | 'end'
+  open?: boolean
+}
+
 function refreshSidebarCustomersFromEvent(payload?: CustomerListRefreshPayload) {
   void fetchSidebarCustomers({ reset: true, preserveScroll: payload?.preserveScroll !== false })
 }
 
 const chatComposerNarrow = ref(false)
 const chatComposerAutoCollapseActive = ref(false)
+const isChatRoute = computed(() => route.path.startsWith('/chat'))
+const showMobileTopBar = computed(() => isMobile.value && !isChatRoute.value)
 
 function getChatComposerWidthIfSidebarExpanded(width: number): number {
   return primarySidebarCollapsed.value ? width - PRIMARY_SIDEBAR_WIDTH_DELTA_PX : width
@@ -1480,6 +1914,12 @@ function handleChatComposerNarrowChange(payload?: ChatComposerNarrowPayload) {
   if (!primarySidebarCollapsed.value) {
     chatComposerAutoCollapseActive.value = false
   }
+}
+
+function openMobileMainMenuFromChat() {
+  if (!isMobile.value) return
+  resetMobileDrawerDragPreview()
+  drawerVisible.value = true
 }
 
 const showSidebarCustomers = computed(() => userStore.hasPermission('customer:view'))
@@ -1572,16 +2012,7 @@ function groupMainNavItems(items: MainNavItem[]): MainNavGroup[] {
 const pcMainNavGroups = computed(() => groupMainNavItems(pcMainNavItems.value))
 const mobilePrimaryNavItems = computed<MainNavItem[]>(() =>
   mainNavItems.value
-    .filter(item => item.key !== 'customer-search')
-    .map(item => {
-      if (item.key !== 'chat') return item
-      return {
-        ...item,
-        icon: 'new-chat',
-        label: '新对话',
-        groupTitle: undefined,
-      }
-    })
+    .filter(item => item.key !== 'customer-search' && item.key !== 'chat')
 )
 const mobileMainNavGroups = computed(() => groupMainNavItems(mobilePrimaryNavItems.value))
 
@@ -1589,7 +2020,19 @@ const configNavItems = computed(() =>
   allConfigNavItems.filter(item => item.permission.some(permission => userStore.hasPermission(permission)))
 )
 
+const mobileProfileSettingsItems = computed(() =>
+  configNavItems.value.filter(item => item.route.startsWith('/settings'))
+)
+
 const showConfigSection = computed(() => configNavItems.value.length > 0)
+const showMobileDrawerNewChatButton = computed(() =>
+  isMobile.value
+    && drawerVisible.value
+    && !chatDrawerOpen.value
+    && !customerSearchDialogVisible.value
+    && !showUserMenu.value
+    && !mobileSessionActionMenuSession.value
+)
 const userDisplayName = computed(() => userStore.realname || userStore.username || '用户')
 const userAccountName = computed(() => userStore.username || userStore.userInfo?.email || userStore.userInfo?.mobile || '用户')
 const userAvatarInitials = computed(() => userDisplayName.value.trim().slice(0, 2).toUpperCase() || 'U')
@@ -1679,6 +2122,8 @@ watch(
   () => route.fullPath,
   () => {
     showUserMenu.value = false
+    showProfileEditSheet.value = false
+    closeMobileSessionActionMenu()
     closeGlobalSearchDropdown()
     if (selectedPrimaryKey.value && !selectedPrimaryItem.value) {
       selectedPrimaryKey.value = ''
@@ -1695,12 +2140,23 @@ watch(
   () => drawerVisible.value,
   isOpen => {
     if (!isOpen) {
+      if (isMobile.value) {
+        recentChatSessionsMoreVisible.value = false
+      }
+      resetMobileDrawerDragPreview()
       showUserMenu.value = false
+      showProfileEditSheet.value = false
+      closeMobileSessionActionMenu()
+      clearMobileSessionLongPressTimer()
+      mobileSessionLongPressConsumed.value = false
     }
   }
 )
 
 watch(showUserMenu, open => {
+  if (!open) {
+    showProfileEditSheet.value = false
+  }
   if (open && !isMobile.value && primarySidebarCollapsed.value) {
     runLayoutNarrowProgrammatic(() => {
       primarySidebarCollapsed.value = false
@@ -1817,6 +2273,10 @@ onMounted(() => {
     void fetchSidebarCustomers({ reset: true })
   }
   document.addEventListener('click', handleDocumentClick)
+  document.addEventListener('touchstart', handleGlobalMobileMainMenuTouchStart, { passive: true })
+  document.addEventListener('touchmove', handleGlobalMobileMainMenuTouchMove, { passive: false })
+  document.addEventListener('touchend', handleGlobalMobileMainMenuTouchEnd, { passive: true })
+  document.addEventListener('touchcancel', handleGlobalMobileMainMenuTouchCancel, { passive: true })
   removeChatComposerNarrowListener = appEvents.on<ChatComposerNarrowPayload>(
     APP_EVENT.CHAT_COMPOSER_NARROW_CHANGE,
     handleChatComposerNarrowChange
@@ -1828,6 +2288,14 @@ onMounted(() => {
   removeCustomerSidebarRefreshListener = appEvents.on<CustomerListRefreshPayload>(
     APP_EVENT.CUSTOMER_SIDEBAR_REFRESH,
     refreshSidebarCustomersFromEvent
+  )
+  removeMobileMainMenuOpenListener = appEvents.on(
+    APP_EVENT.MOBILE_MAIN_MENU_OPEN,
+    openMobileMainMenuFromChat
+  )
+  removeMobileMainMenuDragListener = appEvents.on<MobileMainMenuDragPayload>(
+    APP_EVENT.MOBILE_MAIN_MENU_DRAG,
+    handleMobileMainMenuDrag
   )
 
   if (typeof ResizeObserver !== 'undefined') {
@@ -1859,12 +2327,20 @@ watch(
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleDocumentClick)
+  document.removeEventListener('touchstart', handleGlobalMobileMainMenuTouchStart)
+  document.removeEventListener('touchmove', handleGlobalMobileMainMenuTouchMove)
+  document.removeEventListener('touchend', handleGlobalMobileMainMenuTouchEnd)
+  document.removeEventListener('touchcancel', handleGlobalMobileMainMenuTouchCancel)
   removeChatComposerNarrowListener?.()
   removeChatComposerNarrowListener = null
   removeCustomerListRefreshListener?.()
   removeCustomerListRefreshListener = null
   removeCustomerSidebarRefreshListener?.()
   removeCustomerSidebarRefreshListener = null
+  removeMobileMainMenuOpenListener?.()
+  removeMobileMainMenuOpenListener = null
+  removeMobileMainMenuDragListener?.()
+  removeMobileMainMenuDragListener = null
   if (mainContentColumnResizeObserver) {
     mainContentColumnResizeObserver.disconnect()
     mainContentColumnResizeObserver = null
@@ -1877,10 +2353,12 @@ onBeforeUnmount(() => {
     clearTimeout(primaryNavScrollEndTimer)
     primaryNavScrollEndTimer = null
   }
+  clearMobileDrawerDragSettleTimer()
   if (primarySidebarTransitionTimer) {
     clearTimeout(primarySidebarTransitionTimer)
     primarySidebarTransitionTimer = null
   }
+  clearMobileSessionLongPressTimer()
   if (globalSearchTimer) {
     clearTimeout(globalSearchTimer)
     globalSearchTimer = null
@@ -2124,14 +2602,26 @@ async function handleNewSession() {
   } else {
     api.clearMessages?.()
   }
-  chatStore.requestComposerFocus()
+  if (!isMobile.value) {
+    chatStore.requestComposerFocus()
+  }
 }
 
-async function handleSelectSession(sessionId: string) {
+async function handleFloatingNewChat() {
+  if (isMobile.value) {
+    closeMobileDrawer()
+  }
+  await handleNewSession()
+}
+
+async function handleSelectSession(sessionId: string, options: { focusComposer?: boolean } = {}) {
   selectedPrimaryKey.value = ''
+  const selectPromise = chatStore.selectSession(sessionId)
   await router.push('/chat')
-  await chatStore.selectSession(sessionId)
-  chatStore.requestComposerFocus()
+  await selectPromise
+  if (options.focusComposer !== false) {
+    chatStore.requestComposerFocus()
+  }
 }
 
 async function handleSelectSessionFromMore(sessionId: string) {
@@ -2141,7 +2631,13 @@ async function handleSelectSessionFromMore(sessionId: string) {
 
 async function handleMobileSelectSession(sessionId: string) {
   drawerVisible.value = false
-  await handleSelectSession(sessionId)
+  await handleSelectSession(sessionId, { focusComposer: false })
+}
+
+async function handleMobileSelectSessionFromMore(sessionId: string) {
+  recentChatSessionsMoreVisible.value = false
+  drawerVisible.value = false
+  await handleSelectSession(sessionId, { focusComposer: false })
 }
 
 function isSessionActive(sessionId: string): boolean {
@@ -2157,7 +2653,9 @@ function isCustomerActive(customerId: string): boolean {
 async function handleSelectCustomerChat(customer: CustomerListVO) {
   selectedPrimaryKey.value = ''
   await router.push({ path: '/chat', query: { customerId: customer.customerId } })
-  chatStore.requestComposerFocus()
+  if (!isMobile.value) {
+    chatStore.requestComposerFocus()
+  }
 }
 
 async function handleMobileSelectCustomerChat(customer: CustomerListVO) {
@@ -2335,11 +2833,17 @@ function mobileNavigate(path: string, query?: Record<string, string>) {
   showUserMenu.value = false
 }
 
-function mobileProfileNavigate(path: string, query?: Record<string, string>) {
-  mobileNavigate(path, query)
+function handleMobileCreateCustomer() {
+  drawerVisible.value = false
+  showUserMenu.value = false
+  showCreateCustomer.value = true
 }
 
 function handleOpenAccountSettings() {
+  if (isMobile.value) {
+    showProfileEditSheet.value = true
+    return
+  }
   showUserMenu.value = false
   showAccountSettingsModal.value = true
 }
@@ -2527,6 +3031,26 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
   outline: none;
 }
 
+.wk-mobile-global-search-input {
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  background-color: rgb(241 245 249) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  transition-property: background-color, color;
+}
+
+.wk-mobile-global-search-input:hover,
+.wk-mobile-global-search-input:focus,
+.wk-mobile-global-search-input:focus-visible,
+.wk-mobile-global-search-input:active {
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
 .wk-primary-sidebar {
   border-color: var(--wk-border-subtle) !important;
   background: linear-gradient(180deg, var(--wk-bg-surface) 0%, var(--wk-bg-sidebar) 100%) !important;
@@ -2595,6 +3119,10 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
   background-color: var(--wk-bg-surface) !important;
 }
 
+.wk-mobile-recent-history-input :deep(.el-input__wrapper) {
+  border-radius: 8px !important;
+}
+
 .drawer-overlay-enter-active,
 .drawer-overlay-leave-active {
   transition: opacity 0.3s ease;
@@ -2613,6 +3141,27 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
 .drawer-panel-enter-from,
 .drawer-panel-leave-to {
   transform: translateX(-100%);
+}
+
+.mobile-session-menu-backdrop-enter-active,
+.mobile-session-menu-backdrop-leave-active {
+  transition: opacity 0.16s ease;
+}
+
+.mobile-session-menu-backdrop-enter-from,
+.mobile-session-menu-backdrop-leave-to {
+  opacity: 0;
+}
+
+.mobile-session-action-menu-enter-active,
+.mobile-session-action-menu-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.mobile-session-action-menu-enter-from,
+.mobile-session-action-menu-leave-to {
+  opacity: 0;
+  transform: translateY(6px) scale(0.98);
 }
 
 .dropdown-enter-active,

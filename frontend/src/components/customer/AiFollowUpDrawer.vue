@@ -3,17 +3,28 @@
     <Transition name="fade">
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-[298] bg-slate-900/40 backdrop-blur-sm"
+        class="fixed inset-0 backdrop-blur-sm"
+        :class="isMobile ? 'z-[3450] bg-slate-900/45' : 'z-[298] bg-slate-900/40'"
         @click="handleClose"
       />
     </Transition>
 
-    <Transition name="slide-right">
+    <Transition :name="drawerTransitionName">
       <div
         v-if="modelValue"
-        class="fixed inset-y-0 right-0 z-[299] flex w-full max-w-md flex-col bg-white shadow-2xl"
+        :class="[
+          'wk-ai-follow-up-drawer fixed flex w-full flex-col bg-white shadow-2xl',
+          isMobile
+            ? 'wk-ai-follow-up-drawer--mobile inset-x-0 bottom-0 z-[3451]'
+            : 'inset-y-0 right-0 z-[299] max-w-md'
+        ]"
       >
-        <div class="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+        <span v-if="isMobile" class="wk-ai-follow-up-drawer__handle" aria-hidden="true"></span>
+
+        <div
+          class="flex items-center justify-between border-b border-slate-200"
+          :class="isMobile ? 'px-5 pb-4 pt-2' : 'px-6 py-5'"
+        >
           <div class="min-w-0">
             <h2 class="truncate text-lg font-bold text-slate-900">AI 智能跟进录入</h2>
             <p v-if="customer" class="mt-1 truncate text-xs text-slate-500">{{ customer.companyName }}</p>
@@ -27,9 +38,12 @@
           </button>
         </div>
 
-        <div class="flex-1 overflow-y-auto px-6 py-5">
+        <div
+          class="wk-ai-follow-up-drawer__body flex-1 overflow-y-auto"
+          :class="isMobile ? 'px-5 pt-4' : 'px-6 py-5'"
+        >
           <div v-if="step === 1" class="space-y-6">
-            <section class="hidden md:block rounded-2xl border border-slate-200 bg-slate-50 p-5 text-center">
+            <section class="md:block rounded-2xl border border-slate-200 bg-slate-50 p-5 text-center">
               <div class="mx-auto mb-4 flex size-20 items-center justify-center rounded-full"
                 :class="isRecording ? 'bg-red-100 text-red-500' : isTranscribing ? 'bg-amber-100 text-amber-500' : 'bg-primary/10 text-primary'"
               >
@@ -341,15 +355,22 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { aiParseFollowUp, addFollowUp, transcribeFollowUpAudio } from '@/api/followup'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { getAiConfig } from '@/api/systemConfig'
+import { useResponsive } from '@/composables/useResponsive'
 import type { AiFollowUpParseVO } from '@/api/followup'
 import type { Customer } from '@/types/customer'
 import type { ChatAttachmentDTO } from '@/types/common'
 import { isRequestErrorHandled } from '@/utils/requestError'
+import {
+  canCaptureMobileAudioFile,
+  captureMobileAudioFile,
+  hasMobileAudioInputSupport,
+  requestMobileAudioStream
+} from '@/utils/mobileAudioRecording'
 
 const props = defineProps<{
   modelValue: boolean
@@ -360,6 +381,9 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
   (e: 'saved'): void
 }>()
+
+const { isMobile } = useResponsive()
+const drawerTransitionName = computed(() => isMobile.value ? 'slide-up' : 'slide-right')
 
 interface Attachment {
   id: string
@@ -832,9 +856,26 @@ async function handleRecordedAudioStop() {
 
 async function handleStartAudioRecording() {
   if (isRecording.value || isTranscribing.value) return
-  if (!(await ensureAudioTranscriptionSupported())) return
 
-  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+  const useMobileAudioApi = isMobile.value
+  const hasAudioInput = useMobileAudioApi
+    ? hasMobileAudioInputSupport()
+    : Boolean(navigator.mediaDevices?.getUserMedia)
+  const useMobileAudioFileCapture = useMobileAudioApi
+    && canCaptureMobileAudioFile()
+    && (!hasAudioInput || typeof MediaRecorder === 'undefined')
+
+  if (useMobileAudioFileCapture) {
+    speechInputBase = textInput.value.trim()
+    const capturedFile = await captureMobileAudioFile()
+    if (!capturedFile) return
+    if (!(await ensureAudioTranscriptionSupported())) return
+    await transcribeRecordedAudio(capturedFile)
+    return
+  }
+
+  if (!(await ensureAudioTranscriptionSupported())) return
+  if (!hasAudioInput || typeof MediaRecorder === 'undefined') {
     ElMessage.warning('当前浏览器不支持录音，请改用文字输入')
     return
   }
@@ -844,7 +885,9 @@ async function handleStartAudioRecording() {
     skipNextTranscription = false
     recordedChunks = []
 
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    mediaStream = useMobileAudioApi
+      ? await requestMobileAudioStream({ audio: true })
+      : await navigator.mediaDevices.getUserMedia({ audio: true })
     const mimeType = resolveRecordingMimeType()
     mediaRecorder = mimeType
       ? new MediaRecorder(mediaStream, { mimeType })
@@ -1086,6 +1129,27 @@ function handleRetry() {
 </script>
 
 <style scoped>
+.wk-ai-follow-up-drawer--mobile {
+  max-height: min(92vh, calc(100dvh - 24px));
+  overflow: hidden;
+  border-radius: 28px 28px 0 0;
+}
+
+.wk-ai-follow-up-drawer__handle {
+  width: 42px;
+  height: 4px;
+  margin: 10px auto 2px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: rgb(148 163 184 / 0.35);
+}
+
+.wk-ai-follow-up-drawer--mobile .wk-ai-follow-up-drawer__body {
+  padding-bottom: max(24px, calc(env(safe-area-inset-bottom) + 20px));
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
 .slide-right-enter-active {
   transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -1097,6 +1161,19 @@ function handleRetry() {
 .slide-right-enter-from,
 .slide-right-leave-to {
   transform: translateX(100%);
+}
+
+.slide-up-enter-active {
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.slide-up-leave-active {
+  transition: transform 0.22s ease-in;
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateY(100%);
 }
 
 .fade-enter-active {

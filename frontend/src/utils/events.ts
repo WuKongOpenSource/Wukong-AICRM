@@ -21,4 +21,6 @@ export const APP_EVENT = {
   CUSTOMER_SIDEBAR_REFRESH: 'customer:sidebar:refresh',
   CUSTOMER_DETAIL_REFRESH: 'customer:detail:refresh',
   CHAT_COMPOSER_NARROW_CHANGE: 'chat:composer:narrow-change',
+  MOBILE_MAIN_MENU_OPEN: 'mobile:main-menu:open',
+  MOBILE_MAIN_MENU_DRAG: 'mobile:main-menu:drag',
 } as const

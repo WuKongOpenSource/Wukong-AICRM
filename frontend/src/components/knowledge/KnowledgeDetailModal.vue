@@ -1032,12 +1032,59 @@ function getTypeIconColor(type?: string): string {
   overscroll-behavior: contain;
 }
 
-.office-preview-shell--pptx {
-  background: #edf3fb;
-}
-
 :deep(.office-preview-viewer) {
   min-height: 100%;
+  max-width: 100%;
+}
+
+.office-preview-shell :deep(.vue-office-docx) {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.office-preview-shell :deep(.vue-office-docx-main),
+.office-preview-shell :deep(.docx-wrapper) {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.office-preview-shell :deep(.docx-wrapper > section.docx) {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  overflow-wrap: anywhere;
+  box-sizing: border-box !important;
+}
+
+.office-preview-shell :deep(.vue-office-docx table) {
+  max-width: 100% !important;
+  table-layout: fixed;
+}
+
+.office-preview-shell :deep(.vue-office-docx td),
+.office-preview-shell :deep(.vue-office-docx th),
+.office-preview-shell :deep(.vue-office-docx p) {
+  overflow-wrap: anywhere;
+}
+
+.office-preview-shell :deep(.vue-office-docx img),
+.office-preview-shell :deep(.vue-office-docx svg),
+.office-preview-shell :deep(.vue-office-docx canvas),
+.office-preview-shell :deep(.vue-office-docx video) {
+  max-width: 100% !important;
+  height: auto !important;
+  object-fit: contain;
+}
+
+.office-preview-shell :deep(.vue-office-docx [style*="inline-block"]) {
+  max-width: 100% !important;
+}
+
+.office-preview-shell--pptx {
+  background: #edf3fb;
 }
 
 .office-preview-shell--pptx :deep(.office-preview-viewer--pptx) {
