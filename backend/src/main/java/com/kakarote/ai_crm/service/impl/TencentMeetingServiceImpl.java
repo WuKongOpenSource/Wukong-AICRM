@@ -100,7 +100,7 @@ public class TencentMeetingServiceImpl {
         config.setLastSyncTime(status.getLastSyncTime());
         config.setLastSyncStatus(status.getLastSyncStatus());
         config.setLastSyncError(status.getLastSyncError());
-        configMapper.updateById(config);
+        configMapper.updateSyncStatusIgnoreTenant(config);
         return status;
     }
 
@@ -326,9 +326,7 @@ public class TencentMeetingServiceImpl {
     }
 
     private TencentMeetingCorpConfig findConfig() {
-        return configMapper.selectOne(Wrappers.<TencentMeetingCorpConfig>lambdaQuery()
-                .orderByDesc(TencentMeetingCorpConfig::getUpdateTime)
-                .last("LIMIT 1"));
+        return configMapper.selectLatestOAuthConfigIgnoreTenant();
     }
 
     private TencentMeetingCorpConfig requireConfig() {

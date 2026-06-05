@@ -45,7 +45,7 @@ class TencentMeetingOAuthServiceTest {
         config.setAppId("corp-1");
         config.setSdkId("sdk-1");
         config.setAppSecretEncrypted(new SecretTextCipher("0123456789abcdef").encrypt("secret"));
-        when(configMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(config);
+        when(configMapper.selectLatestOAuthConfigIgnoreTenant()).thenReturn(config);
         Redis redis = mock(Redis.class);
         ReflectionTestUtils.setField(service, "configMapper", configMapper);
         ReflectionTestUtils.setField(service, "userMappingMapper", mock(TencentMeetingUserMappingMapper.class));
@@ -65,6 +65,7 @@ class TencentMeetingOAuthServiceTest {
         assertThat(result.getAuthorizeUrl()).contains("sdk_id=sdk-1");
         assertThat(result.getAuthorizeUrl()).contains("redirect_uri=");
         verify(redis).setex(anyString(), anyInt(), any());
+        verify(configMapper).selectLatestOAuthConfigIgnoreTenant();
     }
 
     @Test
@@ -75,7 +76,7 @@ class TencentMeetingOAuthServiceTest {
         config.setAppId("219307879");
         config.setSdkId("32360100872");
         config.setAppSecretEncrypted(new SecretTextCipher("0123456789abcdef").encrypt("secret"));
-        when(configMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(config);
+        when(configMapper.selectLatestOAuthConfigIgnoreTenant()).thenReturn(config);
         Redis redis = mock(Redis.class);
         ReflectionTestUtils.setField(service, "configMapper", configMapper);
         ReflectionTestUtils.setField(service, "userMappingMapper", mock(TencentMeetingUserMappingMapper.class));
@@ -104,7 +105,7 @@ class TencentMeetingOAuthServiceTest {
         config.setAppId("219307879");
         config.setSdkId("32360100872");
         config.setAppSecretEncrypted(new SecretTextCipher("0123456789abcdef").encrypt("secret"));
-        when(configMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(config);
+        when(configMapper.selectLatestOAuthConfigIgnoreTenant()).thenReturn(config);
         Redis redis = mock(Redis.class);
         ReflectionTestUtils.setField(service, "configMapper", configMapper);
         ReflectionTestUtils.setField(service, "userMappingMapper", mock(TencentMeetingUserMappingMapper.class));
@@ -136,7 +137,7 @@ class TencentMeetingOAuthServiceTest {
         TencentMeetingCorpConfig config = new TencentMeetingCorpConfig();
         config.setAppId("219307879");
         config.setSdkId("32360100872");
-        when(configMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(config);
+        when(configMapper.selectLatestOAuthConfigIgnoreTenant()).thenReturn(config);
         ReflectionTestUtils.setField(service, "configMapper", configMapper);
         ReflectionTestUtils.setField(service, "userMappingMapper", userMappingMapper);
         mockLoginUser();

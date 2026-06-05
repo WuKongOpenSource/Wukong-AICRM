@@ -282,9 +282,7 @@ public class TencentMeetingOAuthService {
     }
 
     private TencentMeetingCorpConfig findConfig() {
-        return configMapper.selectOne(Wrappers.<TencentMeetingCorpConfig>lambdaQuery()
-                .orderByDesc(TencentMeetingCorpConfig::getUpdateTime)
-                .last("LIMIT 1"));
+        return configMapper.selectLatestOAuthConfigIgnoreTenant();
     }
 
     private TencentMeetingCorpConfig requireOAuthConfig() {
