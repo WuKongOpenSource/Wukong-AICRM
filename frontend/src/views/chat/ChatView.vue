@@ -1771,6 +1771,58 @@
       @confirm="onKnowledgePickerConfirm"
     />
 
+    <TaskEditDialog
+      v-model="showRelatedTaskDialog"
+      :default-assignee="relatedTaskDefaultAssignee"
+      :default-relation="relatedRelationDefault"
+      :refresh-store-after-save="false"
+      @saved="handleRelatedObjectMutated"
+    />
+
+    <ScheduleFormDialog
+      v-model="showRelatedScheduleDialog"
+      :default-relation="relatedRelationDefault"
+      :default-participant-users="relatedScheduleDefaultParticipantUsers"
+      @created="handleRelatedObjectMutated"
+      @updated="handleRelatedObjectMutated"
+    />
+
+    <KnowledgeUploadDialog
+      ref="relatedKnowledgeUploadDialogRef"
+      v-model="showRelatedKnowledgeUploadDialog"
+      :employee-id="relatedKnowledgeEmployeeId"
+      :relation-id="relatedKnowledgeRelationId"
+      :headline="relatedKnowledgeUploadCopy.headline"
+      :subline="relatedKnowledgeUploadCopy.subline"
+      :success-message="relatedKnowledgeUploadCopy.successMessage"
+      destroy-on-close
+      @success="handleRelatedObjectMutated"
+    />
+
+    <TaskDetailDrawer
+      v-model="showRelatedTaskDetail"
+      :task="selectedRelatedTask"
+      :is-mobile="isMobile"
+      :can-edit="false"
+      :can-toggle-complete="false"
+      @mutated="handleRelatedObjectMutated"
+    />
+
+    <ScheduleDetailDrawer
+      v-model="showRelatedScheduleDetail"
+      :schedule="selectedRelatedSchedule"
+      :is-mobile="isMobile"
+      :can-edit="false"
+      :can-delete="false"
+      @deleted="handleRelatedObjectMutated"
+    />
+
+    <KnowledgeDetailModal
+      v-model="showRelatedKnowledgeDetail"
+      :knowledge-id="selectedRelatedKnowledgeId"
+      @summary-updated="handleRelatedObjectMutated"
+    />
+
     <el-dialog
       v-model="tencentMeetingPromptVisible"
       title="关联腾讯会议"
@@ -2073,16 +2125,26 @@
         <EmployeeChatInfoPanel
           v-else-if="selectedEmployee"
           :employee="selectedEmployee"
+          :selected-task-id="selectedRelatedTask?.taskId"
+          :selected-schedule-id="selectedRelatedSchedule?.scheduleId"
           @add-task="handleRelatedObjectAdd('task')"
           @add-schedule="handleRelatedObjectAdd('schedule')"
           @add-attachment="handleRelatedObjectAdd('attachment')"
+          @view-task="handleViewRelatedTask"
+          @view-schedule="handleViewRelatedSchedule"
+          @view-attachment="handleViewRelatedKnowledge"
         />
         <RelationChatInfoPanel
           v-else-if="selectedRelationDetail"
           :detail="selectedRelationDetail"
+          :selected-task-id="selectedRelatedTask?.taskId"
+          :selected-schedule-id="selectedRelatedSchedule?.scheduleId"
           @add-task="handleRelatedObjectAdd('task')"
           @add-schedule="handleRelatedObjectAdd('schedule')"
           @add-attachment="handleRelatedObjectAdd('attachment')"
+          @view-task="handleViewRelatedTask"
+          @view-schedule="handleViewRelatedSchedule"
+          @view-attachment="handleViewRelatedKnowledge"
         />
       </div>
     </aside>
@@ -2115,6 +2177,12 @@ import { getAddressBookDetail } from '@/api/addressBook'
 import { getRelationDetail } from '@/api/relation'
 import EmployeeChatInfoPanel from '@/views/chat/components/EmployeeChatInfoPanel.vue'
 import RelationChatInfoPanel from '@/views/chat/components/RelationChatInfoPanel.vue'
+import TaskDetailDrawer from '@/views/task/components/TaskDetailDrawer.vue'
+import TaskEditDialog from '@/views/task/components/TaskEditDialog.vue'
+import ScheduleDetailDrawer from '@/views/calendar/components/ScheduleDetailDrawer.vue'
+import ScheduleFormDialog from '@/views/calendar/components/ScheduleFormDialog.vue'
+import KnowledgeDetailModal from '@/components/knowledge/KnowledgeDetailModal.vue'
+import KnowledgeUploadDialog from '@/components/knowledge/KnowledgeUploadDialog.vue'
 import {
   registerAiQuotaResumeSendHandler,
   unregisterAiQuotaResumeSendHandler,
@@ -2146,7 +2214,8 @@ import {
   shouldPreferMobileAudioFileCapture,
   shouldUseMobileAudioFileCapture
 } from '@/utils/mobileAudioRecording'
-import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, ChatModelOption } from '@/types/common'
+import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, ChatModelOption, Task } from '@/types/common'
+import type { ScheduleVO } from '@/api/schedule'
 import type { Contact, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAttachment } from '@/types/customer'
 import type { WecomConversationTabVO, WecomMessageVO } from '@/types/wecom'
 import type { TencentMeetingCandidateVO } from '@/types/tencentMeeting'
@@ -2306,6 +2375,80 @@ const selectedRelationId = ref<string | null>(null)
 const selectedRelationDetail = ref<RelationDetailVO | null>(null)
 const selectedRelation = computed(() => selectedRelationDetail.value?.relation || null)
 const selectedRelationLoading = ref(false)
+const showRelatedTaskDialog = ref(false)
+const showRelatedScheduleDialog = ref(false)
+const showRelatedKnowledgeUploadDialog = ref(false)
+const relatedKnowledgeUploadDialogRef = ref<InstanceType<typeof KnowledgeUploadDialog> | null>(null)
+const selectedRelatedTask = ref<Task | null>(null)
+const showRelatedTaskDetail = computed({
+  get: () => !!selectedRelatedTask.value,
+  set: (visible: boolean) => {
+    if (!visible) selectedRelatedTask.value = null
+  }
+})
+const selectedRelatedSchedule = ref<ScheduleVO | null>(null)
+const showRelatedScheduleDetail = computed({
+  get: () => !!selectedRelatedSchedule.value,
+  set: (visible: boolean) => {
+    if (!visible) selectedRelatedSchedule.value = null
+  }
+})
+const selectedRelatedKnowledgeId = ref('')
+const showRelatedKnowledgeDetail = ref(false)
+const relatedTaskDefaultAssignee = computed(() => {
+  const employee = selectedEmployee.value
+  if (!employee?.userId) return null
+  return {
+    userId: employee.userId,
+    realname: employee.realname || '',
+    username: ''
+  }
+})
+const relatedRelationDefault = computed(() => {
+  const relation = selectedRelation.value
+  if (!relation?.relationId) return null
+  return {
+    relationId: relation.relationId,
+    name: relation.name || ''
+  }
+})
+const relatedScheduleDefaultParticipantUsers = computed(() => {
+  const employee = selectedEmployee.value
+  if (!employee?.userId) return []
+  return [{
+    userId: employee.userId,
+    realname: employee.realname || '',
+    username: ''
+  }]
+})
+const relatedKnowledgeEmployeeId = computed(() => selectedEmployee.value?.userId ? String(selectedEmployee.value.userId) : undefined)
+const relatedKnowledgeRelationId = computed(() => selectedRelation.value?.relationId ? String(selectedRelation.value.relationId) : undefined)
+const relatedKnowledgeUploadCopy = computed(() => {
+  if (selectedEmployee.value) {
+    return {
+      headline: '上传通讯录文档',
+      subline: '上传后将关联当前员工，AI 将自动解析并建立索引。',
+      successMessage: '通讯录文档上传成功'
+    }
+  }
+  if (selectedRelation.value) {
+    return {
+      headline: '上传关系文档',
+      subline: '上传后将关联当前关系人，AI 将自动解析并建立索引。',
+      successMessage: '关系文档上传成功'
+    }
+  }
+  return {
+    headline: '上传业务文档',
+    subline: '上传后 AI 将自动解析并建立索引。',
+    successMessage: '文档上传成功'
+  }
+})
+
+watch([selectedEmployeeId, selectedRelationId], () => {
+  resetRelatedDetailSelection()
+})
+
 const showSelectedCustomerTagDialog = ref(false)
 const showSelectedCustomerBasicInfoDrawer = ref(false)
 const showSelectedCustomerEditDialog = ref(false)
@@ -4166,13 +4309,73 @@ function sendQuickMessage(text: string) {
   handleSend()
 }
 
+function hasRelatedObjectCreateContext() {
+  return Boolean(selectedEmployee.value || selectedRelation.value)
+}
+
 function handleRelatedObjectAdd(kind: 'task' | 'schedule' | 'attachment') {
-  const labels = {
-    task: '任务',
-    schedule: '日程',
-    attachment: '文档'
-  } as const
-  ElMessage.info(`请在对应${labels[kind]}模块中新增，保存后会在这里展示`)
+  if (!hasRelatedObjectCreateContext()) {
+    ElMessage.warning('请先选择通讯录员工或关系人')
+    return
+  }
+
+  if (kind === 'task') {
+    showRelatedTaskDialog.value = true
+    return
+  }
+
+  if (kind === 'schedule') {
+    showRelatedScheduleDialog.value = true
+    return
+  }
+
+  relatedKnowledgeUploadDialogRef.value?.openEmpty()
+}
+
+function handleViewRelatedTask(task: Task) {
+  selectedRelatedTask.value = task
+}
+
+function handleViewRelatedSchedule(schedule: ScheduleVO) {
+  selectedRelatedSchedule.value = schedule
+}
+
+function handleViewRelatedKnowledge(knowledge: Knowledge) {
+  selectedRelatedKnowledgeId.value = String(knowledge.knowledgeId)
+  showRelatedKnowledgeDetail.value = true
+}
+
+function resetRelatedDetailSelection() {
+  selectedRelatedTask.value = null
+  selectedRelatedSchedule.value = null
+  selectedRelatedKnowledgeId.value = ''
+  showRelatedKnowledgeDetail.value = false
+}
+
+function syncSelectedRelatedDetails() {
+  const taskId = selectedRelatedTask.value?.taskId
+  const scheduleId = selectedRelatedSchedule.value?.scheduleId
+  const tasks = selectedEmployee.value?.relatedTasks || selectedRelationDetail.value?.tasks || []
+  const schedules = selectedEmployee.value?.relatedSchedules || selectedRelationDetail.value?.schedules || []
+
+  if (taskId) {
+    selectedRelatedTask.value = tasks.find(task => String(task.taskId) === String(taskId)) || null
+  }
+  if (scheduleId) {
+    selectedRelatedSchedule.value = schedules.find(schedule => String(schedule.scheduleId) === String(scheduleId)) || null
+  }
+}
+
+async function handleRelatedObjectMutated(_payload?: unknown) {
+  if (selectedEmployeeId.value) {
+    await ensureSelectedEmployeeDetail(selectedEmployeeId.value, { silent: true })
+    syncSelectedRelatedDetails()
+    return
+  }
+  if (selectedRelationId.value) {
+    await ensureSelectedRelationDetail(selectedRelationId.value, { silent: true })
+    syncSelectedRelatedDetails()
+  }
 }
 
 function handleQuoteCustomerAttachment(payload: { followUp: FollowUp; attachment: FollowUpAttachment }) {

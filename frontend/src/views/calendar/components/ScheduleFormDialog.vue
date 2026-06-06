@@ -249,6 +249,15 @@ type DefaultCustomer = {
   customerId?: string | number
   companyName?: string | null
 } | null
+type DefaultRelation = {
+  relationId?: string | number
+  name?: string | null
+} | null
+type DefaultParticipantUser = {
+  userId?: string | number
+  realname?: string | null
+  username?: string | null
+}
 
 type ScheduleFormState = {
   title: string
@@ -256,6 +265,7 @@ type ScheduleFormState = {
   endTime: string
   type: string
   customerId: string
+  relationId: string
   contactId: string
   location: string
   description: string
@@ -265,9 +275,13 @@ const props = withDefaults(defineProps<{
   modelValue: boolean
   editingSchedule?: ScheduleVO | null
   defaultCustomer?: DefaultCustomer
+  defaultRelation?: DefaultRelation
+  defaultParticipantUsers?: DefaultParticipantUser[]
 }>(), {
   editingSchedule: null,
-  defaultCustomer: null
+  defaultCustomer: null,
+  defaultRelation: null,
+  defaultParticipantUsers: () => []
 })
 
 const emit = defineEmits<{
@@ -285,6 +299,7 @@ function createDefaultFormState(): ScheduleFormState {
     endTime: '',
     type: 'meeting',
     customerId: '',
+    relationId: '',
     contactId: '',
     location: '',
     description: ''
@@ -328,7 +343,10 @@ watch(
   () => [
     props.editingSchedule?.scheduleId,
     props.defaultCustomer?.customerId,
-    props.defaultCustomer?.companyName
+    props.defaultCustomer?.companyName,
+    props.defaultRelation?.relationId,
+    props.defaultRelation?.name,
+    props.defaultParticipantUsers.map(user => `${user.userId || ''}:${user.realname || ''}:${user.username || ''}`).join('|')
   ] as const,
   () => {
     if (visible.value) {
@@ -351,6 +369,8 @@ function initScheduleForm() {
   const schedule = props.editingSchedule
   if (!schedule) {
     applyDefaultCustomer()
+    applyDefaultRelation()
+    applyDefaultParticipantUsers()
     return
   }
 
@@ -360,6 +380,7 @@ function initScheduleForm() {
     endTime: schedule.endTime ? (parseAiDateTime(schedule.endTime) || schedule.endTime) : '',
     type: normalizeScheduleType(schedule.type),
     customerId: schedule.customerId ? String(schedule.customerId) : '',
+    relationId: schedule.relationId ? String(schedule.relationId) : '',
     contactId: schedule.contactId ? String(schedule.contactId) : '',
     location: schedule.location || '',
     description: schedule.description || ''
@@ -390,6 +411,26 @@ function applyDefaultCustomer() {
     value: String(customer.customerId),
     label: customer.companyName || String(customer.customerId)
   }]
+}
+
+function applyDefaultRelation() {
+  const relation = props.defaultRelation
+  if (!relation?.relationId) return
+  scheduleForm.relationId = String(relation.relationId)
+}
+
+function applyDefaultParticipantUsers() {
+  const users = props.defaultParticipantUsers
+    .filter(user => user.userId)
+    .map(user => ({
+      userId: String(user.userId),
+      realname: user.realname || '',
+      username: user.username || ''
+    }))
+  if (users.length === 0) return
+
+  mergeUserOptions(users.map(user => buildUserOption(user)))
+  selectedParticipantUserIds.value = users.map(user => user.userId)
 }
 
 function normalizeScheduleType(type?: string): string {
@@ -610,6 +651,7 @@ async function handleSaveSchedule() {
       endTime,
       type: scheduleForm.type,
       customerId: scheduleForm.customerId || undefined,
+      relationId: scheduleForm.relationId || undefined,
       contactId: scheduleForm.contactId || undefined,
       location: scheduleForm.location || undefined,
       description: scheduleForm.description || undefined,

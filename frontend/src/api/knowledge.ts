@@ -17,12 +17,16 @@ export function uploadKnowledge(
   file: File,
   type?: string,
   customerId?: string,
-  summary?: string
+  summary?: string,
+  employeeId?: string,
+  relationId?: string
 ): Promise<string> {
   const formData = new FormData()
   formData.append('file', file)
   if (type) formData.append('type', type)
   if (customerId) formData.append('customerId', customerId)
+  if (employeeId) formData.append('employeeId', employeeId)
+  if (relationId) formData.append('relationId', relationId)
   if (summary) formData.append('summary', summary)
   return upload('/knowledge/upload', formData)
 }

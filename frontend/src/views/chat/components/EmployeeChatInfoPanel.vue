@@ -29,9 +29,14 @@
         :tasks="tasks"
         :schedules="schedules"
         :attachments="attachments"
+        :selected-task-id="selectedTaskId"
+        :selected-schedule-id="selectedScheduleId"
         @add-task="emit('add-task')"
         @add-schedule="emit('add-schedule')"
         @add-attachment="emit('add-attachment')"
+        @view-task="emit('view-task', $event)"
+        @view-schedule="emit('view-schedule', $event)"
+        @view-attachment="emit('view-attachment', $event)"
       />
 
       <PanelSection title="最近记录" :empty="records.length === 0">
@@ -53,17 +58,24 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h } from 'vue'
+import type { ScheduleVO } from '@/api/schedule'
 import type { AddressBookDetail } from '@/types/addressBook'
+import type { Knowledge, Task } from '@/types/common'
 import ObjectRelatedModules from './ObjectRelatedModules.vue'
 
 const props = defineProps<{
   employee: AddressBookDetail
+  selectedTaskId?: string | number | null
+  selectedScheduleId?: string | number | null
 }>()
 
 const emit = defineEmits<{
   (e: 'add-task'): void
   (e: 'add-schedule'): void
   (e: 'add-attachment'): void
+  (e: 'view-task', task: Task): void
+  (e: 'view-schedule', schedule: ScheduleVO): void
+  (e: 'view-attachment', attachment: Knowledge): void
 }>()
 
 const employeeName = computed(() => props.employee.realname || '未命名员工')

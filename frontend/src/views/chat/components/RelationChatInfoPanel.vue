@@ -27,9 +27,14 @@
       :tasks="tasks"
       :schedules="schedules"
       :attachments="attachments"
+      :selected-task-id="selectedTaskId"
+      :selected-schedule-id="selectedScheduleId"
       @add-task="emit('add-task')"
       @add-schedule="emit('add-schedule')"
       @add-attachment="emit('add-attachment')"
+      @view-task="emit('view-task', $event)"
+      @view-schedule="emit('view-schedule', $event)"
+      @view-attachment="emit('view-attachment', $event)"
     />
 
     <section class="mt-5 border-t border-slate-100 pt-5">
@@ -65,17 +70,24 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { ScheduleVO } from '@/api/schedule'
+import type { Knowledge, Task } from '@/types/common'
 import type { RelationDetailVO } from '@/types/relation'
 import ObjectRelatedModules from './ObjectRelatedModules.vue'
 
 const props = defineProps<{
   detail: RelationDetailVO
+  selectedTaskId?: string | number | null
+  selectedScheduleId?: string | number | null
 }>()
 
 const emit = defineEmits<{
   (e: 'add-task'): void
   (e: 'add-schedule'): void
   (e: 'add-attachment'): void
+  (e: 'view-task', task: Task): void
+  (e: 'view-schedule', schedule: ScheduleVO): void
+  (e: 'view-attachment', attachment: Knowledge): void
 }>()
 
 const relation = computed(() => props.detail.relation)

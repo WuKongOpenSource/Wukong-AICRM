@@ -235,6 +235,8 @@ import { normalizeTaskPriority } from '@/utils/taskPriority'
 
 type Option = { value: string; label: string }
 type DefaultCustomer = { customerId?: string | number; companyName?: string | null } | null
+type DefaultRelation = { relationId?: string | number; name?: string | null } | null
+type DefaultAssignee = { userId?: string | number; realname?: string | null; username?: string | null } | null
 type TaskEditSavedPayload = {
   mode: 'create' | 'edit'
   taskId?: string
@@ -244,10 +246,14 @@ const props = withDefaults(defineProps<{
   modelValue: boolean
   editingTask?: Task | null
   defaultCustomer?: DefaultCustomer
+  defaultRelation?: DefaultRelation
+  defaultAssignee?: DefaultAssignee
   refreshStoreAfterSave?: boolean
 }>(), {
   editingTask: null,
   defaultCustomer: null,
+  defaultRelation: null,
+  defaultAssignee: null,
   refreshStoreAfterSave: true
 })
 
@@ -267,7 +273,7 @@ const userSearchLoading = ref(false)
 const customerOptions = ref<Option[]>([])
 const customerSearchLoading = ref(false)
 const selectedParticipants = ref<string[]>([])
-const formData = reactive<TaskAddBO & { status?: TaskStatus; customerId?: string; assignedToName?: string }>({
+const formData = reactive<TaskAddBO & { status?: TaskStatus; customerId?: string; relationId?: string; assignedToName?: string }>({
   title: '',
   description: '',
   priority: 'MEDIUM',
@@ -275,6 +281,8 @@ const formData = reactive<TaskAddBO & { status?: TaskStatus; customerId?: string
   status: undefined,
   taskType: '',
   customerId: '',
+  relationId: '',
+  assignedTo: '',
   assignedToName: ''
 })
 
@@ -302,7 +310,12 @@ watch(
     props.modelValue,
     props.editingTask?.taskId,
     props.defaultCustomer?.customerId,
-    props.defaultCustomer?.companyName
+    props.defaultCustomer?.companyName,
+    props.defaultRelation?.relationId,
+    props.defaultRelation?.name,
+    props.defaultAssignee?.userId,
+    props.defaultAssignee?.realname,
+    props.defaultAssignee?.username
   ] as const,
   ([visible]) => {
     if (visible) hydrateForm()
@@ -326,6 +339,8 @@ function hydrateForm() {
       status: task.status,
       taskType: task.taskType || '',
       customerId: task.customerId || '',
+      relationId: task.relationId || '',
+      assignedTo: task.assignedTo || '',
       assignedToName: task.assignedToName || ''
     })
 
@@ -345,9 +360,13 @@ function hydrateForm() {
     status: undefined,
     taskType: '',
     customerId: '',
+    relationId: '',
+    assignedTo: '',
     assignedToName: ''
   })
   applyDefaultCustomer()
+  applyDefaultRelation()
+  applyDefaultAssignee()
 }
 
 function applyDefaultCustomer() {
@@ -359,6 +378,19 @@ function applyDefaultCustomer() {
     value: String(customer.customerId),
     label: customer.companyName || ''
   }]
+}
+
+function applyDefaultRelation() {
+  const relation = props.defaultRelation
+  if (!relation?.relationId) return
+  formData.relationId = String(relation.relationId)
+}
+
+function applyDefaultAssignee() {
+  const assignee = props.defaultAssignee
+  if (!assignee?.userId) return
+  formData.assignedTo = String(assignee.userId)
+  formData.assignedToName = assignee.realname || assignee.username || ''
 }
 
 async function searchCustomers(query: string) {
@@ -457,7 +489,9 @@ async function handleSubmit() {
       dueDate: formData.dueDate,
       taskType: formData.taskType,
       participantNames: selectedParticipants.value.join(', '),
-      customerId: formData.customerId || undefined
+      customerId: formData.customerId || undefined,
+      relationId: formData.relationId || undefined,
+      assignedTo: formData.assignedTo || undefined
     }
 
     if (props.editingTask) {

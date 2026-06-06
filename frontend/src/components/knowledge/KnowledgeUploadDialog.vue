@@ -163,6 +163,10 @@ const props = withDefaults(
     modelValue: boolean
     /** 关联客户时传入，与知识中心独立上传二选一 */
     customerId?: string
+    /** 关联通讯录员工时传入 */
+    employeeId?: string
+    /** 关联关系人时传入 */
+    relationId?: string
     /** 主标题 */
     headline?: string
     /** 说明文字 */
@@ -282,7 +286,9 @@ async function confirmUpload() {
       selectedFile.value,
       form.value.type,
       props.customerId,
-      form.value.summary
+      form.value.summary,
+      props.employeeId,
+      props.relationId
     )
     ElMessage.success(props.successMessage)
     visible.value = false
