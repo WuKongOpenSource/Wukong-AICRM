@@ -3,6 +3,7 @@ package com.kakarote.ai_crm.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingSyncRunBO;
 import com.kakarote.ai_crm.entity.PO.TencentMeeting;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingCorpConfig;
@@ -13,6 +14,7 @@ import com.kakarote.ai_crm.entity.PO.TencentMeetingTranscriptSegment;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingUserMapping;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingSyncStatusVO;
 import com.kakarote.ai_crm.utils.UserUtil;
+import com.kakarote.ai_crm.mapper.ManageUserMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingParticipantMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingRecordingMapper;
@@ -24,8 +26,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 @Slf4j
@@ -56,6 +62,9 @@ public class TencentMeetingSyncServiceImpl {
     @Autowired
     private TencentMeetingOAuthTokenProvider tokenProvider;
 
+    @Autowired
+    private ManageUserMapper manageUserMapper;
+
     @Transactional(rollbackFor = Exception.class)
     public TencentMeetingSyncStatusVO runSync(TencentMeetingCorpConfig config, TencentMeetingSyncRunBO runBO) {
         TencentMeetingSyncRunBO actualRunBO = runBO == null ? new TencentMeetingSyncRunBO() : runBO;
@@ -78,22 +87,29 @@ public class TencentMeetingSyncServiceImpl {
         int fetched = 0;
         int saved = 0;
         int failed = 0;
+        String lastError = null;
         try {
             List<TencentMeetingUserMapping> mappings = loadMappings(config, actualRunBO);
+            if (mappings.isEmpty()) {
+                failed++;
+                lastError = "请先授权腾讯会议账号";
+            }
             for (TencentMeetingUserMapping mapping : mappings) {
                 try {
                     TencentMeetingOAuthCredential credential = tokenProvider.credential(config, mapping);
-                    List<JSONObject> meetings = apiGateway.listEndedMeetings(credential, syncDays);
+                    List<JSONObject> meetings = listMeetingsForSync(credential, syncDays);
                     fetched += meetings.size();
                     for (JSONObject rawMeeting : meetings) {
                         TencentMeeting meeting = upsertMeeting(config, mapping, rawMeeting);
                         saved++;
                         try {
                             List<JSONObject> participants = apiGateway.getMeetingParticipants(credential, meeting.getMeetingId());
+                            List<TencentMeetingParticipant> savedParticipants = new ArrayList<>();
                             for (JSONObject rawParticipant : participants) {
-                                saveParticipant(config, meeting, rawParticipant);
+                                savedParticipants.add(saveParticipant(config, meeting, rawParticipant));
                                 saved++;
                             }
+                            applyParticipantSummary(meeting, savedParticipants);
                         } catch (Exception detailException) {
                             failed++;
                             log.warn("Tencent Meeting participant sync skipped: meetingId={}, openId={}, error={}",
@@ -146,14 +162,22 @@ public class TencentMeetingSyncServiceImpl {
                     userMappingMapper.updateById(mapping);
                 } catch (Exception accountException) {
                     failed++;
+                    lastError = accountException.getMessage();
                     mapping.setLastSyncTime(new Date());
                     mapping.setLastSyncError(accountException.getMessage());
                     userMappingMapper.updateById(mapping);
                     log.warn("Tencent Meeting account sync skipped: openId={}, error={}", mapping.getMeetingUserId(), accountException.getMessage());
                 }
             }
-            syncLog.setStatus("success");
-            status.setLastSyncStatus("success");
+            if (failed > 0 && fetched == 0 && saved == 0) {
+                syncLog.setStatus("failed");
+                syncLog.setErrorMessage(lastError);
+                status.setLastSyncStatus("failed");
+                status.setLastSyncError(lastError);
+            } else {
+                syncLog.setStatus("success");
+                status.setLastSyncStatus("success");
+            }
         } catch (Exception e) {
             failed++;
             syncLog.setStatus("failed");
@@ -184,6 +208,35 @@ public class TencentMeetingSyncServiceImpl {
 
     public JSONObject createMeeting(TencentMeetingOAuthCredential credential, JSONObject requestBody) {
         return apiGateway.createMeeting(credential, requestBody);
+    }
+
+    public JSONObject getMeetingDetail(TencentMeetingOAuthCredential credential, String meetingId) {
+        return apiGateway.getMeetingDetail(credential, meetingId);
+    }
+
+    private List<JSONObject> listMeetingsForSync(TencentMeetingOAuthCredential credential, int syncDays) {
+        List<JSONObject> meetings = new ArrayList<>();
+        appendAll(meetings, apiGateway.listUpcomingMeetings(credential));
+        appendAll(meetings, apiGateway.listEndedMeetings(credential, syncDays));
+        return deduplicateMeetings(meetings);
+    }
+
+    private void appendAll(List<JSONObject> target, List<JSONObject> source) {
+        if (source != null && !source.isEmpty()) {
+            target.addAll(source);
+        }
+    }
+
+    private List<JSONObject> deduplicateMeetings(List<JSONObject> meetings) {
+        LinkedHashMap<String, JSONObject> byId = new LinkedHashMap<>();
+        for (JSONObject meeting : meetings) {
+            if (meeting == null) {
+                continue;
+            }
+            String meetingId = firstText(meeting, "meeting_id", "meetingId", "meeting_uuid");
+            byId.putIfAbsent(StrUtil.blankToDefault(meetingId, meeting.toJSONString()), meeting);
+        }
+        return new ArrayList<>(byId.values());
     }
 
     private List<TencentMeetingUserMapping> loadMappings(TencentMeetingCorpConfig config, TencentMeetingSyncRunBO runBO) {
@@ -217,13 +270,22 @@ public class TencentMeetingSyncServiceImpl {
         meeting.setMeetingCode(firstText(raw, "meeting_code", "meetingCode"));
         meeting.setSubject(StrUtil.blankToDefault(firstText(raw, "subject", "meeting_subject", "title"), "腾讯会议"));
         meeting.setStatus(normalizeStatus(firstText(raw, "status", "meeting_status")));
-        meeting.setCreatorUserId(StrUtil.blankToDefault(firstText(raw, "creator_userid", "creator_user_id", "userid"), mapping.getMeetingUserId()));
-        meeting.setCreatorName(StrUtil.blankToDefault(firstText(raw, "creator_name", "creatorName", "user_name"), mapping.getUserName()));
+        String creatorUserId = StrUtil.blankToDefault(firstText(raw, "creator_userid", "creator_user_id", "userid"), mapping.getMeetingUserId());
+        meeting.setCreatorUserId(creatorUserId);
+        meeting.setCreatorName(resolveDisplayName(
+                firstText(raw, "creator_name", "creatorName", "nick_name", "nickname", "user_name", "username", "name"),
+                creatorUserId,
+                mapping));
         meeting.setCrmCreatorUserId(mapping.getCrmUserId());
         meeting.setStartTime(toDate(raw.get("start_time")));
         meeting.setEndTime(toDate(raw.get("end_time")));
-        if (meeting.getStartTime() != null && meeting.getEndTime() != null) {
+        Long explicitDuration = resolveDurationSeconds(raw);
+        if (explicitDuration != null) {
+            meeting.setDurationSeconds(explicitDuration);
+        } else if (!"ended".equals(meeting.getStatus()) && meeting.getStartTime() != null && meeting.getEndTime() != null) {
             meeting.setDurationSeconds(Math.max(0L, (meeting.getEndTime().getTime() - meeting.getStartTime().getTime()) / 1000L));
+        } else {
+            meeting.setDurationSeconds(null);
         }
         meeting.setRawJson(raw.toJSONString());
         meeting.setSyncedAt(new Date());
@@ -235,21 +297,49 @@ public class TencentMeetingSyncServiceImpl {
         return meeting;
     }
 
-    private void saveParticipant(TencentMeetingCorpConfig config, TencentMeeting meeting, JSONObject raw) {
+    private TencentMeetingParticipant saveParticipant(TencentMeetingCorpConfig config, TencentMeeting meeting, JSONObject raw) {
         TencentMeetingParticipant participant = new TencentMeetingParticipant();
         participant.setAppId(config.getAppId());
         participant.setMeetingDbId(meeting.getId());
         participant.setMeetingId(meeting.getMeetingId());
         participant.setUserId(firstText(raw, "userid", "user_id", "open_id"));
-        participant.setUserName(firstText(raw, "user_name", "username", "name"));
+        participant.setUserName(resolveDisplayName(firstText(raw, "user_name", "username", "name"), participant.getUserId(), null));
         participant.setRole(firstText(raw, "role", "user_role"));
         participant.setJoinTime(toDate(raw.get("join_time")));
-        participant.setLeaveTime(toDate(raw.get("left_time")));
+        participant.setLeaveTime(toDate(firstValue(raw, "left_time", "leave_time")));
         if (participant.getJoinTime() != null && participant.getLeaveTime() != null) {
             participant.setDurationSeconds(Math.max(0L, (participant.getLeaveTime().getTime() - participant.getJoinTime().getTime()) / 1000L));
         }
         participant.setRawJson(raw.toJSONString());
         participantMapper.insert(participant);
+        return participant;
+    }
+
+    private void applyParticipantSummary(TencentMeeting meeting, List<TencentMeetingParticipant> participants) {
+        if (participants == null || participants.isEmpty()) {
+            return;
+        }
+        Date firstJoin = null;
+        Date lastLeave = null;
+        LinkedHashSet<String> participantNames = new LinkedHashSet<>();
+        for (TencentMeetingParticipant participant : participants) {
+            String displayName = StrUtil.blankToDefault(participant.getUserName(), participant.getUserId());
+            if (StrUtil.isNotBlank(displayName)) {
+                participantNames.add(displayName);
+            }
+            if (participant.getJoinTime() != null && (firstJoin == null || participant.getJoinTime().before(firstJoin))) {
+                firstJoin = participant.getJoinTime();
+            }
+            if (participant.getLeaveTime() != null && (lastLeave == null || participant.getLeaveTime().after(lastLeave))) {
+                lastLeave = participant.getLeaveTime();
+            }
+        }
+        meeting.setParticipantCount(participants.size());
+        meeting.setParticipantNames(participantNames.isEmpty() ? null : String.join(",", participantNames));
+        if (firstJoin != null && lastLeave != null && !lastLeave.before(firstJoin)) {
+            meeting.setDurationSeconds(Math.max(0L, (lastLeave.getTime() - firstJoin.getTime()) / 1000L));
+        }
+        meetingMapper.updateById(meeting);
     }
 
     private TencentMeetingRecording saveRecording(TencentMeetingCorpConfig config, TencentMeeting meeting, JSONObject raw) {
@@ -307,8 +397,11 @@ public class TencentMeetingSyncServiceImpl {
         if (value.contains("取消") || value.contains("cancel")) {
             return "cancelled";
         }
-        if (value.contains("未开始") || value.contains("not_started")) {
+        if (value.contains("未开始") || value.contains("待开始") || value.contains("not_started") || value.contains("init")) {
             return "not_started";
+        }
+        if (value.contains("started") || value.contains("进行中") || value.contains("会议中")) {
+            return "started";
         }
         if (value.contains("结束") || value.contains("end")) {
             return "ended";
@@ -318,6 +411,102 @@ public class TencentMeetingSyncServiceImpl {
 
     private String formatTranscriptLine(TencentMeetingTranscriptSegment segment) {
         return StrUtil.blankToDefault(segment.getSpeakerName(), "未知发言人") + "：" + StrUtil.blankToDefault(segment.getText(), "");
+    }
+
+    private Long resolveDurationSeconds(JSONObject raw) {
+        Long seconds = toLong(firstValue(raw, "duration_seconds", "duration"));
+        if (seconds != null) {
+            return seconds;
+        }
+        Long millis = toLong(firstValue(raw, "meeting_duration", "user_meeting_duration"));
+        return millis == null ? null : Math.max(0L, millis / 1000L);
+    }
+
+    private String resolveDisplayName(String rawName, String userId, TencentMeetingUserMapping mapping) {
+        String normalizedUserId = StrUtil.trim(userId);
+        String mappingUserId = mapping == null ? null : StrUtil.trim(mapping.getMeetingUserId());
+        String displayName = firstDisplayName(normalizedUserId, mappingUserId, rawName);
+        if (displayName != null) {
+            return displayName;
+        }
+        if (mapping != null) {
+            displayName = firstDisplayName(normalizedUserId, mappingUserId, mapping.getUserName());
+            if (displayName != null) {
+                return displayName;
+            }
+            displayName = firstDisplayName(normalizedUserId, mappingUserId, crmUserDisplayName(mapping.getCrmUserId()));
+            if (displayName != null) {
+                return displayName;
+            }
+        }
+        return StrUtil.blankToDefault(rawName, normalizedUserId);
+    }
+
+    private String firstDisplayName(String userId, String mappingUserId, String... values) {
+        for (String value : values) {
+            String candidate = decodeBase64IfNeeded(value);
+            if (StrUtil.isBlank(candidate)) {
+                continue;
+            }
+            if (candidate.equals(userId) || candidate.equals(mappingUserId)) {
+                continue;
+            }
+            return candidate;
+        }
+        return null;
+    }
+
+    private String decodeBase64IfNeeded(String value) {
+        if (StrUtil.isBlank(value)) {
+            return null;
+        }
+        String trimmed = value.trim();
+        try {
+            String decoded = new String(Base64.getDecoder().decode(trimmed), StandardCharsets.UTF_8).trim();
+            if (isReadableText(decoded)) {
+                return decoded;
+            }
+        } catch (IllegalArgumentException ignored) {
+            return trimmed;
+        }
+        return trimmed;
+    }
+
+    private boolean isReadableText(String value) {
+        if (StrUtil.isBlank(value)) {
+            return false;
+        }
+        boolean hasNameCharacter = false;
+        for (int i = 0; i < value.length(); i++) {
+            char character = value.charAt(i);
+            if (Character.isISOControl(character) || character == '\uFFFD') {
+                return false;
+            }
+            if (Character.isLetterOrDigit(character)) {
+                hasNameCharacter = true;
+            }
+        }
+        return hasNameCharacter;
+    }
+
+    private String crmUserDisplayName(Long crmUserId) {
+        if (crmUserId == null || manageUserMapper == null) {
+            return null;
+        }
+        ManagerUser user = manageUserMapper.selectById(crmUserId);
+        if (user == null) {
+            return null;
+        }
+        return firstNotBlank(user.getRealname(), user.getUsername(), user.getMobile(), user.getEmail());
+    }
+
+    private String firstNotBlank(String... values) {
+        for (String value : values) {
+            if (StrUtil.isNotBlank(value)) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private String firstText(JSONObject raw, String... keys) {

@@ -125,7 +125,7 @@ wecom:
     suite-id: ${WECOM_OPEN_PLATFORM_SUITE_ID:wwc241ee78c24021e7}
     suite-secret: ${WECOM_OPEN_PLATFORM_SUITE_SECRET:aqz6mm29b7OcjxdW7-11wbmS_7DLN7RQubN3qArF6d0}
     provider-corp-id: ${WECOM_OPEN_PLATFORM_PROVIDER_CORP_ID:wwbc43295670db368a}
-    provider-secret: ${WECOM_OPEN_PLATFORM_PROVIDER_SECRET:${WECOM_OPEN_PLATFORM_SUITE_SECRET:aqz6mm29b7OcjxdW7-11wbmS_7DLN7RQubN3qArF6d0}}
+    provider-secret: ${WECOM_OPEN_PLATFORM_PROVIDER_SECRET:nv8VaftKubcKTh7d_SXCgEEhblN2dDl4I8k9Qvk-0J6laJWqnjFTYNMBel0POU1u}
     token: ${WECOM_OPEN_PLATFORM_TOKEN:5nTAZePlAZ5EPfOP8zEemj}
     encoding-aes-key: ${WECOM_OPEN_PLATFORM_ENCODING_AES_KEY:gGal1ShzR4QSiZoAAJlyurMGZSC70bsPwJdhqcuTq7F}
     callback-url: ${WECOM_OPEN_PLATFORM_CALLBACK_URL:https://aicrm-saas.5kcrm.cn/crmapi/wecom/open/callback}

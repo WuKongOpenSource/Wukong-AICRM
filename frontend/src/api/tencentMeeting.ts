@@ -50,6 +50,10 @@ export function refreshTencentMeeting(id: string): Promise<void> {
   return post(`/tencent-meeting/${id}/refresh`)
 }
 
+export function refreshTencentMeetingJoinUrl(id: string): Promise<TencentMeetingVO> {
+  return post(`/tencent-meeting/${id}/join-url`, undefined, { silentError: true })
+}
+
 export function bindTencentMeeting(data: TencentMeetingBindPayload): Promise<void> {
   return post('/tencent-meeting/bind', data)
 }

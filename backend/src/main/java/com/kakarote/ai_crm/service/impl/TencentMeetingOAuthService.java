@@ -193,7 +193,7 @@ public class TencentMeetingOAuthService {
         TencentMeetingUserMapping account = existing == null ? new TencentMeetingUserMapping() : existing;
         account.setAppId(config.getAppId());
         account.setMeetingUserId(openId);
-        account.setUserName(StrUtil.blankToDefault(basicInfo.getString("username"), openId));
+        account.setUserName(resolveAccountUserName(openId, state.getUserId(), basicInfo, profileData, existing == null ? null : existing.getUserName()));
         account.setOpenCorpId(firstNotBlank(basicInfo.getString("open_corp_id"), tokenData.getString("open_corp_id")));
         account.setOpenCorpName(basicInfo.getString("open_corp_name"));
         account.setAvatarUrl(basicInfo.getString("avatar_url"));
@@ -212,6 +212,53 @@ public class TencentMeetingOAuthService {
         } else {
             userMappingMapper.updateById(account);
         }
+    }
+
+    private String resolveAccountUserName(String openId,
+                                          Long crmUserId,
+                                          JSONObject basicInfo,
+                                          JSONObject profileData,
+                                          String existingUserName) {
+        String name = firstNotOpenId(openId,
+                jsonText(basicInfo, "username"),
+                jsonText(basicInfo, "user_name"),
+                jsonText(basicInfo, "nick_name"),
+                jsonText(basicInfo, "nickname"),
+                jsonText(profileData, "username"),
+                jsonText(profileData, "user_name"),
+                jsonText(profileData, "nick_name"),
+                jsonText(profileData, "nickname"),
+                existingUserName,
+                crmUserDisplayName(crmUserId));
+        return StrUtil.blankToDefault(name, openId);
+    }
+
+    private String firstNotOpenId(String openId, String... values) {
+        for (String value : values) {
+            if (StrUtil.isBlank(value)) {
+                continue;
+            }
+            String candidate = value.trim();
+            if (!candidate.equals(openId)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private String jsonText(JSONObject object, String key) {
+        return object == null ? null : object.getString(key);
+    }
+
+    private String crmUserDisplayName(Long userId) {
+        if (userId == null || manageUserService == null) {
+            return null;
+        }
+        ManagerUser user = manageUserService.getById(userId);
+        if (user == null) {
+            return null;
+        }
+        return firstNotBlank(user.getRealname(), user.getUsername(), user.getMobile(), user.getEmail());
     }
 
     private JSONObject exchangeAuthCode(TencentMeetingCorpConfig config, String authCode) {

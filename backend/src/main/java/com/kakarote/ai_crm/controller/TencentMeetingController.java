@@ -150,6 +150,13 @@ public class TencentMeetingController {
         return Result.ok();
     }
 
+    @PostMapping("/{id}/join-url")
+    @Operation(summary = "获取腾讯会议入会链接")
+    @RequirePermission("tencentMeeting:detail")
+    public Result<TencentMeetingVO> refreshJoinUrl(@PathVariable("id") Long id) {
+        return Result.ok(meetingService.refreshJoinUrl(id));
+    }
+
     @PostMapping("/bind")
     @Operation(summary = "关联客户")
     @RequirePermission("tencentMeeting:bind")

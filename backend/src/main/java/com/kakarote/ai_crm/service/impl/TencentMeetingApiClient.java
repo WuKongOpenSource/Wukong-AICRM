@@ -60,6 +60,32 @@ public class TencentMeetingApiClient implements TencentMeetingApiGateway {
     }
 
     @Override
+    public List<JSONObject> listUpcomingMeetings(TencentMeetingOAuthCredential credential) {
+        if (StrUtil.isBlank(credential.openId())) {
+            return List.of();
+        }
+        List<JSONObject> result = new ArrayList<>();
+        int pos = 0;
+        for (int page = 0; page < 10; page++) {
+            UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/v1/meetings")
+                    .queryParam("userid", credential.openId())
+                    .queryParam("instanceid", 1);
+            if (pos > 0) {
+                builder.queryParam("pos", pos);
+            }
+            JSONObject response = get(credential, builder.build().toUriString(), false);
+            result.addAll(firstArray(response, "meeting_info_list", "meetings", "meeting_list"));
+            Integer remaining = response.getInteger("remaining");
+            Integer nextPos = response.getInteger("next_pos");
+            if (remaining == null || remaining == 0 || nextPos == null || nextPos <= 0 || nextPos == pos) {
+                break;
+            }
+            pos = nextPos;
+        }
+        return result;
+    }
+
+    @Override
     public List<JSONObject> getMeetingParticipants(TencentMeetingOAuthCredential credential, String meetingId) {
         if (StrUtil.isBlank(meetingId) || StrUtil.isBlank(credential.openId())) {
             return List.of();
@@ -71,6 +97,24 @@ public class TencentMeetingApiClient implements TencentMeetingApiGateway {
                 .toUriString();
         JSONObject response = get(credential, path, false);
         return firstArray(response, "participants", "participant_list", "users");
+    }
+
+    @Override
+    public JSONObject getMeetingDetail(TencentMeetingOAuthCredential credential, String meetingId) {
+        if (StrUtil.isBlank(meetingId) || StrUtil.isBlank(credential.openId())) {
+            return new JSONObject();
+        }
+        String path = UriComponentsBuilder.fromPath("/v1/meetings/" + meetingId)
+                .queryParam("userid", credential.openId())
+                .queryParam("instanceid", 1)
+                .build()
+                .toUriString();
+        JSONObject response = get(credential, path, false);
+        JSONArray meetings = response.getJSONArray("meeting_info_list");
+        if (meetings != null && !meetings.isEmpty() && meetings.get(0) instanceof JSONObject meeting) {
+            return meeting;
+        }
+        return response;
     }
 
     @Override

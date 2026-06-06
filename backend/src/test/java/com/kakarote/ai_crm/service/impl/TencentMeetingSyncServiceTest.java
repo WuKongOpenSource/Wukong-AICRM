@@ -16,6 +16,7 @@ import com.kakarote.ai_crm.entity.PO.TencentMeetingSyncLog;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingTranscriptSegment;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingUserMapping;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingSyncStatusVO;
+import com.kakarote.ai_crm.mapper.ManageUserMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingParticipantMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingRecordingMapper;
@@ -29,12 +30,15 @@ import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -161,6 +165,175 @@ class TencentMeetingSyncServiceTest {
         assertThat(logCaptor.getValue().getFailedCount()).isEqualTo(1);
     }
 
+    @Test
+    void runSyncShouldUseCrmDisplayNameAndAggregateParticipantDuration() {
+        mockLoginUser();
+        TencentMeetingSyncServiceImpl service = newService();
+        TencentMeetingApiGateway apiGateway = mapper(service, "apiGateway");
+        TencentMeetingOAuthTokenProvider tokenProvider = mapper(service, "tokenProvider");
+        TencentMeetingUserMappingMapper userMappingMapper = mapper(service, "userMappingMapper");
+        TencentMeetingMapper meetingMapper = mapper(service, "meetingMapper");
+        TencentMeetingParticipantMapper participantMapper = mapper(service, "participantMapper");
+        TencentMeetingSyncLogMapper syncLogMapper = mapper(service, "syncLogMapper");
+        ManageUserMapper manageUserMapper = mock(ManageUserMapper.class);
+        ReflectionTestUtils.setField(service, "manageUserMapper", manageUserMapper);
+
+        TencentMeetingCorpConfig config = new TencentMeetingCorpConfig();
+        config.setId(1L);
+        config.setAppId("app-1");
+
+        TencentMeetingUserMapping mapping = new TencentMeetingUserMapping();
+        mapping.setMeetingUserId("open-1");
+        mapping.setUserName("open-1");
+        mapping.setCrmUserId(9L);
+        mapping.setAuthStatus("ACTIVE");
+        mapping.setStatus(1);
+        ManagerUser crmUser = new ManagerUser();
+        crmUser.setUserId(9L);
+        crmUser.setRealname("Crm User");
+        crmUser.setUsername("crm@example.com");
+        when(manageUserMapper.selectById(9L)).thenReturn(crmUser);
+
+        TencentMeetingOAuthCredential credential = new TencentMeetingOAuthCredential(config, mapping, "access-token");
+        when(userMappingMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(mapping));
+        when(tokenProvider.credential(config, mapping)).thenReturn(credential);
+        when(apiGateway.listEndedMeetings(credential, 30)).thenReturn(List.of(historyMeetingWithoutCreatorJson()));
+        when(apiGateway.getMeetingParticipants(credential, "meeting-actual")).thenReturn(List.of(
+                participantJson("open-1", base64("Crm User"), "1710000120", "1710000720"),
+                participantJson("guest-1", base64("Guest One"), "1710000300", "1710000600")
+        ));
+        when(meetingMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        doAnswer(invocation -> {
+            TencentMeeting meeting = invocation.getArgument(0);
+            meeting.setId(300L);
+            return 1;
+        }).when(meetingMapper).insert(any(TencentMeeting.class));
+
+        TencentMeetingSyncRunBO runBO = new TencentMeetingSyncRunBO();
+        runBO.setSyncDays(30);
+        runBO.setSyncRecordings(false);
+        TencentMeetingSyncStatusVO status = service.runSync(config, runBO);
+
+        assertThat(status.getLastSyncStatus()).isEqualTo("success");
+        assertThat(status.getSavedCount()).isEqualTo(3);
+
+        ArgumentCaptor<TencentMeeting> meetingInsertCaptor = ArgumentCaptor.forClass(TencentMeeting.class);
+        verify(meetingMapper).insert(meetingInsertCaptor.capture());
+        assertThat(meetingInsertCaptor.getValue().getCreatorUserId()).isEqualTo("open-1");
+        assertThat(meetingInsertCaptor.getValue().getCreatorName()).isEqualTo("Crm User");
+
+        ArgumentCaptor<TencentMeeting> meetingUpdateCaptor = ArgumentCaptor.forClass(TencentMeeting.class);
+        verify(meetingMapper).updateById(meetingUpdateCaptor.capture());
+        TencentMeeting updatedMeeting = meetingUpdateCaptor.getValue();
+        assertThat(updatedMeeting.getParticipantCount()).isEqualTo(2);
+        assertThat(updatedMeeting.getParticipantNames()).isEqualTo("Crm User,Guest One");
+        assertThat(updatedMeeting.getDurationSeconds()).isEqualTo(600L);
+
+        ArgumentCaptor<TencentMeetingParticipant> participantCaptor = ArgumentCaptor.forClass(TencentMeetingParticipant.class);
+        verify(participantMapper, times(2)).insert(participantCaptor.capture());
+        assertThat(participantCaptor.getAllValues().get(0).getUserName()).isEqualTo("Crm User");
+
+        ArgumentCaptor<TencentMeetingSyncLog> logCaptor = ArgumentCaptor.forClass(TencentMeetingSyncLog.class);
+        verify(syncLogMapper).updateById(logCaptor.capture());
+        assertThat(logCaptor.getValue().getStatus()).isEqualTo("success");
+    }
+
+    @Test
+    void runSyncShouldIncludeUpcomingMeetings() {
+        mockLoginUser();
+        TencentMeetingSyncServiceImpl service = newService();
+        TencentMeetingApiGateway apiGateway = mapper(service, "apiGateway");
+        TencentMeetingOAuthTokenProvider tokenProvider = mapper(service, "tokenProvider");
+        TencentMeetingUserMappingMapper userMappingMapper = mapper(service, "userMappingMapper");
+        TencentMeetingMapper meetingMapper = mapper(service, "meetingMapper");
+        TencentMeetingSyncLogMapper syncLogMapper = mapper(service, "syncLogMapper");
+
+        TencentMeetingCorpConfig config = new TencentMeetingCorpConfig();
+        config.setId(1L);
+        config.setAppId("app-1");
+
+        TencentMeetingUserMapping mapping = new TencentMeetingUserMapping();
+        mapping.setMeetingUserId("host-1");
+        mapping.setCrmUserId(9L);
+        mapping.setAuthStatus("ACTIVE");
+        mapping.setStatus(1);
+        TencentMeetingOAuthCredential credential = new TencentMeetingOAuthCredential(config, mapping, "access-token");
+        when(userMappingMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(mapping));
+        when(tokenProvider.credential(config, mapping)).thenReturn(credential);
+        when(apiGateway.listUpcomingMeetings(credential)).thenReturn(List.of(upcomingMeetingJson()));
+        when(apiGateway.listEndedMeetings(credential, 30)).thenReturn(List.of());
+        when(apiGateway.getMeetingParticipants(credential, "meeting-upcoming")).thenReturn(List.of());
+        when(meetingMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        doAnswer(invocation -> {
+            TencentMeeting meeting = invocation.getArgument(0);
+            meeting.setId(301L);
+            return 1;
+        }).when(meetingMapper).insert(any(TencentMeeting.class));
+
+        TencentMeetingSyncRunBO runBO = new TencentMeetingSyncRunBO();
+        runBO.setSyncDays(30);
+        runBO.setSyncRecordings(false);
+        TencentMeetingSyncStatusVO status = service.runSync(config, runBO);
+
+        assertThat(status.getLastSyncStatus()).isEqualTo("success");
+        assertThat(status.getFetchedCount()).isEqualTo(1);
+        assertThat(status.getSavedCount()).isEqualTo(1);
+
+        ArgumentCaptor<TencentMeeting> meetingCaptor = ArgumentCaptor.forClass(TencentMeeting.class);
+        verify(meetingMapper).insert(meetingCaptor.capture());
+        assertThat(meetingCaptor.getValue().getMeetingId()).isEqualTo("meeting-upcoming");
+        assertThat(meetingCaptor.getValue().getStatus()).isEqualTo("not_started");
+
+        ArgumentCaptor<TencentMeetingSyncLog> logCaptor = ArgumentCaptor.forClass(TencentMeetingSyncLog.class);
+        verify(syncLogMapper).updateById(logCaptor.capture());
+        assertThat(logCaptor.getValue().getStatus()).isEqualTo("success");
+    }
+
+    @Test
+    void runSyncShouldExposeAccountErrorWhenNoMeetingsSynced() {
+        mockLoginUser();
+        TencentMeetingSyncServiceImpl service = newService();
+        TencentMeetingApiGateway apiGateway = mapper(service, "apiGateway");
+        TencentMeetingOAuthTokenProvider tokenProvider = mapper(service, "tokenProvider");
+        TencentMeetingUserMappingMapper userMappingMapper = mapper(service, "userMappingMapper");
+        TencentMeetingSyncLogMapper syncLogMapper = mapper(service, "syncLogMapper");
+
+        TencentMeetingCorpConfig config = new TencentMeetingCorpConfig();
+        config.setId(1L);
+        config.setAppId("app-1");
+
+        TencentMeetingUserMapping mapping = new TencentMeetingUserMapping();
+        mapping.setMeetingUserId("host-1");
+        mapping.setCrmUserId(9L);
+        mapping.setAuthStatus("ACTIVE");
+        mapping.setStatus(1);
+        TencentMeetingOAuthCredential credential = new TencentMeetingOAuthCredential(config, mapping, "access-token");
+        when(userMappingMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(mapping));
+        when(tokenProvider.credential(config, mapping)).thenReturn(credential);
+        when(apiGateway.listUpcomingMeetings(credential))
+                .thenThrow(new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "source ip not in whitelist"));
+
+        TencentMeetingSyncRunBO runBO = new TencentMeetingSyncRunBO();
+        runBO.setSyncDays(30);
+        runBO.setSyncRecordings(false);
+        TencentMeetingSyncStatusVO status = service.runSync(config, runBO);
+
+        assertThat(status.getLastSyncStatus()).isEqualTo("failed");
+        assertThat(status.getLastSyncError()).contains("source ip not in whitelist");
+        assertThat(status.getFetchedCount()).isZero();
+        assertThat(status.getSavedCount()).isZero();
+        assertThat(status.getFailedCount()).isEqualTo(1);
+
+        ArgumentCaptor<TencentMeetingUserMapping> mappingCaptor = ArgumentCaptor.forClass(TencentMeetingUserMapping.class);
+        verify(userMappingMapper).updateById(mappingCaptor.capture());
+        assertThat(mappingCaptor.getValue().getLastSyncError()).contains("source ip not in whitelist");
+
+        ArgumentCaptor<TencentMeetingSyncLog> logCaptor = ArgumentCaptor.forClass(TencentMeetingSyncLog.class);
+        verify(syncLogMapper).updateById(logCaptor.capture());
+        assertThat(logCaptor.getValue().getStatus()).isEqualTo("failed");
+        assertThat(logCaptor.getValue().getErrorMessage()).contains("source ip not in whitelist");
+    }
+
     @SuppressWarnings("unchecked")
     private static <T> T mapper(TencentMeetingSyncServiceImpl service, String fieldName) {
         return (T) ReflectionTestUtils.getField(service, fieldName);
@@ -210,6 +383,43 @@ class TencentMeetingSyncServiceTest {
         raw.put("join_time", "1710000001");
         raw.put("left_time", "1710003500");
         return raw;
+    }
+
+    private static JSONObject historyMeetingWithoutCreatorJson() {
+        JSONObject raw = new JSONObject();
+        raw.put("meeting_id", "meeting-actual");
+        raw.put("meeting_code", "987654321");
+        raw.put("subject", "Actual duration meeting");
+        raw.put("status", "MEETING_STATE_ENDED");
+        raw.put("start_time", "1710000000");
+        raw.put("end_time", "1710003600");
+        return raw;
+    }
+
+    private static JSONObject upcomingMeetingJson() {
+        JSONObject raw = new JSONObject();
+        raw.put("meeting_id", "meeting-upcoming");
+        raw.put("meeting_code", "456789123");
+        raw.put("subject", "Upcoming customer meeting");
+        raw.put("status", "MEETING_STATE_INIT");
+        raw.put("start_time", "1710100000");
+        raw.put("end_time", "1710103600");
+        raw.put("creator_userid", "host-1");
+        raw.put("creator_name", "Host User");
+        return raw;
+    }
+
+    private static JSONObject participantJson(String userId, String userName, String joinTime, String leftTime) {
+        JSONObject raw = new JSONObject();
+        raw.put("userid", userId);
+        raw.put("user_name", userName);
+        raw.put("join_time", joinTime);
+        raw.put("left_time", leftTime);
+        return raw;
+    }
+
+    private static String base64(String value) {
+        return Base64.getEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
     }
 
     private static JSONObject recordingJson() {

@@ -28,7 +28,7 @@
           <span class="material-symbols-outlined mr-1 text-[18px]">link_off</span>
           取消授权
         </el-button>
-        <el-button :loading="syncing" @click="handleSync">
+        <el-button :disabled="!oauthStatus.authorized" :loading="syncing" @click="handleSync">
           <span class="material-symbols-outlined mr-1 text-[18px]">sync</span>
           同步我的会议
         </el-button>
@@ -121,9 +121,20 @@
             <span v-else class="tm-customer">未关联</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="292" fixed="right" align="right">
+        <el-table-column label="操作" width="360" fixed="right" align="right">
           <template #default="{ row }">
             <div class="tm-row-actions">
+              <button
+                v-if="canOpenMeeting(row)"
+                type="button"
+                class="tm-row-action is-open"
+                :disabled="isOpeningMeeting(row)"
+                title="进入腾讯会议"
+                @click.stop="openMeeting(row)"
+              >
+                <span class="material-symbols-outlined">{{ isOpeningMeeting(row) ? 'progress_activity' : 'login' }}</span>
+                入会
+              </button>
               <button
                 v-if="canCopyMeetingLink(row)"
                 type="button"
@@ -343,6 +354,7 @@ import {
   getTencentMeetingOAuthStatus,
   getTencentMeetingSyncStatus,
   queryTencentMeetings,
+  refreshTencentMeetingJoinUrl,
   runTencentMeetingSync,
   unbindTencentMeetingOAuth,
   unbindTencentMeeting
@@ -366,6 +378,7 @@ const total = ref(0)
 const loading = ref(false)
 const syncing = ref(false)
 const meetings = ref<TencentMeetingVO[]>([])
+const openingMeetingIds = ref<Set<string>>(new Set())
 const syncStatus = ref('')
 const syncError = ref('')
 const oauthLoading = ref(false)
@@ -485,12 +498,20 @@ async function handleOAuthUnbind() {
 }
 
 async function handleSync() {
+  if (!oauthStatus.value.authorized) {
+    ElMessage.warning('请先授权腾讯会议账号')
+    return
+  }
   syncing.value = true
   try {
     const data = await runTencentMeetingSync({ syncDays: 30, syncRecordings: true, syncTranscripts: true })
     syncStatus.value = data.lastSyncStatus || ''
     syncError.value = data.lastSyncError || ''
-    ElMessage.success('同步已完成')
+    if (data.lastSyncStatus === 'failed') {
+      ElMessage.error(data.lastSyncError || '同步失败')
+      return
+    }
+    ElMessage.success(`同步已完成，获取 ${data.fetchedCount || 0} 场会议`)
     await loadMeetings()
   } finally {
     syncing.value = false
@@ -552,6 +573,64 @@ async function copyRowMeetingLink(meeting: TencentMeetingVO) {
   const link = getMeetingJoinUrl(meeting)
   if (!link) return
   await copyText(link, '会议链接已复制')
+}
+
+async function openMeeting(meeting: TencentMeetingVO) {
+  let link = getMeetingJoinUrl(meeting)
+  if (link) {
+    openMeetingUrl(link)
+    return
+  }
+
+  setOpeningMeeting(meeting.id, true)
+  try {
+    const refreshed = await refreshTencentMeetingJoinUrl(meeting.id)
+    updateMeetingRow(refreshed)
+    link = getMeetingJoinUrl(refreshed)
+    if (!link) {
+      ElMessage.warning('腾讯会议未返回入会链接，请复制会议号在腾讯会议中加入')
+      return
+    }
+    openMeetingUrl(link)
+  } catch (err) {
+    console.error('Open Tencent Meeting failed:', err)
+    ElMessage.error('获取入会链接失败，请确认当前账号已授权并有权限查看该会议')
+  } finally {
+    setOpeningMeeting(meeting.id, false)
+  }
+}
+
+function openMeetingUrl(link: string) {
+  const opened = window.open(link, '_blank')
+  if (opened) {
+    opened.opener = null
+    return
+  }
+  void copyText(link, '会议链接已复制')
+  ElMessage.warning('浏览器拦截了新窗口，已为你复制入会链接')
+}
+
+function updateMeetingRow(updated: TencentMeetingVO) {
+  const index = meetings.value.findIndex(item => item.id === updated.id)
+  if (index >= 0) {
+    meetings.value.splice(index, 1, { ...meetings.value[index], ...updated })
+  }
+  if (detail.value?.id === updated.id) {
+    detail.value = { ...detail.value, ...updated }
+  }
+  if (createdMeeting.value?.id === updated.id) {
+    createdMeeting.value = { ...createdMeeting.value, ...updated }
+  }
+}
+
+function setOpeningMeeting(id: string, opening: boolean) {
+  const next = new Set(openingMeetingIds.value)
+  if (opening) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  openingMeetingIds.value = next
 }
 
 async function copyMeetingInfo() {
@@ -636,12 +715,14 @@ async function handleUnbind(row: TencentMeetingVO) {
 
 function statusLabel(value?: string) {
   if (value === 'not_started') return '未开始'
+  if (value === 'started') return '进行中'
   if (value === 'ended') return '已结束'
   if (value === 'cancelled') return '已取消'
   return value || '-'
 }
 
 function statusClass(value?: string) {
+  if (value === 'started') return 'started'
   if (value === 'ended') return 'ended'
   if (value === 'cancelled') return 'cancelled'
   if (value === 'not_started') return 'scheduled'
@@ -649,7 +730,21 @@ function statusClass(value?: string) {
 }
 
 function canCopyMeetingLink(meeting: TencentMeetingVO) {
-  return meeting.status === 'not_started' && Boolean(getMeetingJoinUrl(meeting))
+  return canOpenMeeting(meeting) && Boolean(getMeetingJoinUrl(meeting))
+}
+
+function canOpenMeeting(meeting: TencentMeetingVO) {
+  return !isClosedMeetingStatus(meeting.status)
+}
+
+function isClosedMeetingStatus(value?: string) {
+  const status = (value || '').trim().toLowerCase()
+  return status === 'ended' || status === 'cancelled' || status.includes('meeting_state_ended')
+    || status.includes('cancel') || status.includes('结束') || status.includes('取消')
+}
+
+function isOpeningMeeting(meeting: TencentMeetingVO) {
+  return openingMeetingIds.value.has(meeting.id)
 }
 
 function getMeetingJoinUrl(meeting: TencentMeetingVO) {
@@ -999,9 +1094,39 @@ function formatDuration(seconds?: number) {
   color: #2854c5;
 }
 
+.tm-row-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .tm-row-action.is-primary {
   border-color: #c7d2fe;
   color: #2854c5;
+}
+
+.tm-row-action.is-open {
+  border-color: #9fc7ff;
+  color: #165dba;
+}
+
+.tm-row-action.is-open:hover:not(:disabled) {
+  border-color: #72a8f5;
+  background: #eff6ff;
+  color: #0f4d9a;
+}
+
+.tm-row-action.is-open .material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 20;
+}
+
+.tm-row-action.is-open:disabled .material-symbols-outlined {
+  animation: tm-row-action-spin 1s linear infinite;
+}
+
+@keyframes tm-row-action-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .tm-row-action.is-copy {

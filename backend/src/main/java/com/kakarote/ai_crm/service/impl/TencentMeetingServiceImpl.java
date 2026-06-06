@@ -10,6 +10,7 @@ import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.auth.DataPermissionContext;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
+import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingBindBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingCandidateQueryBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingCreateBO;
@@ -17,6 +18,7 @@ import com.kakarote.ai_crm.entity.BO.TencentMeetingQueryBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingSyncRunBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingUnbindBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
+import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.PO.TencentMeeting;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingCorpConfig;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingCustomerBinding;
@@ -28,6 +30,7 @@ import com.kakarote.ai_crm.entity.PO.TencentMeetingUserMapping;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingCandidateVO;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingCustomerBindingVO;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingDetailVO;
+import com.kakarote.ai_crm.entity.VO.TencentMeetingOAuthStatusVO;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingParticipantVO;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingRecordingVO;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingSyncStatusVO;
@@ -53,6 +56,8 @@ import java.util.List;
 
 @Service
 public class TencentMeetingServiceImpl {
+
+    private static final String AUTH_REQUIRED_ERROR = "请先授权腾讯会议账号";
 
     @Autowired
     private TencentMeetingCorpConfigMapper configMapper;
@@ -124,6 +129,7 @@ public class TencentMeetingServiceImpl {
             status.setSavedCount(latest.getSavedCount());
             status.setFailedCount(latest.getFailedCount());
         }
+        clearStaleAuthRequiredFailure(status);
         return status;
     }
 
@@ -231,6 +237,33 @@ public class TencentMeetingServiceImpl {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public TencentMeetingVO refreshJoinUrl(Long id) {
+        TencentMeeting meeting = requireMeetingAccess(id);
+        if (StrUtil.isBlank(meeting.getMeetingId())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Tencent meeting id is missing");
+        }
+        JSONObject raw = parseRawJson(meeting.getRawJson());
+        if (StrUtil.isNotBlank(firstText(raw,
+                "join_url", "joinUrl", "meeting_url", "meetingUrl", "participant_join_url",
+                "host_join_url", "hostJoinUrl", "host_join_url_wx", "hostMeetingUrl"))) {
+            return toMeetingVO(meeting);
+        }
+
+        TencentMeetingCorpConfig config = requireConfig();
+        TencentMeetingUserMapping mapping = oauthService.requireCurrentAuthorizedAccount(config);
+        TencentMeetingOAuthCredential credential = tokenProvider.credential(config, mapping);
+        JSONObject remoteDetail = syncService.getMeetingDetail(credential, meeting.getMeetingId());
+        JSONObject merged = raw == null ? new JSONObject() : raw;
+        if (remoteDetail != null) {
+            merged.putAll(remoteDetail);
+        }
+        meeting.setRawJson(merged.toJSONString());
+        meeting.setSyncedAt(new Date());
+        meetingMapper.updateById(meeting);
+        return toMeetingVO(meeting);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public TencentMeetingVO createMeeting(TencentMeetingCreateBO createBO) {
         TencentMeetingCreateBO actual = createBO == null ? new TencentMeetingCreateBO() : createBO;
         if (StrUtil.isBlank(actual.getSubject())) {
@@ -253,7 +286,7 @@ public class TencentMeetingServiceImpl {
         meeting.setSubject(StrUtil.blankToDefault(firstText(rawMeeting, "subject", "meeting_subject", "title"), actual.getSubject()));
         meeting.setStatus("not_started");
         meeting.setCreatorUserId(mapping.getMeetingUserId());
-        meeting.setCreatorName(StrUtil.blankToDefault(mapping.getUserName(), mapping.getMeetingUserId()));
+        meeting.setCreatorName(resolveCurrentCreatorName(mapping));
         meeting.setCrmCreatorUserId(mapping.getCrmUserId());
         meeting.setStartTime(actual.getStartTime());
         meeting.setEndTime(actual.getEndTime());
@@ -329,6 +362,27 @@ public class TencentMeetingServiceImpl {
         return configMapper.selectLatestOAuthConfigIgnoreTenant();
     }
 
+    private void clearStaleAuthRequiredFailure(TencentMeetingSyncStatusVO status) {
+        if (status == null || !isAuthRequiredError(status.getLastSyncError())) {
+            return;
+        }
+        try {
+            TencentMeetingOAuthStatusVO oauthStatus = oauthService.getStatus();
+            if (!Boolean.TRUE.equals(oauthStatus.getAuthorized())) {
+                return;
+            }
+        } catch (Exception ignored) {
+            return;
+        }
+        status.setLastSyncStatus(null);
+        status.setLastSyncError(null);
+        status.setFailedCount(0);
+    }
+
+    private boolean isAuthRequiredError(String errorMessage) {
+        return StrUtil.isNotBlank(errorMessage) && errorMessage.contains(AUTH_REQUIRED_ERROR);
+    }
+
     private TencentMeetingCorpConfig requireConfig() {
         TencentMeetingCorpConfig config = findConfig();
         if (config == null || StrUtil.isBlank(config.getAppId()) || StrUtil.isBlank(config.getSdkId())) {
@@ -371,6 +425,25 @@ public class TencentMeetingServiceImpl {
             body.put("sdk_id", config.getSdkId());
         }
         return body;
+    }
+
+    private String resolveCurrentCreatorName(TencentMeetingUserMapping mapping) {
+        if (mapping != null && StrUtil.isNotBlank(mapping.getUserName()) && !mapping.getUserName().equals(mapping.getMeetingUserId())) {
+            return mapping.getUserName().trim();
+        }
+        LoginUser loginUser = UserUtil.getLoginUser();
+        ManagerUser user = loginUser == null ? null : loginUser.getUser();
+        String displayName = user == null ? null : firstNotBlank(user.getRealname(), user.getUsername(), user.getMobile(), user.getEmail());
+        return StrUtil.blankToDefault(displayName, mapping == null ? null : mapping.getMeetingUserId());
+    }
+
+    private String firstNotBlank(String... values) {
+        for (String value : values) {
+            if (StrUtil.isNotBlank(value)) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private String firstText(JSONObject raw, String... keys) {
