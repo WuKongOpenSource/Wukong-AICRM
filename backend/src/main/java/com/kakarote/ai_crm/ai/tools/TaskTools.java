@@ -4,10 +4,13 @@ import cn.hutool.core.util.StrUtil;
 import com.kakarote.ai_crm.ai.context.AiContextHolder;
 import com.kakarote.ai_crm.ai.tools.support.AiToolCustomerResolver;
 import com.kakarote.ai_crm.ai.tools.support.AiToolPermission;
+import com.kakarote.ai_crm.entity.BO.ProjectBO;
 import com.kakarote.ai_crm.entity.BO.TaskAddBO;
 import com.kakarote.ai_crm.entity.BO.TaskUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
+import com.kakarote.ai_crm.entity.VO.ProjectVO;
 import com.kakarote.ai_crm.entity.VO.TaskVO;
+import com.kakarote.ai_crm.service.IProjectService;
 import com.kakarote.ai_crm.service.ITaskService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
@@ -30,6 +33,9 @@ public class TaskTools {
 
     @Autowired
     private AiToolCustomerResolver customerResolver;
+
+    @Autowired
+    private IProjectService projectService;
 
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
@@ -106,6 +112,12 @@ public class TaskTools {
             customerIdStr, title, customerName, priority, dueDate);
 
         try {
+            Long currentProjectId = AiContextHolder.getCurrentProjectId();
+            if (currentProjectId != null) {
+                return createProjectTaskFromCurrentContext(
+                    currentProjectId, customerIdStr, title, description, customerName, priority, dueDate);
+            }
+
             Long customerId = null;
             String matchedCompanyName = null;
             Long currentRelationId = AiContextHolder.getCurrentRelationId();
@@ -171,9 +183,40 @@ public class TaskTools {
         }
     }
 
-    /**
-     * 更新任务。
-     */
+    private String createProjectTaskFromCurrentContext(
+            Long projectId,
+            String customerIdStr,
+            String title,
+            String description,
+            String customerName,
+            String priority,
+            String dueDate) throws Exception {
+        ProjectBO.TaskSave bo = new ProjectBO.TaskSave();
+        bo.setTitle(title);
+        bo.setDescription(description);
+        bo.setCustomerId(parseOptionalLong(customerIdStr));
+        bo.setCustomerName(customerName);
+        bo.setPriority(priority != null ? priority : "medium");
+        if (hasTextValue(dueDate)) {
+            bo.setDueDate(dateFormat.parse(dueDate));
+        }
+        bo.setGeneratedByAi(true);
+        bo.setAiSourceText("由项目 AI 对话创建");
+
+        ProjectVO updated = projectService.addTask(projectId, bo);
+        return "项目任务创建成功。\n项目: " + StrUtil.blankToDefault(updated.getName(), String.valueOf(projectId))
+            + "\n- 任务: " + title
+            + "\n- 优先级: " + getPriorityLabel(priority != null ? priority : "medium")
+            + (hasTextValue(dueDate) ? "\n- 截止日期: " + dueDate : "");
+    }
+
+    private Long parseOptionalLong(String value) {
+        if (!hasTextValue(value)) {
+            return null;
+        }
+        return Long.parseLong(StrUtil.trim(value));
+    }
+
     @Tool(description = "修改任务信息。当用户要修改、编辑任务的截止日期、标题、描述、优先级、状态等信息时调用。")
     @AiToolPermission(value = "task:edit", action = "编辑任务")
     public String updateTask(

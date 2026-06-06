@@ -443,6 +443,9 @@ export interface ProjectChatComposerSendPayload {
   attachments?: ChatAttachmentDTO[]
   attachmentVOs?: ChatAttachmentVO[]
   knowledgeIds?: string[]
+  modelProvider?: string
+  modelName?: string
+  modelSource?: string
 }
 
 type ComposerAttachmentPreviewItem =
@@ -677,7 +680,10 @@ async function handleSend() {
     content,
     attachments: attachmentDTOs,
     attachmentVOs,
-    knowledgeIds
+    knowledgeIds,
+    modelProvider: chatStore.selectedModel?.provider,
+    modelName: chatStore.selectedModel?.modelName,
+    modelSource: chatStore.selectedModel?.modelSource
   })
 }
 

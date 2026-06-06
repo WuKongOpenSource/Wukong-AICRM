@@ -206,6 +206,10 @@ export interface ChatSession {
   relationId?: string
   relationName?: string
   relationAvatarUrl?: string
+  projectId?: string
+  projectName?: string
+  projectTaskId?: string
+  projectTaskTitle?: string
   pinned?: boolean
   pinnedTime?: string
   createTime: string

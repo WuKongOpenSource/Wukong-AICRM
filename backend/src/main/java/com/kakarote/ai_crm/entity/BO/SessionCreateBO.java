@@ -22,6 +22,12 @@ public class SessionCreateBO {
     @Schema(description = "关联关系人ID")
     private Long relationId;
 
+    @Schema(description = "关联项目ID")
+    private Long projectId;
+
+    @Schema(description = "关联项目任务ID")
+    private Long projectTaskId;
+
     @Schema(description = "会话标题")
     private String title;
 

@@ -100,10 +100,15 @@
         <article
           v-for="project in projects"
           :key="project.projectId"
-          class="group rounded-[8px] border border-[var(--wk-input-border)] bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-slate-200/60"
+          class="group cursor-pointer rounded-[8px] border border-[var(--wk-input-border)] bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-slate-200/60"
+          role="button"
+          tabindex="0"
+          @click="goToProject(project.projectId)"
+          @keydown.enter.prevent="goToProject(project.projectId)"
+          @keydown.space.prevent="goToProject(project.projectId)"
         >
           <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0 flex-1 cursor-pointer" @click="goToProject(project.projectId)">
+            <div class="min-w-0 flex-1">
               <div class="flex min-w-0 items-center gap-2">
                 <h3 class="truncate text-base font-bold text-slate-900 transition-colors group-hover:text-primary">
                   {{ project.name }}
@@ -121,7 +126,7 @@
               type="button"
               class="flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-50 hover:text-primary"
               title="编辑项目"
-              @click="openEditDialog(project)"
+              @click.stop="openEditDialog(project)"
             >
               <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
             </button>
@@ -153,7 +158,7 @@
             <button
               type="button"
               class="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
-              @click="goToProject(project.projectId)"
+              @click.stop="goToProject(project.projectId)"
             >
               进入项目
               <span class="material-symbols-outlined text-[16px] leading-none">arrow_forward</span>
@@ -213,7 +218,7 @@
                       type="button"
                       class="flex size-8 items-center justify-center rounded-lg text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-bg-surface-hover)] hover:text-primary"
                       title="编辑项目"
-                      @click="openEditDialog(project)"
+                      @click.stop="openEditDialog(project)"
                     >
                       <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
                     </button>
@@ -432,7 +437,7 @@ function canEditProject(project: ProjectEntity) {
 }
 
 function goToProject(projectId: string) {
-  router.push({ name: 'ProjectDetail', params: { id: projectId }, query: { view: 'board' } })
+  router.push({ name: 'ProjectDetail', params: { id: projectId }, query: { view: 'ai' } })
 }
 </script>
 

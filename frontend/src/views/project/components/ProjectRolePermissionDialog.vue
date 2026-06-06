@@ -27,7 +27,7 @@
       </div>
     </template>
 
-    <div class="grid min-h-[480px] grid-cols-1 gap-0 bg-white md:grid-cols-[220px_minmax(0,1fr)]" v-loading="loading">
+    <div class="grid min-h-0 grid-cols-1 gap-0 bg-white md:grid-cols-[220px_minmax(0,1fr)]" v-loading="loading">
       <aside class="border-b border-slate-200 bg-slate-50/70 p-4 md:border-b-0 md:border-r">
         <div class="space-y-1">
           <button
@@ -231,16 +231,58 @@ async function handleSave() {
 </script>
 
 <style scoped>
-.wk-project-role-permission-dialog :deep(.el-dialog__header) {
+:global(.wk-project-role-permission-dialog.el-dialog) {
+  display: flex;
+  height: min(760px, calc(100dvh - 32px)) !important;
+  max-height: min(760px, calc(100dvh - 32px)) !important;
+  flex-direction: column;
+  overflow: hidden;
+  margin: 0 auto !important;
+}
+
+:global(.wk-project-role-permission-dialog.el-dialog .el-dialog__header) {
+  flex: 0 0 auto;
   padding: 22px 24px 14px;
   margin-right: 0;
 }
 
-.wk-project-role-permission-dialog :deep(.el-dialog__body) {
-  padding: 0;
+:global(.wk-project-role-permission-dialog.el-dialog .el-dialog__body) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 !important;
 }
 
-.wk-project-role-permission-dialog :deep(.el-dialog__footer) {
-  padding: 14px 24px 22px;
+:global(.wk-project-role-permission-dialog.el-dialog .el-dialog__footer) {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--wk-border-subtle);
+  background: #fff;
+  padding: 14px 24px 22px !important;
+}
+
+:global(.el-overlay:has(.wk-project-role-permission-dialog)),
+:global(.el-overlay-dialog:has(.wk-project-role-permission-dialog)) {
+  overflow: hidden;
+}
+
+:global(.el-overlay-dialog:has(.wk-project-role-permission-dialog)) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 16px;
+}
+
+@media (max-width: 767px) {
+  :global(.wk-project-role-permission-dialog.el-dialog) {
+    height: calc(100dvh - 24px) !important;
+    max-height: calc(100dvh - 24px) !important;
+    margin: 0 auto !important;
+  }
+
+  :global(.el-overlay-dialog:has(.wk-project-role-permission-dialog)) {
+    padding: 12px;
+  }
 }
 </style>

@@ -6,6 +6,7 @@ import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kakarote.ai_crm.ai.AiMode;
@@ -37,6 +38,7 @@ import com.kakarote.ai_crm.entity.VO.AiModelOptionVO;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
 import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
+import com.kakarote.ai_crm.entity.VO.ProjectVO;
 import com.kakarote.ai_crm.mapper.ChatMessageMapper;
 import com.kakarote.ai_crm.mapper.ChatSessionMapper;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
@@ -53,6 +55,7 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.content.Media;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.MimeType;
@@ -149,6 +152,12 @@ public class ChatServiceImpl implements IChatService {
 
     @Autowired
     private AiToolExecutionRecorder aiToolExecutionRecorder;
+
+    @Autowired
+    private IProjectService projectService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private static final int MAX_EXTRACTED_TEXT_LENGTH = 3000;
     private static final String CHAT_ERROR_MESSAGE = "抱歉，处理您的请求时发生错误。请稍后重试。";
@@ -336,6 +345,8 @@ public class ChatServiceImpl implements IChatService {
         Customer boundCustomer = validateVisibleCustomer(sessionCreateBO.getCustomerId());
         ManagerUser boundEmployee = validateVisibleEmployee(sessionCreateBO.getEmployeeId());
         Relation boundRelation = validateVisibleRelation(sessionCreateBO.getRelationId());
+        ProjectVO boundProject = validateVisibleProject(sessionCreateBO.getProjectId());
+        ProjectVO.ProjectTaskVO boundProjectTask = validateVisibleProjectTask(boundProject, sessionCreateBO.getProjectTaskId());
         int boundObjectCount = 0;
         if (boundCustomer != null) {
             boundObjectCount++;
@@ -344,6 +355,9 @@ public class ChatServiceImpl implements IChatService {
             boundObjectCount++;
         }
         if (boundRelation != null) {
+            boundObjectCount++;
+        }
+        if (boundProject != null) {
             boundObjectCount++;
         }
         if (boundObjectCount > 1) {
@@ -359,22 +373,30 @@ public class ChatServiceImpl implements IChatService {
         if (boundRelation != null && StrUtil.isBlank(appCode)) {
             appCode = ChatApplicationCodes.RELATION;
         }
+        if (boundProject != null) {
+            appCode = ChatApplicationCodes.PROJECT;
+        }
 
         ChatSession session = new ChatSession();
         session.setTitle(StrUtil.blankToDefault(sessionCreateBO.getTitle(),
             boundCustomer != null ? boundCustomer.getCompanyName()
                 : boundEmployee != null ? StrUtil.blankToDefault(boundEmployee.getRealname(), boundEmployee.getUsername())
                 : boundRelation != null ? boundRelation.getName()
+                : boundProjectTask != null ? boundProjectTask.getTitle()
+                : boundProject != null ? boundProject.getName()
                 : sessionCreateBO.getTitle()));
         session.setAgentId(sessionCreateBO.getAgentId());
         session.setCustomerId(sessionCreateBO.getCustomerId());
         session.setEmployeeId(sessionCreateBO.getEmployeeId());
         session.setRelationId(sessionCreateBO.getRelationId());
+        session.setProjectId(sessionCreateBO.getProjectId());
+        session.setProjectTaskId(sessionCreateBO.getProjectTaskId());
         session.setAppCode(chatApplicationRegistry.normalize(appCode));
         session.setUserId(UserUtil.getUserId());
         session.setCreateTime(new Date());
         session.setUpdateTime(new Date());
         chatSessionMapper.insert(session);
+        migrateProjectLegacyMessagesIfNeeded(session);
         return session.getSessionId();
     }
 
@@ -395,6 +417,7 @@ public class ChatServiceImpl implements IChatService {
         populateSessionCustomerFields(voList);
         populateSessionEmployeeFields(voList);
         populateSessionRelationFields(voList);
+        populateSessionProjectFields(voList);
         return voList;
     }
 
@@ -445,6 +468,7 @@ public class ChatServiceImpl implements IChatService {
      */
     @Override
     public List<ChatMessageVO> getMessageList(Long sessionId) {
+        migrateProjectLegacyMessagesIfNeeded(getRequiredSession(sessionId));
         List<ChatMessage> messages = chatMessageMapper.selectList(
             new LambdaQueryWrapper<ChatMessage>()
                 .eq(ChatMessage::getSessionId, sessionId)
@@ -529,16 +553,21 @@ public class ChatServiceImpl implements IChatService {
         Long currentTenantId = UserUtil.getTenantId();
         ChatSession session = getRequiredSession(sessionId);
         ChatApplicationDefinition application = resolveChatApplication(sendBO, session);
+        session = bindProjectContextFromSendIfNeeded(sendBO, session, application);
         persistSessionAppCodeIfNeeded(session, application.code());
         Customer boundCustomer = resolveSessionCustomer(session);
         ManagerUser boundEmployee = resolveSessionEmployee(session);
         Relation boundRelation = resolveSessionRelation(session);
+        ProjectVO boundProject = resolveSessionProject(session);
+        ProjectVO.ProjectTaskVO boundProjectTask = resolveSessionProjectTask(boundProject, session.getProjectTaskId());
         if (currentUserId != null) {
             // Spring Security 上下文不会自动透传到 Reactor 线程，这里先把会话级上下文放进自定义 Holder 供工具调用读取。
             AiContextHolder.setContext(sessionId, currentUserId, currentTenantId,
-                session.getCustomerId(), session.getEmployeeId(), session.getRelationId());
-            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}, relationId={}",
-                sessionId, currentUserId, currentTenantId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId());
+                session.getCustomerId(), session.getEmployeeId(), session.getRelationId(),
+                session.getProjectId(), session.getProjectTaskId());
+            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}, relationId={}, projectId={}, projectTaskId={}",
+                sessionId, currentUserId, currentTenantId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId(),
+                session.getProjectId(), session.getProjectTaskId());
         }
 
         Long messageId = saveMessage(sessionId, "user", content);
@@ -591,6 +620,10 @@ public class ChatServiceImpl implements IChatService {
         String relationContext = buildBoundRelationContext(boundRelation);
         if (StrUtil.isNotBlank(relationContext)) {
             enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + relationContext;
+        }
+        String projectContext = buildBoundProjectContext(boundProject, boundProjectTask);
+        if (StrUtil.isNotBlank(projectContext)) {
+            enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + projectContext;
         }
 
         String enhancedContent = content;
@@ -774,15 +807,20 @@ public class ChatServiceImpl implements IChatService {
         Long currentTenantId = UserUtil.getTenantId();
         ChatSession session = getRequiredSession(sessionId);
         ChatApplicationDefinition application = resolveChatApplication(sendBO, session);
+        session = bindProjectContextFromSendIfNeeded(sendBO, session, application);
         persistSessionAppCodeIfNeeded(session, application.code());
         Customer boundCustomer = resolveSessionCustomer(session);
         ManagerUser boundEmployee = resolveSessionEmployee(session);
         Relation boundRelation = resolveSessionRelation(session);
+        ProjectVO boundProject = resolveSessionProject(session);
+        ProjectVO.ProjectTaskVO boundProjectTask = resolveSessionProjectTask(boundProject, session.getProjectTaskId());
         if (currentUserId != null) {
             AiContextHolder.setContext(sessionId, currentUserId, currentTenantId,
-                session.getCustomerId(), session.getEmployeeId(), session.getRelationId());
-            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}, relationId={}",
-                sessionId, currentUserId, currentTenantId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId());
+                session.getCustomerId(), session.getEmployeeId(), session.getRelationId(),
+                session.getProjectId(), session.getProjectTaskId());
+            log.debug("设置 AI 上下文: sessionId={}, userId={}, tenantId={}, customerId={}, employeeId={}, relationId={}, projectId={}, projectTaskId={}",
+                sessionId, currentUserId, currentTenantId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId(),
+                session.getProjectId(), session.getProjectTaskId());
         }
 
         Long messageId = saveMessage(sessionId, "user", content);
@@ -831,6 +869,10 @@ public class ChatServiceImpl implements IChatService {
         String relationContext = buildBoundRelationContext(boundRelation);
         if (StrUtil.isNotBlank(relationContext)) {
             enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + relationContext;
+        }
+        String projectContext = buildBoundProjectContext(boundProject, boundProjectTask);
+        if (StrUtil.isNotBlank(projectContext)) {
+            enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + projectContext;
         }
 
         String enhancedContent = content;
@@ -1474,6 +1516,40 @@ public class ChatServiceImpl implements IChatService {
         return session == null ? null : validateVisibleRelation(session.getRelationId());
     }
 
+    private ProjectVO validateVisibleProject(Long projectId) {
+        if (projectId == null) {
+            return null;
+        }
+        return projectService.getProject(projectId);
+    }
+
+    private ProjectVO.ProjectTaskVO validateVisibleProjectTask(ProjectVO project, Long taskId) {
+        if (taskId == null) {
+            return null;
+        }
+        if (project == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "项目任务会话必须绑定项目");
+        }
+        return project.getTasks().stream()
+            .filter(task -> Objects.equals(task.getTaskId(), taskId))
+            .findFirst()
+            .orElseThrow(() -> new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "项目任务不存在或无权限访问"));
+    }
+
+    private ProjectVO resolveSessionProject(ChatSession session) {
+        return session == null ? null : validateVisibleProject(session.getProjectId());
+    }
+
+    private ProjectVO.ProjectTaskVO resolveSessionProjectTask(ProjectVO project, Long taskId) {
+        if (project == null || taskId == null) {
+            return null;
+        }
+        return project.getTasks().stream()
+            .filter(task -> Objects.equals(task.getTaskId(), taskId))
+            .findFirst()
+            .orElse(null);
+    }
+
     private void populateSessionCustomerFields(List<ChatSessionVO> sessions) {
         if (CollUtil.isEmpty(sessions)) {
             return;
@@ -1549,6 +1625,55 @@ public class ChatServiceImpl implements IChatService {
             session.setRelationName(relation.getName());
             session.setRelationAvatarUrl(resolveRelationAvatarUrl(relation.getAvatar()));
         }
+    }
+
+    private void populateSessionProjectFields(List<ChatSessionVO> sessions) {
+        if (CollUtil.isEmpty(sessions)) {
+            return;
+        }
+        Set<Long> projectIds = sessions.stream()
+            .map(ChatSessionVO::getProjectId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        Set<Long> taskIds = sessions.stream()
+            .map(ChatSessionVO::getProjectTaskId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        if (projectIds.isEmpty() && taskIds.isEmpty()) {
+            return;
+        }
+
+        Map<Long, String> projectNames = projectIds.isEmpty()
+            ? Collections.emptyMap()
+            : queryIdNameMap("crm_project", "project_id", "name", projectIds);
+        Map<Long, String> taskTitles = taskIds.isEmpty()
+            ? Collections.emptyMap()
+            : queryIdNameMap("crm_task", "task_id", "title", taskIds);
+
+        for (ChatSessionVO session : sessions) {
+            if (session.getProjectId() != null) {
+                session.setProjectName(projectNames.get(session.getProjectId()));
+            }
+            if (session.getProjectTaskId() != null) {
+                session.setProjectTaskTitle(taskTitles.get(session.getProjectTaskId()));
+            }
+        }
+    }
+
+    private Map<Long, String> queryIdNameMap(String tableName, String idColumn, String nameColumn, Set<Long> ids) {
+        if (ids.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        String placeholders = ids.stream().map(id -> "?").collect(Collectors.joining(","));
+        String sql = String.format("SELECT %s AS id, %s AS name FROM %s WHERE %s IN (%s)",
+            idColumn, nameColumn, tableName, idColumn, placeholders);
+        return jdbcTemplate.query(sql, ids.toArray(), rs -> {
+            Map<Long, String> result = new HashMap<>();
+            while (rs.next()) {
+                result.put(rs.getLong("id"), rs.getString("name"));
+            }
+            return result;
+        });
     }
 
     private String resolveRelationAvatarUrl(String avatar) {
@@ -1635,6 +1760,61 @@ public class ChatServiceImpl implements IChatService {
         return builder.toString();
     }
 
+    private String buildBoundProjectContext(ProjectVO project, ProjectVO.ProjectTaskVO task) {
+        if (project == null) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        builder.append("[当前绑定项目]\n")
+            .append("- projectId: ").append(project.getProjectId()).append("\n")
+            .append("- 项目名称: ").append(StrUtil.blankToDefault(project.getName(), "未命名项目")).append("\n");
+        appendProjectContextLine(builder, "项目状态", project.getStatus());
+        appendProjectContextLine(builder, "负责人", project.getOwnerName());
+        appendProjectContextLine(builder, "关联客户", project.getCustomerName());
+        if (project.getDueDate() != null) {
+            builder.append("- 项目截止时间: ").append(project.getDueDate()).append("\n");
+        }
+        if (task != null) {
+            builder.append("\n[当前绑定项目任务]\n")
+                .append("- taskId: ").append(task.getTaskId()).append("\n")
+                .append("- 任务标题: ").append(StrUtil.blankToDefault(task.getTitle(), "未命名任务")).append("\n");
+            appendProjectContextLine(builder, "任务状态", task.getStatus());
+            appendProjectContextLine(builder, "优先级", task.getPriority());
+            appendProjectContextLine(builder, "负责人", task.getOwnerName());
+            appendProjectContextLine(builder, "关联客户", StrUtil.blankToDefault(task.getCustomerName(), project.getCustomerName()));
+            if (task.getDueDate() != null) {
+                builder.append("- 任务截止时间: ").append(task.getDueDate()).append("\n");
+            }
+            appendProjectContextLine(builder, "任务描述", task.getDescription());
+        } else if (CollUtil.isNotEmpty(project.getTasks())) {
+            builder.append("\n[当前项目可见任务摘要]\n");
+            project.getTasks().stream().limit(20).forEach(item -> {
+                builder.append("- taskId=").append(item.getTaskId())
+                    .append(", 标题=").append(StrUtil.blankToDefault(item.getTitle(), "未命名任务"));
+                if (StrUtil.isNotBlank(item.getStatus())) {
+                    builder.append(", 状态=").append(item.getStatus());
+                }
+                if (StrUtil.isNotBlank(item.getPriority())) {
+                    builder.append(", 优先级=").append(item.getPriority());
+                }
+                if (item.getDueDate() != null) {
+                    builder.append(", 截止=").append(item.getDueDate());
+                }
+                builder.append("\n");
+            });
+        }
+        builder.append("\n当用户未显式指定其他项目时，项目工具默认围绕该 projectId 执行；")
+            .append("当当前绑定了项目任务且用户说“这个任务/当前任务/该任务”时，任务工具默认围绕该 taskId 执行。")
+            .append("项目或任务的数据增删改查必须调用 ProjectTools，只有工具结果确认成功后才能回复成功。");
+        return builder.toString();
+    }
+
+    private void appendProjectContextLine(StringBuilder builder, String label, String value) {
+        if (StrUtil.isNotBlank(value)) {
+            builder.append("- ").append(label).append(": ").append(value).append("\n");
+        }
+    }
+
     private void appendCustomerContextLine(StringBuilder builder, String label, String value) {
         if (StrUtil.isNotBlank(value)) {
             builder.append("- ").append(label).append(": ").append(value).append("\n");
@@ -1706,6 +1886,9 @@ public class ChatServiceImpl implements IChatService {
         if (StrUtil.isBlank(requestedAppCode) && Boolean.TRUE.equals(sendBO.getRagEnabled())) {
             requestedAppCode = ChatApplicationCodes.KNOWLEDGE;
         }
+        if (StrUtil.isBlank(requestedAppCode) && sendBO.getProjectId() != null) {
+            requestedAppCode = ChatApplicationCodes.PROJECT;
+        }
         if (StrUtil.isBlank(requestedAppCode) && session != null && StrUtil.isNotBlank(session.getAppCode())) {
             requestedAppCode = session.getAppCode();
         }
@@ -1719,6 +1902,30 @@ public class ChatServiceImpl implements IChatService {
             requestedAppCode = ChatApplicationCodes.RELATION;
         }
         return chatApplicationRegistry.resolve(requestedAppCode);
+    }
+
+    private ChatSession bindProjectContextFromSendIfNeeded(ChatSendBO sendBO, ChatSession session, ChatApplicationDefinition application) {
+        if (sendBO.getProjectId() == null || session == null || application == null
+            || !ChatApplicationCodes.PROJECT.equals(application.code())) {
+            return session;
+        }
+        if (session.getCustomerId() != null || session.getEmployeeId() != null || session.getRelationId() != null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前会话已绑定其他业务对象，不能切换为项目对话");
+        }
+
+        ProjectVO project = validateVisibleProject(sendBO.getProjectId());
+        validateVisibleProjectTask(project, sendBO.getProjectTaskId());
+        boolean changed = !Objects.equals(session.getProjectId(), sendBO.getProjectId())
+            || !Objects.equals(session.getProjectTaskId(), sendBO.getProjectTaskId());
+        if (!changed) {
+            return session;
+        }
+
+        session.setProjectId(sendBO.getProjectId());
+        session.setProjectTaskId(sendBO.getProjectTaskId());
+        session.setAppCode(ChatApplicationCodes.PROJECT);
+        chatSessionMapper.updateById(session);
+        return session;
     }
 
     private void persistSessionAppCodeIfNeeded(ChatSession session, String appCode) {
@@ -1763,6 +1970,82 @@ public class ChatServiceImpl implements IChatService {
             session.setUpdateTime(new Date());
             chatSessionMapper.updateById(session);
         }
+    }
+
+    private void migrateProjectLegacyMessagesIfNeeded(ChatSession session) {
+        if (session == null || session.getProjectId() == null || hasStandardMessages(session.getSessionId())) {
+            return;
+        }
+        List<LegacyProjectChatRow> rows = session.getProjectTaskId() != null
+            ? loadLegacyProjectTaskMessages(session.getProjectTaskId())
+            : loadLegacyProjectMessages(session.getProjectId());
+        if (CollUtil.isEmpty(rows)) {
+            return;
+        }
+        Long fallbackTenantId = session.getTenantId() != null ? session.getTenantId() : UserUtil.getTenantId();
+        for (LegacyProjectChatRow row : rows) {
+            insertMigratedChatMessage(
+                session.getSessionId(),
+                row.role(),
+                row.content(),
+                row.createTime(),
+                row.tenantId() != null ? row.tenantId() : fallbackTenantId
+            );
+        }
+    }
+
+    private boolean hasStandardMessages(Long sessionId) {
+        Long count = chatMessageMapper.selectCount(
+            new LambdaQueryWrapper<ChatMessage>()
+                .eq(ChatMessage::getSessionId, sessionId)
+        );
+        return count != null && count > 0;
+    }
+
+    private List<LegacyProjectChatRow> loadLegacyProjectMessages(Long projectId) {
+        return jdbcTemplate.query("""
+                SELECT tenant_id, role, content, create_time
+                FROM crm_project_chat_message
+                WHERE project_id = ?
+                ORDER BY create_time ASC
+                """, (rs, rowNum) -> new LegacyProjectChatRow(
+                rs.getObject("tenant_id", Long.class),
+                rs.getString("role"),
+                rs.getString("content"),
+                rs.getTimestamp("create_time")
+            ), projectId);
+    }
+
+    private List<LegacyProjectChatRow> loadLegacyProjectTaskMessages(Long taskId) {
+        return jdbcTemplate.query("""
+                SELECT tenant_id, role, content, create_time
+                FROM crm_project_task_chat_message
+                WHERE task_id = ?
+                ORDER BY create_time ASC
+                """, (rs, rowNum) -> new LegacyProjectChatRow(
+                rs.getObject("tenant_id", Long.class),
+                rs.getString("role"),
+                rs.getString("content"),
+                rs.getTimestamp("create_time")
+            ), taskId);
+    }
+
+    private void insertMigratedChatMessage(Long sessionId, String role, String content, Date createTime, Long tenantId) {
+        jdbcTemplate.update("""
+                INSERT INTO crm_chat_message(
+                    message_id, session_id, role, content, tokens_used, create_time, tenant_id
+                ) VALUES (?, ?, ?, ?, 0, ?, ?)
+                """,
+            IdWorker.getId(),
+            sessionId,
+            StrUtil.blankToDefault(role, "assistant"),
+            StrUtil.blankToDefault(content, ""),
+            createTime == null ? new Date() : createTime,
+            tenantId
+        );
+    }
+
+    private record LegacyProjectChatRow(Long tenantId, String role, String content, Date createTime) {
     }
 
     /**

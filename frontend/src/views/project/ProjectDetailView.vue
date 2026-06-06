@@ -156,6 +156,32 @@
                 <h2 class="min-w-0 truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">
                   {{ project.name }}
                 </h2>
+                <span class="inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-normal" :class="projectStatusClass(project.status)">
+                  {{ projectStatusLabel(project.status) }}
+                </span>
+                <button
+                  type="button"
+                  class="wk-project-chat-enter-button ml-auto"
+                  @click="switchProjectView('board')"
+                >
+                  <span>进入项目</span>
+                  <span class="material-symbols-outlined text-[16px] leading-none">arrow_forward</span>
+                </button>
+                <button
+                  v-if="showProjectLanePanelShell"
+                  type="button"
+                  class="group/sb-toggle relative flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef]"
+                  :aria-label="projectLanePanelVisible ? '收起项目侧栏' : '显示项目侧栏'"
+                  @click="projectLanePanelVisible = !projectLanePanelVisible"
+                >
+                  <WkIcon name="fold" :size="18" class="shrink-0" />
+                  <span
+                    class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/sb-toggle:opacity-100"
+                    role="tooltip"
+                  >
+                    {{ projectLanePanelVisible ? '收起项目侧栏' : '显示项目侧栏' }}
+                  </span>
+                </button>
               </div>
               <div class="flex min-w-0 items-center gap-2">
                 <span class="material-symbols-outlined inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-[#f4f4f4] text-[18px] text-[#5d5d5d]">
@@ -211,32 +237,102 @@
               </div>
             </div>
 
-            <div class="wk-project-chat-messages">
+            <div ref="projectChatMessagesContainerRef" class="wk-project-chat-messages">
               <div class="wk-project-chat-messages__inner px-4 md:px-8">
                 <div
-                  v-for="message in project.chatMessages"
-                  :key="message.messageId"
+                  v-for="message in projectChatMessages"
+                  :key="message.id"
                   class="wk-project-chat-message mx-auto message-enter"
                   :class="message.role === 'user' ? 'wk-project-chat-message--user' : 'wk-project-chat-message--assistant'"
                 >
-                  <div v-if="message.role === 'user'" class="group flex w-full flex-row-reverse pb-0">
+                  <div
+                    v-if="getDocumentAttachments(message).length > 0"
+                    class="mb-2 flex"
+                    :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
+                  >
+                    <div
+                      class="flex max-w-[80%] flex-wrap gap-2"
+                      :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
+                    >
+                      <a
+                        v-for="att in getDocumentAttachments(message)"
+                        :key="att.id || att.fileName"
+                        :href="att.accessUrl"
+                        target="_blank"
+                        class="group flex max-w-xs items-center gap-3 rounded-2xl border border-[#e5e5e5] bg-white px-3 py-2.5 transition-colors hover:bg-[#f7f7f7]"
+                      >
+                        <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#f4f4f4] text-[#5d5d5d]">
+                          <span class="material-symbols-outlined text-[20px] leading-none">description</span>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <div class="truncate text-sm font-medium text-[#0d0d0d]">{{ att.fileName }}</div>
+                          <div class="mt-0.5 text-xs text-[#8f8f8f]">{{ formatFileSize(att.fileSize) }}</div>
+                        </div>
+                        <span class="material-symbols-outlined text-[18px] leading-none text-[#b4b4b4] transition-colors group-hover:text-[#0d0d0d]">open_in_new</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  <div v-if="message.role === 'user'" class="group flex w-full flex-wrap flex-row-reverse pb-0">
                     <div class="min-w-[50px] max-w-[72%] space-y-3">
                       <div class="rounded-[24px] bg-[#f4f4f4] px-4 py-2.5 text-[15px] leading-7 text-[#0d0d0d]">
                         <div class="whitespace-pre-wrap">{{ message.content || '...' }}</div>
                       </div>
+                      <div v-if="getInlineAttachments(message).length > 0" class="flex flex-col items-end gap-2">
+                        <div v-for="att in getInlineAttachments(message)" :key="att.id || att.fileName">
+                          <el-image
+                            :src="att.accessUrl"
+                            :preview-src-list="[att.accessUrl]"
+                            fit="cover"
+                            class="max-h-[220px] rounded-2xl border border-[#e5e5e5]"
+                            :class="isMobile ? 'max-w-[200px]' : 'max-w-[300px]'"
+                            lazy
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div class="z-10 flex h-8 w-full basis-full items-center justify-end">
+                      <button
+                        type="button"
+                        class="pointer-events-none flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] opacity-0 transition-all hover:bg-[#f1f1f1] hover:text-[#0d0d0d] group-hover:pointer-events-auto group-hover:opacity-100"
+                        aria-label="复制内容"
+                        @click="copyMessageContent(message, 'user')"
+                      >
+                        <WkIcon name="copy" :box-size="18" class="shrink-0 material-symbols-outlined leading-none" title="复制内容" />
+                      </button>
                     </div>
                   </div>
                   <div v-else class="group flex w-full gap-3 pb-4 md:gap-4 md:pb-8">
                     <div class="min-w-0 flex-1 space-y-3">
                       <div class="max-w-full text-left text-[16px] leading-7 text-[#0d0d0d]">
-                        <div class="wk-markdown" v-html="renderAssistantMessage(message.content)" />
+                        <div
+                          class="wk-markdown"
+                          :class="{ 'wk-thinking-shimmer': message.isThinking && message.content.length === 0 }"
+                          v-html="renderAssistantMessage(message.content, message.isStreaming, message.isThinking)"
+                        />
+                        <div v-if="message.isThinking && message.content.length > 0" class="wk-thinking-shimmer mt-1 text-sm">
+                          <p>思考中</p>
+                        </div>
                       </div>
-                      <div v-if="message.content.trim()" class="flex h-8 items-center">
+                      <div v-if="getInlineAttachments(message).length > 0" class="space-y-2">
+                        <div v-for="att in getInlineAttachments(message)" :key="att.id || att.fileName">
+                          <el-image
+                            :src="att.accessUrl"
+                            :preview-src-list="[att.accessUrl]"
+                            fit="cover"
+                            class="max-h-[220px] rounded-2xl border border-[#e5e5e5]"
+                            :class="isMobile ? 'max-w-[200px]' : 'max-w-[300px]'"
+                            lazy
+                          />
+                          <div class="mt-1 text-xs text-[#8f8f8f]">{{ att.fileName }}</div>
+                        </div>
+                      </div>
+                      <div v-if="!message.isStreaming" class="flex h-8 items-center">
                         <button
                           type="button"
                           class="flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] transition-all hover:bg-[#f1f1f1] hover:text-[#0d0d0d]"
                           aria-label="复制内容"
-                          @click="copyProjectAssistantMessage(message.content)"
+                          @click="copyMessageContent(message, 'assistant')"
                         >
                           <WkIcon name="copy" :box-size="18" class="shrink-0 material-symbols-outlined leading-none" title="复制内容" />
                         </button>
@@ -255,6 +351,7 @@
                     placeholder="发消息..."
                     :context-label="project.name"
                     context-icon="task"
+                    :disabled="chatStore.currentSessionIsStreaming"
                     @send="handleSendAiMessage"
                   />
                   <div v-if="false" class="wk-project-chat-composer relative flex min-w-0 items-center rounded-[28px] p-[6px]">
@@ -310,6 +407,80 @@
               </div>
             </div>
           </section>
+          <aside v-if="showProjectLanePanelShell && projectLanePanelVisible" class="wk-project-chat-lanes-panel">
+            <div class="wk-project-chat-lanes-panel__header">
+              <div class="min-w-0">
+                <h2 class="truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">任务泳道图</h2>
+              </div>
+              <span class="wk-project-chat-lanes-panel__count">{{ projectChatTaskCount }}</span>
+            </div>
+
+            <div class="wk-project-chat-lanes-panel__body">
+              <section
+                v-for="lane in orderedLanes"
+                :key="lane.laneId"
+                class="wk-project-chat-lane"
+                :class="{ 'wk-project-chat-lane--collapsed': isProjectChatLaneCollapsed(lane.laneId) }"
+              >
+                <header class="wk-project-chat-lane__header">
+                  <div class="min-w-0 flex-1">
+                    <div class="flex min-w-0 items-center gap-2">
+                      <h3 class="truncate text-sm font-semibold leading-5 text-[#0d0d0d]">{{ lane.name }}</h3>
+                      <span class="wk-project-chat-lane__count">{{ projectChatTasksByLane(lane.laneId).length }}</span>
+                    </div>
+                    <p class="mt-0.5 truncate text-xs leading-4 text-[#8f8f8f]">
+                      {{ lane.system ? '系统默认泳道' : '自定义泳道' }}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    class="wk-project-chat-lane__toggle"
+                    :aria-label="isProjectChatLaneCollapsed(lane.laneId) ? '展开泳道' : '收起泳道'"
+                    @click="toggleProjectChatLane(lane.laneId)"
+                  >
+                    <span class="material-symbols-outlined text-[18px] leading-none">
+                      {{ isProjectChatLaneCollapsed(lane.laneId) ? 'keyboard_arrow_down' : 'keyboard_arrow_up' }}
+                    </span>
+                  </button>
+                </header>
+
+                <div v-if="!isProjectChatLaneCollapsed(lane.laneId)" class="wk-project-chat-lane__tasks">
+                  <button
+                    v-for="task in projectChatTasksByLane(lane.laneId)"
+                    :key="task.taskId"
+                    type="button"
+                    class="wk-project-chat-lane-task"
+                    @click="enterTaskConversation(task)"
+                  >
+                    <div class="flex min-w-0 items-start justify-between gap-2">
+                      <span class="line-clamp-2 min-w-0 text-left text-sm font-semibold leading-5 text-[#0d0d0d]">
+                        {{ task.title }}
+                      </span>
+                      <span class="wk-project-chat-lane-task__priority" :class="projectTaskPriorityClass(task.priority)">
+                        {{ projectTaskPriorityLabel(task.priority) }}
+                      </span>
+                    </div>
+                    <div class="mt-2 flex min-w-0 items-center gap-2 text-xs leading-4 text-[#6b7a90]">
+                      <span class="material-symbols-outlined text-[14px] leading-none">schedule</span>
+                      <span class="truncate">{{ task.dueDate ? formatDateTime(task.dueDate) : '未设置截止时间' }}</span>
+                    </div>
+                    <div class="mt-1 flex min-w-0 items-center gap-2 text-xs leading-4 text-[#6b7a90]">
+                      <span class="material-symbols-outlined text-[14px] leading-none">person</span>
+                      <span class="truncate">{{ task.ownerName || '未指定负责人' }}</span>
+                    </div>
+                  </button>
+
+                  <div v-if="projectChatTasksByLane(lane.laneId).length === 0" class="wk-project-chat-lane__empty">
+                    暂无任务
+                  </div>
+                </div>
+              </section>
+
+              <div v-if="orderedLanes.length === 0" class="wk-project-chat-lanes-panel__empty">
+                当前项目暂无泳道
+              </div>
+            </div>
+          </aside>
         </div>
 
         <div v-else-if="viewMode === 'task_ai' && currentTaskConversation" class="wk-project-chat-shell wk-project-chat-shell--task relative">
@@ -340,32 +511,102 @@
               </button>
             </div>
 
-            <div class="wk-project-task-chat-messages">
+            <div ref="projectChatMessagesContainerRef" class="wk-project-task-chat-messages">
               <div class="wk-project-task-chat-messages__inner px-4 md:px-8">
                 <div
-                  v-for="message in currentTaskConversation.chatMessages"
-                  :key="message.messageId"
+                  v-for="message in projectChatMessages"
+                  :key="message.id"
                   class="wk-project-task-chat-message mx-auto message-enter"
                   :class="message.role === 'user' ? 'wk-project-task-chat-message--user' : 'wk-project-task-chat-message--assistant'"
                 >
-                  <div v-if="message.role === 'user'" class="group flex w-full flex-row-reverse pb-0">
+                  <div
+                    v-if="getDocumentAttachments(message).length > 0"
+                    class="mb-2 flex"
+                    :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
+                  >
+                    <div
+                      class="flex max-w-[80%] flex-wrap gap-2"
+                      :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
+                    >
+                      <a
+                        v-for="att in getDocumentAttachments(message)"
+                        :key="att.id || att.fileName"
+                        :href="att.accessUrl"
+                        target="_blank"
+                        class="group flex max-w-xs items-center gap-3 rounded-2xl border border-[#e5e5e5] bg-white px-3 py-2.5 transition-colors hover:bg-[#f7f7f7]"
+                      >
+                        <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#f4f4f4] text-[#5d5d5d]">
+                          <span class="material-symbols-outlined text-[20px] leading-none">description</span>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <div class="truncate text-sm font-medium text-[#0d0d0d]">{{ att.fileName }}</div>
+                          <div class="mt-0.5 text-xs text-[#8f8f8f]">{{ formatFileSize(att.fileSize) }}</div>
+                        </div>
+                        <span class="material-symbols-outlined text-[18px] leading-none text-[#b4b4b4] transition-colors group-hover:text-[#0d0d0d]">open_in_new</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  <div v-if="message.role === 'user'" class="group flex w-full flex-wrap flex-row-reverse pb-0">
                     <div class="min-w-[50px] max-w-[72%] space-y-3">
                       <div class="rounded-[24px] bg-[#f4f4f4] px-4 py-2.5 text-[15px] leading-7 text-[#0d0d0d]">
                         <div class="whitespace-pre-wrap">{{ message.content || '...' }}</div>
                       </div>
+                      <div v-if="getInlineAttachments(message).length > 0" class="flex flex-col items-end gap-2">
+                        <div v-for="att in getInlineAttachments(message)" :key="att.id || att.fileName">
+                          <el-image
+                            :src="att.accessUrl"
+                            :preview-src-list="[att.accessUrl]"
+                            fit="cover"
+                            class="max-h-[220px] rounded-2xl border border-[#e5e5e5]"
+                            :class="isMobile ? 'max-w-[200px]' : 'max-w-[300px]'"
+                            lazy
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div class="z-10 flex h-8 w-full basis-full items-center justify-end">
+                      <button
+                        type="button"
+                        class="pointer-events-none flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] opacity-0 transition-all hover:bg-[#f1f1f1] hover:text-[#0d0d0d] group-hover:pointer-events-auto group-hover:opacity-100"
+                        aria-label="复制内容"
+                        @click="copyMessageContent(message, 'user')"
+                      >
+                        <WkIcon name="copy" :box-size="18" class="shrink-0 material-symbols-outlined leading-none" title="复制内容" />
+                      </button>
                     </div>
                   </div>
                   <div v-else class="group flex w-full gap-3 pb-4 md:gap-4 md:pb-8">
                     <div class="min-w-0 flex-1 space-y-3">
                       <div class="max-w-full text-left text-[16px] leading-7 text-[#0d0d0d]">
-                        <div class="wk-markdown" v-html="renderTaskAssistantMessage(message.content)" />
+                        <div
+                          class="wk-markdown"
+                          :class="{ 'wk-thinking-shimmer': message.isThinking && message.content.length === 0 }"
+                          v-html="renderAssistantMessage(message.content, message.isStreaming, message.isThinking)"
+                        />
+                        <div v-if="message.isThinking && message.content.length > 0" class="wk-thinking-shimmer mt-1 text-sm">
+                          <p>思考中</p>
+                        </div>
                       </div>
-                      <div v-if="message.content.trim()" class="flex h-8 items-center">
+                      <div v-if="getInlineAttachments(message).length > 0" class="space-y-2">
+                        <div v-for="att in getInlineAttachments(message)" :key="att.id || att.fileName">
+                          <el-image
+                            :src="att.accessUrl"
+                            :preview-src-list="[att.accessUrl]"
+                            fit="cover"
+                            class="max-h-[220px] rounded-2xl border border-[#e5e5e5]"
+                            :class="isMobile ? 'max-w-[200px]' : 'max-w-[300px]'"
+                            lazy
+                          />
+                          <div class="mt-1 text-xs text-[#8f8f8f]">{{ att.fileName }}</div>
+                        </div>
+                      </div>
+                      <div v-if="!message.isStreaming" class="flex h-8 items-center">
                         <button
                           type="button"
                           class="flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] transition-all hover:bg-[#f1f1f1] hover:text-[#0d0d0d]"
                           aria-label="复制内容"
-                          @click="copyProjectAssistantMessage(message.content)"
+                          @click="copyMessageContent(message, 'assistant')"
                         >
                           <WkIcon name="copy" :box-size="18" class="shrink-0 material-symbols-outlined leading-none" title="复制内容" />
                         </button>
@@ -384,6 +625,7 @@
                     placeholder="发消息..."
                     :context-label="currentTaskConversation.title"
                     context-icon="task-1"
+                    :disabled="chatStore.currentSessionIsStreaming"
                     @send="handleSendTaskAiMessage"
                   />
                   <div v-if="false" class="wk-project-chat-composer relative flex min-w-0 items-center rounded-[28px] p-[6px]">
@@ -1038,7 +1280,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
 import { useProjectStore } from '@/stores/project'
+import { useChatStore } from '@/stores/chat'
 import { renderMarkdown } from '@/utils/markdown'
+import { getAssistantMessagePlaceholder, normalizeAssistantMessageContent } from '@/utils/chatMessage'
+import { formatFileSize } from '@/utils/formatFileSize'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import type {
   ProjectMember,
@@ -1069,6 +1314,7 @@ const route = useRoute()
 const router = useRouter()
 const { isMobile } = useResponsive()
 const projectStore = useProjectStore()
+const chatStore = useChatStore()
 
 type ProjectTab = {
   value: 'board' | 'list' | 'cards'
@@ -1081,6 +1327,9 @@ type ProjectChatComposerSendPayload = {
   attachments?: ChatAttachmentDTO[]
   attachmentVOs?: ChatAttachmentVO[]
   knowledgeIds?: string[]
+  modelProvider?: string
+  modelName?: string
+  modelSource?: string
 }
 
 const projectTabs: ProjectTab[] = [
@@ -1095,6 +1344,9 @@ const aiInput = ref('')
 const taskAiInput = ref('')
 const projectAiComposerInputRef = ref<HTMLTextAreaElement | null>(null)
 const taskAiComposerInputRef = ref<HTMLTextAreaElement | null>(null)
+const projectChatMessagesContainerRef = ref<HTMLElement | null>(null)
+const collapsedProjectChatLaneIds = ref<Set<string>>(new Set())
+const projectLanePanelVisible = ref(true)
 const showProjectDialog = ref(false)
 const showTaskDialog = ref(false)
 const showTaskDrawer = ref(false)
@@ -1216,14 +1468,34 @@ const showTaskViewToolbar = computed(() => viewMode.value === 'board' || viewMod
 const canUseCurrentTaskAi = computed(() =>
   currentTaskConversation.value ? projectStore.canCurrentUserUseTaskAi(projectId.value, currentTaskConversation.value) : false
 )
+const showProjectLanePanelShell = computed(() => !isMobile.value && viewMode.value === 'ai')
 const showTaskDetailPanelShell = computed(() => !isMobile.value && isTaskConversation.value && Boolean(currentTaskConversation.value))
+const projectChatMessages = computed(() => chatStore.messages)
+const projectLastChatMessage = computed(() => {
+  const messages = projectChatMessages.value
+  return messages.length ? messages[messages.length - 1] : null
+})
+const projectChatLaneTasks = computed(() => {
+  const laneTasks = new Map<string, ProjectTask[]>()
+  orderedLanes.value.forEach(lane => laneTasks.set(lane.laneId, []))
+  visibleProjectTasks.value.forEach(task => {
+    if (!laneTasks.has(task.laneId)) {
+      laneTasks.set(task.laneId, [])
+    }
+    laneTasks.get(task.laneId)?.push(task)
+  })
+  laneTasks.forEach(tasks => {
+    tasks.sort((a, b) => new Date(b.updateTime).getTime() - new Date(a.updateTime).getTime())
+  })
+  return laneTasks
+})
+const projectChatTaskCount = computed(() => visibleProjectTasks.value.length)
 
-function renderAssistantMessage(content: string) {
-  return renderMarkdown(content || '')
-}
-
-function renderTaskAssistantMessage(content: string) {
-  return renderAssistantMessage(content)
+function renderAssistantMessage(content: string, isStreaming = false, isThinking = false) {
+  const normalized = normalizeAssistantMessageContent(content, isStreaming)
+  return renderMarkdown(normalized || (isThinking ? getAssistantMessagePlaceholder(true) : ''), {
+    streaming: isStreaming
+  })
 }
 
 function htmlToPlainText(html: string): string {
@@ -1254,8 +1526,28 @@ async function copyToClipboard(text: string) {
   }
 }
 
-async function copyProjectAssistantMessage(content: string) {
-  await copyToClipboard(htmlToPlainText(renderAssistantMessage(content)))
+async function copyMessageContent(message: { content: string; isStreaming?: boolean }, kind: 'assistant' | 'user') {
+  if (kind === 'assistant') {
+    await copyToClipboard(htmlToPlainText(renderAssistantMessage(message.content || '', Boolean(message.isStreaming))))
+    return
+  }
+  await copyToClipboard(message.content || '')
+}
+
+function isImageAttachment(attachment?: ChatAttachmentVO | null): boolean {
+  return Boolean(attachment?.mimeType?.startsWith('image/'))
+}
+
+function isDocumentAttachment(attachment?: ChatAttachmentVO | null): boolean {
+  return Boolean(attachment) && !isImageAttachment(attachment)
+}
+
+function getInlineAttachments(message: { attachments?: ChatAttachmentVO[] }): ChatAttachmentVO[] {
+  return (message.attachments || []).filter(isImageAttachment)
+}
+
+function getDocumentAttachments(message: { attachments?: ChatAttachmentVO[] }): ChatAttachmentVO[] {
+  return (message.attachments || []).filter(isDocumentAttachment)
 }
 
 function resizeProjectChatTextarea(el: HTMLTextAreaElement | null) {
@@ -1279,6 +1571,14 @@ watch(currentTaskConversation, task => {
   void nextTick(() => resizeProjectChatTextarea(taskAiComposerInputRef.value))
 })
 
+watch(
+  [() => viewMode.value, project, currentTaskConversation],
+  () => {
+    void ensureProjectChatSession()
+  },
+  { immediate: true }
+)
+
 watch(aiInput, () => {
   void nextTick(() => resizeProjectChatTextarea(projectAiComposerInputRef.value))
 })
@@ -1286,6 +1586,41 @@ watch(aiInput, () => {
 watch(taskAiInput, () => {
   void nextTick(() => resizeProjectChatTextarea(taskAiComposerInputRef.value))
 })
+
+watch(
+  () => [
+    chatStore.currentSessionId,
+    projectChatMessages.value.length,
+    projectLastChatMessage.value?.content.length || 0,
+    Boolean(projectLastChatMessage.value?.isStreaming),
+    Boolean(projectLastChatMessage.value?.isThinking)
+  ],
+  () => scrollProjectChatToBottom(),
+  { flush: 'post' }
+)
+
+function scrollProjectChatToBottom() {
+  void nextTick(() => {
+    const el = projectChatMessagesContainerRef.value
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+  })
+}
+
+async function ensureProjectChatSession() {
+  if (!project.value) return
+  if (viewMode.value === 'ai') {
+    if (!canUseAiChat.value) return
+    await chatStore.openProjectChat(project.value)
+    scrollProjectChatToBottom()
+    return
+  }
+  if (viewMode.value === 'task_ai' && currentTaskConversation.value) {
+    if (!canUseCurrentTaskAi.value) return
+    await chatStore.openProjectTaskChat(project.value, currentTaskConversation.value)
+    scrollProjectChatToBottom()
+  }
+}
 
 function syncTaskConversationFromRoute() {
   const routeTaskId = typeof route.query.taskId === 'string' ? route.query.taskId : ''
@@ -1364,6 +1699,24 @@ function tasksByLane(laneId: string) {
   return filteredProjectTasks.value
     .filter(task => task.laneId === laneId)
     .sort((a, b) => new Date(b.updateTime).getTime() - new Date(a.updateTime).getTime())
+}
+
+function projectChatTasksByLane(laneId: string) {
+  return projectChatLaneTasks.value.get(laneId) || []
+}
+
+function isProjectChatLaneCollapsed(laneId: string) {
+  return collapsedProjectChatLaneIds.value.has(laneId)
+}
+
+function toggleProjectChatLane(laneId: string) {
+  const next = new Set(collapsedProjectChatLaneIds.value)
+  if (next.has(laneId)) {
+    next.delete(laneId)
+  } else {
+    next.add(laneId)
+  }
+  collapsedProjectChatLaneIds.value = next
 }
 
 function laneName(laneId: string) {
@@ -1606,26 +1959,25 @@ async function handleDeleteLane(laneId: string) {
 
 async function handleSendAiMessage(payload?: ProjectChatComposerSendPayload) {
   const content = payload?.content?.trim() || aiInput.value.trim()
-  if (!project.value || !content || !canUseAiChat.value) return
-  await projectStore.handleAiCommand(project.value.projectId, {
-    content,
-    attachments: payload?.attachments,
-    knowledgeIds: payload?.knowledgeIds
-  })
+  if (!project.value || !content || !canUseAiChat.value || chatStore.currentSessionIsStreaming) return
   aiInput.value = ''
   void nextTick(() => resizeProjectChatTextarea(projectAiComposerInputRef.value))
+  await ensureProjectChatSession()
+  await chatStore.sendMessage(content, payload?.attachments, payload?.attachmentVOs, 'project', payload?.knowledgeIds)
+  if (project.value) {
+    await projectStore.loadProject(project.value.projectId, projectTaskSearchKeyword.value.trim() || undefined)
+  }
 }
 
 async function handleSendTaskAiMessage(payload?: ProjectChatComposerSendPayload) {
   const content = payload?.content?.trim() || taskAiInput.value.trim()
-  if (!project.value || !currentTaskConversation.value || !content || !canUseCurrentTaskAi.value) return
-  await projectStore.handleTaskAiCommand(project.value.projectId, currentTaskConversation.value.taskId, {
-    content,
-    attachments: payload?.attachments,
-    knowledgeIds: payload?.knowledgeIds
-  })
+  if (!project.value || !currentTaskConversation.value || !content || !canUseCurrentTaskAi.value || chatStore.currentSessionIsStreaming) return
+  const activeProjectId = project.value.projectId
   taskAiInput.value = ''
   void nextTick(() => resizeProjectChatTextarea(taskAiComposerInputRef.value))
+  await ensureProjectChatSession()
+  await chatStore.sendMessage(content, payload?.attachments, payload?.attachmentVOs, 'project', payload?.knowledgeIds)
+  await projectStore.loadProject(activeProjectId, projectTaskSearchKeyword.value.trim() || undefined)
 }
 
 function openAddMember() {
@@ -1764,6 +2116,35 @@ function memberActionLabel(action: string) {
   font-size: 12px;
   font-weight: 600;
   line-height: 1;
+}
+
+.wk-project-chat-enter-button {
+  display: inline-flex;
+  height: 32px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 8px;
+  background: #0f172a;
+  padding: 0 12px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.wk-project-chat-enter-button:hover {
+  background: #1f2937;
+  box-shadow: 0 8px 18px rgb(15 23 42 / 0.16);
+}
+
+.wk-project-chat-enter-button:active {
+  transform: scale(0.98);
 }
 
 @media (min-width: 768px) {
@@ -1920,6 +2301,24 @@ function memberActionLabel(action: string) {
   line-height: 1.75;
 }
 
+.wk-thinking-shimmer {
+  background: linear-gradient(90deg, #9ca3af 0%, #111827 45%, #9ca3af 90%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: wk-thinking-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes wk-thinking-shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -120% 0;
+  }
+}
+
 .wk-project-chat-message--assistant :deep(.wk-markdown > *:first-child),
 .wk-project-task-chat-message--assistant :deep(.wk-markdown > *:first-child) {
   margin-top: 0;
@@ -2003,6 +2402,165 @@ function memberActionLabel(action: string) {
 .wk-project-task-chat-message--assistant :deep(.wk-markdown th) {
   background: var(--wk-bg-surface-subtle);
   font-weight: 600;
+}
+
+.wk-project-chat-lanes-panel {
+  display: flex;
+  width: 300px;
+  min-width: 280px;
+  max-width: 35%;
+  min-height: 0;
+  flex-shrink: 0;
+  flex-direction: column;
+  border-left: 1px solid var(--wk-border-subtle);
+  background: color-mix(in srgb, var(--wk-bg-surface) 96%, transparent);
+}
+
+.wk-project-chat-lanes-panel__header {
+  display: flex;
+  min-height: 53px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--wk-border-subtle);
+  padding: 10px 16px;
+}
+
+.wk-project-chat-lanes-panel__eyebrow {
+  color: #8f8f8f;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.wk-project-chat-lanes-panel__count,
+.wk-project-chat-lane__count {
+  display: inline-flex;
+  height: 22px;
+  min-width: 22px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--wk-bg-surface-muted);
+  padding: 0 7px;
+  color: var(--wk-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wk-project-chat-lanes-panel__body {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.wk-project-chat-lane {
+  min-width: 0;
+  border: 1px solid var(--wk-border-subtle);
+  border-radius: 8px;
+  background: var(--wk-bg-surface);
+}
+
+.wk-project-chat-lane__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+}
+
+.wk-project-chat-lane__toggle {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: #8f8f8f;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.wk-project-chat-lane__toggle:hover {
+  background: var(--wk-bg-surface-muted);
+  color: var(--wk-text-primary);
+}
+
+.wk-project-chat-lane__tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+
+.wk-project-chat-lane--collapsed .wk-project-chat-lane__header {
+  padding-bottom: 12px;
+}
+
+.wk-project-chat-lane-task {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--wk-border-subtle);
+  border-radius: 8px;
+  background: var(--wk-bg-surface);
+  padding: 11px 12px;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.wk-project-chat-lane-task:hover {
+  border-color: var(--wk-border-muted);
+  background: var(--wk-bg-surface-subtle);
+  box-shadow: 0 8px 20px rgb(var(--wk-shadow-color) / 0.07);
+  transform: translateY(-1px);
+}
+
+.wk-project-chat-lane-task__priority {
+  display: inline-flex;
+  height: 22px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.wk-project-chat-lane__empty,
+.wk-project-chat-lanes-panel__empty {
+  border: 1px dashed var(--wk-border-subtle);
+  border-radius: 8px;
+  background: var(--wk-bg-surface-subtle);
+  padding: 18px 12px;
+  text-align: center;
+  color: #8f8f8f;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+@media (min-width: 1440px) {
+  .wk-project-chat-lanes-panel {
+    width: 340px;
+  }
+}
+
+@media (max-width: 960px) {
+  .wk-project-chat-lanes-panel {
+    display: none;
+  }
 }
 
 .wk-project-chat-customer-panel {

@@ -158,6 +158,12 @@ public class ProjectBO {
         private List<ChatSendBO.AttachmentDTO> attachments;
 
         private List<Long> knowledgeIds;
+
+        private String modelProvider;
+
+        private String modelName;
+
+        private String modelSource;
     }
 
     @Data

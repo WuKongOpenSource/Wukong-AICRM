@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.ai.tools;
 
 import cn.hutool.core.util.StrUtil;
+import com.kakarote.ai_crm.ai.context.AiContextHolder;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.ProjectBO;
 import com.kakarote.ai_crm.entity.VO.ProjectVO;
@@ -64,7 +65,7 @@ public class ProjectTools {
             @ToolParam(description = "项目ID，数字类型，必填") String projectIdStr,
             @ToolParam(description = "可选任务关键词，用于在项目详情中筛选任务", required = false) String taskKeyword) {
         try {
-            Long projectId = parseRequiredLong(projectIdStr, "项目ID");
+            Long projectId = resolveProjectId(projectIdStr, "项目ID");
             ProjectVO project = projectService.getProject(projectId, normalizeOptionalText(taskKeyword));
             return formatProjectDetail(project);
         } catch (Exception e) {
@@ -114,7 +115,7 @@ public class ProjectTools {
             @ToolParam(description = "新的截止日期，格式 yyyy-MM-dd", required = false) String dueDate,
             @ToolParam(description = "新的项目状态：not_started/in_progress/completed/paused/archived 或中文状态", required = false) String status) {
         try {
-            Long projectId = parseRequiredLong(projectIdStr, "项目ID");
+            Long projectId = resolveProjectId(projectIdStr, "项目ID");
             ProjectVO existing = projectService.getProject(projectId);
             ProjectBO.Update bo = new ProjectBO.Update();
             bo.setProjectId(projectId);
@@ -138,7 +139,7 @@ public class ProjectTools {
     public String deleteProject(
             @ToolParam(description = "项目ID，数字类型，必填") String projectIdStr) {
         try {
-            Long projectId = parseRequiredLong(projectIdStr, "项目ID");
+            Long projectId = resolveProjectId(projectIdStr, "项目ID");
             ProjectVO project = projectService.getProject(projectId);
             projectService.deleteProject(projectId);
             return "项目已删除: " + project.getName() + "（项目ID: " + projectId + "）。";
@@ -161,7 +162,7 @@ public class ProjectTools {
             @ToolParam(description = "优先级：low/medium/high/urgent 或中文", required = false) String priority,
             @ToolParam(description = "截止日期，格式 yyyy-MM-dd", required = false) String dueDate) {
         try {
-            Long projectId = parseRequiredLong(projectIdStr, "项目ID");
+            Long projectId = resolveProjectId(projectIdStr, "项目ID");
             ProjectVO project = projectService.getProject(projectId);
             ProjectBO.TaskSave bo = new ProjectBO.TaskSave();
             bo.setTitle(normalizeRequiredText(title, "任务标题"));
@@ -201,8 +202,8 @@ public class ProjectTools {
             @ToolParam(description = "新的优先级：low/medium/high/urgent 或中文", required = false) String priority,
             @ToolParam(description = "新的截止日期，格式 yyyy-MM-dd", required = false) String dueDate) {
         try {
-            Long projectId = parseRequiredLong(projectIdStr, "项目ID");
-            Long taskId = parseRequiredLong(taskIdStr, "任务ID");
+            Long projectId = resolveProjectId(projectIdStr, "项目ID");
+            Long taskId = resolveProjectTaskId(taskIdStr, "任务ID");
             ProjectVO project = projectService.getProject(projectId);
             ProjectVO.ProjectTaskVO existing = findTask(project, taskId);
             ProjectBO.TaskSave bo = new ProjectBO.TaskSave();
@@ -234,8 +235,8 @@ public class ProjectTools {
             @ToolParam(description = "目标泳道ID，数字类型", required = false) String laneIdStr,
             @ToolParam(description = "目标泳道名称，如未开始、进行中、已完成", required = false) String laneName) {
         try {
-            Long projectId = parseRequiredLong(projectIdStr, "项目ID");
-            Long taskId = parseRequiredLong(taskIdStr, "任务ID");
+            Long projectId = resolveProjectId(projectIdStr, "项目ID");
+            Long taskId = resolveProjectTaskId(taskIdStr, "任务ID");
             ProjectVO project = projectService.getProject(projectId);
             Long laneId = resolveLaneId(project, laneIdStr, laneName);
             if (laneId == null) {
@@ -257,8 +258,8 @@ public class ProjectTools {
             @ToolParam(description = "项目ID，数字类型，必填") String projectIdStr,
             @ToolParam(description = "任务ID，数字类型，必填") String taskIdStr) {
         try {
-            Long projectId = parseRequiredLong(projectIdStr, "项目ID");
-            Long taskId = parseRequiredLong(taskIdStr, "任务ID");
+            Long projectId = resolveProjectId(projectIdStr, "项目ID");
+            Long taskId = resolveProjectTaskId(taskIdStr, "任务ID");
             ProjectVO project = projectService.getProject(projectId);
             ProjectVO.ProjectTaskVO task = findTask(project, taskId);
             projectService.deleteTask(projectId, taskId);
@@ -411,6 +412,30 @@ public class ProjectTools {
             throw new IllegalArgumentException(fieldName + "不能为空");
         }
         return parsed;
+    }
+
+    private Long resolveProjectId(String value, String fieldName) {
+        Long parsed = parseOptionalLong(value, fieldName);
+        if (parsed != null) {
+            return parsed;
+        }
+        Long currentProjectId = AiContextHolder.getCurrentProjectId();
+        if (currentProjectId != null) {
+            return currentProjectId;
+        }
+        throw new IllegalArgumentException(fieldName + "不能为空");
+    }
+
+    private Long resolveProjectTaskId(String value, String fieldName) {
+        Long parsed = parseOptionalLong(value, fieldName);
+        if (parsed != null) {
+            return parsed;
+        }
+        Long currentTaskId = AiContextHolder.getCurrentProjectTaskId();
+        if (currentTaskId != null) {
+            return currentTaskId;
+        }
+        throw new IllegalArgumentException(fieldName + "不能为空");
     }
 
     private Long parseOptionalLong(String value, String fieldName) {

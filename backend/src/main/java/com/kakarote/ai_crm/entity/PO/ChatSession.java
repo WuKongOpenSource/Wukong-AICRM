@@ -56,6 +56,12 @@ public class ChatSession implements Serializable {
     @Schema(description = "关联关系人ID")
     private Long relationId;
 
+    @Schema(description = "关联项目ID")
+    private Long projectId;
+
+    @Schema(description = "关联项目任务ID")
+    private Long projectTaskId;
+
     /**
      * 会话标题
      */

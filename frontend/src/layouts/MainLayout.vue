@@ -230,9 +230,9 @@
                   tabindex="0"
                   class="group/project-row flex w-full min-w-0 cursor-pointer items-center gap-2 overflow-hidden rounded-[8px] pl-[10px] pr-[8px] py-[6px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
                   :class="isProjectActive(project.projectId) ? 'bg-[#f3f3f3]' : 'hover:bg-[#f9f9f9]'"
-                  @click="handleSelectProjectBoard(project.projectId)"
-                  @keydown.enter.self.prevent="handleSelectProjectBoard(project.projectId)"
-                  @keydown.space.self.prevent="handleSelectProjectBoard(project.projectId)"
+                  @click="handleStartProjectConversation(project.projectId)"
+                  @keydown.enter.self.prevent="handleStartProjectConversation(project.projectId)"
+                  @keydown.space.self.prevent="handleStartProjectConversation(project.projectId)"
                 >
                   <span class="material-symbols-outlined flex size-[20px] shrink-0 items-center justify-center text-[18px] leading-none text-[#8f8f8f]">
                     folder
@@ -1059,9 +1059,9 @@
                   tabindex="0"
                   class="group flex w-full min-w-0 cursor-pointer items-center gap-3 rounded-[8px] px-3 py-[9px] text-left transition-colors"
                   :class="isProjectActive(project.projectId) ? 'bg-[#f3f3f3]' : 'text-[#0d0d0d] active:bg-slate-100'"
-                  @click="handleMobileSelectProjectBoard(project.projectId)"
-                  @keydown.enter.self.prevent="handleMobileSelectProjectBoard(project.projectId)"
-                  @keydown.space.self.prevent="handleMobileSelectProjectBoard(project.projectId)"
+                  @click="handleMobileStartProjectConversation(project.projectId)"
+                  @keydown.enter.self.prevent="handleMobileStartProjectConversation(project.projectId)"
+                  @keydown.space.self.prevent="handleMobileStartProjectConversation(project.projectId)"
                 >
                   <span class="material-symbols-outlined flex size-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-[18px] leading-none text-[#8f8f8f]">
                     folder
@@ -2903,6 +2903,7 @@ function isUnboundChatSession(session: ChatSession): boolean {
   return !String(session.customerId || '').trim()
     && !String(session.employeeId || '').trim()
     && !String(session.relationId || '').trim()
+    && !chatStore.isProjectContextSession(session)
 }
 
 const sidebarVisibleChatSessions = computed(() =>
@@ -3273,19 +3274,9 @@ function isProjectActive(projectId: string): boolean {
   return route.path.startsWith('/project') && String(route.params.id || '') === String(projectId)
 }
 
-async function handleSelectProjectBoard(projectId: string) {
-  selectedPrimaryKey.value = ''
-  await router.push({ name: 'ProjectDetail', params: { id: projectId }, query: { view: 'board' } })
-}
-
 async function handleStartProjectConversation(projectId: string) {
   selectedPrimaryKey.value = ''
   await router.push({ name: 'ProjectDetail', params: { id: projectId }, query: { view: 'ai' } })
-}
-
-async function handleMobileSelectProjectBoard(projectId: string) {
-  closeMobileDrawer()
-  await handleSelectProjectBoard(projectId)
 }
 
 async function handleMobileStartProjectConversation(projectId: string) {

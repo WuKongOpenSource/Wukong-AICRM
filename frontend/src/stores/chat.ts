@@ -15,6 +15,7 @@ import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, ChatMessage, Cha
 import type { CustomerListVO } from '@/types/customer'
 import type { AddressBookEmployee } from '@/types/addressBook'
 import type { RelationVO } from '@/types/relation'
+import type { ProjectEntity, ProjectTask } from '@/types/project'
 
 interface LocalMessage {
   id: string
@@ -41,13 +42,21 @@ interface PendingNewSessionDraft {
   customerId?: string
   employeeId?: string
   relationId?: string
+  projectId?: string
+  projectTaskId?: string
   appCode: string
+}
+
+interface ProjectSessionContext {
+  projectId: string
+  projectTaskId?: string
 }
 
 export const useChatStore = defineStore('chat', () => {
   const MODEL_STORAGE_KEY = 'wk_ai_crm:chat_selected_model:v1'
   /** Per-session UI app selection (follows conversation across switches / refresh). */
   const SESSION_APP_BY_ID_STORAGE_KEY = 'wk_ai_crm:chat_session_app_by_id:v1'
+  const PROJECT_SESSION_CONTEXT_STORAGE_KEY = 'wk_ai_crm:chat_project_session_context:v1'
   /** Unsent composer text per session (survives refresh). */
   const COMPOSER_DRAFT_BY_SESSION_STORAGE_KEY = 'wk_ai_crm:chat_composer_draft_by_session:v1'
   const GENERAL_APP_CODE = 'general'
@@ -99,6 +108,26 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function loadProjectSessionContextBySessionId(): Record<string, ProjectSessionContext> {
+    try {
+      const raw = localStorage.getItem(PROJECT_SESSION_CONTEXT_STORAGE_KEY)
+      if (!raw) return {}
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+      const out: Record<string, ProjectSessionContext> = {}
+      for (const [sessionId, value] of Object.entries(parsed)) {
+        if (!sessionId || !value || typeof value !== 'object' || Array.isArray(value)) continue
+        const context = value as Record<string, unknown>
+        const projectId = typeof context.projectId === 'string' ? context.projectId : ''
+        const projectTaskId = typeof context.projectTaskId === 'string' ? context.projectTaskId : undefined
+        if (projectId) out[sessionId] = { projectId, projectTaskId }
+      }
+      return out
+    } catch {
+      return {}
+    }
+  }
+
   const sessions = ref<ChatSession[]>([])
   const currentSessionId = ref<string | null>(null)
   /** Incremented so ChatView can focus the composer after sidebar session / new-chat actions. */
@@ -118,6 +147,7 @@ export const useChatStore = defineStore('chat', () => {
   const modelOptions = ref<ChatModelOption[]>([])
   const appOptions = ref<ChatAppOption[]>([])
   const sessionAppCodeBySessionId = ref<Record<string, string>>(loadSessionAppCodeBySessionId())
+  const projectSessionContextBySessionId = ref<Record<string, ProjectSessionContext>>(loadProjectSessionContextBySessionId())
   const composerDraftBySessionId = ref<Record<string, string>>(loadComposerDraftsBySessionId())
   const selectedAppCode = ref(GENERAL_APP_CODE)
   const selectedModelKey = ref(loadSelectedModelKey())
@@ -159,6 +189,7 @@ export const useChatStore = defineStore('chat', () => {
     sessionsLoading.value = true
     fetchSessionsPromise = getSessionList()
       .then((nextSessions) => {
+        rememberProjectContextsFromSessions(nextSessions)
         sessions.value = nextSessions
       })
       .finally(() => {
@@ -193,6 +224,70 @@ export const useChatStore = defineStore('chat', () => {
 
       return String(b.sessionId).localeCompare(String(a.sessionId))
     })
+  }
+
+  function getProjectSessionContext(session?: Pick<ChatSession, 'sessionId' | 'projectId' | 'projectTaskId'> | null): ProjectSessionContext | null {
+    if (!session?.sessionId) return null
+    const sessionProjectId = session.projectId ? String(session.projectId) : ''
+    if (sessionProjectId) {
+      return {
+        projectId: sessionProjectId,
+        projectTaskId: session.projectTaskId ? String(session.projectTaskId) : undefined
+      }
+    }
+    return projectSessionContextBySessionId.value[session.sessionId] || null
+  }
+
+  function getCurrentProjectSessionContext(): ProjectSessionContext | null {
+    if (currentSession.value) {
+      return getProjectSessionContext(currentSession.value)
+    }
+    return currentSessionId.value ? projectSessionContextBySessionId.value[currentSessionId.value] || null : null
+  }
+
+  function isProjectContextSession(session?: Pick<ChatSession, 'sessionId' | 'projectId' | 'projectTaskId'> | null): boolean {
+    return Boolean(getProjectSessionContext(session))
+  }
+
+  function rememberProjectSessionContext(sessionId: string, projectId: string, projectTaskId?: string) {
+    if (!sessionId || !projectId) return
+    const next = {
+      ...projectSessionContextBySessionId.value,
+      [sessionId]: {
+        projectId: String(projectId),
+        projectTaskId: projectTaskId ? String(projectTaskId) : undefined
+      }
+    }
+    projectSessionContextBySessionId.value = next
+    try {
+      localStorage.setItem(PROJECT_SESSION_CONTEXT_STORAGE_KEY, JSON.stringify(next))
+    } catch {
+      // ignore persistence failures
+    }
+  }
+
+  function rememberProjectContextsFromSessions(nextSessions: ChatSession[]) {
+    for (const session of nextSessions) {
+      if (session.projectId) {
+        rememberProjectSessionContext(
+          session.sessionId,
+          String(session.projectId),
+          session.projectTaskId ? String(session.projectTaskId) : undefined
+        )
+      }
+    }
+  }
+
+  function forgetProjectSessionContext(sessionId: string) {
+    if (!(sessionId in projectSessionContextBySessionId.value)) return
+    const next = { ...projectSessionContextBySessionId.value }
+    delete next[sessionId]
+    projectSessionContextBySessionId.value = next
+    try {
+      localStorage.setItem(PROJECT_SESSION_CONTEXT_STORAGE_KEY, JSON.stringify(next))
+    } catch {
+      // ignore persistence failures
+    }
   }
 
   async function fetchModelOptions() {
@@ -231,12 +326,26 @@ export const useChatStore = defineStore('chat', () => {
     customerId?: string,
     appCode: string = GENERAL_APP_CODE,
     employeeId?: string,
-    relationId?: string
+    relationId?: string,
+    projectId?: string,
+    projectTaskId?: string
   ): Promise<string> {
     const normalizedAppCode = normalizeAppCode(appCode)
-    const sessionId = await createSession({ title, agentId, customerId, employeeId, relationId, appCode: normalizedAppCode })
+    const sessionId = await createSession({
+      title,
+      agentId,
+      customerId,
+      employeeId,
+      relationId,
+      projectId,
+      projectTaskId,
+      appCode: normalizedAppCode
+    })
     pendingNewSessionDraft.value = null
     setSessionMessages(sessionId, [])
+    if (projectId) {
+      rememberProjectSessionContext(sessionId, projectId, projectTaskId)
+    }
     await fetchSessions()
     currentSessionId.value = sessionId
     setSelectedAppCode(normalizedAppCode)
@@ -249,7 +358,9 @@ export const useChatStore = defineStore('chat', () => {
     customerId?: string,
     appCode: string = GENERAL_APP_CODE,
     employeeId?: string,
-    relationId?: string
+    relationId?: string,
+    projectId?: string,
+    projectTaskId?: string
   ) {
     const normalizedAppCode = normalizeAppCode(appCode)
     currentSessionId.value = null
@@ -259,6 +370,8 @@ export const useChatStore = defineStore('chat', () => {
       customerId,
       employeeId,
       relationId,
+      projectId,
+      projectTaskId,
       appCode: normalizedAppCode
     }
     selectedAppCode.value = normalizedAppCode
@@ -270,9 +383,11 @@ export const useChatStore = defineStore('chat', () => {
     customerId?: string,
     appCode: string = GENERAL_APP_CODE,
     employeeId?: string,
-    relationId?: string
+    relationId?: string,
+    projectId?: string,
+    projectTaskId?: string
   ): Promise<void> {
-    beginNewSessionDraft(title, agentId, customerId, appCode, employeeId, relationId)
+    beginNewSessionDraft(title, agentId, customerId, appCode, employeeId, relationId, projectId, projectTaskId)
   }
 
   async function selectSession(sessionId: string) {
@@ -360,6 +475,89 @@ export const useChatStore = defineStore('chat', () => {
     return sessionId
   }
 
+  async function openProjectChat(project: Pick<ProjectEntity, 'projectId' | 'name'>): Promise<string> {
+    const projectId = String(project.projectId)
+    if (sessions.value.length === 0) {
+      await fetchSessions()
+    }
+    const currentContext = getCurrentProjectSessionContext()
+    if (
+      currentSessionId.value
+      && currentContext?.projectId === projectId
+      && !currentContext.projectTaskId
+    ) {
+      setSelectedAppCode(PROJECT_APP_CODE)
+      requestComposerFocus()
+      return currentSessionId.value
+    }
+    const existingSession = sessions.value
+      .filter((session) => {
+        const context = getProjectSessionContext(session)
+        return context?.projectId === projectId && !context.projectTaskId
+      })
+      .sort((a, b) => new Date(b.updateTime || b.createTime).getTime() - new Date(a.updateTime || a.createTime).getTime())[0]
+
+    if (existingSession) {
+      rememberProjectSessionContext(existingSession.sessionId, projectId)
+      await selectSession(existingSession.sessionId)
+      setSelectedAppCode(PROJECT_APP_CODE)
+      requestComposerFocus()
+      return existingSession.sessionId
+    }
+
+    const sessionId = await startNewSession(project.name || '项目对话', undefined, undefined, PROJECT_APP_CODE, undefined, undefined, projectId)
+    requestComposerFocus()
+    return sessionId
+  }
+
+  async function openProjectTaskChat(
+    project: Pick<ProjectEntity, 'projectId' | 'name'>,
+    task: Pick<ProjectTask, 'taskId' | 'title'>
+  ): Promise<string> {
+    const projectId = String(project.projectId)
+    const projectTaskId = String(task.taskId)
+    if (sessions.value.length === 0) {
+      await fetchSessions()
+    }
+    const currentContext = getCurrentProjectSessionContext()
+    if (
+      currentSessionId.value
+      && currentContext?.projectId === projectId
+      && currentContext.projectTaskId === projectTaskId
+    ) {
+      setSelectedAppCode(PROJECT_APP_CODE)
+      requestComposerFocus()
+      return currentSessionId.value
+    }
+    const existingSession = sessions.value
+      .filter((session) => {
+        const context = getProjectSessionContext(session)
+        return context?.projectId === projectId && context.projectTaskId === projectTaskId
+      })
+      .sort((a, b) => new Date(b.updateTime || b.createTime).getTime() - new Date(a.updateTime || a.createTime).getTime())[0]
+
+    if (existingSession) {
+      rememberProjectSessionContext(existingSession.sessionId, projectId, projectTaskId)
+      await selectSession(existingSession.sessionId)
+      setSelectedAppCode(PROJECT_APP_CODE)
+      requestComposerFocus()
+      return existingSession.sessionId
+    }
+
+    const sessionId = await startNewSession(
+      task.title || project.name || '任务对话',
+      undefined,
+      undefined,
+      PROJECT_APP_CODE,
+      undefined,
+      undefined,
+      projectId,
+      projectTaskId
+    )
+    requestComposerFocus()
+    return sessionId
+  }
+
   async function removeSession(sessionId: string) {
     await deleteSession(sessionId)
     sessions.value = sessions.value.filter(s => s.sessionId !== sessionId)
@@ -367,6 +565,7 @@ export const useChatStore = defineStore('chat', () => {
     delete streamingTasks.value[sessionId]
     deleteSessionAppCodeRecord(sessionId)
     deleteComposerDraftForSession(sessionId)
+    forgetProjectSessionContext(sessionId)
 
     if (currentSessionId.value === sessionId) {
       currentSessionId.value = null
@@ -402,6 +601,9 @@ export const useChatStore = defineStore('chat', () => {
   ): Promise<string> {
     const effectiveAppCode = resolveEffectiveAppCode(appCodeOrUseRag, knowledgeIds)
     const sessionId = await ensureSessionForSend(effectiveAppCode)
+    const projectContext = effectiveAppCode === PROJECT_APP_CODE
+      ? getProjectSessionContext(sessions.value.find(session => session.sessionId === sessionId) || { sessionId })
+      : null
     // Allow other sessions to stream concurrently; only block double-send on this session.
     if (streamingTasks.value[sessionId]) return sessionId
 
@@ -463,11 +665,13 @@ export const useChatStore = defineStore('chat', () => {
         },
         attachments,
         effectiveAppCode,
-        effectiveAppCode === KNOWLEDGE_APP_CODE,
+        effectiveAppCode === KNOWLEDGE_APP_CODE || Boolean(knowledgeIds?.length),
         selectedModel.value?.provider,
         selectedModel.value?.modelName,
         selectedModel.value?.modelSource,
         knowledgeIds,
+        projectContext?.projectId,
+        projectContext?.projectTaskId,
         abortController.signal
       )
     } catch (error) {
@@ -482,6 +686,9 @@ export const useChatStore = defineStore('chat', () => {
   async function sendMessageWithSync(content: string, appCodeOrUseRag?: string | boolean): Promise<string> {
     const effectiveAppCode = resolveEffectiveAppCode(appCodeOrUseRag)
     const sessionId = await ensureSessionForSend(effectiveAppCode)
+    const projectContext = effectiveAppCode === PROJECT_APP_CODE
+      ? getProjectSessionContext(sessions.value.find(session => session.sessionId === sessionId) || { sessionId })
+      : null
 
     if (streamingTasks.value[sessionId]) {
       return ''
@@ -504,7 +711,10 @@ export const useChatStore = defineStore('chat', () => {
         effectiveAppCode === KNOWLEDGE_APP_CODE,
         selectedModel.value?.provider,
         selectedModel.value?.modelName,
-        selectedModel.value?.modelSource
+        selectedModel.value?.modelSource,
+        undefined,
+        projectContext?.projectId,
+        projectContext?.projectTaskId
       )
 
       appendSessionMessage(sessionId, {
@@ -793,7 +1003,9 @@ export const useChatStore = defineStore('chat', () => {
         draft?.customerId,
         normalizedAppCode || draft?.appCode || GENERAL_APP_CODE,
         draft?.employeeId,
-        draft?.relationId
+        draft?.relationId,
+        draft?.projectId,
+        draft?.projectTaskId
       )
     }
 
@@ -858,6 +1070,9 @@ export const useChatStore = defineStore('chat', () => {
     openCustomerChat,
     openEmployeeChat,
     openRelationChat,
+    openProjectChat,
+    openProjectTaskChat,
+    isProjectContextSession,
     removeSession,
     setSessionPinned,
     sendMessage,

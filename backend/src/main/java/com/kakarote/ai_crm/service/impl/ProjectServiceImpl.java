@@ -4,22 +4,42 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kakarote.ai_crm.ai.AiMode;
+import com.kakarote.ai_crm.ai.AiModelSource;
+import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
+import com.kakarote.ai_crm.ai.app.ChatApplicationCodes;
+import com.kakarote.ai_crm.ai.context.AiContextHolder;
+import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.ProjectBO;
+import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import com.kakarote.ai_crm.entity.VO.ProjectVO;
+import com.kakarote.ai_crm.service.FileStorageService;
+import com.kakarote.ai_crm.service.IKnowledgeService;
 import com.kakarote.ai_crm.service.IProjectService;
 import com.kakarote.ai_crm.service.ISystemConfigService;
 import com.kakarote.ai_crm.service.PermissionService;
+import com.kakarote.ai_crm.utils.AiMediaUtil;
+import com.kakarote.ai_crm.utils.DocumentTextExtractor;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.content.Media;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.MimeType;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.io.InputStream;
+import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -76,6 +96,8 @@ public class ProjectServiceImpl implements IProjectService {
     private static final String PROJECT_CONFIG_TYPE = "project";
     private static final String PROJECT_ROLE_PERMISSION_CONFIG_KEY = "project.role.permissions";
     private static final List<String> PROJECT_ROLES = List.of("OWNER", "ADMIN", "MEMBER", "READONLY", "EXTERNAL");
+    private static final int MAX_AI_CONTEXT_TEXT_LENGTH = 3000;
+    private static final String PROJECT_AI_ERROR_MESSAGE = "抱歉，分析资料时发生错误，请稍后重试。";
 
     private static final List<String> ALL_PERMISSIONS = List.of(
             PERMISSION_VIEW_PROJECT,
@@ -104,7 +126,12 @@ public class ProjectServiceImpl implements IProjectService {
 
     private final JdbcTemplate jdbcTemplate;
     private final PermissionService permissionService;
-    private final ISystemConfigService systemConfigService;
+    private final ObjectProvider<ISystemConfigService> systemConfigServiceProvider;
+    private final ObjectProvider<DynamicChatClientProvider> chatClientProvider;
+    private final FileStorageService fileStorageService;
+    private final IKnowledgeService knowledgeService;
+    private final AiQuotaService aiQuotaService;
+    private final AiModelPricingService aiModelPricingService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -372,7 +399,7 @@ public class ProjectServiceImpl implements IProjectService {
         }
         Map<String, List<String>> rolePermissions = normalizeRolePermissionConfig(
                 configBO == null ? null : configBO.getRolePermissions());
-        systemConfigService.updateConfigsWithType(
+        systemConfigServiceProvider.getObject().updateConfigsWithType(
                 Map.of(PROJECT_ROLE_PERMISSION_CONFIG_KEY, writeJson(rolePermissions)),
                 PROJECT_CONFIG_TYPE);
         return buildRolePermissionConfigVO(rolePermissions);
@@ -628,6 +655,12 @@ public class ProjectServiceImpl implements IProjectService {
         ensureProjectPermission(projectId, PERMISSION_USE_AI_CHAT);
         String content = commandBO.getContent().trim();
         appendProjectChat(projectId, "user", buildAiCommandChatContent(content, commandBO));
+        if (hasAiReferenceMaterials(commandBO)) {
+            String reply = buildProjectMaterialAnalysisReply(projectId, null, content, commandBO);
+            appendProjectChat(projectId, "assistant", reply);
+            touchProject(projectId);
+            return buildProjectVO(projectId);
+        }
         String reply = "我已经记录到当前项目上下文。你也可以继续让我创建任务、总结进展或查询项目任务。";
         ProjectAiCommandParser.ParsedCommand command = ProjectAiCommandParser.parse(content);
 
@@ -722,6 +755,12 @@ public class ProjectServiceImpl implements IProjectService {
         ensureCanUseTaskAi(projectId, task);
         String content = commandBO.getContent().trim();
         appendTaskChat(projectId, taskId, "user", buildAiCommandChatContent(content, commandBO));
+        if (hasAiReferenceMaterials(commandBO)) {
+            String reply = buildProjectMaterialAnalysisReply(projectId, task, content, commandBO);
+            appendTaskChat(projectId, taskId, "assistant", reply);
+            touchProject(projectId);
+            return buildProjectVO(projectId);
+        }
         String reply = "当前对话对象是任务「" + task.title() + "」，我已经收到你的指令。";
 
         if (containsAny(content, "改到", "改成", "调整到", "延期到")
@@ -780,6 +819,456 @@ public class ProjectServiceImpl implements IProjectService {
         appendTaskChat(projectId, taskId, "assistant", reply);
         touchProject(projectId);
         return buildProjectVO(projectId);
+    }
+
+    private boolean hasAiReferenceMaterials(ProjectBO.AiCommand commandBO) {
+        return commandBO != null
+                && (hasItems(commandBO.getAttachments()) || hasItems(commandBO.getKnowledgeIds()));
+    }
+
+    private boolean hasItems(List<?> items) {
+        return items != null && !items.isEmpty();
+    }
+
+    private String buildProjectMaterialAnalysisReply(Long projectId, TaskRow task, String content, ProjectBO.AiCommand commandBO) {
+        ProjectRow project = findProject(projectId);
+        try {
+            ProjectAiBillingContext billingContext = resolveProjectAiBillingContext(commandBO);
+            DynamicChatClientProvider provider = billingContext.provider();
+            DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig = billingContext.runtimeConfig();
+
+            if (StrUtil.isBlank(runtimeConfig.apiKey())) {
+                return "请先在系统设置-系统参数设置-AI/API设置中配置 AI 大模型相关信息。";
+            }
+
+            List<KnowledgeVO> selectedKnowledge = loadSelectedKnowledge(commandBO.getKnowledgeIds());
+            AiModelCapabilities capabilities = runtimeConfig.capabilities();
+            String attachmentContext = buildAiAttachmentContext(commandBO.getAttachments());
+            String knowledgeContext = buildAiKnowledgeContext(selectedKnowledge);
+            String systemPrompt = buildProjectMaterialSystemPrompt(project, task);
+            String enhancedContent = buildProjectMaterialUserContent(content, project, task, attachmentContext, knowledgeContext);
+
+            if (containsImageReference(commandBO.getAttachments(), selectedKnowledge)
+                    && (capabilities == null || !capabilities.isSupportsVision())) {
+                enhancedContent = enhancedContent + "\n\n[系统提示] 当前选择的模型不支持图片理解，请仅基于可提取文本、文件名和已有上下文回答；如需图片内容分析，请切换到支持视觉的模型。";
+            }
+
+            List<Media> mediaList = buildAiMediaList(commandBO.getAttachments(), selectedKnowledge, capabilities);
+            List<Message> history = Collections.emptyList();
+            String quotaTip = aiQuotaService.resolveQuotaFailureMessage(
+                    currentTenantId(),
+                    "project_chat",
+                    systemPrompt,
+                    history,
+                    enhancedContent,
+                    billingContext.pricing().creditMultiplier(),
+                    billingContext.modelSource()
+            );
+            if (quotaTip != null) {
+                return quotaTip;
+            }
+
+            ChatClient chatClient = provider.getChatClient(
+                    billingContext.modelSource(),
+                    runtimeConfig.providerCode(),
+                    runtimeConfig.model(),
+                    ChatApplicationCodes.PROJECT
+            );
+
+            Long aiSessionId = IdWorker.getId();
+            AiContextHolder.setContext(aiSessionId, currentUserId(), currentTenantId());
+            ChatResponse chatResponse;
+            try {
+                ChatClient.ChatClientRequestSpec requestSpec = chatClient.prompt().system(systemPrompt);
+                final String finalEnhancedContent = enhancedContent;
+                chatResponse = hasItems(mediaList)
+                        ? requestSpec.user(user -> user.text(finalEnhancedContent).media(mediaList.toArray(new Media[0]))).call().chatResponse()
+                        : requestSpec.user(finalEnhancedContent).call().chatResponse();
+            } finally {
+                AiContextHolder.clear();
+                AiContextHolder.clearSession(aiSessionId);
+            }
+            String response = extractChatResponseText(chatResponse);
+            if (StrUtil.isBlank(response)) {
+                return "我没有从当前资料中得到可用结论，请换一种问法或重新选择文件后再试。";
+            }
+
+            AiQuotaService.TokenUsageSnapshot usage = aiQuotaService.resolveTokenUsage(
+                    chatResponse,
+                    systemPrompt,
+                    history,
+                    enhancedContent,
+                    response
+            );
+            aiQuotaService.consumeResolvedTokens(
+                    currentTenantId(),
+                    "project_chat",
+                    usage,
+                    billingContext.pricing().creditMultiplier(),
+                    billingContext.modelSource(),
+                    runtimeConfig.providerCode(),
+                    runtimeConfig.model(),
+                    task == null ? "project_chat_message" : "project_task_chat_message",
+                    task == null ? projectId : task.taskId()
+            );
+            return response.trim();
+        } catch (BusinessException e) {
+            return e.getMsg();
+        } catch (Exception e) {
+            logProjectAiError(e);
+            return resolveProjectAiErrorMessage(e);
+        }
+    }
+
+    private ProjectAiBillingContext resolveProjectAiBillingContext(ProjectBO.AiCommand commandBO) {
+        String requestedSource = AiModelSource.normalize(commandBO.getModelSource());
+        boolean explicitModelSelection = StrUtil.isNotBlank(requestedSource)
+                || StrUtil.isNotBlank(commandBO.getModelProvider())
+                || StrUtil.isNotBlank(commandBO.getModelName());
+        DynamicChatClientProvider provider = chatClientProvider.getObject();
+        DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig = provider.getRuntimeConfigSnapshot(
+                requestedSource,
+                commandBO.getModelProvider(),
+                commandBO.getModelName()
+        );
+        String resolvedSource = StrUtil.isNotBlank(requestedSource)
+                ? requestedSource
+                : (runtimeConfig.mode() == AiMode.CUSTOM ? AiModelSource.CUSTOM : AiModelSource.SYSTEM);
+        AiModelPricingService.PricingSnapshot pricing = aiModelPricingService.resolvePricing(
+                runtimeConfig.providerCode(),
+                runtimeConfig.model(),
+                explicitModelSelection && !AiModelSource.isCustom(resolvedSource)
+        );
+        return new ProjectAiBillingContext(provider, runtimeConfig, pricing, resolvedSource);
+    }
+
+    private String buildProjectMaterialSystemPrompt(ProjectRow project, TaskRow task) {
+        String taskContext = task == null
+                ? ""
+                : "\n当前任务：%s；状态：%s；优先级：%s；截止时间：%s。".formatted(
+                        task.title(),
+                        task.status(),
+                        task.priority(),
+                        task.dueDate()
+                );
+        return """
+                你是悟空 CRM 的项目资料分析助手。请基于当前项目/任务上下文、用户上传的图片或附件，以及用户选中的知识库文件回答。
+                要求：
+                1. 优先分析用户本次选择的图片、附件和知识库内容。
+                2. 如果资料中没有答案，请明确说明缺少哪些信息，不要编造。
+                3. 如果用户要求总结、提炼风险、生成执行建议，请给出可操作的条目。
+                4. 如果用户明确要求根据资料创建、修改、移动或删除项目任务，请优先调用项目工具完成操作；创建当前项目任务时必须使用当前项目ID。
+                5. 只有在项目工具结果确认成功后，才可以说数据已创建、更新、移动或删除成功。
+                6. 使用简体中文，回答要清晰、具体。
+
+                当前项目ID：%s；当前项目：%s；状态：%s；关联客户：%s；负责人ID：%s。%s
+                """.formatted(
+                project.projectId(),
+                project.name(),
+                project.status(),
+                StrUtil.blankToDefault(project.customerName(), "未关联"),
+                project.ownerId(),
+                taskContext
+        );
+    }
+
+    private String buildProjectMaterialUserContent(String content,
+                                                   ProjectRow project,
+                                                   TaskRow task,
+                                                   String attachmentContext,
+                                                   String knowledgeContext) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("用户问题：").append(content).append("\n\n");
+        sb.append("[项目上下文]\n");
+        sb.append("- 项目名称：").append(project.name()).append("\n");
+        sb.append("- 项目描述：").append(StrUtil.blankToDefault(project.description(), "无")).append("\n");
+        sb.append("- 项目状态：").append(project.status()).append("\n");
+        sb.append("- 关联客户：").append(StrUtil.blankToDefault(project.customerName(), "未关联")).append("\n");
+        if (task != null) {
+            sb.append("\n[任务上下文]\n");
+            sb.append("- 任务名称：").append(task.title()).append("\n");
+            sb.append("- 任务描述：").append(StrUtil.blankToDefault(task.description(), "无")).append("\n");
+            sb.append("- 任务状态：").append(task.status()).append("\n");
+            sb.append("- 优先级：").append(task.priority()).append("\n");
+            sb.append("- 截止时间：").append(task.dueDate()).append("\n");
+        }
+        if (StrUtil.isNotBlank(attachmentContext)) {
+            sb.append("\n").append(attachmentContext);
+        }
+        if (StrUtil.isNotBlank(knowledgeContext)) {
+            sb.append("\n").append(knowledgeContext);
+        }
+        return sb.toString();
+    }
+
+    private List<KnowledgeVO> loadSelectedKnowledge(List<Long> knowledgeIds) {
+        if (!hasItems(knowledgeIds)) {
+            return Collections.emptyList();
+        }
+        List<KnowledgeVO> result = new ArrayList<>();
+        for (Long knowledgeId : knowledgeIds) {
+            if (knowledgeId == null) {
+                continue;
+            }
+            try {
+                KnowledgeVO knowledge = knowledgeService.getKnowledgeDetail(knowledgeId);
+                if (knowledge != null) {
+                    result.add(knowledge);
+                }
+            } catch (Exception e) {
+                log.warn("读取项目对话知识库文件失败: knowledgeId={}, error={}", knowledgeId, e.getMessage());
+            }
+        }
+        return result;
+    }
+
+    private String buildAiKnowledgeContext(List<KnowledgeVO> selectedKnowledge) {
+        if (!hasItems(selectedKnowledge)) {
+            return "";
+        }
+        StringBuilder context = new StringBuilder("[用户从知识库选中的文件]\n");
+        for (KnowledgeVO knowledge : selectedKnowledge) {
+            context.append("- 知识库文件：")
+                    .append(StrUtil.blankToDefault(knowledge.getName(), "未命名文件"))
+                    .append("（knowledgeId=").append(knowledge.getKnowledgeId()).append("）\n");
+            if (StrUtil.isNotBlank(knowledge.getSummary())) {
+                context.append("  摘要：").append(abbreviateAiContext(knowledge.getSummary(), 800)).append("\n");
+            }
+            String contentText = StrUtil.blankToDefault(knowledge.getContentText(), "");
+            if (StrUtil.isBlank(contentText) && StrUtil.isNotBlank(knowledge.getFilePath())) {
+                contentText = extractAttachmentText(knowledge.getFilePath(), knowledge.getMimeType(), knowledge.getName());
+            }
+            if (StrUtil.isNotBlank(contentText)) {
+                context.append("  内容摘录：\n```\n")
+                        .append(abbreviateAiContext(contentText, MAX_AI_CONTEXT_TEXT_LENGTH))
+                        .append("\n```\n");
+            } else if (isImageFile(knowledge.getMimeType(), knowledge.getName())) {
+                context.append("  说明：该知识库文件是图片，已在模型支持时作为图片传入。\n");
+            } else {
+                context.append("  说明：该文件暂无可读取文本，请结合文件名、摘要和用户问题谨慎回答。\n");
+            }
+        }
+        return context.toString();
+    }
+
+    private String buildAiAttachmentContext(List<ChatSendBO.AttachmentDTO> attachments) {
+        if (!hasItems(attachments)) {
+            return "";
+        }
+        StringBuilder context = new StringBuilder("[用户上传的文件]\n");
+        for (ChatSendBO.AttachmentDTO attachment : attachments) {
+            if (attachment == null) {
+                continue;
+            }
+            String fileName = StrUtil.blankToDefault(attachment.getFileName(), "未命名文件");
+            String mimeType = attachment.getMimeType();
+            if (isImageFile(mimeType, fileName)) {
+                context.append("- 图片：").append(fileName).append("（已在模型支持时作为图片传入，请直接分析图片内容）\n");
+                continue;
+            }
+            String text = extractAttachmentText(attachment.getFilePath(), mimeType, fileName);
+            if (StrUtil.isNotBlank(text)) {
+                context.append("- 文件：").append(fileName).append("，内容摘录如下：\n```\n")
+                        .append(abbreviateAiContext(text, MAX_AI_CONTEXT_TEXT_LENGTH))
+                        .append("\n```\n");
+            } else {
+                context.append("- 文件：").append(fileName)
+                        .append("（类型：").append(StrUtil.blankToDefault(mimeType, "未知")).append("，暂无法提取文本）\n");
+            }
+        }
+        return context.toString();
+    }
+
+    private List<Media> buildAiMediaList(List<ChatSendBO.AttachmentDTO> attachments,
+                                         List<KnowledgeVO> selectedKnowledge,
+                                         AiModelCapabilities capabilities) {
+        if (capabilities == null || !capabilities.isSupportsVision()) {
+            return Collections.emptyList();
+        }
+        List<Media> mediaList = new ArrayList<>();
+        if (hasItems(attachments)) {
+            for (ChatSendBO.AttachmentDTO attachment : attachments) {
+                if (attachment != null && isImageFile(attachment.getMimeType(), attachment.getFileName())) {
+                    addImageMedia(mediaList, attachment.getFileName(), attachment.getFilePath(), attachment.getMimeType());
+                }
+            }
+        }
+        if (hasItems(selectedKnowledge)) {
+            for (KnowledgeVO knowledge : selectedKnowledge) {
+                if (knowledge != null && isImageFile(knowledge.getMimeType(), knowledge.getName())) {
+                    addImageMedia(mediaList, knowledge.getName(), knowledge.getFilePath(), knowledge.getMimeType());
+                }
+            }
+        }
+        return mediaList;
+    }
+
+    private void addImageMedia(List<Media> mediaList, String fileName, String filePath, String mimeType) {
+        if (StrUtil.isBlank(filePath)) {
+            return;
+        }
+        try {
+            MimeType resolvedMimeType = MimeType.valueOf(StrUtil.blankToDefault(mimeType, "image/jpeg"));
+            mediaList.add(AiMediaUtil.buildMedia(fileStorageService, filePath, resolvedMimeType));
+        } catch (Exception e) {
+            log.warn("构建项目对话图片媒体失败: fileName={}, filePath={}", fileName, filePath, e);
+        }
+    }
+
+    private boolean containsImageReference(List<ChatSendBO.AttachmentDTO> attachments, List<KnowledgeVO> selectedKnowledge) {
+        if (hasItems(attachments) && attachments.stream()
+                .filter(Objects::nonNull)
+                .anyMatch(attachment -> isImageFile(attachment.getMimeType(), attachment.getFileName()))) {
+            return true;
+        }
+        return hasItems(selectedKnowledge) && selectedKnowledge.stream()
+                .filter(Objects::nonNull)
+                .anyMatch(knowledge -> isImageFile(knowledge.getMimeType(), knowledge.getName()));
+    }
+
+    private String extractAttachmentText(String filePath, String mimeType, String fileName) {
+        if (StrUtil.isBlank(filePath)) {
+            return "";
+        }
+        if (isTextFile(mimeType, fileName)) {
+            return extractTextFile(filePath);
+        }
+        if (isDocumentFile(mimeType, fileName)) {
+            return extractDocumentFile(filePath);
+        }
+        return "";
+    }
+
+    private String extractTextFile(String filePath) {
+        try (InputStream inputStream = fileStorageService.getFileStream(filePath)) {
+            if (inputStream == null) {
+                return "";
+            }
+            byte[] bytes = inputStream.readNBytes(MAX_AI_CONTEXT_TEXT_LENGTH * 3);
+            return abbreviateAiContext(new String(bytes, java.nio.charset.StandardCharsets.UTF_8), MAX_AI_CONTEXT_TEXT_LENGTH);
+        } catch (Exception e) {
+            log.warn("读取项目对话文本附件失败: {}", filePath, e);
+            return "";
+        }
+    }
+
+    private String extractDocumentFile(String filePath) {
+        try (InputStream inputStream = fileStorageService.getFileStream(filePath)) {
+            if (inputStream == null) {
+                return "";
+            }
+            String text = DocumentTextExtractor.parseToString(inputStream, null, filePath);
+            return abbreviateAiContext(text, MAX_AI_CONTEXT_TEXT_LENGTH);
+        } catch (Exception e) {
+            log.warn("提取项目对话文档附件失败: {}", filePath, e);
+            return "";
+        }
+    }
+
+    private boolean isImageFile(String mimeType, String fileName) {
+        if (mimeType != null && mimeType.startsWith("image/")) {
+            return true;
+        }
+        if (fileName == null) {
+            return false;
+        }
+        String lower = fileName.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg")
+                || lower.endsWith(".webp") || lower.endsWith(".gif") || lower.endsWith(".bmp");
+    }
+
+    private boolean isTextFile(String mimeType, String fileName) {
+        if (mimeType != null && (mimeType.startsWith("text/") || "application/json".equals(mimeType))) {
+            return true;
+        }
+        if (fileName == null) {
+            return false;
+        }
+        String lower = fileName.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".txt") || lower.endsWith(".md") || lower.endsWith(".csv")
+                || lower.endsWith(".json") || lower.endsWith(".xml") || lower.endsWith(".yaml")
+                || lower.endsWith(".yml") || lower.endsWith(".log");
+    }
+
+    private boolean isDocumentFile(String mimeType, String fileName) {
+        if (mimeType != null) {
+            if (mimeType.equals("application/pdf")
+                    || mimeType.equals("application/msword")
+                    || mimeType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                    || mimeType.equals("application/vnd.ms-excel")
+                    || mimeType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    || mimeType.equals("application/vnd.ms-powerpoint")
+                    || mimeType.equals("application/vnd.openxmlformats-officedocument.presentationml.presentation")) {
+                return true;
+            }
+        }
+        if (fileName == null) {
+            return false;
+        }
+        String lower = fileName.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".pdf") || lower.endsWith(".doc") || lower.endsWith(".docx")
+                || lower.endsWith(".xls") || lower.endsWith(".xlsx")
+                || lower.endsWith(".ppt") || lower.endsWith(".pptx");
+    }
+
+    private String abbreviateAiContext(String text, int limit) {
+        String normalized = StrUtil.trim(text);
+        if (StrUtil.isBlank(normalized)) {
+            return "";
+        }
+        if (normalized.length() <= limit) {
+            return normalized;
+        }
+        return normalized.substring(0, limit) + "\n...(内容过长已截断)";
+    }
+
+    private String extractChatResponseText(ChatResponse chatResponse) {
+        if (chatResponse == null || chatResponse.getResult() == null || chatResponse.getResult().getOutput() == null) {
+            return "";
+        }
+        return StrUtil.blankToDefault(chatResponse.getResult().getOutput().getText(), "");
+    }
+
+    private void logProjectAiError(Throwable error) {
+        WebClientResponseException exception = findWebClientResponseException(error);
+        if (exception != null) {
+            log.error("项目资料 AI 分析错误: {}, response body: {}",
+                    error.getMessage(), exception.getResponseBodyAsString(), error);
+            return;
+        }
+        log.error("项目资料 AI 分析错误: {}", error.getMessage(), error);
+    }
+
+    private String resolveProjectAiErrorMessage(Throwable error) {
+        WebClientResponseException exception = findWebClientResponseException(error);
+        if (exception == null) {
+            return PROJECT_AI_ERROR_MESSAGE;
+        }
+        int status = exception.getStatusCode().value();
+        if (status == 401 || status == 403) {
+            return "AI 服务认证失败：当前 API Key 无效或无权访问所选模型。请检查 API Key、服务商和模型权限后重试。";
+        }
+        if (status == 404) {
+            return "当前 AI 模型不可用：所选模型不存在或当前 API Key 无权访问。请检查模型名称、服务商和 API Key 权限后重试。";
+        }
+        if (status == 429) {
+            return "AI 服务暂时无法处理请求：额度不足或请求过于频繁。请稍后重试，或检查服务商额度。";
+        }
+        if (status >= 500) {
+            return "AI 服务商暂时不可用，请稍后重试。";
+        }
+        return PROJECT_AI_ERROR_MESSAGE;
+    }
+
+    private WebClientResponseException findWebClientResponseException(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof WebClientResponseException exception) {
+                return exception;
+            }
+            current = current.getCause();
+        }
+        return null;
     }
 
     private String buildAiCommandChatContent(String content, ProjectBO.AiCommand commandBO) {
@@ -1905,7 +2394,7 @@ public class ProjectServiceImpl implements IProjectService {
     }
 
     private Map<String, List<String>> loadProjectRolePermissions() {
-        String raw = systemConfigService.getConfigValue(PROJECT_ROLE_PERMISSION_CONFIG_KEY, "");
+        String raw = systemConfigServiceProvider.getObject().getConfigValue(PROJECT_ROLE_PERMISSION_CONFIG_KEY, "");
         if (StrUtil.isBlank(raw)) {
             return defaultRolePermissionsCopy();
         }
@@ -2131,5 +2620,13 @@ public class ProjectServiceImpl implements IProjectService {
         String displayName() {
             return StrUtil.blankToDefault(realName, StrUtil.blankToDefault(account, userId == null ? "系统" : String.valueOf(userId)));
         }
+    }
+
+    private record ProjectAiBillingContext(
+            DynamicChatClientProvider provider,
+            DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig,
+            AiModelPricingService.PricingSnapshot pricing,
+            String modelSource
+    ) {
     }
 }

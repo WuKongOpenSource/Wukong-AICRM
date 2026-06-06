@@ -51,6 +51,18 @@ public class ChatSessionVO {
     @Schema(description = "关联关系人头像访问地址")
     private String relationAvatarUrl;
 
+    @Schema(description = "关联项目ID")
+    private Long projectId;
+
+    @Schema(description = "关联项目名称")
+    private String projectName;
+
+    @Schema(description = "关联项目任务ID")
+    private Long projectTaskId;
+
+    @Schema(description = "关联项目任务名称")
+    private String projectTaskTitle;
+
     @Schema(description = "会话标题")
     private String title;
 

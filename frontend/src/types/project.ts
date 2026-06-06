@@ -23,7 +23,7 @@ export interface ProjectListQuery {
   limit?: number
 }
 
-export type ProjectRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'READONLY' | 'EXTERNAL'
+export type ProjectRole = string
 
 export type ProjectMemberStatus = 'ACTIVE' | 'REMOVED' | 'DISABLED'
 
@@ -49,14 +49,14 @@ export type ProjectPermission =
   | 'CREATE_SCHEDULE'
   | 'VIEW_STATISTICS'
 
-export type ProjectRolePermissionConfig = Record<ProjectRole, ProjectPermission[]>
+export type ProjectRolePermissionConfig = Record<string, ProjectPermission[]>
 
 export interface ProjectRolePermissionConfigVO {
   rolePermissions: ProjectRolePermissionConfig
 }
 
 export interface ProjectRolePermissionConfigPayload {
-  rolePermissions: Partial<Record<ProjectRole, ProjectPermission[]>>
+  rolePermissions: Partial<Record<string, ProjectPermission[]>>
 }
 
 export type ProjectMemberActionType =

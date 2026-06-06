@@ -31,6 +31,12 @@ public class ChatSendBO {
     @Schema(description = "聊天应用编码: general/crm/knowledge")
     private String appCode;
 
+    @Schema(description = "项目对话绑定的项目ID")
+    private Long projectId;
+
+    @Schema(description = "任务对话绑定的项目任务ID")
+    private Long projectTaskId;
+
     @Schema(description = "本次对话选择的 AI 服务商编码")
     private String modelProvider;
 

@@ -10,6 +10,8 @@ export function createSession(data: {
   customerId?: string
   employeeId?: string
   relationId?: string
+  projectId?: string
+  projectTaskId?: string
   appCode?: string
 }): Promise<string> {
   return post('/chat/session/create', data)
@@ -59,7 +61,7 @@ export async function sendMessageStream(
   sessionId: string,
   content: string,
   onChunk: (text: string) => void,
-  onComplete?: () => void,
+  onComplete?: () => void | Promise<void>,
   onError?: (error: Error) => void,
   attachments?: ChatAttachmentDTO[],
   appCode?: string,
@@ -68,6 +70,8 @@ export async function sendMessageStream(
   modelName?: string,
   modelSource?: string,
   knowledgeIds?: string[],
+  projectId?: string,
+  projectTaskId?: string,
   signal?: AbortSignal
 ): Promise<void> {
   const token = getToken()
@@ -103,9 +107,11 @@ export async function sendMessageStream(
         modelProvider: modelProvider || undefined,
         modelName: modelName || undefined,
         modelSource: modelSource || undefined,
+        projectId: projectId || undefined,
+        projectTaskId: projectTaskId || undefined,
         knowledgeIds:
           knowledgeIds?.length && knowledgeIds.length > 0
-            ? knowledgeIds.map((id) => Number(id)).filter((n) => !Number.isNaN(n))
+            ? knowledgeIds
             : undefined
       })
     })
@@ -154,7 +160,7 @@ export async function sendMessageStream(
     }
 
     // Stream completed successfully
-    onComplete?.()
+    await onComplete?.()
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error))
     if (err.name === 'AbortError') {
@@ -201,7 +207,9 @@ export function sendMessageSync(
   modelProvider?: string,
   modelName?: string,
   modelSource?: string,
-  knowledgeIds?: string[]
+  knowledgeIds?: string[],
+  projectId?: string,
+  projectTaskId?: string
 ): Promise<string> {
   return post('/chat/sendSync', {
     sessionId,
@@ -212,9 +220,11 @@ export function sendMessageSync(
     modelProvider: modelProvider || undefined,
     modelName: modelName || undefined,
     modelSource: modelSource || undefined,
+    projectId: projectId || undefined,
+    projectTaskId: projectTaskId || undefined,
     knowledgeIds:
       knowledgeIds?.length && knowledgeIds.length > 0
-        ? knowledgeIds.map((id) => Number(id)).filter((n) => !Number.isNaN(n))
+        ? knowledgeIds
         : undefined
   })
 }

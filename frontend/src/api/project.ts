@@ -30,6 +30,9 @@ export interface ProjectAiCommandPayload {
   content: string
   attachments?: ChatAttachmentDTO[]
   knowledgeIds?: string[]
+  modelProvider?: string
+  modelName?: string
+  modelSource?: string
 }
 
 function id(value: unknown): string | undefined {
