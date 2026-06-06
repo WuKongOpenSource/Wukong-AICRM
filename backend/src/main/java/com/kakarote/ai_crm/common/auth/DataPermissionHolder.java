@@ -28,6 +28,10 @@ public final class DataPermissionHolder {
         CACHE.get().put(module, context);
     }
 
+    public static void remove(String module) {
+        CACHE.get().remove(module);
+    }
+
     /**
      * 清理数据权限持有器。
      */

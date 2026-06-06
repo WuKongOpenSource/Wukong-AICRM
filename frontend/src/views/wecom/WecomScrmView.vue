@@ -9,6 +9,12 @@
         <el-tag v-if="canManageWecom && wecomConfig.thirdPartyEnabled" :type="wecomConfig.thirdPartyAuthorized ? 'success' : 'warning'" effect="plain">
           {{ wecomConfig.thirdPartyAuthorized ? '已授权' : '未授权' }}
         </el-tag>
+        <el-tag v-if="canManageWecom" :type="wecomConfig.customerContactEnabled ? 'success' : 'warning'" effect="plain">
+          {{ wecomConfig.customerContactEnabled ? '客户联系已启用' : '客户联系未启用' }}
+        </el-tag>
+        <el-tag v-if="canManageWecom" :type="archiveReady ? 'success' : 'warning'" effect="plain">
+          {{ archiveReady ? '会话存档已配置' : '会话存档未配置' }}
+        </el-tag>
         <el-button v-if="canManageWecom" :loading="authorizing" @click="handleAuthorize">
           <span class="material-symbols-outlined mr-1 text-[18px]">verified_user</span>
           {{ wecomConfig.thirdPartyAuthorized ? '重新授权' : '授权企业微信' }}
@@ -18,9 +24,13 @@
           <span class="material-symbols-outlined mr-1 text-[18px]">account_tree</span>
           同步组织
         </el-button>
-        <el-button :loading="syncing" :title="syncButtonText" @click="handleSync">
+        <el-button :loading="customerSyncing" :title="customerSyncButtonText" @click="handleSyncCustomers">
           <span class="material-symbols-outlined mr-1 text-[18px]">sync</span>
-          同步
+          {{ customerSyncButtonText }}
+        </el-button>
+        <el-button v-if="canManageWecom" :loading="archiveSyncing" @click="handleSyncConversations">
+          <span class="material-symbols-outlined mr-1 text-[18px]">history</span>
+          同步会话
         </el-button>
       </div>
     </header>
@@ -131,7 +141,8 @@ import type {
   WecomConversationType,
   WecomConversationVO,
   WecomEmployeeSessionVO,
-  WecomMessageVO
+  WecomMessageVO,
+  WecomSyncStatusVO
 } from '@/types/wecom'
 import WecomMessageList from './components/WecomMessageList.vue'
 
@@ -146,14 +157,21 @@ const activeConversation = ref<WecomConversationVO | null>(null)
 const employeeLoading = ref(false)
 const conversationLoading = ref(false)
 const messageLoading = ref(false)
-const syncing = ref(false)
+const customerSyncing = ref(false)
+const archiveSyncing = ref(false)
 const orgSyncing = ref(false)
 const authorizing = ref(false)
 const lastSyncText = ref('')
 const wecomConfig = ref<WecomConfigVO>({})
 const userStore = useUserStore()
 const canManageWecom = computed(() => userStore.permissionsLoaded && userStore.hasPermission('config:ai'))
-const syncButtonText = computed(() => (canManageWecom.value ? '全量同步' : '同步我的客户'))
+const customerSyncButtonText = computed(() => (canManageWecom.value ? '同步客户' : '同步我的客户'))
+const archiveReady = computed(() => Boolean(
+  wecomConfig.value.archiveEnabled
+    && wecomConfig.value.archiveSecretConfigured
+    && wecomConfig.value.archivePrivateKeyConfigured
+    && wecomConfig.value.archivePublicKeyVersion
+))
 
 const conversationTypeOptions = [
   { label: '客户会话', value: 'customer' },
@@ -229,26 +247,76 @@ async function selectEmployee(userId: string) {
   await loadConversations()
 }
 
-async function handleSync() {
-  syncing.value = true
+async function handleSyncCustomers() {
+  if (!ensureWecomAuthorized()) {
+    return
+  }
+  customerSyncing.value = true
   try {
-    const status = canManageWecom.value ? await runWecomSync() : await runMyWecomCustomerSync()
-    ElMessage.success(status.lastSyncStatus === 'failed' ? '同步已记录失败状态' : '同步完成')
+    const status = canManageWecom.value
+      ? await runWecomSync({ syncEmployees: false, syncCustomers: true, syncConversations: false })
+      : await runMyWecomCustomerSync()
+    showSyncMessage(status, canManageWecom.value ? '客户同步完成' : '我的客户同步完成')
     await Promise.all([loadConfig(), loadEmployees(), loadStatus(), loadConversations()])
   } finally {
-    syncing.value = false
+    customerSyncing.value = false
+  }
+}
+
+async function handleSyncConversations() {
+  if (!ensureWecomAuthorized()) {
+    return
+  }
+  if (!archiveReady.value) {
+    ElMessage.warning('请先配置并启用企业微信会话存档')
+    return
+  }
+  archiveSyncing.value = true
+  try {
+    const status = await runWecomSync({ syncEmployees: false, syncCustomers: false, syncConversations: true })
+    showSyncMessage(status, '会话存档同步完成')
+    await Promise.all([loadConfig(), loadStatus(), loadConversations()])
+  } finally {
+    archiveSyncing.value = false
   }
 }
 
 async function handleSyncOrg() {
+  if (!ensureWecomAuthorized()) {
+    return
+  }
   orgSyncing.value = true
   try {
     const status = await runWecomOrgSync()
-    ElMessage.success(status.lastSyncStatus === 'failed' ? '组织同步已记录失败状态' : '组织同步完成')
+    showSyncMessage(status, '组织同步完成')
     await Promise.all([loadConfig(), loadEmployees(), loadStatus(), loadConversations()])
   } finally {
     orgSyncing.value = false
   }
+}
+
+function showSyncMessage(status: WecomSyncStatusVO, successText: string) {
+  if (status.lastSyncStatus === 'failed') {
+    ElMessage.warning(status.lastSyncError || `${successText}，但已记录失败状态`)
+    return
+  }
+  if ((status.failedCount || 0) > 0) {
+    ElMessage.warning(`${successText}，${status.failedCount} 条失败`)
+    return
+  }
+  ElMessage.success(successText)
+}
+
+function ensureWecomAuthorized() {
+  if (!wecomConfig.value.thirdPartyEnabled) {
+    ElMessage.warning('企业微信第三方应用未配置')
+    return false
+  }
+  if (!wecomConfig.value.thirdPartyAuthorized) {
+    ElMessage.warning(canManageWecom.value ? '请先点击“授权企业微信”完成第三方应用授权' : '请联系管理员先授权企业微信')
+    return false
+  }
+  return true
 }
 
 async function handleAuthorize() {

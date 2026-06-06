@@ -11,11 +11,9 @@ public class ExternalAuthRegisterBO {
     @NotBlank
     private String ticket;
 
-    @NotBlank(message = "公司名称不能为空")
     private String companyName;
 
-    @NotBlank(message = "密码不能为空")
-    @Size(min = 6, max = 20, message = "密码长度6-20位")
+    @Size(min = 6, max = 20, message = "Password length must be 6-20")
     private String password;
 
     private LoginTypeEnum loginType;

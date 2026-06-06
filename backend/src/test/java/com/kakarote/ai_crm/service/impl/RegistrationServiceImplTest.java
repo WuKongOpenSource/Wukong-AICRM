@@ -31,6 +31,7 @@ import java.nio.file.Path;
 import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -171,12 +172,13 @@ class RegistrationServiceImplTest {
     }
 
     @Test
-    void registerExternalTenantShouldAllowUsernameOnlyAdminWithoutPassword() {
+    void registerExternalTenantShouldGenerateUnknownPasswordWhenPasswordIsMissing() {
         ExternalTenantRegisterBO registerBO = new ExternalTenantRegisterBO();
         registerBO.setUsername("user_a");
         registerBO.setCompanyName("Corp One");
         registerBO.setRealname("Alice");
         registerBO.setEmailVerificationRequired(Boolean.FALSE);
+        when(passwordEncoder.encode(anyString())).thenReturn("encoded-generated-password");
         when(weKnoraClient.isEnabled()).thenReturn(false);
         when(menuService.list()).thenReturn(Collections.emptyList());
         doAnswer(invocation -> {
@@ -192,8 +194,11 @@ class RegistrationServiceImplTest {
         assertEquals("user_a", userCaptor.getValue().getUsername());
         assertEquals("Alice", userCaptor.getValue().getRealname());
         assertEquals(null, userCaptor.getValue().getEmail());
-        assertEquals(null, userCaptor.getValue().getPassword());
-        verify(passwordEncoder, never()).encode(anyString());
+        assertEquals("encoded-generated-password", userCaptor.getValue().getPassword());
+        ArgumentCaptor<String> passwordCaptor = ArgumentCaptor.forClass(String.class);
+        verify(passwordEncoder).encode(passwordCaptor.capture());
+        assertNotNull(passwordCaptor.getValue());
+        assertTrue(passwordCaptor.getValue().length() >= 16);
     }
 
     @Test

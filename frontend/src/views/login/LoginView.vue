@@ -662,6 +662,7 @@ const pendingTenantId = ref('')
 const pendingEmailCodeScene = ref<EmailCodeScene | ''>('')
 const externalLoadingProvider = ref<ExternalAuthProviderCode | ''>('')
 const externalRegisterTicket = ref('')
+const externalLoginTicketProcessing = ref(false)
 let countdownTimer: number | undefined
 let forgotCountdownTimer: number | undefined
 
@@ -934,15 +935,32 @@ async function startExternalLogin(provider: ExternalAuthProviderCode) {
 }
 
 async function handleExternalAuthQuery() {
+  const wecomAuth = typeof route.query.wecomAuth === 'string' ? route.query.wecomAuth : ''
+  if (wecomAuth) {
+    const message = typeof route.query.message === 'string' ? route.query.message : ''
+    if (wecomAuth === 'success') {
+      ElMessage.success('企业微信授权成功，请重新扫码登录')
+    } else {
+      ElMessage.error(message ? `企业微信授权失败：${message}` : '企业微信授权失败')
+    }
+    await clearExternalAuthQuery()
+    return
+  }
+
   const externalError = typeof route.query.externalAuthError === 'string' ? route.query.externalAuthError : ''
   if (externalError) {
     ElMessage.error('External login failed')
-    clearExternalAuthQuery()
+    await clearExternalAuthQuery()
     return
   }
 
   const loginTicket = typeof route.query.externalLoginTicket === 'string' ? route.query.externalLoginTicket : ''
   if (loginTicket) {
+    if (externalLoginTicketProcessing.value) {
+      return
+    }
+    externalLoginTicketProcessing.value = true
+    await clearExternalAuthQuery()
     loading.value = true
     try {
       const result = await exchangeExternalLoginTicket({
@@ -950,18 +968,24 @@ async function handleExternalAuthQuery() {
         loginType: resolveLoginType()
       })
       await userStore.applyLoginResult(result)
-      clearExternalAuthQuery()
       await completeLoginRedirect()
     } catch (error) {
       console.error('External login ticket exchange failed:', error)
     } finally {
       loading.value = false
+      externalLoginTicketProcessing.value = false
     }
     return
   }
 
   const registerTicket = typeof route.query.externalRegisterTicket === 'string' ? route.query.externalRegisterTicket : ''
   if (registerTicket) {
+    const provider = typeof route.query.provider === 'string' ? route.query.provider : ''
+    await clearExternalAuthQuery()
+    if (provider === 'wecom') {
+      ElMessage.warning('请先完成企业微信第三方应用授权')
+      return
+    }
     externalRegisterTicket.value = registerTicket
     Object.assign(externalRegisterForm, {
       companyName: '',
@@ -969,7 +993,6 @@ async function handleExternalAuthQuery() {
       confirmPassword: ''
     })
     showExternalRegisterDialog.value = true
-    clearExternalAuthQuery()
   }
 }
 
@@ -978,8 +1001,10 @@ function clearExternalAuthQuery() {
   delete query.externalAuthError
   delete query.externalLoginTicket
   delete query.externalRegisterTicket
+  delete query.wecomAuth
+  delete query.message
   delete query.provider
-  router.replace({ name: route.name || 'Login', query })
+  return router.replace({ name: route.name || 'Login', query })
 }
 
 function handleExternalRegisterDialogClosed() {

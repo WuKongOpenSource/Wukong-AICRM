@@ -40,8 +40,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
@@ -61,6 +63,8 @@ public class RegistrationServiceImpl implements RegistrationService {
     private static final int RESET_PASSWORD_EMAIL_TYPE = 2;
     private static final int MENU_TYPE_ACTION = 5;
     private static final int DATA_SCOPE_SELF = 1;
+    private static final int GENERATED_EXTERNAL_PASSWORD_BYTES = 24;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final Set<String> SYSTEM_SETTING_MODULES = Set.of(
             "user", "dept", "role", "config", "customField", "agent"
     );
@@ -280,7 +284,7 @@ public class RegistrationServiceImpl implements RegistrationService {
 
             ManagerUser user = new ManagerUser();
             user.setUsername(username);
-            user.setPassword(StrUtil.isBlank(password) ? null : passwordEncoder.encode(password));
+            user.setPassword(encodeExternalTenantPassword(password));
             user.setEmail(email);
             user.setMobile(mobile);
             user.setRealname(StrUtil.isNotBlank(realname) ? realname : username);
@@ -513,6 +517,16 @@ public class RegistrationServiceImpl implements RegistrationService {
         if (StrUtil.length(password) < 6 || StrUtil.length(password) > 20) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "密码长度6-20位");
         }
+    }
+
+    private String encodeExternalTenantPassword(String password) {
+        String rawPassword = password;
+        if (StrUtil.isBlank(rawPassword)) {
+            byte[] randomBytes = new byte[GENERATED_EXTERNAL_PASSWORD_BYTES];
+            SECURE_RANDOM.nextBytes(randomBytes);
+            rawPassword = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+        }
+        return passwordEncoder.encode(rawPassword);
     }
 
     /**

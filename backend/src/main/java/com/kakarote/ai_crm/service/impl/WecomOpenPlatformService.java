@@ -6,6 +6,8 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.kakarote.ai_crm.common.auth.DataPermissionContext;
+import com.kakarote.ai_crm.common.auth.DataPermissionHolder;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.redis.Redis;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
@@ -22,6 +24,7 @@ import com.kakarote.ai_crm.entity.PO.WecomSuiteTicket;
 import com.kakarote.ai_crm.entity.VO.WecomOpenAuthorizeVO;
 import com.kakarote.ai_crm.mapper.ExternalAuthIdentityMapper;
 import com.kakarote.ai_crm.mapper.ExternalTenantBindingMapper;
+import com.kakarote.ai_crm.mapper.ManageUserMapper;
 import com.kakarote.ai_crm.mapper.WecomCorpConfigMapper;
 import com.kakarote.ai_crm.mapper.WecomEmployeeMapper;
 import com.kakarote.ai_crm.mapper.WecomSuiteTicketMapper;
@@ -32,6 +35,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -47,6 +52,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 @Slf4j
 @Service
@@ -60,8 +66,11 @@ public class WecomOpenPlatformService {
     private static final String PROVIDER_TOKEN_KEY_PREFIX = "wecom:open:provider-token:";
     private static final String CORP_TOKEN_KEY_PREFIX = "wecom:open:corp-token:";
     private static final String AUTH_STATE_KEY_PREFIX = "wecom:open:auth-state:";
+    private static final String AUTH_RESULT_KEY_PREFIX = "wecom:open:auth-result:";
+    private static final String EXTERNAL_LOGIN_TICKET_KEY_PREFIX = "external-auth:login-ticket:";
     private static final String INSTALL_URL = "https://open.work.weixin.qq.com/3rdapp/install";
     private static final String LOGIN_URL = "https://open.work.weixin.qq.com/wwopen/sso/3rd_qrConnect";
+    private static final String WECOM_EMPLOYEE_PERMISSION_MODULE = "wecomEmployeeSession";
 
     @Autowired
     private WecomOpenPlatformProperties properties;
@@ -88,6 +97,9 @@ public class WecomOpenPlatformService {
     private ExternalAuthIdentityMapper identityMapper;
 
     @Autowired
+    private ManageUserMapper managerUserMapper;
+
+    @Autowired
     private WecomEmployeeMapper employeeMapper;
 
     @Autowired
@@ -95,6 +107,13 @@ public class WecomOpenPlatformService {
 
     @Autowired
     private Redis redis;
+
+    @Autowired(required = false)
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired(required = false)
+    @Lazy
+    private WecomSyncServiceImpl syncService;
 
     public boolean isUsable() {
         return properties != null && properties.isUsable();
@@ -110,12 +129,31 @@ public class WecomOpenPlatformService {
                 && StrUtil.isNotBlank(config.getPermanentCodeEncrypted());
     }
 
+    public boolean isEnterpriseAuthorized(String corpId) {
+        if (StrUtil.isBlank(corpId)) {
+            return false;
+        }
+        return isAuthorized(configMapper.selectAuthorizedThirdPartyByCorpIdIgnoreTenant(corpId));
+    }
+
     public WecomOpenAuthorizeVO createAuthorizeUrl(String redirect, HttpServletRequest request) {
         requireUsable();
         LoginUser loginUser = UserUtil.getLoginUser();
         AuthState state = new AuthState();
         state.setTenantId(loginUser.getUser().getTenantId());
         state.setRedirect(resolveFrontendRedirect(redirect, request));
+        return createInstallAuthorizeUrl(state, request);
+    }
+
+    public WecomOpenAuthorizeVO createDirectInstallAuthorizeUrl(String redirect, HttpServletRequest request) {
+        requireUsable();
+        AuthState state = new AuthState();
+        state.setDirectInstall(Boolean.TRUE);
+        state.setRedirect(resolveFrontendRedirect(redirect, request));
+        return createInstallAuthorizeUrl(state, request);
+    }
+
+    private WecomOpenAuthorizeVO createInstallAuthorizeUrl(AuthState state, HttpServletRequest request) {
         String stateId = IdUtil.fastSimpleUUID();
         redis.setex(authStateKey(stateId), safeTtl(properties.getStateTtlSeconds()), JSON.toJSONString(state));
 
@@ -150,17 +188,24 @@ public class WecomOpenPlatformService {
         if (StrUtil.isNotBlank(error)) {
             return appendQuery(authState.getRedirect(), "wecomAuth", "error", "message", error);
         }
+        AuthResult cachedResult = readAuthResult(state);
+        if (cachedResult != null) {
+            redis.del(authStateKey(state));
+            return appendAuthResult(authState.getRedirect(), cachedResult);
+        }
         if (StrUtil.isBlank(authCode)) {
             return appendQuery(authState.getRedirect(), "wecomAuth", "error", "message", "missing_auth_code");
         }
         Long previousTenantId = TenantContextHolder.getTenantId();
-        TenantContextHolder.setTenantId(authState.getTenantId());
         try {
-            upsertAuthorizedConfig(authState.getTenantId(), apiClient.fetchPermanentCode(fetchSuiteAccessToken(), authCode));
+            JSONObject permanentData = apiClient.fetchPermanentCode(fetchSuiteAccessToken(), authCode);
+            AuthProcessResult result = processAuthorizedEnterprise(authState, permanentData);
+            storeAuthResult(state, result.getTenantId(), result.getIdentityId(), "success", null);
             redis.del(authStateKey(state));
-            return appendQuery(authState.getRedirect(), "wecomAuth", "success");
+            return appendAuthResult(authState.getRedirect(), result);
         } catch (Exception e) {
             log.warn("WeCom third-party auth callback failed: {}", e.getMessage());
+            storeAuthResult(state, null, null, "error", "callback_failed");
             return appendQuery(authState.getRedirect(), "wecomAuth", "error", "message", "callback_failed");
         } finally {
             restoreTenantContext(previousTenantId);
@@ -231,9 +276,11 @@ public class WecomOpenPlatformService {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom login profile is incomplete");
         }
         WecomCorpConfig config = configMapper.selectAuthorizedThirdPartyByCorpIdIgnoreTenant(corpId);
-        if (config == null) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom enterprise is not authorized");
-        }
+        String corpName = firstNotBlank(
+                config == null ? null : config.getCorpName(),
+                corpInfo == null ? null : corpInfo.getString("corp_name"),
+                corpInfo == null ? null : corpInfo.getString("corp_full_name")
+        );
 
         JSONObject rawProfile = new JSONObject();
         rawProfile.put("loginInfo", loginInfo);
@@ -256,7 +303,7 @@ public class WecomOpenPlatformService {
         profile.setDisplayName(displayName);
         profile.setAvatarUrl(userInfo == null ? null : userInfo.getString("avatar"));
         profile.setExternalTenantKey(corpId);
-        profile.setExternalTenantName(StrUtil.blankToDefault(config.getCorpName(), corpId));
+        profile.setExternalTenantName(corpName);
         profile.setEmailVerified(Boolean.FALSE);
         profile.setRawJson(rawProfile.toJSONString());
         return profile;
@@ -264,14 +311,11 @@ public class WecomOpenPlatformService {
 
     public String buildLoginAuthorizeUrl(String callbackUri, String state) {
         requireLoginUsable();
-        return UriComponentsBuilder.fromHttpUrl(LOGIN_URL)
-                .queryParam("appid", properties.getProviderCorpId())
-                .queryParam("redirect_uri", callbackUri)
-                .queryParam("state", state)
-                .queryParam("usertype", "member")
-                .build()
-                .encode()
-                .toUriString();
+        return LOGIN_URL
+                + "?appid=" + encode(properties.getProviderCorpId())
+                + "&redirect_uri=" + encode(callbackUri)
+                + "&state=" + encode(state)
+                + "&usertype=member";
     }
 
     public String resolveLoginCallbackUri(HttpServletRequest request) {
@@ -351,22 +395,45 @@ public class WecomOpenPlatformService {
             try {
                 state = readAuthState(stateId);
             } catch (BusinessException e) {
+                AuthResult result = readAuthResult(stateId);
+                if (result != null && "success".equals(result.getStatus())) {
+                    return;
+                }
                 log.debug("WeCom auth event local state is unavailable, fallback to direct install: {}", stateId);
                 state = null;
             }
         }
         JSONObject permanentData = apiClient.fetchPermanentCode(fetchSuiteAccessToken(), authCode);
-        Long tenantId = state == null ? resolveDirectInstallTenantId(permanentData) : state.getTenantId();
         Long previousTenantId = TenantContextHolder.getTenantId();
-        TenantContextHolder.setTenantId(tenantId);
         try {
-            upsertAuthorizedConfig(tenantId, permanentData);
+            AuthProcessResult result = processAuthorizedEnterprise(state, permanentData);
+            if (StrUtil.isNotBlank(stateId)) {
+                storeAuthResult(stateId, result.getTenantId(), result.getIdentityId(), "success", null);
+            }
         } finally {
             restoreTenantContext(previousTenantId);
         }
     }
 
-    private Long resolveDirectInstallTenantId(JSONObject permanentData) {
+    private AuthProcessResult processAuthorizedEnterprise(AuthState state, JSONObject permanentData) {
+        boolean directInstall = shouldUseDirectInstall(state);
+        DirectInstallResolution directResolution = directInstall
+                ? resolveDirectInstallTenant(permanentData, Boolean.TRUE.equals(state == null ? null : state.getDirectInstall()))
+                : null;
+        Long tenantId = directInstall ? directResolution.getTenantId() : state.getTenantId();
+        if (tenantId == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom authorized tenant is empty");
+        }
+        TenantContextHolder.setTenantId(tenantId);
+        WecomCorpConfig config = upsertAuthorizedConfig(tenantId, permanentData);
+        syncOrganizationAfterAuthorization(config);
+        AuthProcessResult result = new AuthProcessResult();
+        result.setTenantId(tenantId);
+        result.setIdentityId(directResolution == null ? null : directResolution.getIdentityId());
+        return result;
+    }
+
+    private DirectInstallResolution resolveDirectInstallTenant(JSONObject permanentData, boolean loginRequested) {
         JSONObject corpInfo = permanentData.getJSONObject("auth_corp_info");
         JSONObject authUserInfo = permanentData.getJSONObject("auth_user_info");
         String corpId = resolveAuthorizedCorpId(permanentData);
@@ -377,7 +444,13 @@ public class WecomOpenPlatformService {
                 .eq(ExternalTenantBinding::getStatus, ENABLED_STATUS)
                 .last("LIMIT 1"));
         if (existingBinding != null && existingBinding.getTenantId() != null) {
-            return existingBinding.getTenantId();
+            DirectInstallResolution result = new DirectInstallResolution();
+            result.setTenantId(existingBinding.getTenantId());
+            if (loginRequested) {
+                ExternalAuthIdentity identity = ensureDirectInstallLoginIdentity(permanentData, existingBinding.getTenantId());
+                result.setIdentityId(identity == null ? null : identity.getId());
+            }
+            return result;
         }
 
         String wecomUserId = authUserInfo == null ? null : authUserInfo.getString("userid");
@@ -407,9 +480,12 @@ public class WecomOpenPlatformService {
         if (user == null || user.getTenantId() == null || user.getUserId() == null) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom direct install tenant registration failed");
         }
-        upsertDirectInstallIdentity(permanentData, user, corpId, wecomUserId, displayName, email);
+        ExternalAuthIdentity identity = upsertDirectInstallIdentity(permanentData, user, corpId, wecomUserId, displayName, email);
         upsertDirectInstallEmployee(user, corpId, wecomUserId, displayName, email, StrUtil.isBlank(mobile) ? null : mobile);
-        return user.getTenantId();
+        DirectInstallResolution result = new DirectInstallResolution();
+        result.setTenantId(user.getTenantId());
+        result.setIdentityId(identity == null ? null : identity.getId());
+        return result;
     }
 
     private String resolveAuthorizedCorpId(JSONObject permanentData) {
@@ -424,12 +500,111 @@ public class WecomOpenPlatformService {
         return corpId;
     }
 
-    private void upsertDirectInstallIdentity(JSONObject permanentData,
-                                             ManagerUser user,
-                                             String corpId,
-                                             String wecomUserId,
-                                             String displayName,
-                                             String email) {
+    private ExternalAuthIdentity ensureDirectInstallLoginIdentity(JSONObject permanentData, Long tenantId) {
+        JSONObject authUserInfo = permanentData.getJSONObject("auth_user_info");
+        String corpId = resolveAuthorizedCorpId(permanentData);
+        String wecomUserId = authUserInfo == null ? null : authUserInfo.getString("userid");
+        if (StrUtil.isBlank(wecomUserId)) {
+            return null;
+        }
+        String displayName = firstNotBlank(
+                authUserInfo.getString("name"),
+                authUserInfo.getString("username"),
+                wecomUserId
+        );
+        String email = normalizeEmail(firstNotBlank(
+                authUserInfo.getString("email"),
+                authUserInfo.getString("biz_mail")
+        ));
+        String mobile = StrUtil.trim(authUserInfo.getString("mobile"));
+        ManagerUser user = findDirectInstallManagerUser(tenantId, corpId, wecomUserId);
+        if (user == null) {
+            user = createDirectInstallManagerUser(tenantId, corpId, wecomUserId, displayName, email,
+                    StrUtil.isBlank(mobile) ? null : mobile);
+        }
+        ExternalAuthIdentity identity = upsertDirectInstallIdentity(permanentData, user, corpId, wecomUserId, displayName, email);
+        upsertDirectInstallEmployee(user, corpId, wecomUserId, displayName, email, StrUtil.isBlank(mobile) ? null : mobile);
+        return identity;
+    }
+
+    private ManagerUser findDirectInstallManagerUser(Long tenantId, String corpId, String wecomUserId) {
+        Long previousTenantId = TenantContextHolder.getTenantId();
+        TenantContextHolder.setTenantId(tenantId);
+        try {
+            WecomEmployee employee = withWecomEmployeeDataPermission(() ->
+                    employeeMapper.selectOne(Wrappers.<WecomEmployee>lambdaQuery()
+                            .eq(WecomEmployee::getCorpId, corpId)
+                            .eq(WecomEmployee::getUserId, wecomUserId)
+                            .isNotNull(WecomEmployee::getCrmUserId)
+                            .last("LIMIT 1")));
+            if (employee != null && employee.getCrmUserId() != null) {
+                ManagerUser mappedUser = managerUserMapper.selectById(employee.getCrmUserId());
+                if (mappedUser != null) {
+                    return mappedUser;
+                }
+            }
+            return managerUserMapper.selectOne(Wrappers.<ManagerUser>lambdaQuery()
+                    .eq(ManagerUser::getWecomCorpId, corpId)
+                    .eq(ManagerUser::getWecomUserId, wecomUserId)
+                    .last("LIMIT 1"));
+        } finally {
+            restoreTenantContext(previousTenantId);
+        }
+    }
+
+    private ManagerUser createDirectInstallManagerUser(Long tenantId,
+                                                       String corpId,
+                                                       String wecomUserId,
+                                                       String displayName,
+                                                       String email,
+                                                       String mobile) {
+        Long previousTenantId = TenantContextHolder.getTenantId();
+        TenantContextHolder.setTenantId(tenantId);
+        try {
+            ManagerUser user = new ManagerUser();
+            user.setUsername(resolveDirectInstallUsername(wecomUserId, email, mobile));
+            user.setPassword(encodeGeneratedPassword());
+            user.setRealname(StrUtil.blankToDefault(displayName, wecomUserId));
+            user.setEmail(email);
+            user.setMobile(mobile);
+            user.setStatus(ENABLED_STATUS);
+            user.setWecomCorpId(corpId);
+            user.setWecomUserId(wecomUserId);
+            user.setWecomSyncedAt(new Date());
+            user.setCreateTime(new Date());
+            managerUserMapper.insert(user);
+            return user;
+        } finally {
+            restoreTenantContext(previousTenantId);
+        }
+    }
+
+    private String resolveDirectInstallUsername(String wecomUserId, String email, String mobile) {
+        String username = firstNotBlank(email, mobile, wecomUserId, "wecom_user");
+        if (username.length() > 64) {
+            username = firstNotBlank(wecomUserId, "wecom_user");
+        }
+        if (username.length() > 64) {
+            username = username.substring(0, 64);
+        }
+        if (managerUserMapper.selectCount(Wrappers.<ManagerUser>lambdaQuery()
+                .eq(ManagerUser::getUsername, username)) == 0) {
+            return username;
+        }
+        return "wecom_" + IdUtil.fastSimpleUUID().substring(0, 12);
+    }
+
+    private String encodeGeneratedPassword() {
+        String password = "Wecom" + IdUtil.fastSimpleUUID().substring(0, 12);
+        return passwordEncoder == null ? password : passwordEncoder.encode(password);
+    }
+
+    private ExternalAuthIdentity upsertDirectInstallIdentity(JSONObject permanentData,
+                                                             ManagerUser user,
+                                                             String corpId,
+                                                             String wecomUserId,
+                                                             String displayName,
+                                                             String email) {
         String subject = corpId + ":" + wecomUserId;
         ExternalAuthIdentity identity = identityMapper.selectOne(Wrappers.<ExternalAuthIdentity>lambdaQuery()
                 .eq(ExternalAuthIdentity::getProvider, "wecom")
@@ -456,6 +631,7 @@ public class WecomOpenPlatformService {
         } else {
             identityMapper.updateById(identity);
         }
+        return identity;
     }
 
     private void upsertDirectInstallEmployee(ManagerUser user,
@@ -467,32 +643,34 @@ public class WecomOpenPlatformService {
         Long previousTenantId = TenantContextHolder.getTenantId();
         TenantContextHolder.setTenantId(user.getTenantId());
         try {
-            WecomEmployee employee = employeeMapper.selectOne(Wrappers.<WecomEmployee>lambdaQuery()
-                    .eq(WecomEmployee::getCorpId, corpId)
-                    .eq(WecomEmployee::getUserId, wecomUserId)
-                    .last("LIMIT 1"));
-            if (employee == null) {
-                employee = new WecomEmployee();
-                employee.setCorpId(corpId);
-                employee.setUserId(wecomUserId);
-            }
-            employee.setCrmUserId(user.getUserId());
-            employee.setName(StrUtil.blankToDefault(displayName, wecomUserId));
-            employee.setEmail(email);
-            employee.setMobile(mobile);
-            employee.setStatus(ENABLED_STATUS);
-            employee.setSyncedAt(new Date());
-            if (employee.getId() == null) {
-                employeeMapper.insert(employee);
-            } else {
-                employeeMapper.updateById(employee);
-            }
+            runWithWecomEmployeeDataPermission(() -> {
+                WecomEmployee employee = employeeMapper.selectOne(Wrappers.<WecomEmployee>lambdaQuery()
+                        .eq(WecomEmployee::getCorpId, corpId)
+                        .eq(WecomEmployee::getUserId, wecomUserId)
+                        .last("LIMIT 1"));
+                if (employee == null) {
+                    employee = new WecomEmployee();
+                    employee.setCorpId(corpId);
+                    employee.setUserId(wecomUserId);
+                }
+                employee.setCrmUserId(user.getUserId());
+                employee.setName(StrUtil.blankToDefault(displayName, wecomUserId));
+                employee.setEmail(email);
+                employee.setMobile(mobile);
+                employee.setStatus(ENABLED_STATUS);
+                employee.setSyncedAt(new Date());
+                if (employee.getId() == null) {
+                    employeeMapper.insert(employee);
+                } else {
+                    employeeMapper.updateById(employee);
+                }
+            });
         } finally {
             restoreTenantContext(previousTenantId);
         }
     }
 
-    private void upsertAuthorizedConfig(Long tenantId, JSONObject permanentData) {
+    private WecomCorpConfig upsertAuthorizedConfig(Long tenantId, JSONObject permanentData) {
         JSONObject corpInfo = permanentData.getJSONObject("auth_corp_info");
         JSONObject authInfo = permanentData.getJSONObject("auth_info");
         JSONObject authUserInfo = permanentData.getJSONObject("auth_user_info");
@@ -506,6 +684,7 @@ public class WecomOpenPlatformService {
             config.setCustomerContactEnabled(Boolean.TRUE);
             config.setSyncEnabled(Boolean.TRUE);
         }
+        config.setTenantId(tenantId);
         config.setCorpId(corpId);
         config.setCorpName(corpInfo == null ? corpId : StrUtil.blankToDefault(corpInfo.getString("corp_name"), corpId));
         config.setAgentId(resolveAgentId(authInfo));
@@ -527,6 +706,19 @@ public class WecomOpenPlatformService {
         }
         upsertTenantBinding(tenantId, corpId, config.getCorpName());
         redis.del(CORP_TOKEN_KEY_PREFIX + corpId);
+        return config;
+    }
+
+    private void syncOrganizationAfterAuthorization(WecomCorpConfig config) {
+        if (syncService == null || config == null) {
+            return;
+        }
+        try {
+            runWithWecomEmployeeDataPermission(() -> syncService.syncOrganization(config));
+        } catch (Exception e) {
+            log.warn("WeCom organization sync after authorization failed: corpId={}, error={}",
+                    config.getCorpId(), e.getMessage());
+        }
     }
 
     private void upsertTenantBinding(Long tenantId, String corpId, String corpName) {
@@ -667,6 +859,58 @@ public class WecomOpenPlatformService {
         return JSON.parseObject(raw, AuthState.class);
     }
 
+    private AuthResult readAuthResult(String state) {
+        if (StrUtil.isBlank(state)) {
+            return null;
+        }
+        String raw = redis.get(authResultKey(state));
+        return StrUtil.isBlank(raw) ? null : JSON.parseObject(raw, AuthResult.class);
+    }
+
+    private void storeAuthResult(String state, Long tenantId, Long identityId, String status, String message) {
+        if (StrUtil.isBlank(state)) {
+            return;
+        }
+        AuthResult result = new AuthResult();
+        result.setTenantId(tenantId);
+        result.setIdentityId(identityId);
+        result.setStatus(status);
+        result.setMessage(message);
+        redis.setex(authResultKey(state), safeTtl(properties.getStateTtlSeconds()), JSON.toJSONString(result));
+    }
+
+    private String appendAuthResult(String redirect, AuthResult result) {
+        if (result == null || "success".equals(result.getStatus())) {
+            if (result != null && result.getIdentityId() != null) {
+                return appendQuery(redirect,
+                        "externalLoginTicket", createExternalLoginTicket(result.getIdentityId()),
+                        "provider", "wecom");
+            }
+            return appendQuery(redirect, "wecomAuth", "success");
+        }
+        return appendQuery(redirect, "wecomAuth", "error", "message",
+                StrUtil.blankToDefault(result.getMessage(), "callback_failed"));
+    }
+
+    private String appendAuthResult(String redirect, AuthProcessResult result) {
+        AuthResult authResult = new AuthResult();
+        authResult.setTenantId(result == null ? null : result.getTenantId());
+        authResult.setIdentityId(result == null ? null : result.getIdentityId());
+        authResult.setStatus("success");
+        return appendAuthResult(redirect, authResult);
+    }
+
+    private String createExternalLoginTicket(Long identityId) {
+        String ticketValue = IdUtil.fastSimpleUUID();
+        ExternalAuthServiceImpl.ExternalLoginTicket ticket = new ExternalAuthServiceImpl.ExternalLoginTicket();
+        ticket.setProvider("wecom");
+        ticket.setIdentityId(identityId);
+        redis.setex(EXTERNAL_LOGIN_TICKET_KEY_PREFIX + ticketValue,
+                safeTtl(properties.getStateTtlSeconds()),
+                JSON.toJSONString(ticket));
+        return ticketValue;
+    }
+
     private String decryptRequired(String encrypted, String label) {
         if (StrUtil.isBlank(encrypted)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom " + label + " is not configured");
@@ -702,6 +946,10 @@ public class WecomOpenPlatformService {
 
     private String authStateKey(String state) {
         return AUTH_STATE_KEY_PREFIX + state;
+    }
+
+    private String authResultKey(String state) {
+        return AUTH_RESULT_KEY_PREFIX + state;
     }
 
     private String appendQuery(String redirect, String... pairs) {
@@ -740,6 +988,31 @@ public class WecomOpenPlatformService {
         return null;
     }
 
+    private boolean shouldUseDirectInstall(AuthState state) {
+        return state == null || state.getTenantId() == null || Boolean.TRUE.equals(state.getDirectInstall());
+    }
+
+    private void runWithWecomEmployeeDataPermission(Runnable action) {
+        withWecomEmployeeDataPermission(() -> {
+            action.run();
+            return null;
+        });
+    }
+
+    private <T> T withWecomEmployeeDataPermission(Supplier<T> action) {
+        DataPermissionContext previousContext = DataPermissionHolder.get(WECOM_EMPLOYEE_PERMISSION_MODULE);
+        DataPermissionHolder.put(WECOM_EMPLOYEE_PERMISSION_MODULE, DataPermissionContext.all());
+        try {
+            return action.get();
+        } finally {
+            if (previousContext == null) {
+                DataPermissionHolder.remove(WECOM_EMPLOYEE_PERMISSION_MODULE);
+            } else {
+                DataPermissionHolder.put(WECOM_EMPLOYEE_PERMISSION_MODULE, previousContext);
+            }
+        }
+    }
+
     private void restoreTenantContext(Long previousTenantId) {
         if (previousTenantId != null) {
             TenantContextHolder.setTenantId(previousTenantId);
@@ -752,5 +1025,26 @@ public class WecomOpenPlatformService {
     public static class AuthState {
         private Long tenantId;
         private String redirect;
+        private Boolean directInstall;
+    }
+
+    @Data
+    public static class AuthResult {
+        private Long tenantId;
+        private Long identityId;
+        private String status;
+        private String message;
+    }
+
+    @Data
+    private static class AuthProcessResult {
+        private Long tenantId;
+        private Long identityId;
+    }
+
+    @Data
+    private static class DirectInstallResolution {
+        private Long tenantId;
+        private Long identityId;
     }
 }

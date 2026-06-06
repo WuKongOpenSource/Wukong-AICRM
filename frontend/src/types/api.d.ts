@@ -61,8 +61,8 @@ export interface ExternalAuthTicketLoginParams {
 
 export interface ExternalAuthRegisterParams {
   ticket: string
-  companyName: string
-  password: string
+  companyName?: string
+  password?: string
   loginType?: LoginType
 }
 

@@ -61,6 +61,7 @@ public class WecomServiceImpl {
     private static final String TYPE_EMPLOYEE = "employee";
     private static final String TYPE_CUSTOMER = "customer";
     private static final String TYPE_GROUP = "group";
+    private static final String AUTH_REQUIRED_MESSAGE = "Please authorize WeCom third-party app first";
 
     @Autowired
     private WecomCorpConfigMapper configMapper;
@@ -160,8 +161,10 @@ public class WecomServiceImpl {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom binding is incomplete");
         }
         WecomCorpConfig config = requireConfig(corpId);
-        int saved = syncService.syncVisibleCustomers(config, wecomUserId, currentUserId);
-        WecomSyncStatusVO status = buildSyncStatus(config, saved, saved);
+        WecomSyncServiceImpl.CustomerSyncResult syncResult = syncService.syncVisibleCustomersWithResult(config, wecomUserId, currentUserId);
+        WecomSyncStatusVO status = buildSyncStatus(config, syncResult.fetched(), syncResult.saved());
+        status.setFailedCount(syncResult.failed());
+        status.setLastSyncError(syncResult.errorMessage());
         config.setLastSyncTime(status.getLastSyncTime());
         config.setLastSyncStatus(status.getLastSyncStatus());
         config.setLastSyncError(status.getLastSyncError());
@@ -332,10 +335,11 @@ public class WecomServiceImpl {
     private WecomCorpConfig requireConfig() {
         WecomCorpConfig config = findConfig();
         if (config == null || StrUtil.isBlank(config.getCorpId())) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom config is not complete");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                    openPlatformService.isUsable() ? AUTH_REQUIRED_MESSAGE : "WeCom config is not complete");
         }
         if (!openPlatformService.isAuthorized(config)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom enterprise is not authorized");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, AUTH_REQUIRED_MESSAGE);
         }
         return config;
     }
@@ -351,10 +355,11 @@ public class WecomServiceImpl {
                         LIMIT 1
                         """));
         if (config == null || StrUtil.isBlank(config.getCorpId())) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom config is not complete");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                    openPlatformService.isUsable() ? AUTH_REQUIRED_MESSAGE : "WeCom config is not complete");
         }
         if (!openPlatformService.isAuthorized(config)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom enterprise is not authorized");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, AUTH_REQUIRED_MESSAGE);
         }
         return config;
     }
@@ -385,7 +390,10 @@ public class WecomServiceImpl {
 
     private WecomConfigVO toConfigVO(WecomCorpConfig config) {
         WecomConfigVO vo = new WecomConfigVO();
+        vo.setThirdPartyEnabled(openPlatformService.isUsable());
+        vo.setThirdPartyAuthorized(config != null && openPlatformService.isAuthorized(config));
         if (config == null) {
+            vo.setAuthStatus("UNAUTHORIZED");
             return vo;
         }
         vo.setId(config.getId());
@@ -393,8 +401,6 @@ public class WecomServiceImpl {
         vo.setCorpName(config.getCorpName());
         vo.setAgentId(config.getAgentId());
         vo.setAuthStatus(config.getAuthStatus());
-        vo.setThirdPartyEnabled(openPlatformService.isUsable());
-        vo.setThirdPartyAuthorized(openPlatformService.isAuthorized(config));
         vo.setAuthorizedAt(config.getAuthorizedAt());
         vo.setUnauthorizedAt(config.getUnauthorizedAt());
         vo.setArchiveSecretConfigured(StrUtil.isNotBlank(config.getArchiveSecretEncrypted()));

@@ -5,6 +5,8 @@ import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.kakarote.ai_crm.common.auth.DataPermissionContext;
+import com.kakarote.ai_crm.common.auth.DataPermissionHolder;
 import com.kakarote.ai_crm.common.enums.LoginTypeEnum;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.redis.Redis;
@@ -24,6 +26,7 @@ import com.kakarote.ai_crm.entity.VO.ExternalAuthAuthorizeVO;
 import com.kakarote.ai_crm.entity.VO.ExternalAuthBindingVO;
 import com.kakarote.ai_crm.entity.VO.ExternalAuthProviderVO;
 import com.kakarote.ai_crm.entity.VO.LoginResponseVO;
+import com.kakarote.ai_crm.entity.VO.WecomOpenAuthorizeVO;
 import com.kakarote.ai_crm.mapper.ExternalAuthIdentityMapper;
 import com.kakarote.ai_crm.mapper.ExternalTenantBindingMapper;
 import com.kakarote.ai_crm.mapper.WecomEmployeeMapper;
@@ -63,6 +66,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Supplier;
 
 @Slf4j
 @Service
@@ -73,6 +77,8 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
     private static final String SCENE_LOGIN = "LOGIN";
     private static final String SCENE_BIND = "BIND";
     private static final int ENABLED_STATUS = 1;
+    private static final String WECOM_EMPLOYEE_PERMISSION_MODULE = "wecomEmployeeSession";
+    private static final String DEFAULT_WECOM_TENANT_NAME = "\u4f01\u4e1a\u5fae\u4fe1\u4f01\u4e1a";
 
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -202,6 +208,12 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
         }
 
         if ("wecom".equals(normalizedProvider) && StrUtil.isNotBlank(profile.getExternalTenantKey())) {
+            ExternalTenantBinding binding = findTenantBinding(profile.getProvider(), profile.getExternalTenantKey());
+            if (binding == null || !wecomOpenPlatformService.isEnterpriseAuthorized(profile.getExternalTenantKey())) {
+                WecomOpenAuthorizeVO authorize = wecomOpenPlatformService.createDirectInstallAuthorizeUrl(
+                        authState.getRedirect(), request);
+                return authorize.getAuthorizeUrl();
+            }
             ExternalAuthIdentity provisionedIdentity = autoProvisionWecomIdentity(profile);
             String ticket = createLoginTicket(provisionedIdentity);
             return appendQuery(authState.getRedirect(), "externalLoginTicket", ticket, "provider", normalizedProvider);
@@ -254,28 +266,35 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "External identity is already bound");
         }
 
+        boolean wecomProfile = "wecom".equals(profile.getProvider()) && StrUtil.isNotBlank(profile.getExternalTenantKey());
+        ExternalTenantBinding wecomBinding = wecomProfile
+                ? findTenantBinding(profile.getProvider(), profile.getExternalTenantKey())
+                : null;
+        if (wecomProfile && (wecomBinding == null
+                || !wecomOpenPlatformService.isEnterpriseAuthorized(profile.getExternalTenantKey()))) {
+            redis.del(ticketKey);
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Please authorize WeCom third-party app first");
+        }
         String email = resolveRegistrationEmail(profile);
-        String realname = StrUtil.blankToDefault(StrUtil.trim(profile.getDisplayName()), email);
+        String realname = StrUtil.blankToDefault(StrUtil.trim(profile.getDisplayName()),
+                firstNotBlank(email, profile.getSubject()));
+        String companyName = StrUtil.trim(registerBO.getCompanyName());
 
         ManagerUser user;
-        if ("wecom".equals(profile.getProvider()) && StrUtil.isNotBlank(profile.getExternalTenantKey())) {
-            ExternalTenantBinding binding = findTenantBinding(profile.getProvider(), profile.getExternalTenantKey());
-            if (binding == null) {
-                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom enterprise is not authorized");
-            } else {
-                ExternalTenantMemberRegisterBO memberRegisterBO = new ExternalTenantMemberRegisterBO();
-                memberRegisterBO.setTenantId(binding.getTenantId());
-                memberRegisterBO.setEmail(email);
-                memberRegisterBO.setMobile(profile.getMobile());
-                memberRegisterBO.setPassword(registerBO.getPassword());
-                memberRegisterBO.setRealname(realname);
-                user = registrationService.registerExternalTenantMember(memberRegisterBO);
-            }
+        if (wecomProfile) {
+            ExternalTenantMemberRegisterBO memberRegisterBO = new ExternalTenantMemberRegisterBO();
+            memberRegisterBO.setTenantId(wecomBinding.getTenantId());
+            memberRegisterBO.setEmail(email);
+            memberRegisterBO.setMobile(profile.getMobile());
+            memberRegisterBO.setPassword(registerBO.getPassword());
+            memberRegisterBO.setRealname(realname);
+            user = registrationService.registerExternalTenantMember(memberRegisterBO);
         } else {
+            requireManualRegisterInput(registerBO);
             ExternalTenantRegisterBO tenantRegisterBO = new ExternalTenantRegisterBO();
             tenantRegisterBO.setEmail(email);
             tenantRegisterBO.setPassword(registerBO.getPassword());
-            tenantRegisterBO.setCompanyName(StrUtil.trim(registerBO.getCompanyName()));
+            tenantRegisterBO.setCompanyName(companyName);
             tenantRegisterBO.setRealname(realname);
             tenantRegisterBO.setEmailVerificationRequired(Boolean.FALSE);
             user = registrationService.registerExternalTenant(tenantRegisterBO);
@@ -546,8 +565,8 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
 
         ManagerUser user;
         ExternalTenantBinding binding = findTenantBinding(profile.getProvider(), profile.getExternalTenantKey());
-        if (binding == null) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom enterprise is not authorized");
+        if (binding == null || !wecomOpenPlatformService.isEnterpriseAuthorized(profile.getExternalTenantKey())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Please authorize WeCom third-party app first");
         } else {
             user = findExistingWecomMemberUser(profile, binding.getTenantId(), email);
             if (user == null) {
@@ -631,7 +650,7 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
         ExternalTenantBinding binding = new ExternalTenantBinding();
         binding.setProvider(profile.getProvider());
         binding.setExternalTenantKey(profile.getExternalTenantKey());
-        binding.setExternalTenantName(StrUtil.blankToDefault(profile.getExternalTenantName(), tenantName));
+        binding.setExternalTenantName(resolveExternalTenantName(profile, tenantName));
         binding.setTenantId(tenantId);
         binding.setStatus(ENABLED_STATUS);
         binding.setCreateTime(new Date());
@@ -665,11 +684,12 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
             Long previousTenantId = TenantContextHolder.getTenantId();
             TenantContextHolder.setTenantId(tenantId);
             try {
-                WecomEmployee employee = wecomEmployeeMapper.selectOne(Wrappers.<WecomEmployee>lambdaQuery()
-                        .eq(WecomEmployee::getCorpId, corpId)
-                        .eq(WecomEmployee::getUserId, wecomUserId)
-                        .isNotNull(WecomEmployee::getCrmUserId)
-                        .last("LIMIT 1"));
+                WecomEmployee employee = withWecomEmployeeDataPermission(() ->
+                        wecomEmployeeMapper.selectOne(Wrappers.<WecomEmployee>lambdaQuery()
+                                .eq(WecomEmployee::getCorpId, corpId)
+                                .eq(WecomEmployee::getUserId, wecomUserId)
+                                .isNotNull(WecomEmployee::getCrmUserId)
+                                .last("LIMIT 1")));
                 if (employee != null && employee.getCrmUserId() != null) {
                     ManagerUser mappedUser = manageUserService.getById(employee.getCrmUserId());
                     if (mappedUser != null) {
@@ -714,29 +734,40 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
         Long previousTenantId = TenantContextHolder.getTenantId();
         TenantContextHolder.setTenantId(tenantId);
         try {
-            WecomEmployee employee = wecomEmployeeMapper.selectOne(Wrappers.<WecomEmployee>lambdaQuery()
-                    .eq(WecomEmployee::getCorpId, corpId)
-                    .eq(WecomEmployee::getUserId, wecomUserId)
-                    .last("LIMIT 1"));
-            if (employee == null) {
-                employee = new WecomEmployee();
-                employee.setCorpId(corpId);
-                employee.setUserId(wecomUserId);
-            }
-            employee.setCrmUserId(userId);
-            employee.setName(StrUtil.blankToDefault(profile.getDisplayName(), wecomUserId));
-            employee.setAvatar(profile.getAvatarUrl());
-            employee.setMobile(StrUtil.blankToDefault(profile.getMobile(), employee.getMobile()));
-            employee.setEmail(StrUtil.blankToDefault(profile.getEmail(), employee.getEmail()));
-            employee.setStatus(ENABLED_STATUS);
-            employee.setSyncedAt(new Date());
-            if (employee.getId() == null) {
-                wecomEmployeeMapper.insert(employee);
-            } else {
-                wecomEmployeeMapper.updateById(employee);
-            }
+            runWithWecomEmployeeDataPermission(() -> {
+                WecomEmployee employee = wecomEmployeeMapper.selectOne(Wrappers.<WecomEmployee>lambdaQuery()
+                        .eq(WecomEmployee::getCorpId, corpId)
+                        .eq(WecomEmployee::getUserId, wecomUserId)
+                        .last("LIMIT 1"));
+                if (employee == null) {
+                    employee = new WecomEmployee();
+                    employee.setCorpId(corpId);
+                    employee.setUserId(wecomUserId);
+                }
+                employee.setCrmUserId(userId);
+                employee.setName(StrUtil.blankToDefault(profile.getDisplayName(), wecomUserId));
+                employee.setAvatar(profile.getAvatarUrl());
+                employee.setMobile(StrUtil.blankToDefault(profile.getMobile(), employee.getMobile()));
+                employee.setEmail(StrUtil.blankToDefault(profile.getEmail(), employee.getEmail()));
+                employee.setStatus(ENABLED_STATUS);
+                employee.setSyncedAt(new Date());
+                if (employee.getId() == null) {
+                    wecomEmployeeMapper.insert(employee);
+                } else {
+                    wecomEmployeeMapper.updateById(employee);
+                }
+            });
         } finally {
             restoreTenantContext(previousTenantId);
+        }
+    }
+
+    private void requireManualRegisterInput(ExternalAuthRegisterBO registerBO) {
+        if (StrUtil.isBlank(registerBO.getCompanyName())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Company name is required");
+        }
+        if (StrUtil.isBlank(registerBO.getPassword())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Password is required");
         }
     }
 
@@ -752,6 +783,39 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
         }
         profile.setEmail(email);
         return email;
+    }
+
+    private String resolveWecomCompanyName(ExternalProfile profile, String requestedCompanyName) {
+        String requestedName = StrUtil.trim(requestedCompanyName);
+        if (isUsableWecomTenantName(profile, requestedName)) {
+            return requestedName;
+        }
+        String externalName = StrUtil.trim(profile.getExternalTenantName());
+        if (isUsableWecomTenantName(profile, externalName)) {
+            return externalName;
+        }
+        return DEFAULT_WECOM_TENANT_NAME;
+    }
+
+    private String resolveExternalTenantName(ExternalProfile profile, String fallbackName) {
+        String externalName = StrUtil.trim(profile.getExternalTenantName());
+        if ("wecom".equals(profile.getProvider()) && !isUsableWecomTenantName(profile, externalName)) {
+            externalName = null;
+        }
+        return StrUtil.blankToDefault(externalName, fallbackName);
+    }
+
+    private boolean isUsableWecomTenantName(ExternalProfile profile, String tenantName) {
+        return StrUtil.isNotBlank(tenantName) && !Objects.equals(tenantName, profile.getExternalTenantKey());
+    }
+
+    private String resolveWecomLoginUsername(ExternalProfile profile) {
+        String userId = resolveWecomUserId(profile);
+        if (StrUtil.isNotBlank(userId)) {
+            return userId;
+        }
+        String subject = profile.getSubject();
+        return StrUtil.isBlank(subject) ? "wecom_user" : subject;
     }
 
     private ExternalAuthProperties.ProviderConfig requireUsableProvider(String provider) {
@@ -979,6 +1043,27 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
     private void validateProfile(ExternalProfile profile) {
         if (StrUtil.isBlank(profile.getSubject())) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "External identity subject is missing");
+        }
+    }
+
+    private void runWithWecomEmployeeDataPermission(Runnable action) {
+        withWecomEmployeeDataPermission(() -> {
+            action.run();
+            return null;
+        });
+    }
+
+    private <T> T withWecomEmployeeDataPermission(Supplier<T> action) {
+        DataPermissionContext previousContext = DataPermissionHolder.get(WECOM_EMPLOYEE_PERMISSION_MODULE);
+        DataPermissionHolder.put(WECOM_EMPLOYEE_PERMISSION_MODULE, DataPermissionContext.all());
+        try {
+            return action.get();
+        } finally {
+            if (previousContext == null) {
+                DataPermissionHolder.remove(WECOM_EMPLOYEE_PERMISSION_MODULE);
+            } else {
+                DataPermissionHolder.put(WECOM_EMPLOYEE_PERMISSION_MODULE, previousContext);
+            }
         }
     }
 
