@@ -203,63 +203,11 @@
       </div>
     </div>
 
-    <el-dialog
+    <RelationUpsertDialog
       v-model="dialogVisible"
-      :title="dialogMode === 'create' ? '新建关系' : '编辑关系'"
-      :width="isMobile ? '92vw' : '560px'"
-      destroy-on-close
-    >
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label class="relation-field sm:col-span-2">
-          <span>姓名</span>
-          <el-input v-model="form.name" maxlength="100" />
-        </label>
-        <label class="relation-field">
-          <span>关系类型</span>
-          <el-select v-model="form.relationType" class="w-full">
-            <el-option v-for="option in relationTypeOptions" :key="option.value" :label="option.label" :value="option.value" />
-          </el-select>
-        </label>
-        <label class="relation-field">
-          <span>所属公司</span>
-          <el-input v-model="form.company" maxlength="255" />
-        </label>
-        <label class="relation-field">
-          <span>手机号</span>
-          <el-input v-model="form.phone" maxlength="50" />
-        </label>
-        <label class="relation-field">
-          <span>微信号</span>
-          <el-input v-model="form.wechat" maxlength="100" />
-        </label>
-        <label class="relation-field">
-          <span>邮箱</span>
-          <el-input v-model="form.email" maxlength="100" />
-        </label>
-        <label class="relation-field">
-          <span>头像 URL</span>
-          <el-input v-model="form.avatar" maxlength="500" />
-        </label>
-        <label class="relation-field sm:col-span-2">
-          <span>备注</span>
-          <el-input v-model="form.remark" type="textarea" :rows="4" maxlength="1000" show-word-limit />
-        </label>
-        <DynamicFieldForm
-          ref="dynamicFieldFormRef"
-          v-model="customFieldValues"
-          entity-type="relation"
-          mode="custom"
-          :entity-id="dialogMode === 'edit' ? editingRelationId : null"
-          class="contents"
-        />
-      </div>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="submitting" @click="submitRelation">保存</el-button>
-        </div>
-      </template>
-    </el-dialog>
+      :editing-relation="editingRelation"
+      @saved="handleRelationSaved"
+    />
 
     <el-drawer
       v-model="detailVisible"
@@ -319,34 +267,25 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { addRelation, deleteRelation, getRelationDetail, queryRelationList, updateRelation } from '@/api/relation'
-import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
+import { deleteRelation, getRelationDetail, queryRelationList } from '@/api/relation'
 import AiDialogIcon from '@/components/common/AiDialogIcon.vue'
+import RelationUpsertDialog from '@/views/relation/components/RelationUpsertDialog.vue'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { isRequestErrorHandled } from '@/utils/requestError'
-import type { RelationAddBO, RelationDetailVO, RelationType, RelationUpdateBO, RelationVO } from '@/types/relation'
+import { appEvents, APP_EVENT } from '@/utils/events'
+import { relationTypeOptions } from '@/views/relation/constants'
+import type { RelationDetailVO, RelationVO } from '@/types/relation'
 
 const router = useRouter()
 const route = useRoute()
 const chatStore = useChatStore()
 const userStore = useUserStore()
 const { isMobile } = useResponsive()
-
-const relationTypeOptions: Array<{ value: RelationType; label: string }> = [
-  { value: 'friend', label: '朋友' },
-  { value: 'family', label: '家人' },
-  { value: 'relative', label: '亲戚' },
-  { value: 'partner', label: '合作伙伴' },
-  { value: 'customer_contact', label: '客户联系人' },
-  { value: 'supplier', label: '供应商' },
-  { value: 'investor', label: '投资人' },
-  { value: 'other', label: '其他' }
-]
 
 const relations = ref<RelationVO[]>([])
 const loading = ref(false)
@@ -356,26 +295,11 @@ const page = ref(1)
 const limit = ref(20)
 const total = ref(0)
 const dialogVisible = ref(false)
-const dialogMode = ref<'create' | 'edit'>('create')
-const submitting = ref(false)
-const editingRelationId = ref('')
+const editingRelation = ref<RelationVO | null>(null)
 const detailVisible = ref(false)
 const detailLoading = ref(false)
 const currentDetail = ref<RelationDetailVO | null>(null)
-const dynamicFieldFormRef = ref<InstanceType<typeof DynamicFieldForm> | null>(null)
-const customFieldValues = ref<Record<string, unknown>>({})
 let searchTimer: number | null = null
-
-const form = reactive<RelationAddBO & { relationId?: string }>({
-  name: '',
-  avatar: '',
-  phone: '',
-  wechat: '',
-  email: '',
-  relationType: 'other',
-  company: '',
-  remark: ''
-})
 
 const canCreateRelation = computed(() => userStore.hasPermission('relation:create'))
 const canEditRelation = computed(() => userStore.hasPermission('relation:edit'))
@@ -485,90 +409,21 @@ function changePage(nextPage: number) {
   void loadRelations()
 }
 
-function resetForm() {
-  editingRelationId.value = ''
-  form.name = ''
-  form.avatar = ''
-  form.phone = ''
-  form.wechat = ''
-  form.email = ''
-  form.relationType = 'other'
-  form.company = ''
-  form.remark = ''
-  customFieldValues.value = {}
-}
-
 function openCreateDialog() {
-  dialogMode.value = 'create'
-  resetForm()
+  editingRelation.value = null
   dialogVisible.value = true
 }
 
 function openEditDialog(relation: RelationVO) {
-  dialogMode.value = 'edit'
-  editingRelationId.value = relation.relationId
-  form.name = relation.name || ''
-  form.avatar = relation.avatar || relation.avatarUrl || ''
-  form.phone = relation.phone || ''
-  form.wechat = relation.wechat || ''
-  form.email = relation.email || ''
-  form.relationType = relation.relationType || 'other'
-  form.company = relation.company || ''
-  form.remark = relation.remark || ''
-  customFieldValues.value = { ...(relation.customFields || {}) }
+  editingRelation.value = relation
   dialogVisible.value = true
 }
 
-async function submitRelation() {
-  const name = form.name.trim()
-  if (!name) {
-    ElMessage.warning('请填写姓名')
-    return
-  }
-  const missingFields = dynamicFieldFormRef.value?.getRequiredFieldLabels() || []
-  if (missingFields.length > 0) {
-    ElMessage.warning(`请填写必填字段: ${missingFields.join(', ')}`)
-    return
-  }
-  const uniqueValid = await dynamicFieldFormRef.value?.validateUniqueFields()
-  if (uniqueValid === false) {
-    return
-  }
-  submitting.value = true
-  try {
-    const payload = normalizeRelationPayload()
-    if (dialogMode.value === 'create') {
-      await addRelation(payload)
-      ElMessage.success('关系人已创建')
-    } else {
-      await updateRelation({ ...payload, relationId: editingRelationId.value } as RelationUpdateBO)
-      ElMessage.success('关系人已更新')
-    }
-    dialogVisible.value = false
-    await loadRelations()
-    if (currentDetail.value?.relation.relationId === editingRelationId.value) {
-      await loadDetail(editingRelationId.value)
-    }
-  } catch (error) {
-    if (!isRequestErrorHandled(error)) {
-      ElMessage.error('保存失败')
-    }
-  } finally {
-    submitting.value = false
-  }
-}
-
-function normalizeRelationPayload(): RelationAddBO {
-  return {
-    name: form.name.trim(),
-    avatar: form.avatar?.trim() || undefined,
-    phone: form.phone?.trim() || undefined,
-    wechat: form.wechat?.trim() || undefined,
-    email: form.email?.trim() || undefined,
-    relationType: form.relationType || 'other',
-    company: form.company?.trim() || undefined,
-    remark: form.remark?.trim() || undefined,
-    customFields: customFieldValues.value
+async function handleRelationSaved(payload: { mode: 'create' | 'edit'; relationId?: string }) {
+  await loadRelations()
+  appEvents.emit(APP_EVENT.RELATION_SIDEBAR_REFRESH, { preserveScroll: true })
+  if (payload.relationId && currentDetail.value?.relation.relationId === payload.relationId) {
+    await loadDetail(payload.relationId)
   }
 }
 
@@ -582,6 +437,7 @@ async function handleDelete(relation: RelationVO) {
     await deleteRelation(relation.relationId)
     ElMessage.success('已删除')
     await loadRelations()
+    appEvents.emit(APP_EVENT.RELATION_SIDEBAR_REFRESH, { preserveScroll: true })
     if (currentDetail.value?.relation.relationId === relation.relationId) {
       detailVisible.value = false
       currentDetail.value = null
@@ -718,16 +574,6 @@ function formatDateTime(value?: string) {
 .relation-icon-btn:hover {
   background: #f1f5f9;
   color: #0f172a;
-}
-
-.relation-field {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #475569;
 }
 
 .wk-customer-card {

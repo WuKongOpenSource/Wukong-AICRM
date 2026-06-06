@@ -4,7 +4,8 @@
     :class="{
       'wk-customer-detail-embedded': embedded,
       'wk-customer-detail-mobile': isMobile,
-      'wk-customer-detail-embedded-mobile': isEmbeddedMobileLayout
+      'wk-customer-detail-embedded-mobile': isEmbeddedMobileLayout,
+      'wk-object-detail-embedded': embedded
     }"
   >
     <!-- Loading -->
@@ -898,198 +899,26 @@
               </div>
             </section>
 
-            <!-- Contacts Module -->
-            <section v-if="canViewContacts" class="wk-related-contacts group/contacts-module bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']">
-              <div class="mb-4 flex items-center justify-between">
-                <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedContacts')">
-                    <span :class="sectionMaterialIconClass">group</span>
-                  </span>
-                  联系人
-                  <button
-                    v-if="showContactsModuleToggle"
-                    type="button"
-                    class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-[background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d]"
-                    :aria-expanded="contactsModuleExpanded"
-                    :aria-label="contactsModuleExpanded ? '收起联系人' : '展开联系人'"
-                    @click="contactsModuleExpanded = !contactsModuleExpanded"
-                  >
-                    <span class="material-symbols-outlined text-[16px] leading-none">
-                      {{ contactsModuleExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right' }}
-                    </span>
-                    <span
-                      class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                      role="tooltip"
-                    >
-                      {{ contactsModuleExpanded ? '收起联系人' : '展开联系人' }}
-                    </span>
-                  </button>
-                  <!-- <span class="text-slate-400 font-normal">({{ contactTotal }})</span> -->
-                </h4>
-                <div class="flex shrink-0 items-center gap-2">
-                  <button
-                    v-if="canCreateContacts"
-                    type="button"
-                    class="group/module-action relative flex size-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-all hover:border-primary/30 hover:bg-[#efefef] hover:text-primary"
-                    aria-label="名片上传"
-                    @click="handleAddContactCardUpload"
-                  >
-                    <span class="material-symbols-outlined text-[18px] leading-none">contact_page</span>
-                    <span
-                      class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                      role="tooltip"
-                    >
-                      名片上传
-                    </span>
-                  </button>
-                  <button
-                    v-if="canCreateContacts"
-                    type="button"
-                    class="group/module-action relative flex size-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-all hover:border-primary/30 hover:bg-[#efefef] hover:text-primary"
-                    aria-label="新建联系人"
-                    @click="handleAddContact"
-                  >
-                    <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">person_add</span>
-                    <span
-                      class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                      role="tooltip"
-                    >
-                      新建联系人
-                    </span>
-                  </button>
-                </div>
-              </div>
-              <div v-if="isContactsModuleVisible" class="space-y-4">
-                <div v-if="contactLoading" class="space-y-3">
-                  <div
-                    v-for="index in 3"
-                    :key="`contact-skeleton-${index}`"
-                    class="rounded-2xl border border-slate-200 bg-white p-4"
-                  >
-                    <div class="flex flex-col gap-3">
-                      <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0 flex flex-1 items-center gap-3">
-                          <div class="size-10 shrink-0 animate-pulse rounded-xl bg-slate-100" />
-                          <div class="min-w-0 flex-1 space-y-2">
-                            <div class="h-4 w-24 animate-pulse rounded-full bg-slate-100" />
-                            <div class="h-3 w-16 animate-pulse rounded-full bg-slate-100" />
-                          </div>
-                        </div>
-                        <div class="h-6 w-20 shrink-0 animate-pulse rounded-lg bg-slate-100" />
-                      </div>
-                      <div class="h-px w-full bg-slate-100" />
-                      <div class="space-y-2">
-                        <div class="h-3 w-2/3 animate-pulse rounded-full bg-slate-100" />
-                        <div class="h-3 w-4/5 animate-pulse rounded-full bg-slate-100" />
-                        <div class="h-3 w-1/2 animate-pulse rounded-full bg-slate-100" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div v-else-if="contacts.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
-                  <span class="material-symbols-outlined text-2xl leading-none text-slate-400">person_off</span>
-                  <p class="mt-2 text-xs font-medium text-slate-400">暂无关联联系人</p>
-                </div>
-                <div
-                  v-for="contact in contacts"
-                  :key="contact.contactId"
-                  class="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-white to-slate-50/80 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-slate-200/70"
-                  @click="handleViewContact(contact)"
-                >
-                  <div class="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-slate-50 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
-                  <div class="relative flex flex-col gap-3">
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="min-w-0 flex flex-1 items-center gap-3">
-                        <div class="flex size-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-600 transition-colors group-hover:border-primary/20 group-hover:bg-primary/10 group-hover:text-primary">
-                          {{ contact.name?.trim()?.charAt(0) || '?' }}
-                        </div>
-                        <div class="min-w-0 flex-1">
-                          <div class="flex min-w-0 items-center gap-1.5">
-                            <h5 class="min-w-0 truncate text-sm font-bold leading-tight text-slate-900">{{ contact.name }}</h5>
-                            <button
-                              v-if="!contact.isPrimary && canSetPrimaryContacts"
-                              type="button"
-                              class="group/module-action relative flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600 transition-all hover:bg-amber-100"
-                              aria-label="设为主要联系人"
-                              @click.stop="handleSetPrimary(contact.contactId)"
-                            >
-                              <span
-                                class="material-symbols-outlined text-[18px] leading-none"
-                                style="font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24"
-                              >star</span>
-                              <span
-                                class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                                role="tooltip"
-                              >
-                                设为主要联系人
-                              </span>
-                            </button>
-                            <button
-                              v-if="canCreateRelation"
-                              type="button"
-                              class="group/module-action relative flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-50 text-slate-500 opacity-0 pointer-events-none transition-all hover:bg-primary/10 hover:text-primary group-hover:opacity-100 group-hover:pointer-events-auto"
-                              aria-label="添加到关系"
-                              @click.stop="handleAddContactToRelation(contact)"
-                            >
-                              <span class="material-symbols-outlined text-[18px] leading-none">diversity_3</span>
-                              <span
-                                class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                                role="tooltip"
-                              >
-                                添加到关系
-                              </span>
-                            </button>
-                          </div>
-                          <p class="mt-0.5 truncate text-[11px] font-medium text-slate-500">{{ contact.position || '-' }}</p>
-                        </div>
-                      </div>
-                      <span
-                        v-if="contact.isPrimary"
-                        class="inline-flex shrink-0 items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-[11px] font-bold text-primary"
-                      >
-                        <span class="material-symbols-outlined text-[12px] leading-none">stars</span>
-                        主要联系人
-                      </span>
-                    </div>
-
-                    <div class="h-px w-full bg-slate-100" />
-
-                    <div class="space-y-2">
-                      <div class="flex min-w-0 items-center gap-3 text-slate-600 transition-colors group-hover:text-slate-700">
-                        <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-slate-400">call</span>
-                        <span
-                          :class="contact.phone ? 'font-mono text-xs font-medium tracking-tight text-slate-700' : 'text-xs font-medium text-slate-400'"
-                        >{{ contact.phone || '-' }}</span>
-                      </div>
-                      <div class="flex min-w-0 items-center gap-3 text-slate-600 transition-colors group-hover:text-slate-700">
-                        <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-slate-400">mail</span>
-                        <span
-                          class="min-w-0 truncate text-xs font-medium tracking-tight"
-                          :class="contact.email ? 'text-slate-700' : 'text-slate-400'"
-                        >{{ contact.email || '-' }}</span>
-                      </div>
-                      <div class="flex min-w-0 items-center gap-3 text-slate-600 transition-colors group-hover:text-slate-700">
-                        <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-slate-400">chat</span>
-                        <span
-                          class="min-w-0 truncate text-xs font-medium tracking-tight"
-                          :class="contact.wechat ? 'text-slate-700' : 'text-slate-400'"
-                        >{{ contact.wechat ? `${contact.wechat}` : '-' }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div v-if="contactTotal > contactPageSize" class="pt-2 flex justify-center">
-                  <el-pagination
-                    v-model:current-page="contactPage"
-                    :page-size="contactPageSize"
-                    :total="contactTotal"
-                    layout="prev, pager, next"
-                    small
-                    @current-change="handleContactPageChange"
-                  />
-                </div>
-              </div>
-            </section>
+            <RelatedContactsModule
+              :contacts="contacts"
+              :loading="contactLoading"
+              :visible="canViewContacts"
+              :embedded-layout="isEmbeddedMobileLayout"
+              :expanded="contactsModuleExpanded"
+              :can-create="canCreateContacts"
+              :can-set-primary="canSetPrimaryContacts"
+              :can-create-relation="canCreateRelation"
+              :total="contactTotal"
+              :page="contactPage"
+              :page-size="contactPageSize"
+              @update:expanded="contactsModuleExpanded = $event"
+              @update:page="handleContactPageChange"
+              @upload-card="handleAddContactCardUpload"
+              @add="handleAddContact"
+              @view="handleViewContact"
+              @set-primary="handleSetPrimary"
+              @add-to-relation="handleAddContactToRelation"
+            />
 
             <!-- Opportunities Module (hidden) -->
             <!-- <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
@@ -1117,381 +946,54 @@
               </div>
             </section> -->
 
-            <!-- Tasks Module -->
-            <section v-if="canViewTasks" class="group/tasks-module bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']">
-              <div class="mb-4 flex items-center justify-between">
-                <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <span :class="sectionIconBoxClass" :style="getSectionIconStyle('todoTasks')">
-                    <WkIcon name="task" :size="14" />
-                  </span>
-                  任务
-                  <button
-                    v-if="showTasksModuleToggle"
-                    type="button"
-                    class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-[background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d]"
-                    :aria-expanded="tasksModuleExpanded"
-                    :aria-label="tasksModuleExpanded ? '收起任务' : '展开任务'"
-                    @click="tasksModuleExpanded = !tasksModuleExpanded"
-                  >
-                    <span class="material-symbols-outlined text-[16px] leading-none">
-                      {{ tasksModuleExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right' }}
-                    </span>
-                    <span
-                      class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                      role="tooltip"
-                    >
-                      {{ tasksModuleExpanded ? '收起任务' : '展开任务' }}
-                    </span>
-                  </button>
-                </h4>
-                <div class="flex shrink-0 items-center gap-2">
-                  <button
-                    v-if="canCreateTasks"
-                    type="button"
-                    class="group/module-action relative flex size-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-all hover:border-primary/30 hover:bg-[#efefef] hover:text-primary"
-                    aria-label="新建任务"
-                    @click="handleAddTask"
-                  >
-                    <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">add</span>
-                    <span
-                      class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                      role="tooltip"
-                    >
-                      新建任务
-                    </span>
-                  </button>
-                </div>
-              </div>
-              <div v-if="isTasksModuleVisible" class="space-y-4">
-                <div
-                  v-if="taskLoading"
-                  :class="embedded ? 'space-y-3' : 'ml-3 space-y-3 border-l-2 border-slate-100 pl-5'"
-                >
-                  <div
-                    v-for="index in 3"
-                    :key="`task-skeleton-${index}`"
-                    class="relative rounded-xl border border-slate-200 bg-white p-3"
-                  >
-                    <div v-if="!embedded" class="absolute -left-[27px] top-4 size-3 animate-pulse rounded-full border-2 border-slate-200 bg-white" />
-                    <div class="flex items-start gap-3">
-                      <div class="mt-0.5 size-5 shrink-0 animate-pulse rounded border border-slate-200 bg-slate-100" />
-                      <div class="min-w-0 flex-1 space-y-2">
-                        <div class="h-4 w-3/4 animate-pulse rounded-full bg-slate-100" />
-                        <div class="flex items-center gap-2">
-                          <div class="h-5 w-20 animate-pulse rounded-full bg-slate-100" />
-                          <div class="h-5 w-16 animate-pulse rounded-full bg-slate-100" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div v-else-if="customerTasks.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
-                  <span class="material-symbols-outlined text-2xl leading-none text-slate-400">task_alt</span>
-                  <p class="mt-2 text-xs font-medium text-slate-400">暂无待办任务</p>
-                </div>
-                <div
-                  v-else
-                  :class="embedded ? 'space-y-3' : 'ml-3 space-y-3 border-l-2 border-slate-100 pl-5'"
-                >
-                  <div
-                    v-for="task in customerTasks"
-                    :key="task.taskId"
-                    class="group relative cursor-pointer rounded-xl border border-slate-200 bg-white p-3 transition-all hover:shadow-md"
-                    :class="selectedCustomerTask?.taskId === task.taskId ? 'border-primary ring-1 ring-primary/20' : ''"
-                    @click="handleViewCustomerTask(task)"
-                  >
-                    <div
-                      v-if="!embedded"
-                      class="absolute -left-[27px] top-4 size-3 rounded-full border-2 bg-white"
-                      :class="task.status === 'COMPLETED' ? 'border-emerald-500' : 'border-slate-300'"
-                    />
-                    <div class="flex items-start gap-3">
-                      <button
-                        v-if="canToggleTasks"
-                        type="button"
-                        class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border transition-colors"
-                        :class="task.status === 'COMPLETED'
-                          ? 'border-emerald-500 bg-emerald-500 text-white'
-                          : 'border-slate-300 text-transparent hover:border-primary hover:text-primary/20'"
-                        :aria-label="task.status === 'COMPLETED' ? '标记为未完成' : '标记为已完成'"
-                        :title="task.status === 'COMPLETED' ? '标记为未完成' : '标记为已完成'"
-                        @click.stop="handleToggleCustomerTask(task)"
-                      >
-                        <span class="material-symbols-outlined text-[14px] font-bold">check</span>
-                      </button>
-                      <span
-                        v-else
-                        class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border"
-                        :class="task.status === 'COMPLETED' ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-300 text-transparent'"
-                      >
-                        <span class="material-symbols-outlined text-[14px] font-bold">check</span>
-                      </span>
-                      <div class="min-w-0 flex-1">
-                        <h5
-                          class="mb-1 truncate text-sm font-bold transition-colors group-hover:text-primary"
-                          :class="task.status === 'COMPLETED' ? 'text-slate-400 line-through' : 'text-slate-900'"
-                        >
-                          {{ task.title }}
-                        </h5>
-                        <div class="flex flex-wrap items-center gap-2">
-                          <span
-                            v-if="task.dueDate"
-                            class="rounded-full px-2 py-0.5 text-xs font-bold"
-                            :class="isCustomerTaskOverdue(task) ? 'bg-red-50 text-red-500' : 'bg-slate-50 text-slate-600'"
-                          >
-                            截止 {{ formatDate(task.dueDate) }}
-                          </span>
-                          <span
-                            v-if="task.priority"
-                            class="rounded-full px-2 py-0.5 text-xs font-bold"
-                            :class="getCustomerTaskPriorityClass(task.priority)"
-                          >
-                            {{ getCustomerTaskPriorityLabel(task.priority) }}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
+            <RelatedTasksModule
+              :tasks="customerTasks"
+              :loading="taskLoading"
+              :visible="canViewTasks"
+              :embedded-layout="embedded"
+              :expanded="tasksModuleExpanded"
+              :can-create="canCreateTasks"
+              :can-toggle="canToggleTasks"
+              :clickable="true"
+              :selected-task-id="selectedCustomerTask?.taskId"
+              @update:expanded="tasksModuleExpanded = $event"
+              @add="handleAddTask"
+              @view="handleViewCustomerTask"
+              @toggle="handleToggleCustomerTask"
+            />
 
-            <!-- Schedules Module -->
-            <section v-if="canViewSchedules" class="group/schedules-module bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']">
-              <div class="mb-4 flex items-center justify-between">
-                <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedSchedules')">
-                    <span :class="sectionMaterialIconClass">event_note</span>
-                  </span>
-                  日程
-                  <button
-                    v-if="showSchedulesModuleToggle"
-                    type="button"
-                    class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-[background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d]"
-                    :aria-expanded="schedulesModuleExpanded"
-                    :aria-label="schedulesModuleExpanded ? '收起日程' : '展开日程'"
-                    @click="schedulesModuleExpanded = !schedulesModuleExpanded"
-                  >
-                    <span class="material-symbols-outlined text-[16px] leading-none">
-                      {{ schedulesModuleExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right' }}
-                    </span>
-                    <span
-                      class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                      role="tooltip"
-                    >
-                      {{ schedulesModuleExpanded ? '收起日程' : '展开日程' }}
-                    </span>
-                  </button>
-                  <!-- <span class="text-slate-400 font-normal">({{ scheduleTotal }})</span> -->
-                </h4>
-                <div class="flex shrink-0 items-center gap-2">
-                  <button
-                    v-if="canCreateSchedules"
-                    type="button"
-                    class="group/module-action relative flex size-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-all hover:border-primary/30 hover:bg-[#efefef] hover:text-primary"
-                    aria-label="新建日程"
-                    @click="handleAddSchedule"
-                  >
-                    <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">add</span>
-                    <span
-                      class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                      role="tooltip"
-                    >
-                      新建日程
-                    </span>
-                  </button>
-                </div>
-              </div>
-              <div v-if="isSchedulesModuleVisible" class="space-y-4">
-                <div
-                  v-if="scheduleLoading"
-                  :class="embedded ? 'space-y-3' : 'ml-3 space-y-3 border-l-2 border-slate-100 pl-5'"
-                >
-                  <div
-                    v-for="index in 3"
-                    :key="`schedule-skeleton-${index}`"
-                    class="relative rounded-xl border border-slate-200 bg-white p-3"
-                  >
-                    <div v-if="!embedded" class="absolute -left-[27px] top-4 size-3 animate-pulse rounded-full border-2 border-slate-200 bg-white" />
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="min-w-0 flex-1 space-y-2">
-                        <div class="h-4 w-2/3 animate-pulse rounded-full bg-slate-100" />
-                        <div class="flex flex-wrap items-center gap-2">
-                          <div class="h-5 w-16 animate-pulse rounded-full bg-slate-100" />
-                          <div class="h-5 w-20 animate-pulse rounded-full bg-slate-100" />
-                        </div>
-                        <div class="h-3 w-4/5 animate-pulse rounded-full bg-slate-100" />
-                      </div>
-                      <div class="h-8 w-24 shrink-0 animate-pulse rounded-lg bg-slate-100" />
-                    </div>
-                  </div>
-                </div>
-                <div v-else-if="customerSchedules.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
-                  <span class="material-symbols-outlined text-2xl leading-none text-slate-400">event_busy</span>
-                  <p class="mt-2 text-xs font-medium text-slate-400">暂无关联日程</p>
-                </div>
-                <div
-                  v-else
-                  :class="embedded ? 'space-y-3' : 'ml-3 space-y-3 border-l-2 border-slate-100 pl-5'"
-                >
-                  <div
-                    v-for="schedule in customerSchedules"
-                    :key="schedule.scheduleId"
-                    class="group relative cursor-pointer rounded-xl border border-slate-200 bg-white p-3 transition-all hover:shadow-md"
-                    :class="selectedCustomerSchedule?.scheduleId === schedule.scheduleId ? 'border-primary ring-1 ring-primary/20' : ''"
-                    @click="handleViewCustomerSchedule(schedule)"
-                  >
-                    <div v-if="!embedded" class="absolute -left-[27px] top-4 size-3 rounded-full border-2 border-primary bg-white" />
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="min-w-0 flex-1">
-                        <h5 class="mb-1 truncate text-sm font-bold text-slate-900 transition-colors group-hover:text-primary">{{ schedule.title }}</h5>
-                        <div class="flex flex-wrap items-center gap-2">
-                          <span v-if="schedule.customerName" class="text-xs font-medium text-slate-500">{{ schedule.customerName }}</span>
-                          <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
-                            {{ getScheduleTypeLabel(schedule) }}
-                          </span>
-                          <span v-if="schedule.location" class="rounded-full bg-slate-50 px-2 py-0.5 text-xs font-bold text-slate-600">
-                            {{ schedule.location }}
-                          </span>
-                        </div>
-                        <p v-if="getScheduleListSummary(schedule)" class="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500">
-                          {{ getScheduleListSummary(schedule) }}
-                        </p>
-                      </div>
-                      <div class="shrink-0 text-right">
-                        <span class="inline-block max-w-[9rem] whitespace-normal rounded-lg bg-slate-50 px-2 py-1 text-xs font-bold leading-4 text-slate-600">
-                          {{ formatScheduleDateTime(schedule.startTime) }}
-                          <template v-if="schedule.endTime"> - {{ formatScheduleEndTime(schedule.startTime, schedule.endTime) }}</template>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div v-if="scheduleTotal > schedulePageSize" class="pt-2 flex justify-center">
-                  <el-pagination
-                    v-model:current-page="schedulePage"
-                    :page-size="schedulePageSize"
-                    :total="scheduleTotal"
-                    layout="prev, pager, next"
-                    small
-                    @current-change="handleSchedulePageChange"
-                  />
-                </div>
-              </div>
-            </section>
+            <RelatedSchedulesModule
+              :schedules="customerSchedules"
+              :loading="scheduleLoading"
+              :visible="canViewSchedules"
+              :embedded-layout="embedded"
+              :expanded="schedulesModuleExpanded"
+              :can-create="canCreateSchedules"
+              :clickable="true"
+              :selected-schedule-id="selectedCustomerSchedule?.scheduleId"
+              :total="scheduleTotal"
+              :page="schedulePage"
+              :page-size="schedulePageSize"
+              @update:expanded="schedulesModuleExpanded = $event"
+              @update:page="handleSchedulePageChange"
+              @add="handleAddSchedule"
+              @view="handleViewCustomerSchedule"
+            />
 
-            <!-- Documents Module -->
-            <section v-if="canViewKnowledge" class="group/documents-module bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']">
-              <div class="mb-4 flex items-center justify-between">
-                <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <span :class="sectionIconBoxClass" :style="getSectionIconStyle('documentCenter')">
-                    <WkIcon name="knowledge" :size="14" />
-                  </span>
-                  文档
-                  <button
-                    v-if="showDocumentsModuleToggle"
-                    type="button"
-                    class="group/module-action relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-[background-color,color,border-color] hover:bg-[#efefef] hover:text-[#0d0d0d]"
-                    :aria-expanded="documentsModuleExpanded"
-                    :aria-label="documentsModuleExpanded ? '收起文档' : '展开文档'"
-                    @click="documentsModuleExpanded = !documentsModuleExpanded"
-                  >
-                    <span class="material-symbols-outlined text-[16px] leading-none">
-                      {{ documentsModuleExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right' }}
-                    </span>
-                    <span
-                      class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                      role="tooltip"
-                    >
-                      {{ documentsModuleExpanded ? '收起文档' : '展开文档' }}
-                    </span>
-                  </button>
-                </h4>
-                <div class="flex shrink-0 items-center gap-2">
-                  <button
-                    v-if="canUploadKnowledge"
-                    type="button"
-                    class="group/module-action relative flex size-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-all hover:border-primary/30 hover:bg-[#efefef] hover:text-primary"
-                    aria-label="上传文档"
-                    @click="openCustomerKnowledgeUpload"
-                  >
-                    <span class="material-symbols-outlined text-[18px] leading-none">add</span>
-                    <span
-                      class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                      role="tooltip"
-                    >
-                      上传文档
-                    </span>
-                  </button>
-                </div>
-              </div>
-              <div v-if="isDocumentsModuleVisible">
-                <div v-if="customerKnowledgeLoading" class="space-y-2">
-                  <div
-                    v-for="index in 3"
-                    :key="`document-skeleton-${index}`"
-                    class="rounded-xl border border-slate-200 bg-white p-3"
-                  >
-                    <div class="flex items-start gap-2.5">
-                      <div class="size-8 shrink-0 animate-pulse rounded-lg bg-slate-100" />
-                      <div class="min-w-0 flex-1 space-y-2">
-                        <div class="h-4 w-3/4 animate-pulse rounded-full bg-slate-100" />
-                        <div class="flex items-center gap-2">
-                          <div class="h-3 w-12 animate-pulse rounded-full bg-slate-100" />
-                          <div class="h-3 w-16 animate-pulse rounded-full bg-slate-100" />
-                          <div class="h-3 w-20 animate-pulse rounded-full bg-slate-100" />
-                        </div>
-                      </div>
-                      <div class="size-7 shrink-0 animate-pulse rounded-full bg-slate-100" />
-                    </div>
-                  </div>
-                </div>
-                <div v-else-if="customerKnowledgeList.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
-                  <span class="material-symbols-outlined text-2xl leading-none text-slate-400">folder_off</span>
-                  <p class="mt-2 text-xs font-medium text-slate-400">{{ getKnowledgeEmptyText() }}</p>
-                </div>
-                <div v-else class="space-y-2">
-                  <div
-                    v-for="item in customerKnowledgeList"
-                    :key="item.knowledgeId"
-                    class="group cursor-pointer rounded-xl border border-slate-200 bg-white p-3 transition-all duration-200 hover:border-primary/30 hover:shadow-md"
-                    @click="openKnowledgeDetail(item.knowledgeId)"
-                  >
-                    <div class="flex items-start gap-2.5">
-                      <FileTypeIcon :file-name="item.name" :mime-type="item.mimeType" :knowledge-type="item.type" size="sm" />
-                      <div class="min-w-0 flex-1">
-                        <div class="flex items-start justify-between gap-3">
-                          <div class="min-w-0 flex-1">
-                            <h5 class="truncate text-sm font-bold leading-5 text-slate-900 transition-colors group-hover:text-primary">{{ item.name }}</h5>
-                            <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium leading-4 text-slate-400">
-                              <span>{{ getKnowledgeTypeLabel(item.type) }}</span>
-                              <span aria-hidden="true">·</span>
-                              <span>{{ getKnowledgeFileSizeText(item) }}</span>
-                              <span aria-hidden="true">·</span>
-                              <span>上传 {{ formatDateTime(item.createTime) }}</span>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            class="group/module-action relative flex size-7 shrink-0 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-primary/10 hover:text-primary"
-                            aria-label="下载文档"
-                            @click.stop="handleKnowledgeDownload(item)"
-                          >
-                            <span class="material-symbols-outlined text-sm">download</span>
-                            <span
-                              class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
-                              role="tooltip"
-                            >
-                              下载文档
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
+            <RelatedDocumentsModule
+              :documents="customerKnowledgeList"
+              :loading="customerKnowledgeLoading"
+              :visible="canViewKnowledge"
+              :embedded-layout="isEmbeddedMobileLayout"
+              :expanded="documentsModuleExpanded"
+              :can-upload="canUploadKnowledge"
+              :clickable="true"
+              :empty-text="getKnowledgeEmptyText()"
+              @update:expanded="documentsModuleExpanded = $event"
+              @upload="openCustomerKnowledgeUpload"
+              @open="item => openKnowledgeDetail(item.knowledgeId)"
+            />
+
           </div>
         </div>
       </div>
@@ -1632,7 +1134,7 @@ import { addFollowUp, deleteFollowUp, queryFollowUpPageList, updateFollowUp } fr
 import { deleteContact, queryContactPageList, queryContactsByCustomer, setPrimaryContact } from '@/api/contact'
 import { addRelationFromContact } from '@/api/relation'
 import { getEnabledFieldsByEntity } from '@/api/customField'
-import { downloadKnowledge, queryKnowledgeList } from '@/api/knowledge'
+import { queryKnowledgeList } from '@/api/knowledge'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Knowledge, Task, TaskStatus } from '@/types/common'
 import type { Contact, CustomerAiReportVO, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpAttachment, FollowUpTask, FollowUpUpdateBO } from '@/types/customer'
@@ -1645,7 +1147,10 @@ import FollowUpUpsertDialog from '@/components/customer/FollowUpUpsertDialog.vue
 import type { FollowUpUpsertSubmitPayload } from '@/components/customer/FollowUpUpsertDialog.vue'
 import AiParseInsightSidebar from '@/components/crm/AiParseInsightSidebar.vue'
 import FollowUpCard from '@/components/customer/FollowUpCard.vue'
-import FileTypeIcon from '@/components/common/FileTypeIcon.vue'
+import RelatedContactsModule from '@/components/customer/related/RelatedContactsModule.vue'
+import RelatedDocumentsModule from '@/components/customer/related/RelatedDocumentsModule.vue'
+import RelatedSchedulesModule from '@/components/customer/related/RelatedSchedulesModule.vue'
+import RelatedTasksModule from '@/components/customer/related/RelatedTasksModule.vue'
 import CustomerBasicInfoDrawer from '@/views/customer/components/CustomerBasicInfoDrawer.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import ContactUpsertDialog from '@/views/contact/components/ContactUpsertDialog.vue'
@@ -1661,7 +1166,6 @@ import {
   CUSTOMER_LIST_PAGE_QUERY_KEY
 } from '@/views/customer/constants'
 import { appEvents, APP_EVENT } from '@/utils/events'
-import { formatFileSize as formatFileSizeBytes, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 import { isRequestErrorHandled } from '@/utils/requestError'
 
 const route = useRoute()
@@ -1988,14 +1492,6 @@ const showAiAnalysisToggle = computed(() => !!savedAiParseResult.value)
 const isAiAnalysisVisible = computed(() => aiAnalysisExpanded.value || !showAiAnalysisToggle.value)
 const showFollowUpTimelineToggle = computed(() => followUpLoading.value || followUps.value.length > 0)
 const isFollowUpTimelineVisible = computed(() => followUpTimelineExpanded.value || !showFollowUpTimelineToggle.value)
-const showContactsModuleToggle = computed(() => contactLoading.value || contacts.value.length > 0)
-const isContactsModuleVisible = computed(() => contactsModuleExpanded.value || !showContactsModuleToggle.value)
-const showTasksModuleToggle = computed(() => taskLoading.value || customerTasks.value.length > 0)
-const isTasksModuleVisible = computed(() => tasksModuleExpanded.value || !showTasksModuleToggle.value)
-const showSchedulesModuleToggle = computed(() => scheduleLoading.value || customerSchedules.value.length > 0)
-const isSchedulesModuleVisible = computed(() => schedulesModuleExpanded.value || !showSchedulesModuleToggle.value)
-const showDocumentsModuleToggle = computed(() => customerKnowledgeLoading.value || customerKnowledgeList.value.length > 0)
-const isDocumentsModuleVisible = computed(() => documentsModuleExpanded.value || !showDocumentsModuleToggle.value)
 const aiAnalysisStatus = computed(() => customer.value?.aiAnalysisStatus || '')
 const isAiAnalysisPending = computed(() => aiAnalysisStatus.value === 'pending' || aiAnalysisStatus.value === 'running')
 const isAiAnalysisFailed = computed(() => aiAnalysisStatus.value === 'failed')
@@ -2558,14 +2054,6 @@ function openKnowledgeDetail(knowledgeId: string | number) {
   showKnowledgeDetailModal.value = true
 }
 
-async function handleKnowledgeDownload(item: Knowledge) {
-  try {
-    await downloadKnowledge(item.knowledgeId, item.name)
-  } catch (error) {
-    console.error('Failed to download knowledge:', error)
-  }
-}
-
 function handleKnowledgeSummaryUpdated(payload: { knowledgeId: string; summary: string }) {
   const summary = payload.summary.trim()
   if (!summary) return
@@ -2583,81 +2071,6 @@ function handleQuoteFollowUpAttachment(followUp: FollowUp, attachment: FollowUpA
 
 function getKnowledgeEmptyText() {
   return canUploadKnowledge.value ? '暂无文档，点击右上角上传文档' : '暂无文档'
-}
-
-function getKnowledgeTypeLabel(type?: string) {
-  const labels: Record<string, string> = {
-    meeting: '会议纪要',
-    email: '邮件',
-    recording: '录音',
-    document: '文档',
-    proposal: '方案',
-    contract: '合同'
-  }
-  return labels[String(type || '').toLowerCase()] || '文档'
-}
-
-function getKnowledgeFileSizeText(item: Knowledge) {
-  const formatted = item.fileSizeFormatted?.trim()
-  if (formatted) return formatted
-  return resolveKnowledgeFileSizeBytes(item.fileSize) > 0 ? formatFileSizeBytes(item.fileSize) : '未知大小'
-}
-
-function getScheduleTypeLabel(schedule: ScheduleVO) {
-  if (schedule.typeName) return schedule.typeName
-  const labels: Record<string, string> = {
-    meeting: '会议',
-    call: '电话',
-    visit: '拜访',
-    other: '其他'
-  }
-  return labels[String(schedule.type || '').toLowerCase()] || '日程'
-}
-
-function getScheduleParticipantsLine(schedule: ScheduleVO) {
-  if (schedule.participantUsers?.length) {
-    return schedule.participantUsers
-      .map(user => (user.realname || user.username || '').trim())
-      .filter(Boolean)
-      .join('、')
-  }
-  return (schedule.participantNames || '').trim()
-}
-
-function getScheduleListSummary(schedule: ScheduleVO) {
-  const participants = getScheduleParticipantsLine(schedule)
-  if (participants) return `参与人：${participants}`
-  return schedule.description || ''
-}
-
-function formatScheduleDateTime(dateStr?: string) {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  if (Number.isNaN(date.getTime())) return '-'
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-}
-
-function formatScheduleTime(dateStr?: string) {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  if (Number.isNaN(date.getTime())) return '-'
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-}
-
-function formatScheduleEndTime(startDateStr?: string, endDateStr?: string) {
-  if (!endDateStr) return ''
-  if (!startDateStr) return formatScheduleDateTime(endDateStr)
-
-  const startDate = new Date(startDateStr)
-  const endDate = new Date(endDateStr)
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    return formatScheduleDateTime(endDateStr)
-  }
-
-  const sameDay = startDate.getFullYear() === endDate.getFullYear()
-    && startDate.getMonth() === endDate.getMonth()
-    && startDate.getDate() === endDate.getDate()
-  return sameDay ? formatScheduleTime(endDateStr) : formatScheduleDateTime(endDateStr)
 }
 
 function handleEdit() {
@@ -2915,29 +2328,6 @@ async function refreshCustomerTaskArea() {
   if (id) {
     selectedCustomerTask.value = customerTasks.value.find((t: Task) => String(t.taskId) === String(id)) || null
   }
-}
-
-function isCustomerTaskOverdue(task: Task): boolean {
-  if (!task.dueDate || task.status === 'COMPLETED') return false
-  return new Date(task.dueDate) < new Date()
-}
-
-function getCustomerTaskPriorityLabel(priority?: string) {
-  const labels: Record<string, string> = {
-    HIGH: '高优先级',
-    MEDIUM: '中优先级',
-    LOW: '低优先级'
-  }
-  return labels[String(priority || '').toUpperCase()] || '中优先级'
-}
-
-function getCustomerTaskPriorityClass(priority?: string) {
-  const classes: Record<string, string> = {
-    HIGH: 'bg-red-50 text-red-500',
-    MEDIUM: 'bg-amber-50 text-amber-500',
-    LOW: 'bg-slate-100 text-slate-500'
-  }
-  return classes[String(priority || '').toUpperCase()] || classes.MEDIUM
 }
 
 async function handleToggleCustomerTask(task: Task) {
@@ -3330,10 +2720,6 @@ function getFollowUpIcon(type: string): string {
   return icons[type] || 'edit_note'
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('zh-CN')
-}
-
 function formatDateTime(dateStr?: string): string {
   if (!dateStr) return '-'
   return new Date(dateStr).toLocaleString('zh-CN')
@@ -3362,77 +2748,6 @@ function formatCustomFieldValue(field: CustomField, value: any): string {
 </script>
 
 <style>
-.wk-customer-detail-embedded {
-  background: var(--wk-bg-surface);
-  color: var(--wk-text-primary);
-}
-
-.wk-customer-detail-embedded .bg-white,
-.wk-customer-detail-embedded-mobile .bg-white {
-  background-color: var(--wk-bg-surface) !important;
-}
-
-.wk-customer-detail-embedded .bg-slate-50,
-.wk-customer-detail-embedded .bg-slate-50\/70,
-.wk-customer-detail-embedded .bg-slate-100,
-.wk-customer-detail-embedded-mobile .bg-slate-50,
-.wk-customer-detail-embedded-mobile .bg-slate-50\/70,
-.wk-customer-detail-embedded-mobile .bg-slate-100 {
-  background-color: var(--wk-bg-surface-muted) !important;
-}
-
-.wk-customer-detail-embedded .border-slate-100,
-.wk-customer-detail-embedded .border-slate-200,
-.wk-customer-detail-embedded .border-\[\#ececec\],
-.wk-customer-detail-embedded-mobile .border-slate-100,
-.wk-customer-detail-embedded-mobile .border-slate-200,
-.wk-customer-detail-embedded-mobile .border-\[\#ececec\] {
-  border-color: var(--wk-border-subtle) !important;
-}
-
-.wk-customer-detail-embedded .shadow-sm,
-.wk-customer-detail-embedded-mobile .shadow-sm {
-  box-shadow: none !important;
-}
-
-.wk-customer-detail-embedded .text-slate-900,
-.wk-customer-detail-embedded-mobile .text-slate-900 {
-  color: var(--wk-text-primary) !important;
-}
-
-.wk-customer-detail-embedded .text-slate-700,
-.wk-customer-detail-embedded .text-slate-600,
-.wk-customer-detail-embedded-mobile .text-slate-700,
-.wk-customer-detail-embedded-mobile .text-slate-600 {
-  color: var(--wk-text-secondary) !important;
-}
-
-.wk-customer-detail-embedded .text-slate-500,
-.wk-customer-detail-embedded .text-slate-400,
-.wk-customer-detail-embedded-mobile .text-slate-500,
-.wk-customer-detail-embedded-mobile .text-slate-400 {
-  color: var(--wk-text-muted) !important;
-}
-
-.wk-customer-detail-embedded .text-primary,
-.wk-customer-detail-embedded-mobile .text-primary {
-  color: var(--wk-text-primary) !important;
-}
-
-.wk-customer-detail-embedded .bg-primary,
-.wk-customer-detail-embedded-mobile .bg-primary {
-  background-color: var(--wk-primary) !important;
-}
-
-.wk-customer-detail-embedded .bg-primary\/5,
-.wk-customer-detail-embedded .bg-primary\/10,
-.wk-customer-detail-embedded .bg-primary\/20,
-.wk-customer-detail-embedded-mobile .bg-primary\/5,
-.wk-customer-detail-embedded-mobile .bg-primary\/10,
-.wk-customer-detail-embedded-mobile .bg-primary\/20 {
-  background-color: var(--wk-bg-surface-hover) !important;
-}
-
 .wk-stage-result-popover.el-popover {
   padding: 0;
   border: 1px solid rgb(226 232 240);

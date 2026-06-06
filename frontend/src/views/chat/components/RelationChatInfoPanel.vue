@@ -1,6 +1,6 @@
 <template>
-  <div class="h-full overflow-y-auto px-4 py-4">
-    <section class="rounded-lg border border-slate-200 p-4">
+  <div class="wk-object-detail-embedded h-full overflow-y-auto bg-[var(--wk-bg-surface)] px-4 py-4">
+    <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div class="flex items-start gap-3">
         <img v-if="avatarUrl" :src="avatarUrl" class="size-12 rounded-full object-cover" alt="avatar" />
         <div v-else class="flex size-12 shrink-0 items-center justify-center rounded-full bg-slate-900 text-base font-bold text-white">
@@ -23,18 +23,40 @@
       </p>
     </section>
 
-    <section v-for="section in sections" :key="section.key" class="mt-4 rounded-lg border border-slate-200 p-4">
-      <div class="mb-3 flex items-center justify-between">
-        <h4 class="text-sm font-bold text-slate-900">{{ section.title }}</h4>
-        <span class="text-xs text-slate-400">{{ section.items.length }}</span>
+    <ObjectRelatedModules
+      :tasks="tasks"
+      :schedules="schedules"
+      :attachments="attachments"
+      @add-task="emit('add-task')"
+      @add-schedule="emit('add-schedule')"
+      @add-attachment="emit('add-attachment')"
+    />
+
+    <section class="mt-5 border-t border-slate-100 pt-5">
+      <div class="mb-4 flex items-center justify-between">
+        <h4 class="flex items-center gap-2 text-sm font-bold text-slate-900">
+          <span class="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white shadow-sm">
+            <span class="material-symbols-outlined text-[17px] leading-none">history</span>
+          </span>
+          历史记录
+        </h4>
+        <span class="text-xs font-medium text-slate-400">{{ histories.length }}</span>
       </div>
-      <div v-if="section.items.length === 0" class="py-5 text-center text-xs text-slate-400">
-        暂无数据
+
+      <div v-if="histories.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
+        <span class="material-symbols-outlined mb-1 text-[22px] text-slate-300">history</span>
+        <p class="text-xs font-medium text-slate-400">暂无数据</p>
       </div>
-      <div v-else class="space-y-2">
-        <div v-for="item in section.items" :key="item.key" class="rounded-lg bg-slate-50 px-3 py-2">
-          <p class="truncate text-sm font-semibold text-slate-800">{{ item.title }}</p>
-          <p v-if="item.subtitle" class="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{{ item.subtitle }}</p>
+      <div v-else class="space-y-3">
+        <div
+          v-for="history in histories"
+          :key="history.followUpId"
+          class="rounded-xl border border-slate-200 bg-white p-3"
+        >
+          <p class="line-clamp-2 text-sm font-semibold leading-5 text-slate-800">{{ history.content || '-' }}</p>
+          <p class="mt-1 truncate text-xs leading-5 text-slate-500">
+            {{ [history.typeName || history.type, history.followTime ? formatDateTime(history.followTime) : ''].filter(Boolean).join(' · ') || '-' }}
+          </p>
         </div>
       </div>
     </section>
@@ -44,57 +66,29 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { RelationDetailVO } from '@/types/relation'
+import ObjectRelatedModules from './ObjectRelatedModules.vue'
 
 const props = defineProps<{
   detail: RelationDetailVO
 }>()
 
+const emit = defineEmits<{
+  (e: 'add-task'): void
+  (e: 'add-schedule'): void
+  (e: 'add-attachment'): void
+}>()
+
 const relation = computed(() => props.detail.relation)
+const tasks = computed(() => props.detail.tasks || [])
+const schedules = computed(() => props.detail.schedules || [])
+const attachments = computed(() => props.detail.attachments || [])
+const histories = computed(() => props.detail.histories || [])
 const avatarUrl = computed(() => relation.value.avatarUrl || relation.value.avatar || '')
 const sourceLabel = computed(() => {
   if (relation.value.source === 'customer_contact') return '客户联系人'
   if (relation.value.source === 'manual') return '手动创建'
   return relation.value.source || '-'
 })
-
-const sections = computed(() => [
-  {
-    key: 'tasks',
-    title: '相关任务',
-    items: (props.detail.tasks || []).map(task => ({
-      key: `task-${task.taskId}`,
-      title: task.title,
-      subtitle: [task.statusName || task.status, task.dueDate ? `截止 ${formatDateTime(task.dueDate)}` : ''].filter(Boolean).join(' · ')
-    }))
-  },
-  {
-    key: 'schedules',
-    title: '相关日程',
-    items: (props.detail.schedules || []).map(schedule => ({
-      key: `schedule-${schedule.scheduleId}`,
-      title: schedule.title,
-      subtitle: [schedule.startTime ? formatDateTime(schedule.startTime) : '', schedule.location || ''].filter(Boolean).join(' · ')
-    }))
-  },
-  {
-    key: 'attachments',
-    title: '相关附件',
-    items: (props.detail.attachments || []).map(knowledge => ({
-      key: `knowledge-${knowledge.knowledgeId}`,
-      title: knowledge.name,
-      subtitle: [knowledge.summary || '', knowledge.createTime ? formatDateTime(knowledge.createTime) : ''].filter(Boolean).join(' · ')
-    }))
-  },
-  {
-    key: 'histories',
-    title: '历史记录',
-    items: (props.detail.histories || []).map(history => ({
-      key: `history-${history.followUpId}`,
-      title: history.content,
-      subtitle: [history.typeName || history.type, history.followTime ? formatDateTime(history.followTime) : ''].filter(Boolean).join(' · ')
-    }))
-  }
-])
 
 function formatDateTime(value?: string) {
   if (!value) return ''

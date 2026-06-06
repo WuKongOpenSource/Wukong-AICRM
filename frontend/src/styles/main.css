@@ -133,6 +133,96 @@ body {
     color 160ms ease;
 }
 
+.wk-object-detail-embedded,
+.wk-customer-detail-embedded {
+  background: var(--wk-bg-surface);
+  color: var(--wk-text-primary);
+}
+
+.wk-object-detail-embedded .bg-white,
+.wk-customer-detail-embedded .bg-white,
+.wk-customer-detail-embedded-mobile .bg-white {
+  background-color: var(--wk-bg-surface) !important;
+}
+
+.wk-object-detail-embedded .bg-slate-50,
+.wk-object-detail-embedded .bg-slate-50\/70,
+.wk-object-detail-embedded .bg-slate-100,
+.wk-customer-detail-embedded .bg-slate-50,
+.wk-customer-detail-embedded .bg-slate-50\/70,
+.wk-customer-detail-embedded .bg-slate-100,
+.wk-customer-detail-embedded-mobile .bg-slate-50,
+.wk-customer-detail-embedded-mobile .bg-slate-50\/70,
+.wk-customer-detail-embedded-mobile .bg-slate-100 {
+  background-color: var(--wk-bg-surface-muted) !important;
+}
+
+.wk-object-detail-embedded .border-slate-100,
+.wk-object-detail-embedded .border-slate-200,
+.wk-object-detail-embedded .border-\[\#ececec\],
+.wk-customer-detail-embedded .border-slate-100,
+.wk-customer-detail-embedded .border-slate-200,
+.wk-customer-detail-embedded .border-\[\#ececec\],
+.wk-customer-detail-embedded-mobile .border-slate-100,
+.wk-customer-detail-embedded-mobile .border-slate-200,
+.wk-customer-detail-embedded-mobile .border-\[\#ececec\] {
+  border-color: var(--wk-border-subtle) !important;
+}
+
+.wk-object-detail-embedded .shadow-sm,
+.wk-customer-detail-embedded .shadow-sm,
+.wk-customer-detail-embedded-mobile .shadow-sm {
+  box-shadow: none !important;
+}
+
+.wk-object-detail-embedded .text-slate-900,
+.wk-customer-detail-embedded .text-slate-900,
+.wk-customer-detail-embedded-mobile .text-slate-900 {
+  color: var(--wk-text-primary) !important;
+}
+
+.wk-object-detail-embedded .text-slate-700,
+.wk-object-detail-embedded .text-slate-600,
+.wk-customer-detail-embedded .text-slate-700,
+.wk-customer-detail-embedded .text-slate-600,
+.wk-customer-detail-embedded-mobile .text-slate-700,
+.wk-customer-detail-embedded-mobile .text-slate-600 {
+  color: var(--wk-text-secondary) !important;
+}
+
+.wk-object-detail-embedded .text-slate-500,
+.wk-object-detail-embedded .text-slate-400,
+.wk-customer-detail-embedded .text-slate-500,
+.wk-customer-detail-embedded .text-slate-400,
+.wk-customer-detail-embedded-mobile .text-slate-500,
+.wk-customer-detail-embedded-mobile .text-slate-400 {
+  color: var(--wk-text-muted) !important;
+}
+
+.wk-object-detail-embedded .text-primary,
+.wk-customer-detail-embedded .text-primary,
+.wk-customer-detail-embedded-mobile .text-primary {
+  color: var(--wk-text-primary) !important;
+}
+
+.wk-object-detail-embedded .bg-primary,
+.wk-customer-detail-embedded .bg-primary,
+.wk-customer-detail-embedded-mobile .bg-primary {
+  background-color: var(--wk-primary) !important;
+}
+
+.wk-object-detail-embedded .bg-primary\/5,
+.wk-object-detail-embedded .bg-primary\/10,
+.wk-object-detail-embedded .bg-primary\/20,
+.wk-customer-detail-embedded .bg-primary\/5,
+.wk-customer-detail-embedded .bg-primary\/10,
+.wk-customer-detail-embedded .bg-primary\/20,
+.wk-customer-detail-embedded-mobile .bg-primary\/5,
+.wk-customer-detail-embedded-mobile .bg-primary\/10,
+.wk-customer-detail-embedded-mobile .bg-primary\/20 {
+  background-color: var(--wk-bg-surface-hover) !important;
+}
+
 .el-button--primary {
   --el-button-bg-color: var(--wk-primary);
   --el-button-border-color: var(--wk-primary);

@@ -223,13 +223,16 @@
                 暂无项目数据
               </div>
               <template v-else>
-                <button
+                <div
                   v-for="project in sidebarProjects"
                   :key="project.projectId"
-                  type="button"
-                  class="group/project-row flex w-full min-w-0 items-center gap-2 overflow-hidden rounded-[8px] pl-[10px] pr-[8px] py-[6px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
+                  role="button"
+                  tabindex="0"
+                  class="group/project-row flex w-full min-w-0 cursor-pointer items-center gap-2 overflow-hidden rounded-[8px] pl-[10px] pr-[8px] py-[6px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
                   :class="isProjectActive(project.projectId) ? 'bg-[#f3f3f3]' : 'hover:bg-[#f9f9f9]'"
                   @click="handleSelectProjectBoard(project.projectId)"
+                  @keydown.enter.self.prevent="handleSelectProjectBoard(project.projectId)"
+                  @keydown.space.self.prevent="handleSelectProjectBoard(project.projectId)"
                 >
                   <span class="material-symbols-outlined flex size-[20px] shrink-0 items-center justify-center text-[18px] leading-none text-[#8f8f8f]">
                     folder
@@ -246,7 +249,7 @@
                   >
                     <WkIcon name="new-chat" :size="18" class="shrink-0" />
                   </button>
-                </button>
+                </div>
               </template>
             </div>
           </div>
@@ -531,6 +534,21 @@
                 </span>
               </button>
               <div class="ml-auto flex shrink-0 items-center justify-end gap-1">
+                <button
+                  v-if="canCreateRelation"
+                  type="button"
+                  class="wk-customer-header-action group/relation-create-action relative flex size-6 items-center justify-center rounded-md text-[#8f8f8f] transition-colors hover:text-[#0d0d0d]"
+                  aria-label="新建关系"
+                  @click.stop="openCreateRelationDialog"
+                >
+                  <span class="material-symbols-outlined text-[18px] leading-none">person_add</span>
+                  <span
+                    class="pointer-events-none absolute right-0 top-full z-[200] mt-2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/relation-create-action:opacity-100"
+                    role="tooltip"
+                  >
+                    新建关系
+                  </span>
+                </button>
                 <button
                   type="button"
                   class="wk-customer-header-action group/relation-action relative flex size-6 items-center justify-center rounded-md text-[#8f8f8f] transition-colors hover:text-[#0d0d0d]"
@@ -1034,13 +1052,16 @@
                 暂无项目数据
               </div>
               <template v-else>
-                <button
+                <div
                   v-for="project in sidebarProjects"
                   :key="project.projectId"
-                  type="button"
-                  class="group flex w-full min-w-0 items-center gap-3 rounded-[8px] px-3 py-[9px] text-left transition-colors"
+                  role="button"
+                  tabindex="0"
+                  class="group flex w-full min-w-0 cursor-pointer items-center gap-3 rounded-[8px] px-3 py-[9px] text-left transition-colors"
                   :class="isProjectActive(project.projectId) ? 'bg-[#f3f3f3]' : 'text-[#0d0d0d] active:bg-slate-100'"
                   @click="handleMobileSelectProjectBoard(project.projectId)"
+                  @keydown.enter.self.prevent="handleMobileSelectProjectBoard(project.projectId)"
+                  @keydown.space.self.prevent="handleMobileSelectProjectBoard(project.projectId)"
                 >
                   <span class="material-symbols-outlined flex size-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-[18px] leading-none text-[#8f8f8f]">
                     folder
@@ -1054,7 +1075,7 @@
                   >
                     <span class="material-symbols-outlined text-[17px] leading-none">chat_bubble</span>
                   </button>
-                </button>
+                </div>
               </template>
             </div>
 
@@ -1202,7 +1223,28 @@
             </div>
 
             <div v-if="showSidebarRelations" class="pt-3">
-              <p class="px-3 pb-2.5 text-[1rem] font-bold leading-7 text-[#0d0d0d]">关系</p>
+              <div class="flex items-center gap-3 px-3 pb-2.5">
+                <p class="min-w-0 flex-1 text-[1rem] font-bold leading-7 text-[#0d0d0d]">关系</p>
+                <button
+                  v-if="canCreateRelation"
+                  type="button"
+                  class="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors active:bg-slate-100 active:text-[#0d0d0d]"
+                  aria-label="移动端新建关系"
+                  title="新建关系"
+                  @click.stop="handleMobileCreateRelation"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">person_add</span>
+                </button>
+                <button
+                  type="button"
+                  class="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors active:bg-slate-100 active:text-[#0d0d0d]"
+                  aria-label="移动端查看关系列表"
+                  title="查看关系列表"
+                  @click.stop="mobileNavigate('/relation')"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">format_list_bulleted</span>
+                </button>
+              </div>
               <div v-if="sidebarRelationsLoading && sidebarRelations.length === 0" class="flex justify-center py-6">
                 <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
               </div>
@@ -1573,6 +1615,10 @@
     </div>
 
     <CustomerUpsertDialog v-model="showCreateCustomer" mode="create" @success="handleCreateCustomerSuccess" />
+    <RelationUpsertDialog
+      v-model="showCreateRelation"
+      @saved="handleCreateRelationSuccess"
+    />
     <ProjectUpsertDialog
       v-model="showCreateProject"
       :editing-project="null"
@@ -1728,6 +1774,7 @@ import AiQuotaModals from '@/components/layout/AiQuotaModals.vue'
 import AccountSettingsModal from '@/views/profile/components/AccountSettingsModal.vue'
 import ChatSessionActionsPopover from '@/components/layout/ChatSessionActionsPopover.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
+import RelationUpsertDialog from '@/views/relation/components/RelationUpsertDialog.vue'
 import ProjectUpsertDialog from '@/views/project/components/ProjectUpsertDialog.vue'
 import type { WkIconName } from '@/components/common/wkIcon'
 import { queryGlobalSearch, type GlobalSearchResult } from '@/api/search'
@@ -2125,6 +2172,7 @@ const sidebarRelationsHasMore = ref(true)
 const showUserMenu = ref(false)
 const showAccountSettingsModal = ref(false)
 const showCreateCustomer = ref(false)
+const showCreateRelation = ref(false)
 const showCreateProject = ref(false)
 const customerSearchDialogVisible = ref(false)
 const customerSearchKeyword = ref('')
@@ -2160,7 +2208,7 @@ type ChatComposerNarrowPayload = {
   minWidth?: number
 }
 
-type CustomerListRefreshPayload = {
+type SidebarRefreshPayload = {
   preserveScroll?: boolean
 }
 
@@ -2174,7 +2222,7 @@ type MobileMainMenuDragPayload = {
   open?: boolean
 }
 
-function refreshSidebarCustomersFromEvent(payload?: CustomerListRefreshPayload) {
+function refreshSidebarCustomersFromEvent(payload?: SidebarRefreshPayload) {
   void fetchSidebarCustomers({ reset: true, preserveScroll: payload?.preserveScroll !== false })
 }
 
@@ -2244,6 +2292,7 @@ const sidebarProjects = computed(() => projectStore.accessibleProjectSummaries.s
 const showSidebarCustomers = computed(() => userStore.hasPermission('customer:view'))
 const showSidebarAddressBook = computed(() => true)
 const showSidebarRelations = computed(() => true)
+const canCreateRelation = computed(() => userStore.hasPermission('relation:create'))
 
 watch(showSidebarProjects, visible => {
   if (visible) {
@@ -2656,11 +2705,11 @@ onMounted(() => {
     APP_EVENT.CHAT_COMPOSER_NARROW_CHANGE,
     handleChatComposerNarrowChange
   )
-  removeCustomerListRefreshListener = appEvents.on<CustomerListRefreshPayload>(
+  removeCustomerListRefreshListener = appEvents.on<SidebarRefreshPayload>(
     APP_EVENT.CUSTOMER_LIST_REFRESH,
     refreshSidebarCustomersFromEvent
   )
-  removeCustomerSidebarRefreshListener = appEvents.on<CustomerListRefreshPayload>(
+  removeCustomerSidebarRefreshListener = appEvents.on<SidebarRefreshPayload>(
     APP_EVENT.CUSTOMER_SIDEBAR_REFRESH,
     refreshSidebarCustomersFromEvent
   )
@@ -3662,6 +3711,15 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
   }
 }
 
+function openCreateRelationDialog() {
+  showCreateRelation.value = true
+}
+
+function handleCreateRelationSuccess() {
+  sidebarRelationsExpanded.value = true
+  appEvents.emit(APP_EVENT.RELATION_SIDEBAR_REFRESH, { preserveScroll: true })
+}
+
 function openCreateProjectDialog() {
   showCreateProject.value = true
 }
@@ -3669,6 +3727,11 @@ function openCreateProjectDialog() {
 function handleMobileCreateCustomer() {
   closeMobileDrawer()
   showCreateCustomer.value = true
+}
+
+function handleMobileCreateRelation() {
+  closeMobileDrawer()
+  showCreateRelation.value = true
 }
 
 function openMobileCreateProjectDialog() {

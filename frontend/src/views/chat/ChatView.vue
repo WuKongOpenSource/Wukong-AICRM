@@ -2073,10 +2073,16 @@
         <EmployeeChatInfoPanel
           v-else-if="selectedEmployee"
           :employee="selectedEmployee"
+          @add-task="handleRelatedObjectAdd('task')"
+          @add-schedule="handleRelatedObjectAdd('schedule')"
+          @add-attachment="handleRelatedObjectAdd('attachment')"
         />
         <RelationChatInfoPanel
           v-else-if="selectedRelationDetail"
           :detail="selectedRelationDetail"
+          @add-task="handleRelatedObjectAdd('task')"
+          @add-schedule="handleRelatedObjectAdd('schedule')"
+          @add-attachment="handleRelatedObjectAdd('attachment')"
         />
       </div>
     </aside>
@@ -2832,13 +2838,13 @@ const isObjectContextChat = computed(() => Boolean(
     || selectedRelationId.value || currentSessionRelationId.value
   )
 ))
-const isCenteredEmptyChat = computed(() => isChatEmpty.value && !isCustomerContextChat.value)
+const isCenteredEmptyChat = computed(() => isChatEmpty.value && !isObjectContextChat.value)
 const mobileChatFloatingBarTop = computed(() => '0px')
 const showMobileFloatingBar = computed(() =>
   isMobile.value
   && currentView.value === 'chat'
   && mobilePanel.value === 'chat'
-  && !isCustomerContextChat.value
+  && !isObjectContextChat.value
 )
 const showMobileCustomerSummaryAction = computed(() =>
   shouldShowMobileCustomerSummaryAction({
@@ -2852,7 +2858,7 @@ const showMobileNewSessionAction = computed(() =>
   isMobile.value
   && currentView.value === 'chat'
   && mobilePanel.value === 'chat'
-  && !isCustomerContextChat.value
+  && !isObjectContextChat.value
   && Boolean(chatStore.currentSessionId)
   && !chatStore.isNewSessionPending
 )
@@ -4158,6 +4164,15 @@ function handleStopChatAudioRecording() {
 function sendQuickMessage(text: string) {
   inputText.value = text
   handleSend()
+}
+
+function handleRelatedObjectAdd(kind: 'task' | 'schedule' | 'attachment') {
+  const labels = {
+    task: '任务',
+    schedule: '日程',
+    attachment: '文档'
+  } as const
+  ElMessage.info(`请在对应${labels[kind]}模块中新增，保存后会在这里展示`)
 }
 
 function handleQuoteCustomerAttachment(payload: { followUp: FollowUp; attachment: FollowUpAttachment }) {
