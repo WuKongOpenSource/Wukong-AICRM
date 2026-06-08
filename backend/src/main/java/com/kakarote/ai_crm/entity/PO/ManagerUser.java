@@ -114,6 +114,12 @@ public class ManagerUser implements Serializable {
 	private Date wecomSyncedAt;
 
 	/**
+	 * 用户级 UI 偏好(JSON)
+	 */
+	@Schema(description = "用户级 UI 偏好(JSON)")
+	private String uiPreferences;
+
+	/**
 	 * 租户ID
 	 */
 	@TableField(fill = FieldFill.INSERT)

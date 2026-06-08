@@ -31,11 +31,11 @@
         </if>
     </select>
     <select id="getUserId" resultType="com.kakarote.ai_crm.entity.PO.ManagerUser">
-        SELECT a.user_id, a.password, a.username, a.img, a.create_time, a.realname, a.num, a.mobile, a.email, a.sex, a.dept_id, a.post, a.status, a.employee_status, a.parent_id, a.tenant_id
+        SELECT a.user_id, a.password, a.username, a.img, a.create_time, a.realname, a.num, a.mobile, a.email, a.sex, a.dept_id, a.post, a.status, a.employee_status, a.parent_id, a.tenant_id, a.ui_preferences
         FROM manager_user a where a.user_id=#{userId}
     </select>
     <select id="queryUserByUsername" resultType="com.kakarote.ai_crm.entity.PO.ManagerUser">
-        SELECT a.user_id, a.password, a.username, a.img, a.create_time, a.realname, a.num, a.mobile, a.email, a.sex, a.dept_id, a.post, a.status, a.employee_status, a.parent_id, a.tenant_id
+        SELECT a.user_id, a.password, a.username, a.img, a.create_time, a.realname, a.num, a.mobile, a.email, a.sex, a.dept_id, a.post, a.status, a.employee_status, a.parent_id, a.tenant_id, a.ui_preferences
         FROM manager_user a
         WHERE (
             a.username=#{username}
@@ -46,7 +46,7 @@
         LIMIT 1
     </select>
     <select id="queryUsersByUsername" resultType="com.kakarote.ai_crm.entity.PO.ManagerUser">
-        SELECT a.user_id, a.password, a.username, a.img, a.create_time, a.realname, a.num, a.mobile, a.email, a.sex, a.dept_id, a.post, a.status, a.employee_status, a.parent_id, a.tenant_id
+        SELECT a.user_id, a.password, a.username, a.img, a.create_time, a.realname, a.num, a.mobile, a.email, a.sex, a.dept_id, a.post, a.status, a.employee_status, a.parent_id, a.tenant_id, a.ui_preferences
         FROM manager_user a
         WHERE (
             a.username=#{username}

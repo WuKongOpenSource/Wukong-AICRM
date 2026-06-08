@@ -15,6 +15,7 @@ import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.BO.ResetUsernameBO;
 import com.kakarote.ai_crm.entity.BO.UserAddBO;
+import com.kakarote.ai_crm.entity.BO.UserPreferenceUpdateBO;
 import com.kakarote.ai_crm.entity.BO.UserQueryBO;
 import com.kakarote.ai_crm.entity.BO.UserStatusBO;
 import com.kakarote.ai_crm.entity.BO.UserUpdateBO;
@@ -26,6 +27,7 @@ import com.kakarote.ai_crm.entity.PO.ManagerUserRole;
 import com.kakarote.ai_crm.entity.PO.SystemConfig;
 import com.kakarote.ai_crm.entity.VO.LoginTenantOptionVO;
 import com.kakarote.ai_crm.entity.VO.ManageUserVO;
+import com.kakarote.ai_crm.entity.VO.UserPreferenceVO;
 import com.kakarote.ai_crm.mapper.ManageUserMapper;
 import com.kakarote.ai_crm.mapper.ManagerDeptMapper;
 import com.kakarote.ai_crm.mapper.SystemConfigMapper;
@@ -34,6 +36,7 @@ import com.kakarote.ai_crm.service.ICrmTenantService;
 import com.kakarote.ai_crm.service.IManagerRoleService;
 import com.kakarote.ai_crm.service.IManagerUserRoleService;
 import com.kakarote.ai_crm.service.ManageUserService;
+import com.kakarote.ai_crm.service.support.UserPreferenceSupport;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -469,7 +472,30 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         fillImgUrl(Collections.singletonList(vo));
         fillTenantCreatorFlag(Collections.singletonList(vo));
         fillEmployeeStatusName(Collections.singletonList(vo));
+        vo.setPreferences(UserPreferenceSupport.parsePreferences(userEntity.getUiPreferences()));
         return vo;
+    }
+
+    /**
+     * 更新当前登录用户 UI 偏好。
+     */
+    @Override
+    public UserPreferenceVO updateCurrentUserPreferences(UserPreferenceUpdateBO preferenceUpdateBO) {
+        Long userId = UserUtil.getUserId();
+        if (userId == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NOT_LOGIN);
+        }
+
+        UserPreferenceVO preferences = UserPreferenceSupport.toPreferenceVO(
+                preferenceUpdateBO == null ? null : preferenceUpdateBO.getSidebarModuleOrder());
+        ManagerUser updateUser = new ManagerUser();
+        updateUser.setUserId(userId);
+        updateUser.setUiPreferences(UserPreferenceSupport.serializePreferences(preferences));
+        boolean updated = updateById(updateUser);
+        if (!updated) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_USER_DOES_NOT_EXIST);
+        }
+        return preferences;
     }
 
     /**

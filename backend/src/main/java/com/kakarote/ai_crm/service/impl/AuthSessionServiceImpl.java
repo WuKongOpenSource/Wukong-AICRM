@@ -11,6 +11,7 @@ import com.kakarote.ai_crm.entity.VO.ManageUserVO;
 import com.kakarote.ai_crm.service.AuthSessionService;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.OidcService;
+import com.kakarote.ai_crm.service.support.UserPreferenceSupport;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,6 +75,7 @@ public class AuthSessionServiceImpl implements AuthSessionService {
         }
         userVO.setMobile(user.getMobile());
         userVO.setEmail(user.getEmail());
+        userVO.setPreferences(UserPreferenceSupport.parsePreferences(user.getUiPreferences()));
         return userVO;
     }
 }

@@ -41,6 +41,14 @@ export interface LoginResult {
   tenantOptions?: LoginTenantOption[]
 }
 
+export interface UserPreferences {
+  sidebarModuleOrder?: string[]
+}
+
+export interface UserPreferenceUpdateParams {
+  sidebarModuleOrder?: string[]
+}
+
 export type ExternalAuthProviderCode = 'google' | 'outlook' | 'wechat' | 'wecom'
 
 export interface ExternalAuthProvider {
@@ -91,4 +99,5 @@ export interface UserInfo {
   sex?: number
   tenantId?: string | number
   tenantCreator?: boolean
+  preferences?: UserPreferences
 }

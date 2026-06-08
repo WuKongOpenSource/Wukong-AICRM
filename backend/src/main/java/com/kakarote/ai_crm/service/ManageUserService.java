@@ -4,12 +4,14 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.ResetUsernameBO;
 import com.kakarote.ai_crm.entity.BO.UserAddBO;
+import com.kakarote.ai_crm.entity.BO.UserPreferenceUpdateBO;
 import com.kakarote.ai_crm.entity.BO.UserQueryBO;
 import com.kakarote.ai_crm.entity.BO.UserStatusBO;
 import com.kakarote.ai_crm.entity.BO.UserUpdateBO;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.VO.LoginTenantOptionVO;
 import com.kakarote.ai_crm.entity.VO.ManageUserVO;
+import com.kakarote.ai_crm.entity.VO.UserPreferenceVO;
 
 import java.util.Collection;
 import java.util.List;
@@ -94,4 +96,11 @@ public interface ManageUserService extends IService<ManagerUser> {
      * @param newPassword 新密码
      */
     void updatePassword(String oldPassword, String newPassword);
+
+    /**
+     * 更新当前登录用户 UI 偏好。
+     * @param preferenceUpdateBO 偏好数据
+     * @return 规范化后的偏好
+     */
+    UserPreferenceVO updateCurrentUserPreferences(UserPreferenceUpdateBO preferenceUpdateBO);
 }

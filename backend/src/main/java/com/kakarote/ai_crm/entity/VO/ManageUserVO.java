@@ -79,4 +79,7 @@ public class ManageUserVO {
 
     @Schema(description = "是否企业创建者主账号")
     private Boolean tenantCreator;
+
+    @Schema(description = "当前用户 UI 偏好")
+    private UserPreferenceVO preferences;
 }

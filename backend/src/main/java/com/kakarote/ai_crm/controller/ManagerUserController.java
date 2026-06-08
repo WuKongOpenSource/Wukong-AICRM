@@ -5,10 +5,12 @@ import com.kakarote.ai_crm.common.auth.RequirePermission;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.ResetUsernameBO;
 import com.kakarote.ai_crm.entity.BO.UserAddBO;
+import com.kakarote.ai_crm.entity.BO.UserPreferenceUpdateBO;
 import com.kakarote.ai_crm.entity.BO.UserQueryBO;
 import com.kakarote.ai_crm.entity.BO.UserStatusBO;
 import com.kakarote.ai_crm.entity.BO.UserUpdateBO;
 import com.kakarote.ai_crm.entity.VO.ManageUserVO;
+import com.kakarote.ai_crm.entity.VO.UserPreferenceVO;
 import com.kakarote.ai_crm.service.ManageUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -42,6 +44,15 @@ public class ManagerUserController {
     @Operation(summary = "Query current login user")
     public Result<ManageUserVO> queryLoginUser() {
         return Result.ok(manageUserService.queryLoginUser());
+    }
+
+    /**
+     * 更新当前登录用户 UI 偏好。
+     */
+    @PostMapping("/preferences")
+    @Operation(summary = "Update current user preferences")
+    public Result<UserPreferenceVO> updateCurrentUserPreferences(@RequestBody UserPreferenceUpdateBO preferenceUpdateBO) {
+        return Result.ok(manageUserService.updateCurrentUserPreferences(preferenceUpdateBO));
     }
 
     /**

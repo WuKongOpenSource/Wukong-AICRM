@@ -116,16 +116,17 @@
         />
       </div>
 
-      <nav
-        ref="primaryNavRef"
-        class="wk-primary-nav-scroll wk-scrollbar-gutter-stable flex-1 flex w-full overflow-y-auto pb-4"
-        :class="primarySidebarContentCollapsed ? '!px-2' : 'px-3'"
-        @scroll.passive="onPrimaryNavScroll"
-      >
-        <div
-          class="wk-primary-nav-sections w-full"
-          :class="primarySidebarContentCollapsed ? 'flex flex-col items-center' : ''"
+      <div class="relative min-h-0 flex-1">
+        <nav
+          ref="primaryNavRef"
+          class="wk-primary-nav-scroll wk-scrollbar-gutter-stable flex h-full w-full overflow-y-auto pb-4"
+          :class="primarySidebarContentCollapsed ? '!px-2' : 'px-3'"
+          @scroll.passive="onPrimaryNavScroll"
         >
+          <div
+            class="wk-primary-nav-sections flex min-h-full w-full flex-col"
+            :class="primarySidebarContentCollapsed ? 'items-center' : ''"
+          >
 
           <template v-for="group in pcMainNavGroups" :key="group.title || 'default'">
             <div v-if="group.title && !primarySidebarContentCollapsed" class="pt-[8px] pb-[3px]" style="margin-top: 8px; margin-bottom: 0px;">
@@ -162,7 +163,65 @@
             </button>
           </template>
 
-          <div v-if="!primarySidebarContentCollapsed && showSidebarProjects" class="wk-sidebar-project-section space-y-1 pt-1">
+          <div
+            v-if="!primarySidebarContentCollapsed && sidebarSortMode"
+            class="wk-sidebar-sort-section space-y-1 pt-1"
+            :style="{ order: DYNAMIC_SIDEBAR_SECTION_ORDER_BASE }"
+          >
+            <div
+              v-for="moduleKey in sidebarDraftModuleOrder"
+              :key="moduleKey"
+              class="wk-sidebar-sort-row flex w-full cursor-grab items-center gap-2 rounded-lg pl-3 pr-2 py-[7px] mt-[8px] text-left transition-colors active:cursor-grabbing"
+              :class="sidebarDraggingModuleKey === moduleKey ? 'bg-[#f3f3f3] opacity-70' : 'hover:bg-[#f9f9f9]'"
+              draggable="true"
+              @dragstart="handleSidebarSortDragStart($event, moduleKey)"
+              @dragover.prevent="handleSidebarSortDragOver"
+              @drop.prevent="handleSidebarSortDrop($event, moduleKey)"
+              @dragend="handleSidebarSortDragEnd"
+            >
+              <span class="material-symbols-outlined inline-flex size-5 shrink-0 items-center justify-center text-[19px] leading-none text-[#8f8f8f]">
+                {{ getSidebarModuleIcon(moduleKey) }}
+              </span>
+              <span class="min-w-0 flex-1 truncate text-[14px] font-semibold uppercase tracking-tight text-[#0d0d0d]">
+                {{ getSidebarModuleLabel(moduleKey) }}
+              </span>
+              <span class="material-symbols-outlined inline-flex size-6 shrink-0 items-center justify-center text-[20px] leading-none text-[#c9c9c9]">
+                drag_indicator
+              </span>
+            </div>
+            <div class="flex items-center gap-1 px-1.5 pt-2">
+              <button
+                type="button"
+                class="wk-sidebar-sort-save-button flex h-8 flex-1 items-center justify-center rounded-lg bg-[#0d0d0d] px-2 text-[13px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="sidebarSavingModuleOrder"
+                @click="saveSidebarModuleOrder"
+              >
+                保存
+              </button>
+              <button
+                type="button"
+                class="flex h-8 flex-1 items-center justify-center rounded-lg px-2 text-[13px] font-medium text-[#0d0d0d] transition-colors hover:bg-[#f3f3f3] disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="sidebarSavingModuleOrder"
+                @click="cancelSidebarSortMode"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                class="flex h-8 flex-1 items-center justify-center rounded-lg px-2 text-[13px] font-medium text-[#8f8f8f] transition-colors hover:bg-[#f3f3f3] hover:text-[#0d0d0d] disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="sidebarSavingModuleOrder"
+                @click="restoreDefaultSidebarDraftOrder"
+              >
+                恢复默认
+              </button>
+            </div>
+          </div>
+
+          <div
+            v-if="!primarySidebarContentCollapsed && !sidebarSortMode && showSidebarProjects"
+            class="wk-sidebar-project-section space-y-1 pt-1"
+            :style="{ order: getSidebarModuleRenderOrder('project') }"
+          >
             <div
               class="wk-project-header-row group/project-header flex w-full items-center gap-2 rounded-lg pl-3 pr-1 py-[6px] mt-[12px] mb-[0px] hover:!bg-[#f9f9f9]"
               :style="{ backgroundColor: projectHeaderHovered ? '#f9f9f9' : 'transparent' }"
@@ -258,7 +317,11 @@
           <template v-if="!primarySidebarContentCollapsed">
             <!-- <div class="pt-2" /> -->
             <!-- <div class="mx-1 h-px bg-slate-100" /> -->
-            <div class="wk-sidebar-recent-section space-y-1 pt-0">
+            <div
+              v-if="!sidebarSortMode"
+              class="wk-sidebar-recent-section space-y-1 pt-0"
+              :style="{ order: getSidebarModuleRenderOrder('recent') }"
+            >
               <button
                 type="button"
                 class="group flex shrink-0 items-center gap-1 rounded-lg pl-3 pr-1 text-left transition-colors mt-[12px] mb-[0px] w-full py-[6px]"
@@ -319,7 +382,11 @@
               </div>
           </div>
 
-          <div v-if="showSidebarCustomers" class="wk-sidebar-customer-section space-y-1 pt-1">
+          <div
+            v-if="!sidebarSortMode && showSidebarCustomers"
+            class="wk-sidebar-customer-section space-y-1 pt-1"
+            :style="{ order: getSidebarModuleRenderOrder('customer') }"
+          >
             <div
               class="wk-customer-header-row group/customer-header flex w-full items-center gap-2 rounded-lg pl-3 pr-1 py-[6px] mt-[12px] mb-[0px] hover:!bg-[#f9f9f9]"
               :style="{ backgroundColor: customerHeaderHovered ? '#f9f9f9' : 'transparent' }"
@@ -424,7 +491,11 @@
             </div>
           </div>
 
-          <div v-if="showSidebarAddressBook" class="wk-sidebar-address-section space-y-1 pt-1">
+          <div
+            v-if="!sidebarSortMode && showSidebarAddressBook"
+            class="wk-sidebar-address-section space-y-1 pt-1"
+            :style="{ order: getSidebarModuleRenderOrder('addressBook') }"
+          >
             <div
               class="wk-customer-header-row group/address-book-header flex w-full items-center gap-2 rounded-lg pl-3 pr-1 py-[6px] mt-[12px] mb-[0px] hover:!bg-[#f9f9f9]"
               :style="{ backgroundColor: addressBookHeaderHovered ? '#f9f9f9' : 'transparent' }"
@@ -511,7 +582,11 @@
             </div>
           </div>
 
-          <div v-if="showSidebarRelations" class="wk-sidebar-relation-section space-y-1 pt-1">
+          <div
+            v-if="!sidebarSortMode && showSidebarRelations"
+            class="wk-sidebar-relation-section space-y-1 pt-1"
+            :style="{ order: getSidebarModuleRenderOrder('relation') }"
+          >
             <div
               class="wk-customer-header-row group/relation-header flex w-full items-center gap-2 rounded-lg pl-3 pr-1 py-[6px] mt-[12px] mb-[0px] hover:!bg-[#f9f9f9]"
               :style="{ backgroundColor: relationHeaderHovered ? '#f9f9f9' : 'transparent' }"
@@ -614,8 +689,29 @@
           </div>
           </template>
 
+          </div>
+        </nav>
+
+        <div
+          v-if="!primarySidebarContentCollapsed && !sidebarSortMode"
+          class="pointer-events-none absolute bottom-2 right-3 z-30"
+        >
+          <button
+            type="button"
+            class="group/sidebar-sort-action pointer-events-auto relative flex size-7 items-center justify-center rounded-lg border border-[#ececec] bg-white/95 text-[#8f8f8f] shadow-[0_4px_12px_rgb(0,0,0,0.08)] backdrop-blur transition-colors hover:bg-[#f3f3f3] hover:text-[#0d0d0d]"
+            aria-label="设置排序"
+            @click.stop="openSidebarSortMode()"
+          >
+            <span class="material-symbols-outlined text-[18px] leading-none">swap_vert</span>
+            <span
+              class="pointer-events-none absolute bottom-full right-0 z-[200] mb-2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/sidebar-sort-action:opacity-100"
+              role="tooltip"
+            >
+              设置排序
+            </span>
+          </button>
         </div>
-      </nav>
+      </div>
 
       <Transition name="drawer-panel">
         <div
@@ -1791,6 +1887,13 @@ import { useUserStore } from '@/stores/user'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import { shouldCloseMobileDrawerFromSwipe, type SwipePoint } from '@/utils/mobileDrawerSwipe'
+import {
+  DEFAULT_SIDEBAR_MODULE_ORDER,
+  normalizeSidebarModuleOrder,
+  readStoredSidebarModuleOrder,
+  writeStoredSidebarModuleOrder,
+  type SidebarModuleKey
+} from '@/utils/sidebarModuleOrder'
 import type { ChatSession } from '@/types/common'
 import type { CustomerListVO } from '@/types/customer'
 import type { ProjectEntity } from '@/types/project'
@@ -1822,6 +1925,7 @@ const PRIMARY_SIDEBAR_WIDTH_EXPANDED_PX = 256
 const PRIMARY_SIDEBAR_WIDTH_COLLAPSED_PX = 52
 const PRIMARY_SIDEBAR_WIDTH_DELTA_PX = PRIMARY_SIDEBAR_WIDTH_EXPANDED_PX - PRIMARY_SIDEBAR_WIDTH_COLLAPSED_PX
 const PRIMARY_SIDEBAR_TRANSITION_MS = 200
+const DYNAMIC_SIDEBAR_SECTION_ORDER_BASE = 20
 const SIDEBAR_STORAGE_KEYS = {
   primaryCollapsed: 'wk_ai_crm:main_layout:primary_sidebar_collapsed:v1',
   recentChatExpanded: 'wk_ai_crm:main_layout:recent_chat_sessions_expanded:v1',
@@ -1830,6 +1934,22 @@ const SIDEBAR_STORAGE_KEYS = {
   sidebarAddressBookExpanded: 'wk_ai_crm:main_layout:sidebar_address_book_expanded:v1',
   sidebarRelationsExpanded: 'wk_ai_crm:main_layout:sidebar_relations_expanded:v1'
 } as const
+
+const SIDEBAR_MODULE_LABELS: Record<SidebarModuleKey, string> = {
+  recent: '最近',
+  customer: '客户',
+  project: '项目',
+  relation: '关系',
+  addressBook: '通讯录'
+}
+
+const SIDEBAR_MODULE_ICONS: Record<SidebarModuleKey, string> = {
+  recent: 'forum',
+  customer: 'business_center',
+  project: 'folder',
+  relation: 'account_tree',
+  addressBook: 'contacts'
+}
 
 function mainContentWidthAsIfSidebarExpanded(sidebarCollapsed: boolean, mainColumnWidth: number) {
   return sidebarCollapsed ? mainColumnWidth - PRIMARY_SIDEBAR_WIDTH_DELTA_PX : mainColumnWidth
@@ -1853,6 +1973,143 @@ function writeStoredBoolean(key: string, value: boolean) {
     window.localStorage.setItem(key, value ? '1' : '0')
   } catch {
     // Ignore storage failures.
+  }
+}
+
+function getCurrentSidebarOrderUserId() {
+  return userStore.userInfo?.userId || userStore.userId || undefined
+}
+
+function getCurrentSidebarOrderTenantId() {
+  return userStore.userInfo?.tenantId
+}
+
+function getInitialSidebarModuleOrder(): SidebarModuleKey[] {
+  const stored = readStoredSidebarModuleOrder(getCurrentSidebarOrderUserId(), getCurrentSidebarOrderTenantId())
+  if (stored) return stored
+  return normalizeSidebarModuleOrder(userStore.userInfo?.preferences?.sidebarModuleOrder)
+}
+
+const sidebarModuleOrder = ref<SidebarModuleKey[]>(getInitialSidebarModuleOrder())
+const sidebarDraftModuleOrder = ref<SidebarModuleKey[]>([...sidebarModuleOrder.value])
+const sidebarSortMode = ref(false)
+const sidebarSavingModuleOrder = ref(false)
+const sidebarDraggingModuleKey = ref<SidebarModuleKey | null>(null)
+
+function getSidebarModuleLabel(moduleKey: SidebarModuleKey) {
+  return SIDEBAR_MODULE_LABELS[moduleKey]
+}
+
+function getSidebarModuleIcon(moduleKey: SidebarModuleKey) {
+  return SIDEBAR_MODULE_ICONS[moduleKey]
+}
+
+function getSidebarModuleRenderOrder(moduleKey: SidebarModuleKey) {
+  const orderIndex = sidebarModuleOrder.value.indexOf(moduleKey)
+  if (orderIndex >= 0) return DYNAMIC_SIDEBAR_SECTION_ORDER_BASE + orderIndex
+  const defaultIndex = DEFAULT_SIDEBAR_MODULE_ORDER.indexOf(moduleKey)
+  return DYNAMIC_SIDEBAR_SECTION_ORDER_BASE + Math.max(defaultIndex, 0)
+}
+
+function applySidebarModuleOrder(order: readonly SidebarModuleKey[]) {
+  sidebarModuleOrder.value = normalizeSidebarModuleOrder([...order])
+  if (!sidebarSortMode.value) {
+    sidebarDraftModuleOrder.value = [...sidebarModuleOrder.value]
+  }
+}
+
+function hydrateSidebarModuleOrderFromUserInfo() {
+  const info = userStore.userInfo
+  if (!info) {
+    applySidebarModuleOrder(DEFAULT_SIDEBAR_MODULE_ORDER)
+    return
+  }
+
+  const serverOrder = info.preferences?.sidebarModuleOrder
+  if (Array.isArray(serverOrder)) {
+    const normalized = normalizeSidebarModuleOrder(serverOrder)
+    applySidebarModuleOrder(normalized)
+    writeStoredSidebarModuleOrder(normalized, info.userId, info.tenantId)
+    return
+  }
+
+  const stored = readStoredSidebarModuleOrder(info.userId, info.tenantId)
+  applySidebarModuleOrder(stored || DEFAULT_SIDEBAR_MODULE_ORDER)
+}
+
+function openSidebarSortMode() {
+  if (primarySidebarContentCollapsed.value) return
+  recentChatSessionsMoreVisible.value = false
+  sidebarDraftModuleOrder.value = [...sidebarModuleOrder.value]
+  sidebarSortMode.value = true
+}
+
+function cancelSidebarSortMode() {
+  sidebarDraftModuleOrder.value = [...sidebarModuleOrder.value]
+  sidebarDraggingModuleKey.value = null
+  sidebarSortMode.value = false
+}
+
+function restoreDefaultSidebarDraftOrder() {
+  sidebarDraftModuleOrder.value = [...DEFAULT_SIDEBAR_MODULE_ORDER]
+}
+
+function handleSidebarSortDragStart(event: DragEvent, moduleKey: SidebarModuleKey) {
+  sidebarDraggingModuleKey.value = moduleKey
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', moduleKey)
+  }
+}
+
+function handleSidebarSortDragOver(event: DragEvent) {
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+}
+
+function handleSidebarSortDrop(event: DragEvent, targetKey: SidebarModuleKey) {
+  const sourceKey = sidebarDraggingModuleKey.value || event.dataTransfer?.getData('text/plain') as SidebarModuleKey
+  if (!sourceKey || sourceKey === targetKey) return
+  if (!DEFAULT_SIDEBAR_MODULE_ORDER.includes(sourceKey)) return
+
+  const nextOrder = [...sidebarDraftModuleOrder.value]
+  const sourceIndex = nextOrder.indexOf(sourceKey)
+  if (sourceIndex < 0 || nextOrder.indexOf(targetKey) < 0) return
+
+  nextOrder.splice(sourceIndex, 1)
+  const targetIndexAfterRemoval = nextOrder.indexOf(targetKey)
+  const targetElement = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
+  const insertAfterTarget = targetElement
+    ? event.clientY > targetElement.getBoundingClientRect().top + targetElement.getBoundingClientRect().height / 2
+    : false
+  nextOrder.splice(targetIndexAfterRemoval + (insertAfterTarget ? 1 : 0), 0, sourceKey)
+  sidebarDraftModuleOrder.value = normalizeSidebarModuleOrder(nextOrder)
+}
+
+function handleSidebarSortDragEnd() {
+  sidebarDraggingModuleKey.value = null
+}
+
+async function saveSidebarModuleOrder() {
+  if (sidebarSavingModuleOrder.value) return
+  const previousOrder = [...sidebarModuleOrder.value]
+  const nextOrder = normalizeSidebarModuleOrder(sidebarDraftModuleOrder.value)
+  sidebarSavingModuleOrder.value = true
+  try {
+    const preferences = await userStore.updatePreferences({ sidebarModuleOrder: nextOrder })
+    const savedOrder = normalizeSidebarModuleOrder(preferences.sidebarModuleOrder)
+    applySidebarModuleOrder(savedOrder)
+    writeStoredSidebarModuleOrder(savedOrder, getCurrentSidebarOrderUserId(), getCurrentSidebarOrderTenantId())
+    sidebarSortMode.value = false
+    ElMessage.success('排序已保存')
+  } catch (error) {
+    console.error('Save sidebar module order failed:', error)
+    applySidebarModuleOrder(previousOrder)
+    ElMessage.error('排序保存失败')
+  } finally {
+    sidebarSavingModuleOrder.value = false
+    sidebarDraggingModuleKey.value = null
   }
 }
 
@@ -2570,6 +2827,14 @@ watch(showUserMenu, open => {
   }
 })
 
+watch(
+  () => userStore.userInfo,
+  () => {
+    hydrateSidebarModuleOrderFromUserInfo()
+  },
+  { immediate: true }
+)
+
 watch(primarySidebarCollapsed, collapsed => {
   if (layoutNarrowProgrammatic.value) return
   writeStoredBoolean(SIDEBAR_STORAGE_KEYS.primaryCollapsed, collapsed)
@@ -2817,6 +3082,9 @@ watch(
     sidebarEmployeesLoading.value,
     sidebarRelations.value.length,
     sidebarRelationsLoading.value,
+    sidebarSortMode.value,
+    sidebarModuleOrder.value.join('|'),
+    sidebarDraftModuleOrder.value.join('|'),
   ],
   () => {
     queueMicrotask(() => updatePrimaryNavScrollbar())
@@ -3804,6 +4072,15 @@ async function handleCreateProject(payload: {
 
 .wk-primary-sidebar :deep(button:hover) {
   background-color: var(--wk-bg-surface-hover) !important;
+}
+
+.wk-primary-sidebar .wk-sidebar-sort-save-button,
+.wk-primary-sidebar .wk-sidebar-sort-save-button:hover,
+.wk-primary-sidebar .wk-sidebar-sort-save-button:focus,
+.wk-primary-sidebar .wk-sidebar-sort-save-button:active,
+.wk-primary-sidebar .wk-sidebar-sort-save-button:disabled {
+  background-color: #0d0d0d !important;
+  color: #fff !important;
 }
 
 .wk-primary-sidebar .wk-customer-header-row:hover,
