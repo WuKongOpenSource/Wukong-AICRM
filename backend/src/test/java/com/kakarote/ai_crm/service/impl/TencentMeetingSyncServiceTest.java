@@ -38,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -332,6 +333,70 @@ class TencentMeetingSyncServiceTest {
         verify(syncLogMapper).updateById(logCaptor.capture());
         assertThat(logCaptor.getValue().getStatus()).isEqualTo("failed");
         assertThat(logCaptor.getValue().getErrorMessage()).contains("source ip not in whitelist");
+    }
+
+    @Test
+    void refreshMeetingFromWebhookShouldCreateMeetingWhenCreatorMapped() {
+        TencentMeetingSyncServiceImpl service = newService();
+        TencentMeetingMapper meetingMapper = mapper(service, "meetingMapper");
+        TencentMeetingUserMappingMapper userMappingMapper = mapper(service, "userMappingMapper");
+
+        TencentMeetingCorpConfig config = new TencentMeetingCorpConfig();
+        config.setAppId("app-1");
+
+        TencentMeetingUserMapping mapping = new TencentMeetingUserMapping();
+        mapping.setMeetingUserId("host-1");
+        mapping.setCrmUserId(9L);
+
+        when(meetingMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(userMappingMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(mapping);
+
+        service.refreshMeetingFromWebhook("meeting.created", externalMeetingInfoJson(), config);
+
+        ArgumentCaptor<TencentMeeting> captor = ArgumentCaptor.forClass(TencentMeeting.class);
+        verify(meetingMapper).insert(captor.capture());
+        TencentMeeting created = captor.getValue();
+        assertThat(created.getMeetingId()).isEqualTo("ext-meeting-1");
+        assertThat(created.getAppId()).isEqualTo("app-1");
+        assertThat(created.getBindStatus()).isEqualTo("UNBOUND");
+        assertThat(created.getStatus()).isEqualTo("not_started");
+        assertThat(created.getSubject()).isEqualTo("外部创建的会议");
+        assertThat(created.getCreatorUserId()).isEqualTo("host-1");
+        assertThat(created.getCreatorName()).isEqualTo("张三");
+        assertThat(created.getCrmCreatorUserId()).isEqualTo(9L);
+        assertThat(created.getDurationSeconds()).isEqualTo(3600L);
+    }
+
+    @Test
+    void refreshMeetingFromWebhookShouldSkipCreateWhenCreatorNotMapped() {
+        TencentMeetingSyncServiceImpl service = newService();
+        TencentMeetingMapper meetingMapper = mapper(service, "meetingMapper");
+        TencentMeetingUserMappingMapper userMappingMapper = mapper(service, "userMappingMapper");
+
+        TencentMeetingCorpConfig config = new TencentMeetingCorpConfig();
+        config.setAppId("app-1");
+
+        when(meetingMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(userMappingMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+
+        service.refreshMeetingFromWebhook("meeting.created", externalMeetingInfoJson(), config);
+
+        verify(meetingMapper, never()).insert(any(TencentMeeting.class));
+        verify(meetingMapper, never()).updateById(any(TencentMeeting.class));
+    }
+
+    private static JSONObject externalMeetingInfoJson() {
+        JSONObject creator = new JSONObject();
+        creator.put("userid", "host-1");
+        creator.put("user_name", base64("张三"));
+        JSONObject meetingInfo = new JSONObject();
+        meetingInfo.put("meeting_id", "ext-meeting-1");
+        meetingInfo.put("meeting_code", "111222333");
+        meetingInfo.put("subject", "外部创建的会议");
+        meetingInfo.put("creator", creator);
+        meetingInfo.put("start_time", "1710000000");
+        meetingInfo.put("end_time", "1710003600");
+        return meetingInfo;
     }
 
     @SuppressWarnings("unchecked")
