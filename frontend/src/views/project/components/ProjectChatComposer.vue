@@ -133,12 +133,12 @@
                   @mouseenter="clearUploadMenuLeaveTimer"
                   @mouseleave="handleUploadMenuMouseLeave"
                 >
-                  <button type="button" class="wk-chat-upload-menu__item wk-chat-upload-menu__item--compact" @click="handleUploadMenuAddFile">
-                    <WkIcon name="file" :box-size="16" class="shrink-0" />
+                  <button type="button" class="wk-chat-upload-menu__item" @click="handleUploadMenuAddFile">
+                    <WkIcon name="file" :box-size="18" class="shrink-0" />
                     <span class="wk-chat-upload-menu__label">上传图片和文件</span>
                   </button>
-                  <button type="button" class="wk-chat-upload-menu__item wk-chat-upload-menu__item--compact" @click="handleUploadMenuChooseKnowledge">
-                    <WkIcon name="knowledge-1" :box-size="16" class="shrink-0" />
+                  <button type="button" class="wk-chat-upload-menu__item" @click="handleUploadMenuChooseKnowledge">
+                    <WkIcon name="knowledge-1" :size="18" class="shrink-0" />
                     <span class="wk-chat-upload-menu__label">选择知识库文件</span>
                   </button>
                   <el-popover
@@ -1177,25 +1177,15 @@ function handleStopAudioRecording() {
   background: var(--wk-bg-surface-hover);
 }
 
-.wk-chat-upload-menu__item--compact {
-  gap: 6px;
-}
-
 .wk-chat-upload-menu__item:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
 
-.wk-chat-upload-menu__label,
-.wk-chat-upload-submenu__label {
-  min-width: 0;
-  flex: 1 1 auto;
-  overflow: hidden;
+.wk-chat-upload-menu__label {
   font-size: 14px;
   font-weight: 400;
   line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .wk-chat-upload-menu__apps-ref {
@@ -1218,7 +1208,12 @@ function handleStopAudioRecording() {
 }
 
 .wk-chat-upload-submenu__label {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
   text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .wk-chat-upload-menu__check {

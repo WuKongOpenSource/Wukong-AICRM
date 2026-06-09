@@ -90,7 +90,7 @@
       </div>
     </div>
 
-    <main class="min-h-0 flex-1 overflow-y-auto" v-loading="loading">
+    <main class="min-h-0 flex-1 overflow-y-auto" v-loading="showListLoading">
       <div v-if="projects.length === 0" class="flex h-full min-h-[280px] flex-col items-center justify-center text-center text-slate-400">
         <span class="material-symbols-outlined text-5xl">folder_open</span>
         <p class="mt-4 text-sm">{{ keyword.trim() ? '没有匹配的项目' : '还没有项目，先创建一个项目开始管理任务吧。' }}</p>
@@ -265,7 +265,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { queryProjectPageList } from '@/api/project'
@@ -306,6 +306,7 @@ const editingProject = ref<ProjectEntity | null>(null)
 let searchTimer: number | null = null
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / limit.value)))
+const showListLoading = computed(() => loading.value && projects.value.length === 0)
 const visiblePages = computed(() => {
   const totalPageCount = totalPages.value
   const current = page.value
@@ -326,6 +327,7 @@ const statusFilters = computed(() => [
 ])
 
 onMounted(() => {
+  hydrateProjectsFromStore(true)
   void loadProjects()
 })
 
@@ -333,7 +335,37 @@ onBeforeUnmount(() => {
   if (searchTimer) window.clearTimeout(searchTimer)
 })
 
+watch(
+  () => projectStore.accessibleProjectSummaries,
+  () => {
+    if (!loading.value || projects.value.length > 0) return
+    hydrateProjectsFromStore()
+  }
+)
+
+function isDefaultProjectListQuery() {
+  return keyword.value.trim() === '' && statusFilter.value === 'all' && page.value === 1
+}
+
+function hydrateProjectsFromStore(force = false) {
+  if (!isDefaultProjectListQuery()) return false
+  if (!force && projects.value.length > 0) return true
+
+  const cachedProjects = projectStore.accessibleProjectSummaries
+  if (cachedProjects.length === 0) return false
+
+  projects.value = cachedProjects.slice(0, limit.value)
+  total.value = cachedProjects.length
+  stats.value = {
+    all: cachedProjects.length,
+    inProgress: cachedProjects.filter(project => project.status === 'IN_PROGRESS').length,
+    completed: cachedProjects.filter(project => project.status === 'COMPLETED').length
+  }
+  return true
+}
+
 async function loadProjects() {
+  hydrateProjectsFromStore()
   loading.value = true
   try {
     const result = await queryProjectPageList({

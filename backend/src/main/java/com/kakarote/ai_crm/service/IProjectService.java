@@ -39,6 +39,10 @@ public interface IProjectService {
 
     ProjectVO addTaskAttachment(Long projectId, Long taskId, ProjectBO.TaskAttachmentSave attachmentBO);
 
+    ProjectVO deleteTaskAttachment(Long projectId, Long taskId, Long attachmentId);
+
+    ProjectVO.ProjectTaskAttachmentVO getTaskAttachment(Long projectId, Long taskId, Long attachmentId);
+
     ProjectVO deleteTask(Long projectId, Long taskId);
 
     ProjectVO moveTask(Long projectId, ProjectBO.TaskMove moveBO);

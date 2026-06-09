@@ -1,4 +1,4 @@
-import { get, post } from '@/utils/request'
+import { download, get, post } from '@/utils/request'
 import type { PageResult } from '@/types/api'
 import type { ChatAttachmentDTO } from '@/types/common'
 import type {
@@ -322,6 +322,39 @@ export function addProjectTaskAttachment(
   payload: ProjectTaskAttachmentPayload
 ): Promise<ProjectEntity> {
   return unwrapProject(post(`/project/${projectId}/task/${taskId}/attachment/add`, payload))
+}
+
+export function deleteProjectTaskAttachment(
+  projectId: string,
+  taskId: string,
+  attachmentId: string
+): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/${projectId}/task/${taskId}/attachment/delete/${attachmentId}`))
+}
+
+export function getProjectTaskAttachmentBlob(
+  projectId: string,
+  taskId: string,
+  attachmentId: string
+): Promise<Blob> {
+  return get(`/project/${projectId}/task/${taskId}/attachment/${attachmentId}/download`, { responseType: 'blob' })
+}
+
+export function getProjectTaskAttachmentPreviewHtml(
+  projectId: string,
+  taskId: string,
+  attachmentId: string
+): Promise<string> {
+  return get(`/project/${projectId}/task/${taskId}/attachment/${attachmentId}/preview-html`)
+}
+
+export function downloadProjectTaskAttachment(
+  projectId: string,
+  taskId: string,
+  attachmentId: string,
+  filename: string
+): Promise<void> {
+  return download(`/project/${projectId}/task/${taskId}/attachment/${attachmentId}/download`, filename)
 }
 
 export function deleteProjectTask(projectId: string, taskId: string): Promise<ProjectEntity> {

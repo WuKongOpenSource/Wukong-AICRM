@@ -25,6 +25,7 @@ import {
   createProjectTask,
   deleteLane as apiDeleteLane,
   deleteProject as apiDeleteProject,
+  deleteProjectTaskAttachment,
   deleteProjectTask,
   getProjectDetail,
   moveProjectTask,
@@ -150,6 +151,12 @@ export const useProjectStore = defineStore('project', () => {
     return project.tasks.find(task => task.taskId === taskId)?.attachments[0] || null
   }
 
+  async function deleteTaskAttachment(projectId: string, taskId: string, attachmentId: string) {
+    const project = await deleteProjectTaskAttachment(projectId, taskId, attachmentId)
+    upsertProject(project)
+    return project.tasks.find(task => task.taskId === taskId) || null
+  }
+
   async function deleteTask(projectId: string, taskId: string) {
     const project = await deleteProjectTask(projectId, taskId)
     upsertProject(project)
@@ -260,6 +267,10 @@ export const useProjectStore = defineStore('project', () => {
     return getUserProjectPermission(projectId, 'UPLOAD_ATTACHMENT') && canCurrentUserViewTask(projectId, task)
   }
 
+  function canCurrentUserDeleteTaskAttachment(projectId: string, task: ProjectTask) {
+    return getUserProjectPermission(projectId, 'DELETE_ATTACHMENT') && canCurrentUserViewTask(projectId, task)
+  }
+
   function canCurrentUserCreateTaskSchedule(projectId: string, task: ProjectTask) {
     return getUserProjectPermission(projectId, 'CREATE_SCHEDULE') && canCurrentUserViewTask(projectId, task)
   }
@@ -323,6 +334,7 @@ export const useProjectStore = defineStore('project', () => {
     deleteTask,
     moveTask,
     addTaskAttachment,
+    deleteTaskAttachment,
     addTaskSchedule: appendTaskChatMessage,
     addTaskNote: appendTaskChatMessage,
     addLane,
@@ -342,6 +354,7 @@ export const useProjectStore = defineStore('project', () => {
     canCurrentUserMoveTask,
     canCurrentUserUseTaskAi,
     canCurrentUserUploadTaskAttachment,
+    canCurrentUserDeleteTaskAttachment,
     canCurrentUserCreateTaskSchedule,
     canCurrentUserAddTaskNote,
     findProjectMember

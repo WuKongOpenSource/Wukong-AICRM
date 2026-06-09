@@ -62,6 +62,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.MimeType;
 import org.springframework.web.multipart.MultipartFile;
@@ -261,6 +262,49 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         } else {
             knowledge.setWeKnoraParseStatus("unsupported");
             log.info("聊天附件类型不被 WeKnora 支持，跳过 RAG 解析: {}", normalizedFileName);
+        }
+
+        save(knowledge);
+
+        if (weKnoraClient.isEnabled() && weKnoraSupported) {
+            self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), filePath, normalizedFileName, UserUtil.getTenantId());
+        }
+
+        globalSearchIndexService.refreshKnowledgeIndex(knowledge.getKnowledgeId());
+        return knowledge.getKnowledgeId();
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public Long archiveExistingStandaloneFile(String fileName, String filePath, Long fileSize, String mimeType, Long customerId, String summary) {
+        if (customerId != null) {
+            Customer customer = customerMapper.selectById(customerId);
+            if (ObjectUtil.isNull(customer)) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在或无权限访问");
+            }
+        }
+        if (StrUtil.isBlank(filePath)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "文件路径不能为空");
+        }
+
+        String normalizedFileName = StrUtil.blankToDefault(fileName, FileUtil.getName(filePath));
+        Knowledge knowledge = new Knowledge();
+        knowledge.setName(normalizedFileName);
+        knowledge.setType("document");
+        knowledge.setCustomerId(customerId);
+        knowledge.setFilePath(filePath);
+        knowledge.setFileSize(fileSize);
+        knowledge.setMimeType(mimeType);
+        knowledge.setSummary(normalizeUserFacingSummary(summary));
+        knowledge.setContentText(extractSearchableContent(filePath, mimeType, normalizedFileName));
+        knowledge.setUploadUserId(UserUtil.getUserId());
+
+        boolean weKnoraSupported = weKnoraClient.isSupportedFileType(normalizedFileName);
+        if (weKnoraSupported) {
+            knowledge.setWeKnoraParseStatus("pending");
+        } else {
+            knowledge.setWeKnoraParseStatus("unsupported");
+            log.info("任务附件类型不被 WeKnora 支持，跳过 RAG 解析: {}", normalizedFileName);
         }
 
         save(knowledge);

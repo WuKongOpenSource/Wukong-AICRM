@@ -39,6 +39,11 @@ public interface IKnowledgeService extends IService<Knowledge> {
     Long archiveExistingFile(String fileName, String filePath, Long fileSize, String mimeType, Long customerId, String summary);
 
     /**
+     * Archive an already uploaded standalone file to the knowledge base.
+     */
+    Long archiveExistingStandaloneFile(String fileName, String filePath, Long fileSize, String mimeType, Long customerId, String summary);
+
+    /**
      * 将已经上传到文件存储的文件归档到员工对象知识库。
      */
     Long archiveExistingEmployeeFile(String fileName, String filePath, Long fileSize, String mimeType, Long employeeId, String summary);

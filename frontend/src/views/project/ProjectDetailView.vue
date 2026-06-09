@@ -1,10 +1,10 @@
 <template>
   <div class="flex h-full flex-col overflow-hidden bg-[#f6f7f4]">
-    <div v-if="projectRouteLoading" class="flex flex-1 items-center justify-center px-6 text-center">
+    <div v-if="showProjectRouteLoading" class="flex flex-1 items-center justify-center px-6 text-center">
       <span class="material-symbols-outlined animate-spin text-5xl text-slate-300">progress_activity</span>
     </div>
 
-    <div v-else-if="project && canViewProject" class="flex flex-1 flex-col overflow-hidden">
+    <div v-else-if="project && showProjectContent" class="flex flex-1 flex-col overflow-hidden">
       <header v-if="!isProjectChatView" class="border-b border-slate-200 bg-white px-4 py-2 md:px-6">
         <div class="flex w-full flex-col gap-2">
           <div class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
@@ -834,26 +834,54 @@
                     <article
                       v-for="attachment in currentTaskConversation.attachments"
                       :key="attachment.attachmentId"
-                      class="rounded-xl border border-[var(--wk-border-subtle)] bg-white px-3 py-2.5"
+                      class="group cursor-pointer rounded-lg border border-[#ececec] bg-white px-3 py-2 text-sm transition-colors hover:border-[#e0e0e0] hover:bg-[#fafafa]"
+                      @click="openTaskAttachmentPreview(attachment)"
                     >
-                      <a
-                        v-if="attachment.fileUrl"
-                        :href="attachment.fileUrl"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="flex items-center gap-2 text-[13px] font-medium text-[#0d0d0d] hover:text-primary"
-                      >
-                        <span class="material-symbols-outlined text-[17px] text-[#8f8f8f]">draft</span>
-                        <span class="min-w-0 flex-1 truncate">{{ attachment.name }}</span>
-                      </a>
-                      <div v-else class="flex items-center gap-2 text-[13px] font-medium text-[#0d0d0d]">
-                        <span class="material-symbols-outlined text-[17px] text-[#8f8f8f]">draft</span>
-                        <span class="min-w-0 flex-1 truncate">{{ attachment.name }}</span>
+                      <div class="flex items-start gap-2.5">
+                        <FileTypeIcon
+                          :file-name="attachment.name"
+                          :mime-type="attachment.mimeType"
+                          :knowledge-type="getTaskAttachmentKnowledgeType(attachment)"
+                          size="sm"
+                        />
+                        <div class="min-w-0 flex-1">
+                          <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0 flex-1">
+                              <h5
+                                class="truncate text-sm font-medium leading-5 text-[#0d0d0d]"
+                                :title="attachment.name"
+                              >
+                                {{ attachment.name || '-' }}
+                              </h5>
+                              <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-4 text-[#8f8f8f]">
+                                <span>{{ getTaskAttachmentTypeLabel(attachment) }}</span>
+                                <span aria-hidden="true">·</span>
+                                <span>{{ getTaskAttachmentFileSizeText(attachment) }}</span>
+                                <span v-if="attachment.createdByName" aria-hidden="true">·</span>
+                                <span v-if="attachment.createdByName">{{ attachment.createdByName }}</span>
+                                <span v-if="attachment.createTime" aria-hidden="true">·</span>
+                                <span v-if="attachment.createTime">上传 {{ formatDateTime(attachment.createTime) }}</span>
+                              </div>
+                            </div>
+                            <button
+                              v-if="canDeleteCurrentTaskAttachment"
+                              type="button"
+                              class="group/module-action relative flex size-7 shrink-0 items-center justify-center rounded-full text-[#8f8f8f] transition-colors hover:bg-[#f1f1f1] hover:text-[#0d0d0d] disabled:cursor-not-allowed disabled:opacity-50"
+                              :disabled="isTaskAttachmentDeleting(attachment.attachmentId)"
+                              aria-label="删除附件"
+                              @click.stop="handleDeleteTaskAttachment(attachment)"
+                            >
+                              <span class="material-symbols-outlined text-sm">delete</span>
+                              <span
+                                class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
+                                role="tooltip"
+                              >
+                                删除附件
+                              </span>
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <p class="mt-1 text-[12px] leading-5 text-[#8f8f8f]">
-                        {{ attachment.createdByName || '系统' }} · {{ formatDateTime(attachment.createTime) }}
-                        <template v-if="attachment.fileSize"> · {{ formatFileSize(attachment.fileSize) }}</template>
-                      </p>
                     </article>
                   </div>
                   <p v-else class="mt-3 text-[13px] leading-5 text-[#8f8f8f]">暂无附件</p>
@@ -1265,6 +1293,13 @@
       :editing-member="editingMember"
       @submit="handleSubmitMember"
     />
+
+    <ProjectTaskAttachmentPreviewModal
+      v-model="showTaskAttachmentPreview"
+      :attachment="previewingTaskAttachment"
+      :project-id="projectId"
+      :task-id="currentTaskConversation?.taskId || ''"
+    />
   </div>
 </template>
 
@@ -1286,6 +1321,7 @@ import type {
   ProjectPermission,
   ProjectStatus,
   ProjectTask,
+  ProjectTaskAttachment,
   ProjectViewMode
 } from '@/types/project'
 import type { ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
@@ -1300,8 +1336,10 @@ import {
   projectTaskPriorityClass,
   projectTaskPriorityLabel
 } from '@/utils/project'
+import FileTypeIcon from '@/components/common/FileTypeIcon.vue'
 import ProjectMemberDialog from '@/views/project/components/ProjectMemberDialog.vue'
 import ProjectChatComposer from '@/views/project/components/ProjectChatComposer.vue'
+import ProjectTaskAttachmentPreviewModal from '@/views/project/components/ProjectTaskAttachmentPreviewModal.vue'
 import ProjectTaskDialog from '@/views/project/components/ProjectTaskDialog.vue'
 import ProjectTaskDrawer from '@/views/project/components/ProjectTaskDrawer.vue'
 import ProjectUpsertDialog from '@/views/project/components/ProjectUpsertDialog.vue'
@@ -1368,15 +1406,18 @@ const showProjectDialog = ref(false)
 const showTaskDialog = ref(false)
 const showTaskDrawer = ref(false)
 const showMemberDialog = ref(false)
+const showTaskAttachmentPreview = ref(false)
 const taskDetailPanelVisible = ref(true)
 const taskAttachmentInputRef = ref<HTMLInputElement | null>(null)
 const taskAttachmentUploading = ref(false)
+const deletingTaskAttachmentIds = ref<string[]>([])
 const draggingTaskId = ref('')
 const dragOverLaneId = ref('')
 const defaultLaneId = ref('')
 const selectedTaskId = ref('')
 const editingTask = ref<ProjectTask | null>(null)
 const editingMember = ref<ProjectMember | null>(null)
+const previewingTaskAttachment = ref<ProjectTaskAttachment | null>(null)
 const taskConversationId = ref('')
 const projectTaskSearchKeyword = ref('')
 const projectTaskSearchLoading = ref(false)
@@ -1395,7 +1436,6 @@ async function loadCurrentProjectRoute() {
   const token = ++projectRouteLoadToken
   projectRouteLoading.value = true
   try {
-    await projectStore.ensureInitialized()
     if (currentProjectId) {
       await projectStore.loadProject(currentProjectId)
     }
@@ -1440,6 +1480,8 @@ onBeforeUnmount(() => {
 const projectAttachments = computed(() => project.value?.attachments || [])
 const projectSchedules = computed(() => project.value?.schedules || [])
 const canViewProject = computed(() => projectStore.getUserProjectPermission(projectId.value, 'VIEW_PROJECT'))
+const showProjectRouteLoading = computed(() => projectRouteLoading.value && !project.value)
+const showProjectContent = computed(() => Boolean(project.value) && (canViewProject.value || projectRouteLoading.value))
 const orderedLanes = computed(() =>
   [...(project.value?.lanes || [])].sort((a, b) => a.order - b.order)
 )
@@ -1504,6 +1546,9 @@ const canUseCurrentTaskAi = computed(() =>
 )
 const canUploadCurrentTaskAttachment = computed(() =>
   currentTaskConversation.value ? projectStore.canCurrentUserUploadTaskAttachment(projectId.value, currentTaskConversation.value) : false
+)
+const canDeleteCurrentTaskAttachment = computed(() =>
+  currentTaskConversation.value ? projectStore.canCurrentUserDeleteTaskAttachment(projectId.value, currentTaskConversation.value) : false
 )
 const showProjectLanePanelShell = computed(() => !isMobile.value && viewMode.value === 'ai')
 const showTaskDetailPanelShell = computed(() => !isMobile.value && isTaskConversation.value && Boolean(currentTaskConversation.value))
@@ -1590,6 +1635,27 @@ function getInlineAttachments(message: { attachments?: ChatAttachmentVO[] }): Ch
 
 function getDocumentAttachments(message: { attachments?: ChatAttachmentVO[] }): ChatAttachmentVO[] {
   return (message.attachments || []).filter(isDocumentAttachment)
+}
+
+function getTaskAttachmentFileSizeText(attachment: ProjectTaskAttachment): string {
+  const size = Number(attachment.fileSize || 0)
+  return size > 0 ? formatFileSize(size) : '未知大小'
+}
+
+function getTaskAttachmentKnowledgeType(attachment: ProjectTaskAttachment): string {
+  const mimeType = String(attachment.mimeType || '').toLowerCase()
+  const fileName = String(attachment.name || '').toLowerCase()
+  if (mimeType.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(fileName)) return 'recording'
+  return 'document'
+}
+
+function getTaskAttachmentTypeLabel(attachment: ProjectTaskAttachment): string {
+  const mimeType = String(attachment.mimeType || '').toLowerCase()
+  const fileName = String(attachment.name || '').toLowerCase()
+  if (mimeType.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(fileName)) return '图片'
+  if (mimeType.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(fileName)) return '录音'
+  if (mimeType.startsWith('video/') || /\.(mp4|webm|mov|m4v|avi|mkv)$/i.test(fileName)) return '视频'
+  return '文档'
 }
 
 function resizeProjectChatTextarea(el: HTMLTextAreaElement | null) {
@@ -2050,6 +2116,45 @@ async function handleDeleteLane(laneId: string) {
 function triggerTaskAttachmentUpload() {
   if (!canUploadCurrentTaskAttachment.value || taskAttachmentUploading.value) return
   taskAttachmentInputRef.value?.click()
+}
+
+function openTaskAttachmentPreview(attachment: ProjectTaskAttachment) {
+  if (!attachment.fileUrl) {
+    ElMessage.warning('附件地址不存在，无法预览')
+    return
+  }
+  previewingTaskAttachment.value = attachment
+  showTaskAttachmentPreview.value = true
+}
+
+function isTaskAttachmentDeleting(attachmentId?: string) {
+  return Boolean(attachmentId && deletingTaskAttachmentIds.value.includes(attachmentId))
+}
+
+async function handleDeleteTaskAttachment(attachment: ProjectTaskAttachment) {
+  if (!project.value || !currentTaskConversation.value || !canDeleteCurrentTaskAttachment.value || !attachment.attachmentId) return
+  if (isTaskAttachmentDeleting(attachment.attachmentId)) return
+
+  try {
+    await ElMessageBox.confirm(`确定删除附件“${attachment.name || '未命名附件'}”吗？`, '提示', { type: 'warning' })
+  } catch {
+    return
+  }
+
+  const activeProjectId = project.value.projectId
+  const activeTaskId = currentTaskConversation.value.taskId
+  deletingTaskAttachmentIds.value = [...deletingTaskAttachmentIds.value, attachment.attachmentId]
+  try {
+    await projectStore.deleteTaskAttachment(activeProjectId, activeTaskId, attachment.attachmentId)
+    ElMessage.success('附件已删除')
+  } catch (error) {
+    console.error('项目任务附件删除失败:', error)
+    if (!isRequestErrorHandled(error)) {
+      ElMessage.error('附件删除失败，请重试')
+    }
+  } finally {
+    deletingTaskAttachmentIds.value = deletingTaskAttachmentIds.value.filter(id => id !== attachment.attachmentId)
+  }
 }
 
 async function handleTaskAttachmentUploadChange(event: Event) {

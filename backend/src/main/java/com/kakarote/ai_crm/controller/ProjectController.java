@@ -2,13 +2,24 @@ package com.kakarote.ai_crm.controller;
 
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.common.BasePage;
+import com.kakarote.ai_crm.common.exception.BusinessException;
+import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.ProjectBO;
 import com.kakarote.ai_crm.entity.VO.ProjectVO;
+import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IProjectService;
+import com.kakarote.ai_crm.utils.DocToHtmlConverter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,15 +28,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/project")
 @Tag(name = "项目管理")
+@Slf4j
 public class ProjectController {
 
     private final IProjectService projectService;
+    private final FileStorageService fileStorageService;
 
     @GetMapping("/list")
     @Operation(summary = "项目列表")
@@ -119,6 +135,66 @@ public class ProjectController {
                                                @PathVariable Long taskId,
                                                @RequestBody ProjectBO.TaskAttachmentSave attachmentBO) {
         return Result.ok(projectService.addTaskAttachment(projectId, taskId, attachmentBO));
+    }
+
+    @PostMapping("/{projectId}/task/{taskId}/attachment/delete/{attachmentId}")
+    @Operation(summary = "Delete project task attachment")
+    public Result<ProjectVO> deleteTaskAttachment(@PathVariable Long projectId,
+                                                  @PathVariable Long taskId,
+                                                  @PathVariable Long attachmentId) {
+        return Result.ok(projectService.deleteTaskAttachment(projectId, taskId, attachmentId));
+    }
+
+    @GetMapping("/{projectId}/task/{taskId}/attachment/{attachmentId}/preview-html")
+    @Operation(summary = "预览项目任务 .doc 附件HTML")
+    public Result<String> previewTaskAttachmentHtml(@PathVariable Long projectId,
+                                                    @PathVariable Long taskId,
+                                                    @PathVariable Long attachmentId) {
+        ProjectVO.ProjectTaskAttachmentVO attachment = projectService.getTaskAttachment(projectId, taskId, attachmentId);
+        String fileName = attachment.getName();
+        String fileNameLower = fileName != null ? fileName.toLowerCase() : "";
+        if (!fileNameLower.endsWith(".doc") || fileNameLower.endsWith(".docx")) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "该文件不是 .doc 格式");
+        }
+        try (InputStream inputStream = fileStorageService.getFileStream(attachment.getFilePath())) {
+            return Result.ok(DocToHtmlConverter.convertToHtml(inputStream));
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to convert .doc project task attachment to HTML, projectId={}, taskId={}, attachmentId={}",
+                    projectId, taskId, attachmentId, e);
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "文档转换失败，请下载后查看");
+        }
+    }
+
+    @GetMapping("/{projectId}/task/{taskId}/attachment/{attachmentId}/download")
+    @Operation(summary = "下载项目任务附件")
+    public ResponseEntity<Resource> downloadTaskAttachment(@PathVariable Long projectId,
+                                                           @PathVariable Long taskId,
+                                                           @PathVariable Long attachmentId) {
+        ProjectVO.ProjectTaskAttachmentVO attachment = projectService.getTaskAttachment(projectId, taskId, attachmentId);
+        InputStream inputStream = fileStorageService.getFileStream(attachment.getFilePath());
+        Resource resource = new InputStreamResource(inputStream);
+
+        MediaType mediaType = MediaTypeFactory.getMediaType(attachment.getName())
+                .orElse(MediaType.APPLICATION_OCTET_STREAM);
+        if (attachment.getMimeType() != null && !attachment.getMimeType().isBlank()) {
+            try {
+                mediaType = MediaType.parseMediaType(attachment.getMimeType());
+            } catch (Exception ignored) {
+                // fallback to filename-based media type
+            }
+        }
+
+        String encodedFilename = URLEncoder.encode(attachment.getName(), StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
+                .contentType(mediaType)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encodedFilename);
+        if (attachment.getFileSize() != null && attachment.getFileSize() >= 0) {
+            builder.contentLength(attachment.getFileSize());
+        }
+        return builder.body(resource);
     }
 
     @PostMapping("/{projectId}/task/delete/{taskId}")

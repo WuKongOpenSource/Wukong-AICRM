@@ -35,6 +35,8 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.MimeType;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
@@ -565,6 +567,67 @@ public class ProjectServiceImpl implements IProjectService {
         ));
         touchProject(projectId);
         return buildProjectVO(projectId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ProjectVO deleteTaskAttachment(Long projectId, Long taskId, Long attachmentId) {
+        TaskRow task = findTask(projectId, taskId);
+        if (!hasProjectPermission(projectId, PERMISSION_DELETE_ATTACHMENT) || !canViewTask(projectId, task)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_AUTH, "当前账号没有删除该任务附件的权限");
+        }
+        Long matched = jdbcTemplate.queryForObject("""
+                SELECT COUNT(1)
+                FROM crm_project_task_attachment
+                WHERE project_id = ? AND task_id = ? AND attachment_id = ?
+                """, Long.class, projectId, taskId, attachmentId);
+        if (matched == null || matched == 0) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "附件不存在或已删除");
+        }
+        jdbcTemplate.update("""
+                DELETE FROM crm_project_task_attachment
+                WHERE project_id = ? AND task_id = ? AND attachment_id = ?
+                """, projectId, taskId, attachmentId);
+        Long remaining = jdbcTemplate.queryForObject("""
+                SELECT COUNT(1)
+                FROM crm_project_task_attachment
+                WHERE project_id = ? AND task_id = ?
+                """, Long.class, projectId, taskId);
+        jdbcTemplate.update("""
+                UPDATE crm_task
+                SET has_attachments = ?, update_time = CURRENT_TIMESTAMP
+                WHERE project_id = ? AND task_id = ?
+                """, remaining != null && remaining > 0, projectId, taskId);
+        touchProject(projectId);
+        return buildProjectVO(projectId);
+    }
+
+    @Override
+    public ProjectVO.ProjectTaskAttachmentVO getTaskAttachment(Long projectId, Long taskId, Long attachmentId) {
+        TaskRow task = findTask(projectId, taskId);
+        if (!canViewTask(projectId, task)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_AUTH, "当前账号没有查看该任务附件的权限");
+        }
+        List<ProjectVO.ProjectTaskAttachmentVO> rows = jdbcTemplate.query("""
+                SELECT attachment_id, name, file_url, file_path, file_size, mime_type, create_user_name, create_time
+                FROM crm_project_task_attachment
+                WHERE project_id = ? AND task_id = ? AND attachment_id = ?
+                """, (rs, rowNum) -> {
+            ProjectVO.ProjectTaskAttachmentVO vo = new ProjectVO.ProjectTaskAttachmentVO();
+            vo.setAttachmentId(rs.getLong("attachment_id"));
+            vo.setName(rs.getString("name"));
+            vo.setFileUrl(rs.getString("file_url"));
+            vo.setFilePath(rs.getString("file_path"));
+            vo.setFileSize(getLong(rs, "file_size"));
+            vo.setMimeType(rs.getString("mime_type"));
+            vo.setCreatedByName(rs.getString("create_user_name"));
+            vo.setCreateTime(rs.getTimestamp("create_time"));
+            return vo;
+        }, projectId, taskId, attachmentId);
+        if (rows.isEmpty()) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_DATA_DOES_NOT_EXIST, "附件不存在或已删除");
+        }
+        return rows.get(0);
     }
 
     @Override
@@ -1910,6 +1973,14 @@ public class ProjectServiceImpl implements IProjectService {
                 currentUserId(),
                 user.displayName());
         jdbcTemplate.update("UPDATE crm_task SET has_attachments = TRUE, update_time = CURRENT_TIMESTAMP WHERE task_id = ?", taskId);
+        scheduleTaskAttachmentKnowledgeSync(
+                projectId,
+                taskId,
+                name,
+                filePath,
+                attachment.getFileSize(),
+                StrUtil.blankToDefault(attachment.getMimeType(), "application/octet-stream")
+        );
     }
 
     private String resolveAttachmentFileUrl(String filePath) {
@@ -1921,6 +1992,38 @@ public class ProjectServiceImpl implements IProjectService {
         } catch (Exception e) {
             log.warn("获取项目任务附件访问地址失败: {}", filePath, e);
             return null;
+        }
+    }
+
+    private void scheduleTaskAttachmentKnowledgeSync(Long projectId, Long taskId, String fileName,
+                                                     String filePath, Long fileSize, String mimeType) {
+        if (StrUtil.isBlank(filePath)) {
+            return;
+        }
+        Runnable sync = () -> syncTaskAttachmentToKnowledge(projectId, taskId, fileName, filePath, fileSize, mimeType);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    sync.run();
+                }
+            });
+            return;
+        }
+        sync.run();
+    }
+
+    private void syncTaskAttachmentToKnowledge(Long projectId, Long taskId, String fileName,
+                                               String filePath, Long fileSize, String mimeType) {
+        try {
+            TaskRow task = findTask(projectId, taskId);
+            ProjectRow project = findProject(projectId);
+            Long customerId = firstNonNull(task.customerId(), project.customerId());
+            String summary = "项目任务附件自动同步。项目：" + project.name() + "；任务：" + task.title();
+            knowledgeService.archiveExistingStandaloneFile(fileName, filePath, fileSize, mimeType, customerId, summary);
+        } catch (Exception e) {
+            log.warn("项目任务附件同步知识库失败: projectId={}, taskId={}, fileName={}, error={}",
+                    projectId, taskId, fileName, e.getMessage(), e);
         }
     }
 
