@@ -101,12 +101,13 @@ public class TencentMeetingController {
 
     @PostMapping("/webhook")
     @Operation(summary = "腾讯会议Webhook")
-    public Result<Boolean> webhook(@RequestBody String body,
+    public String webhook(@RequestBody String body,
                                    @RequestHeader(value = "timestamp", required = false) String timestamp,
                                    @RequestHeader(value = "nonce", required = false) String nonce,
                                    @RequestHeader(value = "signature", required = false) String signature,
                                    @RequestHeader(value = "encrypt", required = false) String encrypt) {
-        return Result.ok(webhookService.handleWebhook(body, timestamp, nonce, signature, encrypt));
+        webhookService.handleWebhook(body, timestamp, nonce, signature, encrypt);
+        return "successfully received callback";
     }
 
     @GetMapping("/webhook")
