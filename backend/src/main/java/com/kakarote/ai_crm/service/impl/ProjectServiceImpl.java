@@ -501,7 +501,10 @@ public class ProjectServiceImpl implements IProjectService {
                 currentUserId(),
                 currentUserId());
 
-        if (Boolean.TRUE.equals(taskBO.getHasAttachments())) {
+        List<ProjectBO.TaskAttachmentSave> attachments = normalizedTaskAttachments(taskBO.getAttachments());
+        if (!attachments.isEmpty()) {
+            appendTaskAttachments(projectId, taskId, attachments);
+        } else if (Boolean.TRUE.equals(taskBO.getHasAttachments())) {
             appendTaskAttachment(projectId, taskId, "手动标记附件");
         }
         if (Boolean.TRUE.equals(taskBO.getHasSchedule())) {
@@ -545,6 +548,21 @@ public class ProjectServiceImpl implements IProjectService {
                 currentUserId(),
                 projectId,
                 taskBO.getTaskId());
+        appendTaskAttachments(projectId, taskBO.getTaskId(), normalizedTaskAttachments(taskBO.getAttachments()));
+        touchProject(projectId);
+        return buildProjectVO(projectId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ProjectVO addTaskAttachment(Long projectId, Long taskId, ProjectBO.TaskAttachmentSave attachmentBO) {
+        TaskRow task = findTask(projectId, taskId);
+        if (!hasProjectPermission(projectId, PERMISSION_UPLOAD_ATTACHMENT) || !canViewTask(projectId, task)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_AUTH, "当前账号没有上传该任务附件的权限");
+        }
+        appendTaskAttachments(projectId, taskId, normalizedTaskAttachments(
+                attachmentBO == null ? Collections.emptyList() : List.of(attachmentBO)
+        ));
         touchProject(projectId);
         return buildProjectVO(projectId);
     }
@@ -1632,7 +1650,7 @@ public class ProjectServiceImpl implements IProjectService {
 
     private List<ProjectVO.ProjectTaskAttachmentVO> loadTaskAttachments(Long taskId) {
         return jdbcTemplate.query("""
-                SELECT attachment_id, name, create_user_name, create_time
+                SELECT attachment_id, name, file_url, file_path, file_size, mime_type, create_user_name, create_time
                 FROM crm_project_task_attachment
                 WHERE task_id = ?
                 ORDER BY create_time DESC
@@ -1640,6 +1658,10 @@ public class ProjectServiceImpl implements IProjectService {
             ProjectVO.ProjectTaskAttachmentVO vo = new ProjectVO.ProjectTaskAttachmentVO();
             vo.setAttachmentId(rs.getLong("attachment_id"));
             vo.setName(rs.getString("name"));
+            vo.setFileUrl(rs.getString("file_url"));
+            vo.setFilePath(rs.getString("file_path"));
+            vo.setFileSize(getLong(rs, "file_size"));
+            vo.setMimeType(rs.getString("mime_type"));
             vo.setCreatedByName(rs.getString("create_user_name"));
             vo.setCreateTime(rs.getTimestamp("create_time"));
             return vo;
@@ -1847,6 +1869,59 @@ public class ProjectServiceImpl implements IProjectService {
                     message_id, tenant_id, project_id, task_id, role, content, create_user_id, create_user_name, create_time
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """, IdWorker.getId(), currentTenantId(), projectId, taskId, role, content, currentUserId(), user.displayName());
+    }
+
+    private List<ProjectBO.TaskAttachmentSave> normalizedTaskAttachments(List<ProjectBO.TaskAttachmentSave> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return attachments.stream()
+                .filter(Objects::nonNull)
+                .filter(attachment -> StrUtil.isNotBlank(attachment.getFileName()) || StrUtil.isNotBlank(attachment.getFilePath()))
+                .toList();
+    }
+
+    private void appendTaskAttachments(Long projectId, Long taskId, List<ProjectBO.TaskAttachmentSave> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return;
+        }
+        attachments.forEach(attachment -> appendTaskAttachment(projectId, taskId, attachment));
+    }
+
+    private void appendTaskAttachment(Long projectId, Long taskId, ProjectBO.TaskAttachmentSave attachment) {
+        String filePath = StrUtil.trimToNull(attachment.getFilePath());
+        String name = StrUtil.blankToDefault(attachment.getFileName(), StrUtil.blankToDefault(filePath, "附件"));
+        UserSnapshot user = currentUserSnapshot();
+        jdbcTemplate.update("""
+                INSERT INTO crm_project_task_attachment(
+                    attachment_id, tenant_id, project_id, task_id, name, file_url, file_path, file_size, mime_type,
+                    create_user_id, create_user_name, create_time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                IdWorker.getId(),
+                currentTenantId(),
+                projectId,
+                taskId,
+                name,
+                resolveAttachmentFileUrl(filePath),
+                filePath,
+                attachment.getFileSize(),
+                StrUtil.blankToDefault(attachment.getMimeType(), "application/octet-stream"),
+                currentUserId(),
+                user.displayName());
+        jdbcTemplate.update("UPDATE crm_task SET has_attachments = TRUE, update_time = CURRENT_TIMESTAMP WHERE task_id = ?", taskId);
+    }
+
+    private String resolveAttachmentFileUrl(String filePath) {
+        if (StrUtil.isBlank(filePath)) {
+            return null;
+        }
+        try {
+            return fileStorageService.getUrl(filePath);
+        } catch (Exception e) {
+            log.warn("获取项目任务附件访问地址失败: {}", filePath, e);
+            return null;
+        }
     }
 
     private void appendTaskAttachment(Long projectId, Long taskId, String name) {
@@ -2368,8 +2443,12 @@ public class ProjectServiceImpl implements IProjectService {
     }
 
     private String normalizeRole(String role) {
-        String normalized = StrUtil.blankToDefault(role, "MEMBER").toUpperCase(Locale.ROOT);
-        return Set.of("OWNER", "ADMIN", "MEMBER", "READONLY", "EXTERNAL").contains(normalized) ? normalized : "MEMBER";
+        String normalized = StrUtil.blankToDefault(role, "MEMBER").trim();
+        String systemRole = normalized.toUpperCase(Locale.ROOT);
+        if (PROJECT_ROLES.contains(systemRole)) {
+            return systemRole;
+        }
+        return StrUtil.isBlank(normalized) ? "MEMBER" : normalized;
     }
 
     private String normalizeMemberStatus(String status) {
@@ -2436,6 +2515,17 @@ public class ProjectServiceImpl implements IProjectService {
             }
             normalized.put(role, permissions);
         }
+        rolePermissions.forEach((submittedRole, submittedPermissions) -> {
+            String role = normalizeRole(submittedRole);
+            if (PROJECT_ROLES.contains(role) || submittedPermissions == null) {
+                return;
+            }
+            List<String> permissions = normalizePermissions(submittedPermissions);
+            if (!permissions.contains(PERMISSION_VIEW_PROJECT)) {
+                permissions.add(0, PERMISSION_VIEW_PROJECT);
+            }
+            normalized.put(role, permissions);
+        });
         return normalized;
     }
 

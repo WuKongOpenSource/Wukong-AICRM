@@ -59,7 +59,7 @@
           <label class="mb-1.5 block text-xs font-bold text-slate-500">项目角色 <span class="text-red-500">*</span></label>
           <el-select v-model="form.role" class="wk-crm-el-field-select w-full" size="large" @change="applyRolePermissions">
             <el-option
-              v-for="item in PROJECT_ROLE_OPTIONS"
+              v-for="item in projectRoleOptions"
               :key="item.value"
               :label="item.label"
               :value="item.value"
@@ -156,7 +156,7 @@ import type {
 import {
   PROJECT_MEMBER_STATUS_OPTIONS,
   PROJECT_PERMISSION_OPTIONS,
-  PROJECT_ROLE_OPTIONS,
+  getProjectRoleOptions,
   roleDefaultPermissions,
   setProjectRolePermissions
 } from '@/utils/project'
@@ -193,6 +193,7 @@ const { isMobile } = useResponsive()
 
 const userLoading = ref(false)
 const userOptions = ref<UserOption[]>([])
+const projectRoleOptions = ref(getProjectRoleOptions())
 const selectedPermissions = ref<ProjectPermission[]>([])
 
 const form = reactive({
@@ -225,8 +226,10 @@ async function prepareForm() {
   try {
     const config = await getProjectRolePermissionConfig()
     setProjectRolePermissions(config.rolePermissions)
+    projectRoleOptions.value = getProjectRoleOptions()
   } catch {
     // Keep the current in-memory defaults if the config request fails.
+    projectRoleOptions.value = getProjectRoleOptions()
   }
   if (!props.modelValue) return
   hydrateForm()

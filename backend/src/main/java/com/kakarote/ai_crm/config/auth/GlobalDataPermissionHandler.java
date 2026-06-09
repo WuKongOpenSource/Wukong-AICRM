@@ -125,7 +125,13 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
                     ? "((" + qualifiedColumn(table, "relation_id") + " IS NULL AND "
                     + qualifiedColumn(table, "assigned_to") + " IN (" + inClause + "))"
                     + " OR (" + qualifiedColumn(table, "relation_id") + " IS NOT NULL AND "
-                    + qualifiedColumn(table, "create_user_id") + " IN (" + inClause + ")))"
+                    + qualifiedColumn(table, "create_user_id") + " IN (" + inClause + "))"
+                    + " OR (" + qualifiedColumn(table, "project_id") + " IS NOT NULL AND "
+                    + qualifiedColumn(table, "project_id") + " IN ("
+                    + "SELECT p.project_id FROM crm_project p WHERE p.owner_id IN (" + inClause + ") "
+                    + "OR EXISTS (SELECT 1 FROM crm_project_member m WHERE m.project_id = p.project_id "
+                    + "AND m.user_id IN (" + inClause + ") AND m.status = 'ACTIVE')"
+                    + ")))"
                     : null;
             case "followup" -> "crm_follow_up".equals(tableName)
                     ? "((" + qualifiedColumn(table, "customer_id")
@@ -187,6 +193,7 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
                     : null;
             case "task" -> "crm_task".equals(tableName)
                     ? "(" + qualifiedColumn(table, "relation_id") + " IS NULL OR "
+                    + qualifiedColumn(table, "project_id") + " IS NOT NULL OR "
                     + qualifiedColumn(table, "create_user_id") + " = " + currentUserId + ")"
                     : null;
             case "followup" -> "crm_follow_up".equals(tableName)

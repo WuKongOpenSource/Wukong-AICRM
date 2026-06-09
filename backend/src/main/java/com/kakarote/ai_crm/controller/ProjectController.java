@@ -113,6 +113,14 @@ public class ProjectController {
         return Result.ok(projectService.updateTask(projectId, taskBO));
     }
 
+    @PostMapping("/{projectId}/task/{taskId}/attachment/add")
+    @Operation(summary = "添加项目任务附件")
+    public Result<ProjectVO> addTaskAttachment(@PathVariable Long projectId,
+                                               @PathVariable Long taskId,
+                                               @RequestBody ProjectBO.TaskAttachmentSave attachmentBO) {
+        return Result.ok(projectService.addTaskAttachment(projectId, taskId, attachmentBO));
+    }
+
     @PostMapping("/{projectId}/task/delete/{taskId}")
     @Operation(summary = "删除项目任务")
     public Result<ProjectVO> deleteTask(@PathVariable Long projectId, @PathVariable Long taskId) {

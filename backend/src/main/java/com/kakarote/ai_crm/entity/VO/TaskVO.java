@@ -57,6 +57,18 @@ public class TaskVO {
     @Schema(description = "关系人姓名")
     private String relationName;
 
+    @Schema(description = "所属项目ID")
+    private Long projectId;
+
+    @Schema(description = "所属项目名称")
+    private String projectName;
+
+    @Schema(description = "所属项目泳道ID")
+    private Long laneId;
+
+    @Schema(description = "所属项目泳道名称")
+    private String laneName;
+
     @Schema(description = "是否AI生成")
     private Integer generatedByAi;
 

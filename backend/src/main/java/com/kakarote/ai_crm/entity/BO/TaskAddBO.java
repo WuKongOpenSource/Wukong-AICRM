@@ -35,6 +35,12 @@ public class TaskAddBO {
     @Schema(description = "关系人ID")
     private Long relationId;
 
+    @Schema(description = "所属项目ID")
+    private Long projectId;
+
+    @Schema(description = "所属项目泳道ID")
+    private Long laneId;
+
     @Schema(description = "Source follow-up ID")
     private Long sourceFollowUpId;
 

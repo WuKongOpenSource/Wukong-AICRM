@@ -106,6 +106,20 @@
           >
             <div class="min-w-0">
               <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">folder</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">所属项目</p>
+              </div>
+              <p class="truncate text-sm text-[#0d0d0d]" :title="getProjectDisplayName(task)">
+                {{ getProjectDisplayName(task) }}
+              </p>
+              <p v-if="task.laneName" class="mt-1 truncate text-xs text-slate-400">{{ task.laneName }}</p>
+            </div>
+          </div>
+          <div
+            class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
+          >
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
                 <span class="material-symbols-outlined text-[18px] leading-none">person</span>
                 <p class="text-[11px] font-bold uppercase tracking-wider">创建人</p>
               </div>
@@ -312,6 +326,20 @@
           <div class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
             <div class="flex items-center gap-3">
               <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
+                <span class="material-symbols-outlined text-[18px] leading-none">folder</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">所属项目</p>
+                <p class="truncate text-sm text-[#0d0d0d]" :title="getProjectDisplayName(task)">
+                  {{ getProjectDisplayName(task) }}
+                </p>
+                <p v-if="task.laneName" class="mt-0.5 truncate text-xs text-slate-400">{{ task.laneName }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <div class="flex items-center gap-3">
+              <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
                 <span class="material-symbols-outlined text-[18px] leading-none">person</span>
               </div>
               <div class="min-w-0 flex-1">
@@ -478,6 +506,10 @@ const displayCreateUserName = computed(() => {
   const name = props.task?.createUserName?.trim()
   return name || '未知'
 })
+
+function getProjectDisplayName(task: Task): string {
+  return task.projectName || '未关联项目'
+}
 
 async function handleToggleComplete() {
   const task = props.task

@@ -72,6 +72,66 @@
         />
       </div>
 
+      <div>
+        <div class="mb-2 flex items-center justify-between gap-3">
+          <label class="block text-xs font-bold text-slate-500">附件</label>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--wk-input-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50"
+            :disabled="taskAttachmentUploading"
+            @click="taskAttachmentFileInputRef?.click()"
+          >
+            <span class="material-symbols-outlined text-[16px] leading-none">attach_file</span>
+            上传附件
+          </button>
+          <input
+            ref="taskAttachmentFileInputRef"
+            type="file"
+            multiple
+            class="hidden"
+            @change="handleTaskAttachmentFileChange"
+          />
+        </div>
+        <div
+          v-if="selectedAttachmentFiles.length || editingTask?.attachments?.length"
+          class="space-y-2 rounded-2xl border border-[var(--wk-input-border)] bg-white p-3"
+        >
+          <article
+            v-for="attachment in editingTask?.attachments || []"
+            :key="attachment.attachmentId"
+            class="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2"
+          >
+            <span class="material-symbols-outlined text-[18px] text-slate-400">draft</span>
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-sm font-medium text-slate-700">{{ attachment.name }}</p>
+              <p class="text-xs text-slate-400">已上传</p>
+            </div>
+          </article>
+          <article
+            v-for="(file, index) in selectedAttachmentFiles"
+            :key="`${file.name}-${file.size}-${index}`"
+            class="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2"
+          >
+            <span class="material-symbols-outlined text-[18px] text-slate-400">upload_file</span>
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-sm font-medium text-slate-700">{{ file.name }}</p>
+              <p class="text-xs text-slate-400">{{ formatFileSize(file.size) }}</p>
+            </div>
+            <button
+              type="button"
+              class="flex size-7 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-red-500"
+              :disabled="taskAttachmentUploading"
+              @click="removeTaskAttachmentFile(index)"
+            >
+              <span class="material-symbols-outlined text-[16px] leading-none">close</span>
+            </button>
+          </article>
+        </div>
+        <p v-else class="rounded-2xl border border-dashed border-[var(--wk-input-border)] px-3 py-3 text-xs text-slate-400">
+          暂无附件
+        </p>
+      </div>
+
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label class="mb-1.5 block text-xs font-bold text-slate-500">所属泳道</label>
@@ -202,7 +262,7 @@
         <button
           type="button"
           class="flex-1 rounded-xl bg-primary py-2.5 text-sm font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="submitting || !form.title.trim()"
+          :disabled="submitting || taskAttachmentUploading || !form.title.trim()"
           @click="handleSubmit"
         >
           {{ submitting ? '提交中...' : (editingTask ? '保存修改' : '创建任务') }}
@@ -217,10 +277,13 @@ import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { queryUserList } from '@/api/auth'
 import { queryCustomerList } from '@/api/customer'
+import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { aiParseTask } from '@/api/task'
 import { useResponsive } from '@/composables/useResponsive'
-import type { ProjectLane, ProjectTask, ProjectTaskPriority } from '@/types/project'
+import type { ProjectLane, ProjectTask, ProjectTaskAttachmentPayload, ProjectTaskPriority } from '@/types/project'
 import { PROJECT_TASK_PRIORITY_OPTIONS } from '@/utils/project'
+import { formatFileSize } from '@/utils/formatFileSize'
+import { isRequestErrorHandled } from '@/utils/requestError'
 
 type SelectOption = { value: string; label: string }
 type UserListItem = { userId: string | number; realname?: string; username?: string }
@@ -256,6 +319,7 @@ const emit = defineEmits<{
     customerName?: string
     hasAttachments: boolean
     hasSchedule: boolean
+    attachments?: ProjectTaskAttachmentPayload[]
   }): void
 }>()
 
@@ -270,6 +334,9 @@ const userOptions = ref<SelectOption[]>([])
 const customerOptions = ref<SelectOption[]>([])
 const participantIds = ref<string[]>([])
 const participantNames = ref<string[]>([])
+const selectedAttachmentFiles = ref<File[]>([])
+const taskAttachmentFileInputRef = ref<HTMLInputElement | null>(null)
+const taskAttachmentUploading = ref(false)
 
 const form = reactive({
   title: '',
@@ -305,6 +372,7 @@ function hydrateForm() {
   aiParseInput.value = ''
   userOptions.value = []
   customerOptions.value = []
+  selectedAttachmentFiles.value = []
 
   if (editingTask.value) {
     form.title = editingTask.value.title
@@ -406,6 +474,54 @@ function syncParticipantNames() {
   participantNames.value = participantIds.value.map(value =>
     userOptions.value.find(item => item.value === value)?.label || value
   )
+}
+
+function handleTaskAttachmentFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  input.value = ''
+  if (!files.length) return
+
+  const existingKeys = new Set(selectedAttachmentFiles.value.map(file => `${file.name}-${file.size}-${file.lastModified}`))
+  const toAdd = files.filter(file => !existingKeys.has(`${file.name}-${file.size}-${file.lastModified}`))
+  if (!toAdd.length) {
+    ElMessage.warning('所选附件已在列表中')
+    return
+  }
+  selectedAttachmentFiles.value = [...selectedAttachmentFiles.value, ...toAdd]
+}
+
+function removeTaskAttachmentFile(index: number) {
+  selectedAttachmentFiles.value.splice(index, 1)
+}
+
+async function uploadTaskAttachmentFiles(): Promise<ProjectTaskAttachmentPayload[]> {
+  if (!selectedAttachmentFiles.value.length) return []
+
+  taskAttachmentUploading.value = true
+  try {
+    const files = [...selectedAttachmentFiles.value]
+    const uploads = await Promise.all(files.map(async (file) => {
+      const presigned = await getPresignedUploadUrl(file.name, file.type)
+      await uploadToMinIO(file, presigned.uploadUrl)
+      return {
+        fileName: file.name,
+        filePath: presigned.objectKey,
+        fileSize: file.size,
+        mimeType: file.type || 'application/octet-stream'
+      }
+    }))
+    selectedAttachmentFiles.value = []
+    return uploads
+  } catch (error) {
+    console.error('项目任务附件上传失败:', error)
+    if (!isRequestErrorHandled(error)) {
+      ElMessage.error('附件上传失败，请重试')
+    }
+    throw error
+  } finally {
+    taskAttachmentUploading.value = false
+  }
 }
 
 async function handleAiParse() {
@@ -523,6 +639,7 @@ async function handleSubmit() {
   }
   submitting.value = true
   try {
+    const uploadedAttachments = await uploadTaskAttachmentFiles()
     emit('submit', {
       title: form.title.trim(),
       description: form.description.trim() || undefined,
@@ -535,8 +652,9 @@ async function handleSubmit() {
       priority: form.priority,
       customerId: form.customerId || undefined,
       customerName: form.customerName || undefined,
-      hasAttachments: form.hasAttachments,
-      hasSchedule: form.hasSchedule
+      hasAttachments: form.hasAttachments || uploadedAttachments.length > 0 || Boolean(editingTask.value?.attachments?.length),
+      hasSchedule: form.hasSchedule,
+      attachments: uploadedAttachments.length ? uploadedAttachments : undefined
     })
     open.value = false
   } finally {

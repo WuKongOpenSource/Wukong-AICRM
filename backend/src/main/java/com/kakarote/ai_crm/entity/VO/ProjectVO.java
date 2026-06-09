@@ -91,6 +91,10 @@ public class ProjectVO {
         @JsonSerialize(using = ToStringSerializer.class)
         private Long attachmentId;
         private String name;
+        private String fileUrl;
+        private String filePath;
+        private Long fileSize;
+        private String mimeType;
         private Date createTime;
         private String createdByName;
     }

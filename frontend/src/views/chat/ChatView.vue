@@ -1,5 +1,81 @@
 <template>
   <div ref="chatViewRef" class="flex h-full" :class="{ 'flex-col': isMobile }">
+    <Teleport to="body">
+      <div
+        v-if="showMobileFloatingBar"
+        class="wk-mobile-chat-floating-bar pointer-events-none px-4 py-3"
+        :style="mobileTopFixedLayerStyle"
+      >
+        <button
+          type="button"
+          class="wk-mobile-chat-menu-fab pointer-events-auto"
+          aria-label="打开菜单"
+          title="打开菜单"
+          @click="openMobileMainMenu"
+        >
+          <span class="material-symbols-outlined text-[22px] leading-none">menu</span>
+        </button>
+        <div v-if="showMobileChatFloatingActions" class="pointer-events-auto flex items-center justify-end gap-3">
+          <div class="wk-mobile-chat-actions" :class="{ 'wk-mobile-chat-actions--single': mobileChatFloatingActionCount === 1 }">
+            <button
+              v-if="showMobileNewSessionAction"
+              type="button"
+              class="wk-mobile-chat-actions__btn"
+              aria-label="新建会话"
+              title="新建会话"
+              @click="handleNewSession"
+            >
+              <span class="material-symbols-outlined text-[20px] leading-none">edit_square</span>
+            </button>
+            <span v-if="showMobileNewSessionAction && showMobileCustomerSummaryAction" class="wk-mobile-chat-actions__divider" aria-hidden="true"></span>
+            <button
+              v-if="showMobileCustomerSummaryAction"
+              type="button"
+              class="wk-mobile-chat-actions__btn"
+              aria-label="客户详情"
+              title="客户详情"
+              @click="openMobileCustomerSummary"
+            >
+              <span class="material-symbols-outlined text-[24px] leading-none">more_horiz</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <MobileChatTopHeader
+      :visible="showMobileCustomerHeader"
+      kind="customer"
+      :title="mobileCustomerHeaderName"
+      :avatar-url="selectedCustomer?.logoUrl"
+      :fixed-style="mobileTopFixedLayerStyle"
+      @menu="openMobileMainMenu"
+      @title="openSelectedCustomerBasicInfo"
+      @detail="openMobileCustomerSummary"
+    />
+
+    <MobileChatTopHeader
+      :visible="showMobileEmployeeHeader"
+      kind="employee"
+      :title="mobileEmployeeHeaderName"
+      :avatar-url="selectedEmployee?.imgUrl"
+      :fixed-style="mobileTopFixedLayerStyle"
+      @menu="openMobileMainMenu"
+      @title="openMobileObjectDetail('employee')"
+      @detail="openMobileObjectDetail('employee')"
+    />
+
+    <MobileChatTopHeader
+      :visible="showMobileRelationHeader"
+      kind="relation"
+      :title="mobileRelationHeaderName"
+      :avatar-url="mobileRelationHeaderAvatarUrl"
+      :fixed-style="mobileTopFixedLayerStyle"
+      @menu="openMobileMainMenu"
+      @title="openMobileObjectDetail('relation')"
+      @detail="openMobileObjectDetail('relation')"
+    />
+
     <!-- Internal Sidebar: Chat History -->
     <aside v-if="isMobile && mobilePanel === 'sessions'" class="flex flex-1 flex-col bg-slate-50/50">
       <!-- System Notifications Menu Item -->
@@ -134,57 +210,14 @@
     >
       <!-- Chat View -->
       <template v-if="currentView === 'chat'">
-        <!-- Mobile top bar (chat detail) -->
-        <div
-          v-if="showMobileFloatingBar"
-          class="wk-mobile-chat-floating-bar pointer-events-none absolute inset-x-0 z-30 px-4 py-3"
-          :style="{ top: mobileChatFloatingBarTop }"
-        >
-          <button
-            type="button"
-            class="wk-mobile-chat-menu-fab pointer-events-auto"
-            aria-label="打开菜单"
-            title="打开菜单"
-            @click="openMobileMainMenu"
-          >
-            <span class="material-symbols-outlined text-[22px] leading-none">menu</span>
-          </button>
-          <div v-if="showMobileChatFloatingActions" class="pointer-events-auto flex items-center justify-end gap-3">
-            <div class="wk-mobile-chat-actions" :class="{ 'wk-mobile-chat-actions--single': mobileChatFloatingActionCount === 1 }">
-              <button
-                v-if="showMobileNewSessionAction"
-                type="button"
-                class="wk-mobile-chat-actions__btn"
-                aria-label="新建会话"
-                title="新建会话"
-                @click="handleNewSession"
-              >
-                <span class="material-symbols-outlined text-[20px] leading-none">edit_square</span>
-              </button>
-              <span v-if="showMobileNewSessionAction && showMobileCustomerSummaryAction" class="wk-mobile-chat-actions__divider" aria-hidden="true"></span>
-              <button
-                v-if="showMobileCustomerSummaryAction"
-                type="button"
-                class="wk-mobile-chat-actions__btn"
-                aria-label="客户详情"
-                title="客户详情"
-                @click="openMobileCustomerSummary"
-              >
-                <span class="material-symbols-outlined text-[24px] leading-none">more_horiz</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
           <div
             class="flex-1 flex flex-col overflow-hidden relative"
             :class="isCenteredEmptyChat && !isMobile ? 'justify-center -translate-y-[100px]' : ''"
           >
           <div
-            v-if="showCustomerHeader"
+            v-if="showCustomerHeader && !isMobile"
             class="wk-chat-customer-header sticky top-0 z-20 shrink-0 border-b py-2"
             :class="isMobile ? 'px-3' : 'pl-4 pr-1 md:pl-8'"
-            :style="chatCustomerHeaderStyle"
           >
             <div class="mx-auto flex h-9 w-full items-center justify-between gap-2" :class="isMobile ? '' : 'pr-20'">
               <button
@@ -390,30 +423,30 @@
           </div>
 
           <div
-            v-else-if="selectedEmployee"
-            class="wk-chat-customer-header relative shrink-0 border-b pl-4 pr-1 py-2 md:pl-8"
+            v-else-if="showEmployeeHeader && !isMobile"
+            class="wk-chat-customer-header relative shrink-0 border-b py-2 pl-4 pr-1 md:pl-8"
           >
             <div class="mx-auto flex h-9 w-full items-center justify-between gap-3 pr-20">
               <div class="flex min-w-0 flex-1 items-center gap-2">
                 <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
                   <img
-                    v-if="selectedEmployee.imgUrl"
+                    v-if="selectedEmployee?.imgUrl"
                     :src="selectedEmployee.imgUrl"
-                    :alt="selectedEmployee.realname || 'employee avatar'"
+                    :alt="mobileEmployeeHeaderName || 'employee avatar'"
                     class="size-full bg-white object-cover"
                   />
                   <span v-else class="text-xs font-bold text-slate-400">
-                    {{ selectedEmployee.realname?.charAt(0) || '?' }}
+                    {{ mobileEmployeeHeaderName.charAt(0) || '?' }}
                   </span>
                 </div>
                 <h2 class="min-w-[80px] max-w-[190px] truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">
-                  {{ selectedEmployee.realname || '未命名员工' }}
+                  {{ selectedEmployee?.realname || '未命名员工' }}
                 </h2>
                 <span class="inline-flex h-6 shrink-0 items-center rounded-lg bg-[var(--wk-bg-surface-muted)] px-2 text-[11px] font-medium text-[var(--wk-text-secondary)]">
-                  {{ selectedEmployee.post || '员工' }}
+                  {{ selectedEmployee?.post || '员工' }}
                 </span>
                 <span class="hidden min-w-0 truncate text-xs text-slate-400 md:inline">
-                  {{ selectedEmployee.deptName || '-' }}
+                  {{ selectedEmployee?.deptName || '-' }}
                 </span>
               </div>
             </div>
@@ -435,30 +468,30 @@
           </div>
 
           <div
-            v-else-if="selectedRelation"
-            class="wk-chat-customer-header relative shrink-0 border-b pl-4 pr-1 py-2 md:pl-8"
+            v-else-if="showRelationHeader && !isMobile"
+            class="wk-chat-customer-header relative shrink-0 border-b py-2 pl-4 pr-1 md:pl-8"
           >
             <div class="mx-auto flex h-9 w-full items-center justify-between gap-3 pr-20">
               <div class="flex min-w-0 flex-1 items-center gap-2">
                 <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
                   <img
-                    v-if="selectedRelation.avatarUrl || selectedRelation.avatar"
+                    v-if="selectedRelation?.avatarUrl || selectedRelation?.avatar"
                     :src="selectedRelation.avatarUrl || selectedRelation.avatar"
-                    :alt="selectedRelation.name || 'relation avatar'"
+                    :alt="mobileRelationHeaderName || 'relation avatar'"
                     class="size-full bg-white object-cover"
                   />
                   <span v-else class="text-xs font-bold text-slate-400">
-                    {{ selectedRelation.name?.charAt(0) || '?' }}
+                    {{ mobileRelationHeaderName.charAt(0) || '?' }}
                   </span>
                 </div>
                 <h2 class="min-w-[80px] max-w-[190px] truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">
-                  {{ selectedRelation.name || '未命名关系人' }}
+                  {{ selectedRelation?.name || '未命名关系人' }}
                 </h2>
                 <span class="inline-flex h-6 shrink-0 items-center rounded-lg bg-[var(--wk-bg-surface-muted)] px-2 text-[11px] font-medium text-[var(--wk-text-secondary)]">
-                  {{ selectedRelation.relationTypeName || selectedRelation.relationType || '关系' }}
+                  {{ selectedRelation?.relationTypeName || selectedRelation?.relationType || '关系' }}
                 </span>
                 <span class="hidden min-w-0 truncate text-xs text-slate-400 md:inline">
-                  {{ selectedRelation.company || '-' }}
+                  {{ selectedRelation?.company || '-' }}
                 </span>
               </div>
             </div>
@@ -478,6 +511,11 @@
               </span>
             </button>
           </div>
+          <div
+            v-if="showMobileObjectHeaderSpacer"
+            class="wk-chat-customer-header-spacer shrink-0"
+            aria-hidden="true"
+          ></div>
 
           <!-- Messages Area -->
           <div
@@ -1345,95 +1383,78 @@
                           <span class="wk-chat-upload-menu__icon material-symbols-outlined">menu_book</span>
                           <span class="wk-chat-upload-menu__label">选择知识库文件</span>
                         </button>
-                        <div
-                          class="wk-chat-upload-menu__apps-group"
-                          :class="{ 'is-disabled': isUploading }"
-                          :aria-disabled="isUploading ? 'true' : undefined"
+                        <button
+                          type="button"
+                          class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                          :disabled="isUploading"
+                          @click="handleChatUploadMenuSelectApp('crm')"
                         >
-                          <div class="wk-chat-upload-menu__apps-ref">
-                            <span class="wk-chat-upload-menu__icon material-symbols-outlined">apps</span>
-                            <span class="wk-chat-upload-menu__label">悟空技能</span>
-                            <span class="wk-chat-upload-menu__chevron material-symbols-outlined">chevron_right</span>
-                          </div>
-                          <div
-                            class="wk-chat-upload-submenu"
-                            @mouseenter="clearChatUploadMenuLeaveTimer"
-                            @mouseleave="handleChatUploadMenuMouseLeave"
-                          >
-                            <button
-                              type="button"
-                              class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
-                              :disabled="isUploading"
-                              @click="handleChatUploadMenuSelectApp('crm')"
-                            >
-                              <WkIcon
-                                name="customer"
-                                :size="18"
-                                class="shrink-0"
-                                :class="chatStore.selectedAppCode === 'crm' ? 'text-primary' : ''"
-                              />
-                              <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">CRM管理</span>
-                              <span
-                                v-if="chatStore.selectedAppCode === 'crm'"
-                                class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
-                              >check</span>
-                            </button>
-                            <button
-                              type="button"
-                              class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
-                              :disabled="isUploading"
-                              @click="handleChatUploadMenuSelectApp('project')"
-                            >
-                              <WkIcon
-                                name="task"
-                                :size="18"
-                                class="shrink-0"
-                                :class="chatStore.selectedAppCode === 'project' ? 'text-primary' : ''"
-                              />
-                              <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">项目</span>
-                              <span
-                                v-if="chatStore.selectedAppCode === 'project'"
-                                class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
-                              >check</span>
-                            </button>
-                            <button
-                              type="button"
-                              class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
-                              :disabled="isUploading"
-                              @click="handleChatUploadMenuSelectApp('knowledge')"
-                            >
-                              <WkIcon
-                                name="knowledge-1"
-                                :size="18"
-                                class="shrink-0"
-                                :class="chatStore.selectedAppCode === 'knowledge' ? 'text-primary' : ''"
-                              />
-                              <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">知识库检索</span>
-                              <span
-                                v-if="chatStore.selectedAppCode === 'knowledge'"
-                                class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
-                              >check</span>
-                            </button>
-                            <button
-                              type="button"
-                              class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
-                              :disabled="isUploading"
-                              @click="handleChatUploadMenuSelectApp('address_book')"
-                            >
-                              <WkIcon
-                                name="customer"
-                                :size="18"
-                                class="shrink-0"
-                                :class="chatStore.selectedAppCode === 'address_book' ? 'text-primary' : ''"
-                              />
-                              <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">通讯录</span>
-                              <span
-                                v-if="chatStore.selectedAppCode === 'address_book'"
-                                class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
-                              >check</span>
-                            </button>
-                          </div>
-                        </div>
+                          <WkIcon
+                            name="customer"
+                            :size="18"
+                            class="shrink-0"
+                            :class="chatStore.selectedAppCode === 'crm' ? 'text-primary' : ''"
+                          />
+                          <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">CRM管理</span>
+                          <span
+                            v-if="chatStore.selectedAppCode === 'crm'"
+                            class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                          >check</span>
+                        </button>
+                        <button
+                          type="button"
+                          class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                          :disabled="isUploading"
+                          @click="handleChatUploadMenuSelectApp('project')"
+                        >
+                          <WkIcon
+                            name="task"
+                            :size="18"
+                            class="shrink-0"
+                            :class="chatStore.selectedAppCode === 'project' ? 'text-primary' : ''"
+                          />
+                          <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">项目</span>
+                          <span
+                            v-if="chatStore.selectedAppCode === 'project'"
+                            class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                          >check</span>
+                        </button>
+                        <button
+                          type="button"
+                          class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                          :disabled="isUploading"
+                          @click="handleChatUploadMenuSelectApp('knowledge')"
+                        >
+                          <WkIcon
+                            name="knowledge-1"
+                            :size="18"
+                            class="shrink-0"
+                            :class="chatStore.selectedAppCode === 'knowledge' ? 'text-primary' : ''"
+                          />
+                          <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">知识库检索</span>
+                          <span
+                            v-if="chatStore.selectedAppCode === 'knowledge'"
+                            class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                          >check</span>
+                        </button>
+                        <button
+                          type="button"
+                          class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                          :disabled="isUploading"
+                          @click="handleChatUploadMenuSelectApp('address_book')"
+                        >
+                          <WkIcon
+                            name="customer"
+                            :size="18"
+                            class="shrink-0"
+                            :class="chatStore.selectedAppCode === 'address_book' ? 'text-primary' : ''"
+                          />
+                          <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">通讯录</span>
+                          <span
+                            v-if="chatStore.selectedAppCode === 'address_book'"
+                            class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                          >check</span>
+                        </button>
                       </div>
                     </el-popover>
 
@@ -2073,6 +2094,102 @@
       </div>
     </Transition>
 
+    <Transition name="wk-mobile-customer-summary-fade">
+      <div
+        v-if="mobileObjectDetailKind && isMobile"
+        class="wk-mobile-customer-summary"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wk-mobile-object-detail-title"
+      >
+        <button
+          type="button"
+          class="wk-mobile-customer-summary__backdrop"
+          aria-label="关闭详情"
+          @click="closeMobileObjectDetail"
+        ></button>
+        <section
+          class="wk-mobile-customer-summary__sheet"
+          :class="{ 'is-dragging': customerSummarySheetDragging }"
+          :style="mobileCustomerSummarySheetStyle"
+        >
+          <header
+            class="wk-mobile-customer-summary__header"
+            @pointerdown="handleCustomerSummaryDragStart"
+          >
+            <span class="wk-mobile-customer-summary__handle" aria-hidden="true"></span>
+            <div class="wk-mobile-customer-summary__title-row">
+              <div class="min-w-0 flex-1">
+                <p id="wk-mobile-object-detail-title" class="wk-mobile-customer-summary__title">
+                  {{ mobileObjectDetailTitle }}
+                </p>
+              </div>
+              <div class="wk-mobile-customer-summary__actions">
+                <button
+                  type="button"
+                  class="wk-mobile-customer-summary__close"
+                  aria-label="关闭详情"
+                  @pointerdown.stop
+                  @click.stop="closeMobileObjectDetail"
+                >
+                  <span class="material-symbols-outlined text-[24px] leading-none">close</span>
+                </button>
+              </div>
+            </div>
+          </header>
+          <div class="wk-mobile-customer-summary__body">
+            <div v-if="mobileObjectDetailLoading" class="flex h-full items-center justify-center">
+              <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+            </div>
+            <div
+              v-else-if="mobileObjectDetailKind === 'employee' && !selectedEmployee"
+              class="flex h-full flex-col items-center justify-center px-6 text-center"
+            >
+              <div class="mb-4 flex size-12 items-center justify-center rounded-2xl bg-[#f5f5f5] text-slate-400">
+                <WkIcon name="customer" :size="24" />
+              </div>
+              <p class="text-sm font-semibold text-slate-700">暂无通讯录详情</p>
+              <p class="mt-1 text-xs leading-relaxed text-slate-400">通讯录资料加载后会在这里展示。</p>
+            </div>
+            <div
+              v-else-if="mobileObjectDetailKind === 'relation' && !selectedRelationDetail"
+              class="flex h-full flex-col items-center justify-center px-6 text-center"
+            >
+              <div class="mb-4 flex size-12 items-center justify-center rounded-2xl bg-[#f5f5f5] text-slate-400">
+                <WkIcon name="customer" :size="24" />
+              </div>
+              <p class="text-sm font-semibold text-slate-700">暂无关系详情</p>
+              <p class="mt-1 text-xs leading-relaxed text-slate-400">关系资料加载后会在这里展示。</p>
+            </div>
+            <EmployeeChatInfoPanel
+              v-else-if="mobileObjectDetailKind === 'employee' && selectedEmployee"
+              :employee="selectedEmployee"
+              :selected-task-id="selectedRelatedTask?.taskId"
+              :selected-schedule-id="selectedRelatedSchedule?.scheduleId"
+              @add-task="handleRelatedObjectAdd('task')"
+              @add-schedule="handleRelatedObjectAdd('schedule')"
+              @add-attachment="handleRelatedObjectAdd('attachment')"
+              @view-task="handleViewRelatedTask"
+              @view-schedule="handleViewRelatedSchedule"
+              @view-attachment="handleViewRelatedKnowledge"
+            />
+            <RelationChatInfoPanel
+              v-else-if="mobileObjectDetailKind === 'relation' && selectedRelationDetail"
+              :detail="selectedRelationDetail"
+              :selected-task-id="selectedRelatedTask?.taskId"
+              :selected-schedule-id="selectedRelatedSchedule?.scheduleId"
+              @add-task="handleRelatedObjectAdd('task')"
+              @add-schedule="handleRelatedObjectAdd('schedule')"
+              @add-attachment="handleRelatedObjectAdd('attachment')"
+              @view-task="handleViewRelatedTask"
+              @view-schedule="handleViewRelatedSchedule"
+              @view-attachment="handleViewRelatedKnowledge"
+            />
+          </div>
+        </section>
+      </div>
+    </Transition>
+
     <button
       v-if="showObjectPanelShell && !customerPanelVisible"
       type="button"
@@ -2176,6 +2293,7 @@ import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDial
 import WecomMessageList from '@/views/wecom/components/WecomMessageList.vue'
 import { getAddressBookDetail } from '@/api/addressBook'
 import { getRelationDetail } from '@/api/relation'
+import MobileChatTopHeader from '@/views/chat/components/MobileChatTopHeader.vue'
 import EmployeeChatInfoPanel from '@/views/chat/components/EmployeeChatInfoPanel.vue'
 import RelationChatInfoPanel from '@/views/chat/components/RelationChatInfoPanel.vue'
 import TaskDetailDrawer from '@/views/task/components/TaskDetailDrawer.vue'
@@ -2294,7 +2412,7 @@ const messagesContainer = ref<HTMLElement | null>(null)
 const chatComposerWrapRef = ref<HTMLElement | null>(null)
 const showScrollToBottomButton = ref(false)
 const mobileKeyboardInset = ref(0)
-const mobileVisualViewportTopOffset = ref(0)
+const mobileTopFixedLayerViewportOffset = ref(0)
 const mobilePanel = ref<'sessions' | 'chat'>('chat')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 /** 桌面端多行输入（模板中 v-if="!isMobile" 的 textarea） */
@@ -2371,6 +2489,8 @@ const mobileCustomerSummaryVisible = ref(false)
 const customerSummaryDetailRef = ref<InstanceType<typeof CustomerDetailView> | null>(null)
 const customerSummarySheetHeight = ref(58)
 const customerSummarySheetDragging = ref(false)
+type MobileObjectDetailKind = 'employee' | 'relation'
+const mobileObjectDetailKind = ref<MobileObjectDetailKind | null>(null)
 const selectedEmployeeId = ref<string | null>(null)
 const selectedEmployee = ref<AddressBookDetail | null>(null)
 const selectedEmployeeLoading = ref(false)
@@ -2495,9 +2615,9 @@ const chatComposerWrapStyle = computed(() => (
     ? { transform: `translate3d(0, -${mobileKeyboardInset.value}px, 0)` }
     : undefined
 ))
-const chatCustomerHeaderStyle = computed(() => (
-  isMobile.value && mobileVisualViewportTopOffset.value > 0
-    ? { transform: `translate3d(0, ${mobileVisualViewportTopOffset.value}px, 0)` }
+const mobileTopFixedLayerStyle = computed(() => (
+  isMobile.value && mobileTopFixedLayerViewportOffset.value > 0
+    ? { transform: `translate3d(0, ${mobileTopFixedLayerViewportOffset.value}px, 0)` }
     : undefined
 ))
 
@@ -2982,16 +3102,16 @@ const isChatEmpty = computed(() => chatStore.messages.length === 0)
 const isCustomerContextChat = computed(() =>
   !chatStore.isNewSessionPending && Boolean(selectedCustomerId.value || currentSessionCustomerId.value)
 )
+const isEmployeeContextChat = computed(() =>
+  !chatStore.isNewSessionPending && Boolean(selectedEmployeeId.value || currentSessionEmployeeId.value)
+)
+const isRelationContextChat = computed(() =>
+  !chatStore.isNewSessionPending && Boolean(selectedRelationId.value || currentSessionRelationId.value)
+)
 const isObjectContextChat = computed(() => Boolean(
-  !chatStore.isNewSessionPending
-  && (
-    selectedCustomerId.value || currentSessionCustomerId.value
-    || selectedEmployeeId.value || currentSessionEmployeeId.value
-    || selectedRelationId.value || currentSessionRelationId.value
-  )
+  isCustomerContextChat.value || isEmployeeContextChat.value || isRelationContextChat.value
 ))
 const isCenteredEmptyChat = computed(() => isChatEmpty.value && !isObjectContextChat.value)
-const mobileChatFloatingBarTop = computed(() => '0px')
 const showMobileFloatingBar = computed(() =>
   isMobile.value
   && currentView.value === 'chat'
@@ -3025,11 +3145,65 @@ const mobileCustomerSummaryName = computed(() =>
 const mobileCustomerHeaderName = computed(() =>
   selectedCustomer.value?.companyName || boundCustomerName.value || chatStore.currentSession?.title || '客户'
 )
+const mobileEmployeeHeaderName = computed(() =>
+  selectedEmployee.value?.realname || boundEmployeeName.value || chatStore.currentSession?.title || '员工'
+)
+const mobileRelationHeaderName = computed(() =>
+  selectedRelation.value?.name || boundRelationName.value || chatStore.currentSession?.title || '关系'
+)
+const mobileRelationHeaderAvatarUrl = computed(() =>
+  selectedRelation.value?.avatarUrl || selectedRelation.value?.avatar || ''
+)
 const showCustomerHeader = computed(() =>
   !chatStore.isNewSessionPending && Boolean(selectedCustomer.value || (isMobile.value && isCustomerContextChat.value))
 )
+const showMobileCustomerHeader = computed(() =>
+  isMobile.value
+  && currentView.value === 'chat'
+  && mobilePanel.value === 'chat'
+  && showCustomerHeader.value
+)
+const showEmployeeHeader = computed(() =>
+  !chatStore.isNewSessionPending && Boolean(selectedEmployee.value || (isMobile.value && isEmployeeContextChat.value))
+)
+const showMobileEmployeeHeader = computed(() =>
+  isMobile.value
+  && currentView.value === 'chat'
+  && mobilePanel.value === 'chat'
+  && showEmployeeHeader.value
+)
+const showRelationHeader = computed(() =>
+  !chatStore.isNewSessionPending && Boolean(selectedRelation.value || (isMobile.value && isRelationContextChat.value))
+)
+const showMobileRelationHeader = computed(() =>
+  isMobile.value
+  && currentView.value === 'chat'
+  && mobilePanel.value === 'chat'
+  && showRelationHeader.value
+)
 const showMobileCustomerHeaderSpacer = computed(() =>
   isMobile.value && showCustomerHeader.value
+)
+const showMobileObjectHeaderSpacer = computed(() =>
+  isMobile.value && (showEmployeeHeader.value || showRelationHeader.value)
+)
+const showMobileTopFixedLayer = computed(() =>
+  showMobileFloatingBar.value
+  || showMobileCustomerHeader.value
+  || showMobileEmployeeHeader.value
+  || showMobileRelationHeader.value
+)
+const mobileObjectDetailTitle = computed(() =>
+  mobileObjectDetailKind.value === 'employee'
+    ? mobileEmployeeHeaderName.value
+    : mobileRelationHeaderName.value
+)
+const mobileObjectDetailLoading = computed(() =>
+  mobileObjectDetailKind.value === 'employee'
+    ? selectedEmployeeLoading.value
+    : mobileObjectDetailKind.value === 'relation'
+      ? selectedRelationLoading.value
+      : false
 )
 const showMobileSummaryVoiceAction = computed(() =>
   mobileCustomerSummaryVisible.value
@@ -3053,6 +3227,30 @@ watch(
   ([mobile, hasCustomer]) => {
     if (!mobile || !hasCustomer) {
       closeMobileCustomerSummary()
+    }
+  }
+)
+
+watch(
+  () => [
+    isMobile.value,
+    isEmployeeContextChat.value,
+    isRelationContextChat.value,
+    currentSessionEmployeeId.value,
+    currentSessionRelationId.value,
+    selectedEmployeeId.value,
+    selectedRelationId.value,
+  ] as const,
+  ([mobile, hasEmployee, hasRelation]) => {
+    if (!mobile) {
+      closeMobileObjectDetail()
+      return
+    }
+    if (mobileObjectDetailKind.value === 'employee' && !hasEmployee) {
+      closeMobileObjectDetail()
+    }
+    if (mobileObjectDetailKind.value === 'relation' && !hasRelation) {
+      closeMobileObjectDetail()
     }
   }
 )
@@ -3167,6 +3365,7 @@ function openMobileCustomerSummary() {
   const customerId = currentSessionCustomerId.value || selectedCustomerId.value
   if (!customerId) return
   customerSummarySheetHeight.value = CUSTOMER_SUMMARY_SHEET_LEVELS[0]
+  mobileObjectDetailKind.value = null
   mobileCustomerSummaryVisible.value = true
   void ensureSelectedCustomerDetail(customerId, { silent: Boolean(selectedCustomer.value) })
 }
@@ -3178,16 +3377,50 @@ function openSelectedCustomerBasicInfo() {
   void ensureSelectedCustomerDetail(customerId, { silent: Boolean(selectedCustomer.value) })
 }
 
-function closeMobileCustomerSummary() {
+function openMobileObjectDetail(kind: MobileObjectDetailKind) {
+  if (kind === 'employee') {
+    const employeeId = currentSessionEmployeeId.value || selectedEmployeeId.value
+    if (!employeeId) return
+    customerSummarySheetHeight.value = CUSTOMER_SUMMARY_SHEET_LEVELS[0]
+    mobileCustomerSummaryVisible.value = false
+    mobileObjectDetailKind.value = 'employee'
+    void ensureSelectedEmployeeDetail(employeeId, { silent: Boolean(selectedEmployee.value) })
+    return
+  }
+
+  const relationId = currentSessionRelationId.value || selectedRelationId.value
+  if (!relationId) return
+  customerSummarySheetHeight.value = CUSTOMER_SUMMARY_SHEET_LEVELS[0]
   mobileCustomerSummaryVisible.value = false
-  customerSummarySheetDragging.value = false
+  mobileObjectDetailKind.value = 'relation'
+  void ensureSelectedRelationDetail(relationId, { silent: Boolean(selectedRelationDetail.value) })
+}
+
+function removeCustomerSummaryDragListeners() {
   window.removeEventListener('pointermove', handleCustomerSummaryDragMove)
   window.removeEventListener('pointerup', handleCustomerSummaryDragEnd)
   window.removeEventListener('pointercancel', handleCustomerSummaryDragEnd)
 }
 
+function closeMobileCustomerSummary() {
+  mobileCustomerSummaryVisible.value = false
+  customerSummarySheetDragging.value = false
+  removeCustomerSummaryDragListeners()
+}
+
+function closeMobileObjectDetail() {
+  mobileObjectDetailKind.value = null
+  customerSummarySheetDragging.value = false
+  removeCustomerSummaryDragListeners()
+}
+
+function closeMobileDetailSheets() {
+  closeMobileCustomerSummary()
+  closeMobileObjectDetail()
+}
+
 function handleCustomerSummaryDragStart(event: PointerEvent) {
-  if (!mobileCustomerSummaryVisible.value) return
+  if (!mobileCustomerSummaryVisible.value && !mobileObjectDetailKind.value) return
   customerSummarySheetDragging.value = true
   customerSummaryDragStartY = event.clientY
   customerSummaryDragStartHeight = customerSummarySheetHeight.value
@@ -3209,9 +3442,7 @@ function handleCustomerSummaryDragEnd() {
   if (!customerSummarySheetDragging.value) return
   customerSummarySheetDragging.value = false
   customerSummarySheetHeight.value = snapCustomerSummaryHeight(customerSummarySheetHeight.value)
-  window.removeEventListener('pointermove', handleCustomerSummaryDragMove)
-  window.removeEventListener('pointerup', handleCustomerSummaryDragEnd)
-  window.removeEventListener('pointercancel', handleCustomerSummaryDragEnd)
+  removeCustomerSummaryDragListeners()
 }
 
 function openMobileSummaryVoiceInput() {
@@ -3624,17 +3855,18 @@ function isMobileComposerFocused(): boolean {
   return activeElement === mobileChatInputRef.value || Boolean(chatComposerWrapRef.value?.contains(activeElement))
 }
 
-function updateMobileVisualViewportTopOffset() {
-  if (!isMobile.value || typeof window === 'undefined') {
-    mobileVisualViewportTopOffset.value = 0
+function updateMobileTopFixedLayerViewportOffset() {
+  if (!isMobile.value || typeof window === 'undefined' || !showMobileTopFixedLayer.value) {
+    mobileTopFixedLayerViewportOffset.value = 0
     return
   }
+
   const offsetTop = window.visualViewport?.offsetTop ?? 0
-  mobileVisualViewportTopOffset.value = offsetTop > 1 ? Math.round(offsetTop) : 0
+  mobileTopFixedLayerViewportOffset.value = offsetTop > 1 ? Math.round(offsetTop) : 0
 }
 
 function updateMobileKeyboardInset() {
-  updateMobileVisualViewportTopOffset()
+  updateMobileTopFixedLayerViewportOffset()
   if (!isMobile.value || typeof window === 'undefined' || !isMobileComposerFocused()) {
     mobileKeyboardInset.value = 0
     return
@@ -3673,7 +3905,7 @@ function startMobileKeyboardInsetTracking() {
     mobileKeyboardInsetTrackTimer = setTimeout(tick, MOBILE_KEYBOARD_TRACK_INTERVAL_MS)
   }
 
-  mobileKeyboardInsetTrackTimer = setTimeout(tick, MOBILE_KEYBOARD_TRACK_INTERVAL_MS)
+  tick()
 }
 
 function scheduleMobileKeyboardInsetUpdate(trackKeyboardOpening: boolean | Event = false) {
@@ -3692,6 +3924,14 @@ function scheduleMobileKeyboardInsetUpdate(trackKeyboardOpening: boolean | Event
     startMobileKeyboardInsetTracking()
   }
 }
+
+watch(
+  showMobileTopFixedLayer,
+  () => {
+    updateMobileTopFixedLayerViewportOffset()
+  },
+  { flush: 'post' }
+)
 
 function registerMobileKeyboardInsetListeners() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return
@@ -3716,7 +3956,7 @@ function unregisterMobileKeyboardInsetListeners() {
   }
   clearMobileKeyboardInsetTracking()
   mobileKeyboardInset.value = 0
-  mobileVisualViewportTopOffset.value = 0
+  mobileTopFixedLayerViewportOffset.value = 0
 }
 
 onMounted(async () => {
@@ -3775,7 +4015,7 @@ onBeforeUnmount(() => {
   }
   abortChatVoiceRecording()
   transcriptionToken += 1
-  closeMobileCustomerSummary()
+  closeMobileDetailSheets()
   unregisterMobileKeyboardInsetListeners()
   document.removeEventListener('touchmove', handleMobileSummaryTouchMove)
   unregisterAiQuotaResumeSendHandler()
@@ -4710,7 +4950,7 @@ function openMobileMainMenu() {
 
 async function handleNewSession() {
   isPinnedToBottom.value = true
-  closeMobileCustomerSummary()
+  closeMobileDetailSheets()
   if (route.query.customerId || route.query.employeeId || route.query.relationId || route.query.sessionId) {
     await router.replace({ path: '/chat' })
   }
@@ -4727,7 +4967,7 @@ async function handleNewSession() {
 async function handleSelectSession(sessionId: string) {
   // if (chatStore.currentSessionId === sessionId && currentView.value === 'chat') return
   isPinnedToBottom.value = true
-  closeMobileCustomerSummary()
+  closeMobileDetailSheets()
   currentView.value = 'chat'
   if (isMobile.value) {
     mobilePanel.value = 'chat'
@@ -5157,8 +5397,6 @@ void sendQuickMessage
     left: 0;
     z-index: 40;
     padding-top: max(8px, env(safe-area-inset-top));
-    transition: transform 160ms cubic-bezier(0.2, 0, 0, 1);
-    will-change: transform;
   }
 
   .wk-chat-customer-header-spacer {
@@ -5199,9 +5437,15 @@ void sendQuickMessage
 
 .wk-mobile-chat-floating-bar {
   display: flex;
+  position: fixed;
+  top: var(--wk-safe-top);
+  right: var(--wk-safe-right);
+  left: var(--wk-safe-left);
+  z-index: 90;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding-top: 12px;
 }
 
 .wk-mobile-chat-menu-fab {

@@ -4,7 +4,7 @@ export type ProjectTaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
 
 export type ProjectTaskSource = 'manual' | 'ai'
 
-export type ProjectViewMode = 'ai' | 'board' | 'list' | 'cards' | 'members' | 'task_ai'
+export type ProjectViewMode = 'ai' | 'board' | 'list' | 'members' | 'task_ai'
 
 export type ProjectListViewMode = 'card' | 'table'
 
@@ -76,8 +76,19 @@ export interface ProjectLane {
 export interface ProjectTaskAttachment {
   attachmentId: string
   name: string
+  fileUrl?: string
+  filePath?: string
+  fileSize?: number
+  mimeType?: string
   createTime: string
   createdByName?: string
+}
+
+export interface ProjectTaskAttachmentPayload {
+  fileName: string
+  filePath: string
+  fileSize?: number
+  mimeType?: string
 }
 
 export interface ProjectTaskSchedule {
@@ -240,6 +251,7 @@ export interface ProjectTaskPayload {
   hasSchedule?: boolean
   generatedByAi?: boolean
   aiSourceText?: string
+  attachments?: ProjectTaskAttachmentPayload[]
 }
 
 export interface ProjectTaskUpdatePayload extends Partial<ProjectTaskPayload> {

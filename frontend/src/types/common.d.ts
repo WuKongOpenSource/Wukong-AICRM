@@ -7,6 +7,10 @@ export interface Task {
   customerName?: string
   relationId?: string
   relationName?: string
+  projectId?: string
+  projectName?: string
+  laneId?: string
+  laneName?: string
   priority: TaskPriority
   priorityName?: string
   status: TaskStatus
@@ -37,6 +41,8 @@ export interface TaskAddBO {
   customerId?: string
   priority?: TaskPriority
   relationId?: string
+  projectId?: string
+  laneId?: string
   dueDate?: string
   assignedTo?: string
   taskType?: string
@@ -56,6 +62,8 @@ export interface TaskQueryBO {
   customerId?: string
   assignedTo?: string
   relationId?: string
+  projectId?: string
+  laneId?: string
   filter?: 'all' | 'today' | 'thisWeek' | 'overdue' | 'mine'
   sortMode?: 'default' | 'value'
   highValueOnly?: boolean

@@ -169,16 +169,22 @@
             :style="{ order: DYNAMIC_SIDEBAR_SECTION_ORDER_BASE }"
           >
             <div
-              v-for="moduleKey in sidebarDraftModuleOrder"
+              v-for="(moduleKey, moduleIndex) in sidebarDraftModuleOrder"
               :key="moduleKey"
-              class="wk-sidebar-sort-row flex w-full cursor-grab items-center gap-2 rounded-lg pl-3 pr-2 py-[7px] mt-[8px] text-left transition-colors active:cursor-grabbing"
-              :class="sidebarDraggingModuleKey === moduleKey ? 'bg-[#f3f3f3] opacity-70' : 'hover:bg-[#f9f9f9]'"
+              class="wk-sidebar-sort-row flex w-full cursor-grab items-center gap-2 rounded-lg pl-3 pr-2 py-[7px] mt-[8px] text-left active:cursor-grabbing"
+              :class="{
+                'is-dragging': sidebarDraggingModuleKey === moduleKey,
+                'is-drag-over': sidebarDragOverModuleKey === moduleKey && sidebarDraggingModuleKey !== moduleKey
+              }"
               draggable="true"
               @dragstart="handleSidebarSortDragStart($event, moduleKey)"
-              @dragover.prevent="handleSidebarSortDragOver"
+              @dragover.prevent="handleSidebarSortDragOver($event, moduleKey)"
               @drop.prevent="handleSidebarSortDrop($event, moduleKey)"
               @dragend="handleSidebarSortDragEnd"
             >
+              <span class="wk-sidebar-sort-row__order inline-flex size-5 shrink-0 items-center justify-center rounded-md text-[11px] font-bold tabular-nums">
+                {{ moduleIndex + 1 }}
+              </span>
               <span class="material-symbols-outlined inline-flex size-5 shrink-0 items-center justify-center text-[19px] leading-none text-[#8f8f8f]">
                 {{ getSidebarModuleIcon(moduleKey) }}
               </span>
@@ -299,15 +305,6 @@
                   <span class="block min-w-0 flex-1 truncate text-sm leading-5 text-[#0d0d0d]" :title="project.name">
                     {{ project.name }}
                   </span>
-                  <button
-                    type="button"
-                    class="relative flex size-6 shrink-0 items-center justify-center rounded-md text-[#8f8f8f] opacity-0 transition-all hover:text-[#0d0d0d] group-hover/project-row:opacity-100"
-                    aria-label="在项目中开始对话"
-                    title="在项目中开始对话"
-                    @click.stop="handleStartProjectConversation(project.projectId)"
-                  >
-                    <WkIcon name="new-chat" :size="18" class="shrink-0" />
-                  </button>
                 </div>
               </template>
             </div>
@@ -1042,8 +1039,9 @@
           class="fixed inset-y-0 left-0 right-0 z-[101] flex w-screen max-w-none touch-pan-y flex-col bg-white shadow-2xl"
           :style="mobileDrawerPanelStyle"
           @touchstart.passive="handleMobileDrawerTouchStart"
+          @touchmove="handleMobileDrawerTouchMove"
           @touchend.passive="handleMobileDrawerTouchEnd"
-          @touchcancel.passive="resetMobileDrawerSwipe"
+          @touchcancel.passive="handleMobileDrawerTouchCancel"
         >
           <div class="flex items-center justify-between gap-4 px-4 pb-4 pt-8">
             <div class="flex min-w-0 flex-1 items-center gap-3">
@@ -1163,14 +1161,6 @@
                     folder
                   </span>
                   <span class="block min-w-0 flex-1 truncate text-[1rem] leading-6">{{ project.name }}</span>
-                  <button
-                    type="button"
-                    class="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f]"
-                    aria-label="在项目中开始对话"
-                    @click.stop="handleMobileStartProjectConversation(project.projectId)"
-                  >
-                    <span class="material-symbols-outlined text-[17px] leading-none">chat_bubble</span>
-                  </button>
                 </div>
               </template>
             </div>
@@ -1799,9 +1789,26 @@
             </div>
 
             <div
+              ref="customerSearchScrollRef"
               class="flex-1 overflow-y-auto"
               :class="isMobile ? 'min-h-0 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-2' : 'min-h-[320px] px-4 py-3'"
+              @scroll="handleCustomerSearchScroll"
+              @touchstart.passive="handleCustomerSearchTouchStart"
+              @touchmove="handleCustomerSearchTouchMove"
+              @touchend.passive="handleCustomerSearchTouchEnd"
+              @touchcancel.passive="handleCustomerSearchTouchCancel"
             >
+              <div
+                v-if="isMobile"
+                class="wk-mobile-customer-search-pull-indicator"
+                :class="{ 'is-active': customerSearchPullDistance > 0 || customerSearchRefreshing }"
+                :style="{ height: `${customerSearchPullIndicatorHeight}px` }"
+              >
+                <span class="material-symbols-outlined" :class="{ 'animate-spin': customerSearchRefreshing }">
+                  {{ customerSearchRefreshing ? 'progress_activity' : 'keyboard_arrow_down' }}
+                </span>
+                <span>{{ customerSearchPullLabel }}</span>
+              </div>
               <div v-if="customerSearchLoading && customerSearchCustomers.length === 0" class="flex h-56 items-center justify-center">
                 <span class="material-symbols-outlined animate-spin text-2xl leading-none text-[#c9c9c9]">progress_activity</span>
               </div>
@@ -1840,8 +1847,14 @@
                   </div>
                   <!-- <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-[#c9c9c9] transition-colors group-hover:text-[#8f8f8f]">chevron_right</span> -->
                 </button>
-                <div v-if="customerSearchLoading" class="flex justify-center py-3">
+                <div v-if="customerSearchAppending" class="flex justify-center py-3">
                   <span class="material-symbols-outlined animate-spin text-[18px] leading-none text-[#c9c9c9]">progress_activity</span>
+                </div>
+                <div
+                  v-if="isMobile && !customerSearchLoading"
+                  class="px-2 py-4 text-center text-xs font-medium text-[#8f8f8f]"
+                >
+                  {{ customerSearchHasMore ? '上滑加载更多' : '没有更多客户了' }}
                 </div>
               </template>
             </div>
@@ -1933,6 +1946,7 @@ const SIDEBAR_STORAGE_KEYS = {
   primaryCollapsed: 'wk_ai_crm:main_layout:primary_sidebar_collapsed:v1',
   recentChatExpanded: 'wk_ai_crm:main_layout:recent_chat_sessions_expanded:v1',
   sidebarProjectsExpanded: 'wk_ai_crm:main_layout:sidebar_projects_expanded:v1',
+  sidebarProjectCache: 'wk_ai_crm:main_layout:sidebar_project_cache:v1',
   sidebarCustomersExpanded: 'wk_ai_crm:main_layout:sidebar_customers_expanded:v1',
   sidebarAddressBookExpanded: 'wk_ai_crm:main_layout:sidebar_address_book_expanded:v1',
   sidebarRelationsExpanded: 'wk_ai_crm:main_layout:sidebar_relations_expanded:v1'
@@ -1998,6 +2012,7 @@ const sidebarDraftModuleOrder = ref<SidebarModuleKey[]>([...sidebarModuleOrder.v
 const sidebarSortMode = ref(false)
 const sidebarSavingModuleOrder = ref(false)
 const sidebarDraggingModuleKey = ref<SidebarModuleKey | null>(null)
+const sidebarDragOverModuleKey = ref<SidebarModuleKey | null>(null)
 
 function getSidebarModuleLabel(moduleKey: SidebarModuleKey) {
   return SIDEBAR_MODULE_LABELS[moduleKey]
@@ -2050,6 +2065,7 @@ function openSidebarSortMode() {
 function cancelSidebarSortMode() {
   sidebarDraftModuleOrder.value = [...sidebarModuleOrder.value]
   sidebarDraggingModuleKey.value = null
+  sidebarDragOverModuleKey.value = null
   sidebarSortMode.value = false
 }
 
@@ -2059,39 +2075,70 @@ function restoreDefaultSidebarDraftOrder() {
 
 function handleSidebarSortDragStart(event: DragEvent, moduleKey: SidebarModuleKey) {
   sidebarDraggingModuleKey.value = moduleKey
+  sidebarDragOverModuleKey.value = moduleKey
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = 'move'
     event.dataTransfer.setData('text/plain', moduleKey)
   }
 }
 
-function handleSidebarSortDragOver(event: DragEvent) {
-  if (event.dataTransfer) {
-    event.dataTransfer.dropEffect = 'move'
-  }
-}
-
-function handleSidebarSortDrop(event: DragEvent, targetKey: SidebarModuleKey) {
-  const sourceKey = sidebarDraggingModuleKey.value || event.dataTransfer?.getData('text/plain') as SidebarModuleKey
-  if (!sourceKey || sourceKey === targetKey) return
-  if (!DEFAULT_SIDEBAR_MODULE_ORDER.includes(sourceKey)) return
+function moveSidebarDraftModule(sourceKey: SidebarModuleKey, targetKey: SidebarModuleKey, insertAfterTarget: boolean) {
+  if (sourceKey === targetKey) return false
+  if (!DEFAULT_SIDEBAR_MODULE_ORDER.includes(sourceKey) || !DEFAULT_SIDEBAR_MODULE_ORDER.includes(targetKey)) return false
 
   const nextOrder = [...sidebarDraftModuleOrder.value]
   const sourceIndex = nextOrder.indexOf(sourceKey)
-  if (sourceIndex < 0 || nextOrder.indexOf(targetKey) < 0) return
+  const targetIndex = nextOrder.indexOf(targetKey)
+  if (sourceIndex < 0 || targetIndex < 0) return false
 
   nextOrder.splice(sourceIndex, 1)
   const targetIndexAfterRemoval = nextOrder.indexOf(targetKey)
+  if (targetIndexAfterRemoval < 0) return false
+
+  const insertIndex = targetIndexAfterRemoval + (insertAfterTarget ? 1 : 0)
+  if (sourceIndex === insertIndex) return false
+
+  nextOrder.splice(insertIndex, 0, sourceKey)
+  const normalizedOrder = normalizeSidebarModuleOrder(nextOrder)
+  if (normalizedOrder.join('|') === sidebarDraftModuleOrder.value.join('|')) return false
+
+  sidebarDraftModuleOrder.value = normalizedOrder
+  return true
+}
+
+function getSidebarSortInsertAfter(event: DragEvent) {
   const targetElement = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
-  const insertAfterTarget = targetElement
+  return targetElement
     ? event.clientY > targetElement.getBoundingClientRect().top + targetElement.getBoundingClientRect().height / 2
     : false
-  nextOrder.splice(targetIndexAfterRemoval + (insertAfterTarget ? 1 : 0), 0, sourceKey)
-  sidebarDraftModuleOrder.value = normalizeSidebarModuleOrder(nextOrder)
+}
+
+function getSidebarSortSourceKey(event: DragEvent): SidebarModuleKey | null {
+  const sourceKey = sidebarDraggingModuleKey.value || event.dataTransfer?.getData('text/plain') as SidebarModuleKey
+  return sourceKey && DEFAULT_SIDEBAR_MODULE_ORDER.includes(sourceKey) ? sourceKey : null
+}
+
+function handleSidebarSortDragOver(event: DragEvent, targetKey: SidebarModuleKey) {
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+  sidebarDragOverModuleKey.value = targetKey
+  const sourceKey = getSidebarSortSourceKey(event)
+  if (!sourceKey) return
+  moveSidebarDraftModule(sourceKey, targetKey, getSidebarSortInsertAfter(event))
+}
+
+function handleSidebarSortDrop(event: DragEvent, targetKey: SidebarModuleKey) {
+  const sourceKey = getSidebarSortSourceKey(event)
+  if (sourceKey) {
+    moveSidebarDraftModule(sourceKey, targetKey, getSidebarSortInsertAfter(event))
+  }
+  sidebarDragOverModuleKey.value = null
 }
 
 function handleSidebarSortDragEnd() {
   sidebarDraggingModuleKey.value = null
+  sidebarDragOverModuleKey.value = null
 }
 
 async function saveSidebarModuleOrder() {
@@ -2113,6 +2160,41 @@ async function saveSidebarModuleOrder() {
   } finally {
     sidebarSavingModuleOrder.value = false
     sidebarDraggingModuleKey.value = null
+    sidebarDragOverModuleKey.value = null
+  }
+}
+
+function normalizeSidebarProjectItem(value: unknown): SidebarProjectItem | null {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Partial<Record<'projectId' | 'name', unknown>>
+  const projectId = typeof record.projectId === 'string' ? record.projectId : String(record.projectId || '')
+  const name = typeof record.name === 'string' ? record.name : String(record.name || '')
+  if (!projectId || !name) return null
+  return { projectId, name }
+}
+
+function readStoredSidebarProjects(): SidebarProjectItem[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(SIDEBAR_STORAGE_KEYS.sidebarProjectCache)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .map(normalizeSidebarProjectItem)
+      .filter((project): project is SidebarProjectItem => Boolean(project))
+      .slice(0, 12)
+  } catch {
+    return []
+  }
+}
+
+function writeStoredSidebarProjects(projects: SidebarProjectItem[]) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(SIDEBAR_STORAGE_KEYS.sidebarProjectCache, JSON.stringify(projects.slice(0, 12)))
+  } catch {
+    // Ignore storage failures.
   }
 }
 
@@ -2147,6 +2229,7 @@ const drawerVisible = ref(false)
 const mobileDrawerDragProgress = ref(0)
 const mobileDrawerDragActive = ref(false)
 const mobileDrawerDragSettling = ref(false)
+const mobileDrawerClosing = ref(false)
 const mobileMainMenuGlobalSwipeStart = ref<SwipePoint | null>(null)
 const mobileDrawerTouchStart = ref<SwipePoint | null>(null)
 /** PC：一级侧栏收起为图标栏 */
@@ -2161,6 +2244,7 @@ const MOBILE_MAIN_MENU_MIN_SWIPE_PX = 64
 const MOBILE_MAIN_MENU_MAX_VERTICAL_PX = 88
 const MOBILE_MAIN_MENU_DIRECTION_RATIO = 1.25
 const MOBILE_MAIN_MENU_MIN_PREVIEW_PX = 6
+const MOBILE_DRAWER_TRANSITION_MS = 180
 
 function onCollapsedPrimarySidebarEnter() {
   if (primarySidebarCollapsed.value) collapsedSidebarAsideHovered.value = true
@@ -2172,26 +2256,41 @@ function onCollapsedPrimarySidebarLeave() {
 
 function openMobileDrawer() {
   if (!isMobile.value) return
+  clearMobileDrawerClosingTimer()
+  mobileDrawerClosing.value = false
   resetMobileDrawerDragPreview()
   drawerVisible.value = true
 }
 
 function closeMobileDrawer() {
+  const shouldKeepClosingLayer = isMobile.value && drawerVisible.value
+  if (shouldKeepClosingLayer) {
+    scheduleMobileDrawerClosingState()
+  }
   drawerVisible.value = false
   recentChatSessionsMoreVisible.value = false
   showUserMenu.value = false
   resetGlobalMobileMainMenuSwipe()
   resetMobileDrawerSwipe()
-  resetMobileDrawerDragPreview()
+  if (!shouldKeepClosingLayer) {
+    resetMobileDrawerDragPreview()
+  }
 }
 
 const mobileDrawerRendered = computed(() =>
-  isMobile.value && (drawerVisible.value || mobileDrawerDragActive.value || mobileDrawerDragSettling.value)
+  isMobile.value && (
+    drawerVisible.value ||
+    mobileDrawerDragActive.value ||
+    mobileDrawerDragSettling.value ||
+    mobileDrawerClosing.value
+  )
 )
 
-const mobileDrawerResolvedProgress = computed(() =>
-  drawerVisible.value ? 1 : Math.min(Math.max(mobileDrawerDragProgress.value, 0), 1)
-)
+const mobileDrawerResolvedProgress = computed(() => {
+  const dragProgress = Math.min(Math.max(mobileDrawerDragProgress.value, 0), 1)
+  if (mobileDrawerDragActive.value || mobileDrawerDragSettling.value) return dragProgress
+  return drawerVisible.value ? 1 : 0
+})
 
 const mobileDrawerOverlayStyle = computed(() => ({
   opacity: mobileDrawerResolvedProgress.value,
@@ -2210,11 +2309,56 @@ function clearMobileDrawerDragSettleTimer() {
   }
 }
 
+function clearMobileDrawerClosingTimer() {
+  if (mobileDrawerClosingTimer) {
+    clearTimeout(mobileDrawerClosingTimer)
+    mobileDrawerClosingTimer = null
+  }
+}
+
+function scheduleMobileDrawerClosingState() {
+  clearMobileDrawerClosingTimer()
+  mobileDrawerClosing.value = true
+  mobileDrawerClosingTimer = setTimeout(() => {
+    mobileDrawerClosing.value = false
+    mobileDrawerClosingTimer = null
+    resetMobileDrawerDragPreview()
+  }, MOBILE_DRAWER_TRANSITION_MS)
+}
+
 function settleMobileDrawerDragClosed() {
   clearMobileDrawerDragSettleTimer()
   mobileDrawerDragActive.value = false
   mobileDrawerDragSettling.value = true
   mobileDrawerDragProgress.value = 0
+  mobileDrawerDragSettleTimer = setTimeout(() => {
+    mobileDrawerDragSettling.value = false
+    mobileDrawerDragSettleTimer = null
+  }, 180)
+}
+
+function settleMobileDrawerDragOpen() {
+  clearMobileDrawerDragSettleTimer()
+  mobileDrawerDragActive.value = false
+  mobileDrawerDragSettling.value = true
+  mobileDrawerDragProgress.value = 1
+  mobileDrawerDragSettleTimer = setTimeout(() => {
+    mobileDrawerDragSettling.value = false
+    mobileDrawerDragProgress.value = 0
+    mobileDrawerDragSettleTimer = null
+  }, 180)
+}
+
+function settleMobileDrawerSwipeClosed() {
+  clearMobileDrawerDragSettleTimer()
+  mobileDrawerDragActive.value = false
+  mobileDrawerDragSettling.value = true
+  mobileDrawerDragProgress.value = 0
+  drawerVisible.value = false
+  recentChatSessionsMoreVisible.value = false
+  showUserMenu.value = false
+  resetGlobalMobileMainMenuSwipe()
+  resetMobileDrawerSwipe()
   mobileDrawerDragSettleTimer = setTimeout(() => {
     mobileDrawerDragSettling.value = false
     mobileDrawerDragSettleTimer = null
@@ -2356,6 +2500,46 @@ function handleMobileDrawerTouchStart(event: TouchEvent) {
   mobileDrawerTouchStart.value = getTouchPoint(event.touches[0])
 }
 
+function handleMobileDrawerTouchMove(event: TouchEvent) {
+  const start = mobileDrawerTouchStart.value
+  const point = getTouchPoint(event.touches[0])
+  if (!drawerVisible.value || !start || !point) return
+
+  const deltaX = point.clientX - start.clientX
+  const deltaY = point.clientY - start.clientY
+  const horizontalDistance = Math.abs(deltaX)
+  const verticalDistance = Math.abs(deltaY)
+
+  if (deltaX >= 0) {
+    if (mobileDrawerDragActive.value) {
+      mobileDrawerDragProgress.value = 1
+    }
+    return
+  }
+
+  if (
+    verticalDistance > MOBILE_MAIN_MENU_MAX_VERTICAL_PX
+    || (verticalDistance > MOBILE_MAIN_MENU_MIN_PREVIEW_PX && verticalDistance > horizontalDistance)
+  ) {
+    if (mobileDrawerDragActive.value) settleMobileDrawerDragOpen()
+    resetMobileDrawerSwipe()
+    return
+  }
+
+  if (horizontalDistance < MOBILE_MAIN_MENU_MIN_PREVIEW_PX) return
+  if (horizontalDistance < verticalDistance * MOBILE_MAIN_MENU_DIRECTION_RATIO) return
+
+  if (event.cancelable) {
+    event.preventDefault()
+  }
+
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 360
+  clearMobileDrawerDragSettleTimer()
+  mobileDrawerDragActive.value = true
+  mobileDrawerDragSettling.value = false
+  mobileDrawerDragProgress.value = Math.min(Math.max(1 - horizontalDistance / Math.max(viewportWidth, 1), 0), 1)
+}
+
 function handleMobileDrawerTouchEnd(event: TouchEvent) {
   const start = mobileDrawerTouchStart.value
   const end = getTouchPoint(event.changedTouches[0])
@@ -2363,7 +2547,23 @@ function handleMobileDrawerTouchEnd(event: TouchEvent) {
   if (!start || !end) return
 
   if (shouldCloseMobileDrawerFromSwipe({ start, end })) {
+    if (mobileDrawerDragActive.value) {
+      settleMobileDrawerSwipeClosed()
+      return
+    }
     closeMobileDrawer()
+    return
+  }
+
+  if (mobileDrawerDragActive.value) {
+    settleMobileDrawerDragOpen()
+  }
+}
+
+function handleMobileDrawerTouchCancel() {
+  resetMobileDrawerSwipe()
+  if (mobileDrawerDragActive.value) {
+    settleMobileDrawerDragOpen()
   }
 }
 
@@ -2414,6 +2614,9 @@ const SIDEBAR_EMPLOYEE_LIMIT = 10
 const SIDEBAR_RELATION_LIMIT = 10
 const CUSTOMER_SEARCH_LIMIT = 10
 const SIDEBAR_CUSTOMER_SCROLL_THRESHOLD_PX = 120
+const CUSTOMER_SEARCH_SCROLL_THRESHOLD_PX = 96
+const CUSTOMER_SEARCH_PULL_REFRESH_THRESHOLD_PX = 56
+const CUSTOMER_SEARCH_PULL_MAX_PX = 78
 const sidebarCustomers = ref<CustomerListVO[]>([])
 const sidebarCustomersLoading = ref(false)
 const sidebarCustomersPage = ref(1)
@@ -2438,7 +2641,16 @@ const customerSearchDialogVisible = ref(false)
 const customerSearchKeyword = ref('')
 const customerSearchCustomers = ref<CustomerListVO[]>([])
 const customerSearchLoading = ref(false)
+const customerSearchRefreshing = ref(false)
+const customerSearchAppending = ref(false)
+const customerSearchPage = ref(1)
+const customerSearchTotal = ref(0)
+const customerSearchHasMore = ref(true)
+const customerSearchTouchStartY = ref<number | null>(null)
+const customerSearchPullStartY = ref<number | null>(null)
+const customerSearchPullDistance = ref(0)
 const customerSearchInputRef = ref<HTMLInputElement | null>(null)
+const customerSearchScrollRef = ref<HTMLElement | null>(null)
 const mobileCustomerSearchKeyboardProxyRef = ref<HTMLInputElement | null>(null)
 
 const globalSearchKeyword = ref('')
@@ -2461,6 +2673,7 @@ let removeProjectSidebarRefreshListener: (() => void) | null = null
 let removeMobileMainMenuOpenListener: (() => void) | null = null
 let removeMobileMainMenuDragListener: (() => void) | null = null
 let mobileDrawerDragSettleTimer: ReturnType<typeof setTimeout> | null = null
+let mobileDrawerClosingTimer: ReturnType<typeof setTimeout> | null = null
 
 type ChatComposerNarrowPayload = {
   narrow?: boolean
@@ -2481,6 +2694,8 @@ type MobileMainMenuDragPayload = {
   phase?: 'move' | 'end'
   open?: boolean
 }
+
+type SidebarProjectItem = Pick<ProjectEntity, 'projectId' | 'name'>
 
 function refreshSidebarCustomersFromEvent(payload?: SidebarRefreshPayload) {
   void fetchSidebarCustomers({ reset: true, preserveScroll: payload?.preserveScroll !== false })
@@ -2548,7 +2763,18 @@ function handleChatComposerNarrowChange(payload?: ChatComposerNarrowPayload) {
 }
 
 const showSidebarProjects = computed(() => userStore.hasPermission('task'))
-const sidebarProjects = computed(() => projectStore.accessibleProjectSummaries.slice(0, 12))
+const sidebarProjectCache = ref<SidebarProjectItem[]>(readStoredSidebarProjects())
+const liveSidebarProjects = computed<SidebarProjectItem[]>(() =>
+  projectStore.accessibleProjectSummaries
+    .slice(0, 12)
+    .map(project => ({
+      projectId: project.projectId,
+      name: project.name
+    }))
+)
+const sidebarProjects = computed<SidebarProjectItem[]>(() =>
+  liveSidebarProjects.value.length > 0 ? liveSidebarProjects.value : sidebarProjectCache.value
+)
 const showSidebarCustomers = computed(() => userStore.hasPermission('customer:view'))
 const showSidebarAddressBook = computed(() => true)
 const showSidebarRelations = computed(() => true)
@@ -2622,6 +2848,7 @@ const allMainNavItems: MainNavItem[] = [
   { key: 'customer-search', icon: 'search', label: '搜索客户', route: '', permission: 'customer:view', action: 'customerSearch' },
   { key: 'task', icon: 'task-1', label: '项目', route: '/project', permission: 'task' },
   { key: 'calendar', icon: 'event', label: '日程', route: '/calendar', permission: 'schedule' },
+  { key: 'work-task', icon: 'task-1', label: '任务', route: '/task', permission: 'task:view' },
   { key: 'mail', icon: 'event', materialIcon: 'mail', label: '邮箱', route: '/mail', permission: 'mail:view' },
   { key: 'wecom', icon: 'event', materialIcon: 'forum', label: '企业微信', route: '/scrm', permission: 'wecomCustomerSession:view' },
   { key: 'tencent-meetings', icon: 'event', materialIcon: 'video_camera_front', label: '腾讯会议', route: '/tencent-meetings', permission: 'tencentMeeting:view' },
@@ -2704,6 +2931,18 @@ const showFloatingNewChatButton = computed(() => {
     return !hasTaskConversation && view !== 'ai' && view !== 'task_ai'
   }
   return true
+})
+
+const customerSearchPullIndicatorHeight = computed(() =>
+  customerSearchRefreshing.value
+    ? 48
+    : Math.ceil(customerSearchPullDistance.value)
+)
+
+const customerSearchPullLabel = computed(() => {
+  if (customerSearchRefreshing.value) return '正在刷新'
+  if (customerSearchPullDistance.value >= CUSTOMER_SEARCH_PULL_REFRESH_THRESHOLD_PX) return '松开刷新'
+  return '下拉刷新'
 })
 
 const activeMenu = computed(() => {
@@ -2809,7 +3048,9 @@ watch(
   () => drawerVisible.value,
   isOpen => {
     if (isOpen) {
-      resetMobileDrawerDragPreview()
+      if (!mobileDrawerDragActive.value && !mobileDrawerDragSettling.value) {
+        resetMobileDrawerDragPreview()
+      }
       return
     }
     if (!isOpen) {
@@ -2817,6 +3058,7 @@ watch(
       recentChatSessionsMoreVisible.value = false
       resetGlobalMobileMainMenuSwipe()
       resetMobileDrawerSwipe()
+      if (mobileDrawerDragSettling.value || mobileDrawerClosing.value) return
       resetMobileDrawerDragPreview()
     }
   }
@@ -2850,6 +3092,16 @@ watch(recentChatSessionsExpanded, expanded => {
 watch(sidebarProjectsExpanded, expanded => {
   writeStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarProjectsExpanded, expanded)
 })
+
+watch(
+  () => [projectStore.initialized, projectStore.loading, liveSidebarProjects.value] as const,
+  ([initialized, loading, projects]) => {
+    if (!initialized || loading) return
+    sidebarProjectCache.value = projects
+    writeStoredSidebarProjects(projects)
+  },
+  { deep: true, immediate: true }
+)
 
 watch(sidebarCustomersExpanded, expanded => {
   writeStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarCustomersExpanded, expanded)
@@ -3056,6 +3308,7 @@ onBeforeUnmount(() => {
     primarySidebarTransitionTimer = null
   }
   clearMobileDrawerDragSettleTimer()
+  clearMobileDrawerClosingTimer()
   if (globalSearchTimer) {
     clearTimeout(globalSearchTimer)
     globalSearchTimer = null
@@ -3665,6 +3918,7 @@ function openCustomerSearchDialog() {
 function closeCustomerSearchDialog() {
   customerSearchFocusRequestId++
   customerSearchDialogVisible.value = false
+  resetCustomerSearchPull()
   if (customerSearchTimer) {
     clearTimeout(customerSearchTimer)
     customerSearchTimer = null
@@ -3673,6 +3927,12 @@ function closeCustomerSearchDialog() {
     customerSearchInputRef.value?.blur()
     mobileCustomerSearchKeyboardProxyRef.value?.blur()
   }
+}
+
+function resetCustomerSearchPull() {
+  customerSearchTouchStartY.value = null
+  customerSearchPullStartY.value = null
+  customerSearchPullDistance.value = 0
 }
 
 function handleCustomerSearchInput() {
@@ -3694,25 +3954,142 @@ function clearCustomerSearchKeyword() {
   void nextTick(() => customerSearchInputRef.value?.focus())
 }
 
-async function fetchCustomerSearchCustomers() {
+function handleCustomerSearchScroll() {
+  if (!isMobile.value) return
+  maybeLoadMoreCustomerSearchCustomers()
+}
+
+function isCustomerSearchNearBottom() {
+  const el = customerSearchScrollRef.value
+  if (!el) return false
+  const remaining = el.scrollHeight - el.scrollTop - el.clientHeight
+  return remaining <= CUSTOMER_SEARCH_SCROLL_THRESHOLD_PX
+}
+
+function maybeLoadMoreCustomerSearchCustomers() {
+  if (!isMobile.value || customerSearchLoading.value || !customerSearchHasMore.value) return
+  if (!isCustomerSearchNearBottom()) return
+  void loadMoreCustomerSearchCustomers()
+}
+
+function handleCustomerSearchTouchStart(event: TouchEvent) {
+  if (!isMobile.value || customerSearchLoading.value) return
+  const pointY = event.touches[0]?.clientY ?? null
+  customerSearchTouchStartY.value = pointY
+  const el = customerSearchScrollRef.value
+  if (!el || el.scrollTop > 0) {
+    customerSearchPullStartY.value = null
+    customerSearchPullDistance.value = 0
+    return
+  }
+  customerSearchPullStartY.value = pointY
+}
+
+function handleCustomerSearchTouchMove(event: TouchEvent) {
+  if (!isMobile.value || customerSearchLoading.value) return
+  const startY = customerSearchPullStartY.value
+  const pointY = event.touches[0]?.clientY
+  const el = customerSearchScrollRef.value
+  if (startY == null || pointY == null || !el || el.scrollTop > 0) return
+
+  const deltaY = pointY - startY
+  if (deltaY <= 0) {
+    customerSearchPullDistance.value = 0
+    return
+  }
+
+  customerSearchPullDistance.value = Math.min(CUSTOMER_SEARCH_PULL_MAX_PX, deltaY * 0.45)
+  if (event.cancelable) {
+    event.preventDefault()
+  }
+}
+
+function handleCustomerSearchTouchEnd(event?: TouchEvent) {
+  if (!isMobile.value) {
+    resetCustomerSearchPull()
+    return
+  }
+  if (customerSearchPullDistance.value >= CUSTOMER_SEARCH_PULL_REFRESH_THRESHOLD_PX) {
+    void refreshCustomerSearchCustomers()
+    return
+  }
+  const endY = event?.changedTouches[0]?.clientY ?? null
+  const startY = customerSearchTouchStartY.value
+  const isSwipeUp = startY != null && endY != null ? startY - endY > 8 : true
+  const shouldLoadMore = isSwipeUp && isCustomerSearchNearBottom()
+  resetCustomerSearchPull()
+  if (shouldLoadMore) {
+    maybeLoadMoreCustomerSearchCustomers()
+  }
+}
+
+function handleCustomerSearchTouchCancel() {
+  resetCustomerSearchPull()
+}
+
+async function refreshCustomerSearchCustomers() {
+  await fetchCustomerSearchCustomers({ refreshing: true })
+}
+
+async function loadMoreCustomerSearchCustomers() {
+  if (customerSearchLoading.value || !customerSearchHasMore.value) return
+  await fetchCustomerSearchCustomers({ append: true })
+}
+
+function scheduleCustomerSearchFillCheck() {
+  if (!isMobile.value || !customerSearchDialogVisible.value) return
+  void nextTick(() => {
+    maybeLoadMoreCustomerSearchCustomers()
+  })
+}
+
+async function fetchCustomerSearchCustomers(options: { append?: boolean; refreshing?: boolean } = {}) {
+  const append = Boolean(options.append)
+  if (append && customerSearchLoading.value) return
+  const refreshing = Boolean(options.refreshing)
+  const page = append ? customerSearchPage.value : 1
   const requestId = ++customerSearchRequestId
   customerSearchLoading.value = true
+  customerSearchRefreshing.value = refreshing
+  customerSearchAppending.value = append
   try {
     const result = await queryCustomerList({
-      page: 1,
+      page,
       limit: CUSTOMER_SEARCH_LIMIT,
       keyword: customerSearchKeyword.value.trim() || undefined,
     })
     if (requestId !== customerSearchRequestId) return
-    customerSearchCustomers.value = result.list || []
+    const nextCustomers = result.list || []
+    if (append) {
+      const existingIds = new Set(customerSearchCustomers.value.map(customer => String(customer.customerId)))
+      customerSearchCustomers.value = [
+        ...customerSearchCustomers.value,
+        ...nextCustomers.filter(customer => !existingIds.has(String(customer.customerId)))
+      ]
+    } else {
+      customerSearchCustomers.value = nextCustomers
+      customerSearchScrollRef.value?.scrollTo({ top: 0 })
+    }
+    customerSearchTotal.value = result.totalRow || customerSearchCustomers.value.length
+    customerSearchPage.value = page + 1
+    customerSearchHasMore.value = nextCustomers.length > 0 && customerSearchCustomers.value.length < customerSearchTotal.value
+    scheduleCustomerSearchFillCheck()
   } catch (error) {
     if (requestId !== customerSearchRequestId) return
     console.error('Search customers failed:', error)
-    customerSearchCustomers.value = []
+    if (!append) {
+      customerSearchCustomers.value = []
+      customerSearchPage.value = 1
+      customerSearchTotal.value = 0
+      customerSearchHasMore.value = true
+    }
     ElMessage.warning('客户搜索失败')
   } finally {
     if (requestId === customerSearchRequestId) {
       customerSearchLoading.value = false
+      customerSearchRefreshing.value = false
+      customerSearchAppending.value = false
+      resetCustomerSearchPull()
     }
   }
 }
@@ -4030,6 +4407,29 @@ async function handleCreateProject(payload: {
   outline: none;
 }
 
+.wk-mobile-customer-search-pull-indicator {
+  display: flex;
+  height: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  overflow: hidden;
+  color: #8f8f8f;
+  font-size: 12px;
+  font-weight: 600;
+  transition: height 160ms cubic-bezier(0.22, 1, 0.36, 1), opacity 140ms ease;
+  opacity: 0;
+}
+
+.wk-mobile-customer-search-pull-indicator.is-active {
+  opacity: 1;
+}
+
+.wk-mobile-customer-search-pull-indicator .material-symbols-outlined {
+  font-size: 18px;
+  line-height: 1;
+}
+
 .wk-primary-sidebar {
   border-color: var(--wk-border-subtle) !important;
   background: linear-gradient(180deg, var(--wk-bg-surface) 0%, var(--wk-bg-sidebar) 100%) !important;
@@ -4067,6 +4467,45 @@ async function handleCreateProject(payload: {
 
 .wk-primary-sidebar :deep(button:hover) {
   background-color: var(--wk-bg-surface-hover) !important;
+}
+
+.wk-sidebar-sort-row {
+  position: relative;
+  transform: translateZ(0);
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease,
+    opacity 150ms ease,
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.wk-sidebar-sort-row:hover,
+.wk-sidebar-sort-row.is-drag-over {
+  background: var(--wk-bg-surface-hover);
+}
+
+.wk-sidebar-sort-row.is-dragging {
+  background: #f3f3f3;
+  box-shadow: inset 0 0 0 1px #ececec;
+  opacity: 0.72;
+  transform: scale(0.985);
+}
+
+.wk-sidebar-sort-row__order {
+  background: #f3f3f3;
+  color: #8f8f8f;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wk-sidebar-sort-row.is-dragging .wk-sidebar-sort-row__order,
+.wk-sidebar-sort-row.is-drag-over .wk-sidebar-sort-row__order {
+  background: #0d0d0d;
+  color: #fff;
+  transform: scale(1.04);
 }
 
 .wk-primary-sidebar .wk-sidebar-sort-save-button,

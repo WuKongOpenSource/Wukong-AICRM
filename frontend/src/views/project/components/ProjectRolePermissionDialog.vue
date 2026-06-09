@@ -30,18 +30,109 @@
     <div class="grid min-h-0 grid-cols-1 gap-0 bg-white md:grid-cols-[220px_minmax(0,1fr)]" v-loading="loading">
       <aside class="border-b border-slate-200 bg-slate-50/70 p-4 md:border-b-0 md:border-r">
         <div class="space-y-1">
+          <template v-for="role in roleOptions" :key="role.value">
+            <div v-if="editingRole === role.value" class="rounded-xl border border-primary/20 bg-white p-2 shadow-sm">
+              <input
+                v-model="editingRoleName"
+                class="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition-colors focus:border-primary"
+                maxlength="20"
+                placeholder="输入角色名称"
+                @keydown.enter.prevent="handleRenameRole"
+                @keydown.esc.prevent="cancelEditRole"
+              >
+              <div class="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  class="flex-1 rounded-lg bg-primary px-2 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="!editingRoleName.trim() || saving"
+                  @click="handleRenameRole"
+                >
+                  确定
+                </button>
+                <button
+                  type="button"
+                  class="flex-1 rounded-lg bg-slate-100 px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200"
+                  @click="cancelEditRole"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+            <div
+              v-else
+              class="group/role flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition-colors"
+              :class="activeRole === role.value ? 'bg-white font-bold text-primary shadow-sm' : 'text-slate-600 hover:bg-white/70 hover:text-slate-900'"
+            >
+              <button
+                type="button"
+                class="flex min-w-0 flex-1 items-center justify-between gap-3 text-left"
+                @click="activeRole = role.value"
+              >
+                <span class="truncate">{{ role.label }}</span>
+                <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+                  {{ rolePermissions[role.value]?.length || 0 }}
+                </span>
+              </button>
+              <div
+                v-if="isCustomRole(role.value)"
+                class="flex w-0 shrink-0 items-center justify-end gap-1 overflow-hidden opacity-0 transition-all duration-150 group-hover/role:w-14 group-hover/role:opacity-100 group-focus-within/role:w-14 group-focus-within/role:opacity-100"
+              >
+                <button
+                  type="button"
+                  class="flex size-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                  aria-label="编辑角色"
+                  title="编辑角色"
+                  @click.stop="startEditRole(role.value)"
+                >
+                  <span class="material-symbols-outlined text-[15px]">edit</span>
+                </button>
+                <button
+                  type="button"
+                  class="flex size-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                  aria-label="删除角色"
+                  title="删除角色"
+                  @click.stop="handleDeleteRole(role.value)"
+                >
+                  <span class="material-symbols-outlined text-[15px]">delete</span>
+                </button>
+              </div>
+            </div>
+          </template>
+          <div v-if="creatingRole" class="rounded-xl border border-primary/20 bg-white p-2 shadow-sm">
+            <input
+              v-model="newRoleName"
+              class="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition-colors focus:border-primary"
+              maxlength="20"
+              placeholder="输入角色名称"
+              @keydown.enter.prevent="handleCreateRole"
+              @keydown.esc.prevent="cancelCreateRole"
+            >
+            <div class="mt-2 flex gap-2">
+              <button
+                type="button"
+                class="flex-1 rounded-lg bg-primary px-2 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="!newRoleName.trim() || saving"
+                @click="handleCreateRole"
+              >
+                确定
+              </button>
+              <button
+                type="button"
+                class="flex-1 rounded-lg bg-slate-100 px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200"
+                @click="cancelCreateRole"
+              >
+                取消
+              </button>
+            </div>
+          </div>
           <button
-            v-for="role in PROJECT_ROLE_OPTIONS"
-            :key="role.value"
+            v-else
             type="button"
-            class="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors"
-            :class="activeRole === role.value ? 'bg-white font-bold text-primary shadow-sm' : 'text-slate-600 hover:bg-white/70 hover:text-slate-900'"
-            @click="activeRole = role.value"
+            class="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 bg-white/70 px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-primary/40 hover:text-primary"
+            @click="startCreateRole"
           >
-            <span class="truncate">{{ role.label }}</span>
-            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
-              {{ rolePermissions[role.value].length }}
-            </span>
+            <span class="material-symbols-outlined text-[17px]">add</span>
+            新增角色
           </button>
         </div>
       </aside>
@@ -50,7 +141,7 @@
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div class="min-w-0">
             <h3 class="text-base font-bold text-slate-900">{{ activeRoleLabel }}</h3>
-            <p class="mt-1 text-xs text-slate-500">已选择 {{ rolePermissions[activeRole].length }} 项权限</p>
+            <p class="mt-1 text-xs text-slate-500">已选择 {{ rolePermissions[activeRole]?.length || 0 }} 项权限</p>
           </div>
           <div class="flex items-center gap-2">
             <button
@@ -78,7 +169,7 @@
           <label
             v-for="permission in PROJECT_PERMISSION_OPTIONS"
             :key="permission.value"
-            class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 transition-colors hover:border-primary/25 hover:bg-primary/[0.03]"
+            class="wk-project-role-permission-item flex min-h-[42px] items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2 transition-colors hover:border-primary/25 hover:bg-primary/[0.03]"
           >
             <el-checkbox
               :value="permission.value"
@@ -115,7 +206,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getProjectRolePermissionConfig,
   updateProjectRolePermissionConfig
@@ -129,8 +220,9 @@ import type {
 import {
   DEFAULT_ROLE_PERMISSIONS,
   PROJECT_PERMISSION_OPTIONS,
-  PROJECT_ROLE_OPTIONS,
+  SYSTEM_PROJECT_ROLE_VALUES,
   getProjectRolePermissions,
+  getProjectRoleOptions,
   projectRoleLabel,
   setProjectRolePermissions
 } from '@/utils/project'
@@ -149,6 +241,10 @@ const { isMobile } = useResponsive()
 const loading = ref(false)
 const saving = ref(false)
 const activeRole = ref<ProjectRole>('MEMBER')
+const creatingRole = ref(false)
+const newRoleName = ref('')
+const editingRole = ref<ProjectRole>('')
+const editingRoleName = ref('')
 const rolePermissions = reactive<ProjectRolePermissionConfig>(getProjectRolePermissions())
 
 const open = computed({
@@ -157,6 +253,7 @@ const open = computed({
 })
 
 const activeRoleLabel = computed(() => projectRoleLabel(activeRole.value))
+const roleOptions = computed(() => getProjectRoleOptions(rolePermissions))
 
 watch(
   () => props.modelValue,
@@ -171,8 +268,9 @@ async function loadConfig() {
   loading.value = true
   try {
     const config = await getProjectRolePermissionConfig()
-    setProjectRolePermissions(config.rolePermissions)
-    applyLocalRolePermissions(config.rolePermissions)
+    const mergedConfig = mergeSavedRolePermissions(config.rolePermissions, getProjectRolePermissions())
+    setProjectRolePermissions(mergedConfig)
+    applyLocalRolePermissions(mergedConfig)
   } catch {
     applyLocalRolePermissions(getProjectRolePermissions())
   } finally {
@@ -181,14 +279,20 @@ async function loadConfig() {
 }
 
 function applyLocalRolePermissions(config: ProjectRolePermissionConfig) {
-  PROJECT_ROLE_OPTIONS.forEach(role => {
-    rolePermissions[role.value] = [...config[role.value]]
+  Object.keys(rolePermissions).forEach(role => {
+    delete rolePermissions[role]
+  })
+  getProjectRoleOptions(config).forEach(role => {
+    rolePermissions[role.value] = [...(config[role.value] || DEFAULT_ROLE_PERMISSIONS[role.value] || ['VIEW_PROJECT'])]
     ensureRoleBaseline(role.value)
   })
+  if (!rolePermissions[activeRole.value]) {
+    activeRole.value = rolePermissions.MEMBER ? 'MEMBER' : roleOptions.value[0]?.value || 'MEMBER'
+  }
 }
 
 function resetCurrentRole() {
-  rolePermissions[activeRole.value] = [...DEFAULT_ROLE_PERMISSIONS[activeRole.value]]
+  rolePermissions[activeRole.value] = [...(DEFAULT_ROLE_PERMISSIONS[activeRole.value] || ['VIEW_PROJECT'])]
   ensureActiveRoleBaseline()
 }
 
@@ -201,7 +305,7 @@ function ensureActiveRoleBaseline() {
 }
 
 function ensureRoleBaseline(role: ProjectRole) {
-  const permissions = rolePermissions[role]
+  const permissions = rolePermissions[role] || []
   if (role === 'OWNER') {
     rolePermissions.OWNER = [...DEFAULT_ROLE_PERMISSIONS.OWNER]
     return
@@ -212,21 +316,193 @@ function ensureRoleBaseline(role: ProjectRole) {
   rolePermissions[role] = Array.from(new Set(permissions)) as ProjectPermission[]
 }
 
-async function handleSave() {
+function startCreateRole() {
+  cancelEditRole()
+  creatingRole.value = true
+  newRoleName.value = ''
+}
+
+function cancelCreateRole() {
+  creatingRole.value = false
+  newRoleName.value = ''
+}
+
+async function handleCreateRole() {
+  const roleName = newRoleName.value.trim()
+  if (!roleName) {
+    ElMessage.warning('请输入角色名称')
+    return
+  }
+  if (isDuplicatedRoleName(roleName)) {
+    ElMessage.warning('角色名称已存在')
+    return
+  }
+  const previousRole = activeRole.value
+  rolePermissions[roleName] = ['VIEW_PROJECT']
+  activeRole.value = roleName
+  cancelCreateRole()
+  try {
+    await persistRolePermissionConfig({ successMessage: '角色已新增' })
+  } catch {
+    delete rolePermissions[roleName]
+    activeRole.value = previousRole
+    ElMessage.error('新增角色保存失败，请稍后重试')
+  }
+}
+
+function isCustomRole(role: ProjectRole) {
+  return Boolean(role) && !SYSTEM_PROJECT_ROLE_VALUES.has(role)
+}
+
+function isDuplicatedRoleName(roleName: string, currentRole: ProjectRole = '') {
+  const normalizedRoleName = roleName.toLowerCase()
+  return roleOptions.value.some(option => {
+    if (option.value === currentRole) return false
+    return option.value.toLowerCase() === normalizedRoleName || option.label === roleName
+  })
+}
+
+function startEditRole(role: ProjectRole) {
+  if (!isCustomRole(role)) return
+  cancelCreateRole()
+  editingRole.value = role
+  editingRoleName.value = role
+}
+
+function cancelEditRole() {
+  editingRole.value = ''
+  editingRoleName.value = ''
+}
+
+async function handleRenameRole() {
+  const currentRole = editingRole.value
+  const nextRole = editingRoleName.value.trim()
+  if (!currentRole || !isCustomRole(currentRole)) {
+    cancelEditRole()
+    return
+  }
+  if (!nextRole) {
+    ElMessage.warning('请输入角色名称')
+    return
+  }
+  if (SYSTEM_PROJECT_ROLE_VALUES.has(nextRole) || isDuplicatedRoleName(nextRole, currentRole)) {
+    ElMessage.warning('角色名称已存在')
+    return
+  }
+  if (nextRole === currentRole) {
+    cancelEditRole()
+    return
+  }
+  const entries = Object.entries(rolePermissions).map(([role, permissions]) =>
+    role === currentRole ? [nextRole, permissions] as const : [role, permissions] as const
+  )
+  Object.keys(rolePermissions).forEach(role => {
+    delete rolePermissions[role]
+  })
+  entries.forEach(([role, permissions]) => {
+    rolePermissions[role] = [...permissions]
+  })
+  activeRole.value = nextRole
+  cancelEditRole()
+  try {
+    await persistRolePermissionConfig({ successMessage: '角色已更新' })
+  } catch {
+    ElMessage.error('角色更新保存失败，请稍后重试')
+    void loadConfig()
+  }
+}
+
+async function handleDeleteRole(role: ProjectRole) {
+  if (!isCustomRole(role)) return
+  try {
+    await ElMessageBox.confirm('删除后该角色将从项目角色权限配置中移除，已使用该角色的成员不会自动变更角色。', '删除角色', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消'
+    })
+  } catch {
+    return
+  }
+  delete rolePermissions[role]
+  if (editingRole.value === role) {
+    cancelEditRole()
+  }
+  if (activeRole.value === role) {
+    activeRole.value = rolePermissions.MEMBER ? 'MEMBER' : Object.keys(rolePermissions)[0] || 'MEMBER'
+  }
+  try {
+    await persistRolePermissionConfig({ successMessage: '角色已删除' })
+  } catch {
+    ElMessage.error('删除角色保存失败，请稍后重试')
+    void loadConfig()
+  }
+}
+
+function normalizeCurrentRolePermissions() {
+  Object.keys(rolePermissions).forEach(role => {
+    if (!role.trim()) {
+      delete rolePermissions[role]
+      return
+    }
+    if (!SYSTEM_PROJECT_ROLE_VALUES.has(role) && (rolePermissions[role]?.length || 0) === 0) {
+      rolePermissions[role] = ['VIEW_PROJECT']
+    }
+    ensureRoleBaseline(role)
+  })
+}
+
+function cloneCurrentRolePermissions(): ProjectRolePermissionConfig {
+  return Object.entries(rolePermissions).reduce((config, [role, permissions]) => {
+    if (!role.trim()) return config
+    config[role] = [...(permissions || [])]
+    return config
+  }, {} as ProjectRolePermissionConfig)
+}
+
+function mergeSavedRolePermissions(
+  saved: ProjectRolePermissionConfig,
+  submitted: ProjectRolePermissionConfig
+): ProjectRolePermissionConfig {
+  const merged = Object.entries(saved || {}).reduce((config, [role, permissions]) => {
+    if (!role.trim()) return config
+    config[role] = [...(permissions || [])]
+    return config
+  }, {} as ProjectRolePermissionConfig)
+  Object.entries(submitted || {}).forEach(([role, permissions]) => {
+    if (!role.trim() || SYSTEM_PROJECT_ROLE_VALUES.has(role)) return
+    merged[role] = [...(permissions || ['VIEW_PROJECT'])]
+  })
+  return merged
+}
+
+async function persistRolePermissionConfig(options: { close?: boolean; successMessage?: string } = {}) {
   saving.value = true
   try {
-    PROJECT_ROLE_OPTIONS.forEach(role => ensureRoleBaseline(role.value))
+    normalizeCurrentRolePermissions()
+    const submittedRolePermissions = cloneCurrentRolePermissions()
     const config = await updateProjectRolePermissionConfig({
       rolePermissions: { ...rolePermissions }
     })
-    setProjectRolePermissions(config.rolePermissions)
-    applyLocalRolePermissions(config.rolePermissions)
-    ElMessage.success('项目角色权限配置已保存')
+    const mergedConfig = mergeSavedRolePermissions(config.rolePermissions, submittedRolePermissions)
+    setProjectRolePermissions(mergedConfig)
+    applyLocalRolePermissions(mergedConfig)
+    if (options.successMessage) {
+      ElMessage.success(options.successMessage)
+    }
     emit('saved')
-    open.value = false
+    if (options.close) {
+      open.value = false
+    }
   } finally {
     saving.value = false
   }
+}
+
+async function handleSave() {
+  await persistRolePermissionConfig({
+    close: true,
+    successMessage: '项目角色权限配置已保存'
+  })
 }
 </script>
 
@@ -259,6 +535,17 @@ async function handleSave() {
   border-top: 1px solid var(--wk-border-subtle);
   background: #fff;
   padding: 14px 24px 22px !important;
+}
+
+.wk-project-role-permission-item :deep(.el-checkbox) {
+  height: auto;
+  margin-right: 0;
+  line-height: 1;
+}
+
+.wk-project-role-permission-item :deep(.el-checkbox__input) {
+  display: inline-flex;
+  align-items: center;
 }
 
 :global(.el-overlay:has(.wk-project-role-permission-dialog)),

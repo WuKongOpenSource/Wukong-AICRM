@@ -10,6 +10,7 @@ import type {
   ProjectPermission,
   ProjectRole,
   ProjectTask,
+  ProjectTaskAttachmentPayload,
   ProjectTaskChatMessage,
   ProjectTaskPayload,
   ProjectTaskUpdatePayload,
@@ -17,6 +18,7 @@ import type {
 } from '@/types/project'
 import {
   addLane as apiAddLane,
+  addProjectTaskAttachment,
   addProjectMember,
   archiveProject as apiArchiveProject,
   createProject as apiCreateProject,
@@ -140,6 +142,12 @@ export const useProjectStore = defineStore('project', () => {
     const project = await updateProjectTask(projectId, payload)
     upsertProject(project)
     return project.tasks.find(task => task.taskId === payload.taskId) || null
+  }
+
+  async function addTaskAttachment(projectId: string, taskId: string, payload: ProjectTaskAttachmentPayload) {
+    const project = await addProjectTaskAttachment(projectId, taskId, payload)
+    upsertProject(project)
+    return project.tasks.find(task => task.taskId === taskId)?.attachments[0] || null
   }
 
   async function deleteTask(projectId: string, taskId: string) {
@@ -295,6 +303,7 @@ export const useProjectStore = defineStore('project', () => {
 
   return {
     projects,
+    initialized,
     loading,
     projectSummaries,
     accessibleProjectSummaries,
@@ -313,7 +322,7 @@ export const useProjectStore = defineStore('project', () => {
     updateTask,
     deleteTask,
     moveTask,
-    addTaskAttachment: appendTaskChatMessage,
+    addTaskAttachment,
     addTaskSchedule: appendTaskChatMessage,
     addTaskNote: appendTaskChatMessage,
     addLane,

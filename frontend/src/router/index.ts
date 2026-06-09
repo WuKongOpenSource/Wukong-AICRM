@@ -63,7 +63,9 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'task',
-        redirect: '/project'
+        name: 'TaskList',
+        component: () => import('@/views/task/TaskListView.vue'),
+        meta: { title: '任务管理', icon: 'task_alt', permission: 'task:view' }
       },
       {
         path: 'project',

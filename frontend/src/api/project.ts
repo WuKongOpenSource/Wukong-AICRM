@@ -10,18 +10,17 @@ import type {
   ProjectMember,
   ProjectMemberPayload,
   ProjectPermission,
-  ProjectRole,
   ProjectRolePermissionConfig,
   ProjectRolePermissionConfigPayload,
   ProjectRolePermissionConfigVO,
   ProjectSchedule,
   ProjectTask,
+  ProjectTaskAttachmentPayload,
   ProjectTaskPayload,
   ProjectTaskUpdatePayload,
   ProjectUpdatePayload
 } from '@/types/project'
 
-const PROJECT_ROLES: ProjectRole[] = ['OWNER', 'ADMIN', 'MEMBER', 'READONLY', 'EXTERNAL']
 const PROJECT_ROLE_PERMISSION_PATHS = ['/project/role-permissions', '/project/rolePermissions'] as const
 
 type RawProject = Record<string, any>
@@ -106,6 +105,10 @@ export function normalizeProject(raw: RawProject): ProjectEntity {
       attachments: list<any>(task.attachments).map(item => ({
         attachmentId: id(item.attachmentId) || '',
         name: item.name || '',
+        fileUrl: item.fileUrl || '',
+        filePath: item.filePath || '',
+        fileSize: item.fileSize === null || item.fileSize === undefined ? undefined : Number(item.fileSize),
+        mimeType: item.mimeType || '',
         createTime: date(item.createTime) || new Date().toISOString(),
         createdByName: item.createdByName || ''
       })),
@@ -256,8 +259,9 @@ export function deleteProject(projectId: string): Promise<void> {
 
 function normalizeRolePermissionConfig(raw: any): ProjectRolePermissionConfig {
   const source = raw?.rolePermissions && typeof raw.rolePermissions === 'object' ? raw.rolePermissions : {}
-  return PROJECT_ROLES.reduce((config, role) => {
-    config[role] = list<ProjectPermission>(source[role])
+  return Object.entries(source).reduce((config, [role, permissions]) => {
+    if (!role.trim()) return config
+    config[role] = list<ProjectPermission>(permissions)
     return config
   }, {} as ProjectRolePermissionConfig)
 }
@@ -310,6 +314,14 @@ export function createProjectTask(projectId: string, payload: ProjectTaskPayload
 
 export function updateProjectTask(projectId: string, payload: ProjectTaskUpdatePayload): Promise<ProjectEntity> {
   return unwrapProject(post(`/project/${projectId}/task/update`, taskPayload(payload)))
+}
+
+export function addProjectTaskAttachment(
+  projectId: string,
+  taskId: string,
+  payload: ProjectTaskAttachmentPayload
+): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/${projectId}/task/${taskId}/attachment/add`, payload))
 }
 
 export function deleteProjectTask(projectId: string, taskId: string): Promise<ProjectEntity> {

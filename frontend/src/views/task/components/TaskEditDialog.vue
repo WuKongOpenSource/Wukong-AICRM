@@ -110,6 +110,49 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
+            <label class="text-xs font-bold text-slate-500 mb-1.5 block">所属项目（可选）</label>
+            <el-select
+              v-model="formData.projectId"
+              filterable
+              clearable
+              placeholder="不关联项目"
+              :loading="projectLoading"
+              class="w-full wk-crm-el-field-select"
+              size="large"
+              @change="handleProjectChange"
+            >
+              <el-option label="不关联项目" :value="''" />
+              <el-option
+                v-for="project in projectOptions"
+                :key="project.projectId"
+                :label="project.name"
+                :value="project.projectId"
+              />
+            </el-select>
+          </div>
+          <div>
+            <label class="text-xs font-bold text-slate-500 mb-1.5 block">所属泳道</label>
+            <el-select
+              v-model="formData.laneId"
+              filterable
+              clearable
+              placeholder="选择项目后可选泳道"
+              :disabled="!formData.projectId"
+              class="w-full wk-crm-el-field-select"
+              size="large"
+            >
+              <el-option
+                v-for="lane in laneOptions"
+                :key="lane.laneId"
+                :label="lane.name"
+                :value="lane.laneId"
+              />
+            </el-select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
             <label class="text-xs font-bold text-slate-500 mb-1.5 block">任务类型</label>
             <el-select
               v-model="formData.taskType"
@@ -229,6 +272,7 @@ import { queryUserList } from '@/api/auth'
 import { queryCustomerList } from '@/api/customer'
 import { aiParseTask } from '@/api/task'
 import { useResponsive } from '@/composables/useResponsive'
+import { useProjectStore } from '@/stores/project'
 import { useTaskStore } from '@/stores/task'
 import type { Task, TaskAddBO, TaskStatus } from '@/types/common'
 import { normalizeTaskPriority } from '@/utils/taskPriority'
@@ -263,6 +307,7 @@ const emit = defineEmits<{
 }>()
 
 const taskStore = useTaskStore()
+const projectStore = useProjectStore()
 const { isMobile } = useResponsive()
 
 const submitting = ref(false)
@@ -272,6 +317,7 @@ const userOptions = ref<Option[]>([])
 const userSearchLoading = ref(false)
 const customerOptions = ref<Option[]>([])
 const customerSearchLoading = ref(false)
+const projectLoading = ref(false)
 const selectedParticipants = ref<string[]>([])
 const formData = reactive<TaskAddBO & { status?: TaskStatus; customerId?: string; relationId?: string; assignedToName?: string }>({
   title: '',
@@ -280,6 +326,8 @@ const formData = reactive<TaskAddBO & { status?: TaskStatus; customerId?: string
   dueDate: undefined,
   status: undefined,
   taskType: '',
+  projectId: '',
+  laneId: '',
   customerId: '',
   relationId: '',
   assignedTo: '',
@@ -305,6 +353,16 @@ const participants = computed({
   }
 })
 
+const projectOptions = computed(() => projectStore.accessibleProjectSummaries)
+
+const selectedProject = computed(() => {
+  const projectId = formData.projectId
+  if (!projectId) return null
+  return projectStore.getProjectById(projectId)
+})
+
+const laneOptions = computed(() => selectedProject.value?.lanes || [])
+
 watch(
   () => [
     props.modelValue,
@@ -318,7 +376,10 @@ watch(
     props.defaultAssignee?.username
   ] as const,
   ([visible]) => {
-    if (visible) hydrateForm()
+    if (visible) {
+      void ensureProjectOptions()
+      hydrateForm()
+    }
   },
   { immediate: true }
 )
@@ -338,6 +399,8 @@ function hydrateForm() {
       dueDate: task.dueDate ? formatDateTimeLocal(task.dueDate) : undefined,
       status: task.status,
       taskType: task.taskType || '',
+      projectId: task.projectId ? String(task.projectId) : '',
+      laneId: task.laneId ? String(task.laneId) : '',
       customerId: task.customerId || '',
       relationId: task.relationId || '',
       assignedTo: task.assignedTo || '',
@@ -346,6 +409,9 @@ function hydrateForm() {
 
     if (task.customerId && task.customerName) {
       customerOptions.value = [{ value: String(task.customerId), label: task.customerName }]
+    }
+    if (task.projectId) {
+      void ensureProjectLoaded(String(task.projectId))
     }
     selectedParticipants.value = splitParticipants(task.participantNames)
     userOptions.value = selectedParticipants.value.map(name => ({ value: name, label: name }))
@@ -359,6 +425,8 @@ function hydrateForm() {
     dueDate: undefined,
     status: undefined,
     taskType: '',
+    projectId: '',
+    laneId: '',
     customerId: '',
     relationId: '',
     assignedTo: '',
@@ -391,6 +459,45 @@ function applyDefaultAssignee() {
   if (!assignee?.userId) return
   formData.assignedTo = String(assignee.userId)
   formData.assignedToName = assignee.realname || assignee.username || ''
+}
+
+async function ensureProjectOptions() {
+  if (projectLoading.value) return
+  projectLoading.value = true
+  try {
+    await projectStore.ensureInitialized()
+  } catch (error) {
+    console.warn('项目列表加载失败:', error)
+  } finally {
+    projectLoading.value = false
+  }
+}
+
+async function ensureProjectLoaded(projectId: string) {
+  if (!projectId) return
+  await ensureProjectOptions()
+  const cached = projectStore.getProjectById(projectId)
+  if (!cached || cached.lanes.length === 0) {
+    try {
+      await projectStore.loadProject(projectId)
+    } catch (error) {
+      console.warn('项目详情加载失败:', error)
+      return
+    }
+  }
+  const project = projectStore.getProjectById(projectId)
+  if (project?.lanes.length && !formData.laneId) {
+    formData.laneId = project.lanes[0].laneId
+  }
+}
+
+function handleProjectChange(value: string | number | boolean | undefined) {
+  const projectId = value ? String(value) : ''
+  formData.projectId = projectId
+  formData.laneId = ''
+  if (projectId) {
+    void ensureProjectLoaded(projectId)
+  }
 }
 
 async function searchCustomers(query: string) {
@@ -489,6 +596,8 @@ async function handleSubmit() {
       dueDate: formData.dueDate,
       taskType: formData.taskType,
       participantNames: selectedParticipants.value.join(', '),
+      projectId: formData.projectId || undefined,
+      laneId: formData.projectId ? (formData.laneId || undefined) : undefined,
       customerId: formData.customerId || undefined,
       relationId: formData.relationId || undefined,
       assignedTo: formData.assignedTo || undefined
@@ -504,6 +613,7 @@ async function handleSubmit() {
         refreshMyTasks: props.refreshStoreAfterSave
       })
       ElMessage.success('更新成功')
+      refreshAffectedProjects(props.editingTask.projectId, submitData.projectId)
       open.value = false
       emit('saved', { mode: 'edit', taskId: props.editingTask.taskId })
     } else {
@@ -512,6 +622,7 @@ async function handleSubmit() {
         refreshMyTasks: props.refreshStoreAfterSave
       })
       ElMessage.success('创建成功')
+      refreshAffectedProjects(submitData.projectId)
       open.value = false
       emit('saved', { mode: 'create', taskId })
     }
@@ -520,6 +631,12 @@ async function handleSubmit() {
   } finally {
     submitting.value = false
   }
+}
+
+function refreshAffectedProjects(...projectIds: Array<string | undefined>) {
+  const ids = Array.from(new Set(projectIds.filter((id): id is string => Boolean(id))))
+  if (ids.length === 0) return
+  void projectStore.ensureInitialized(true)
 }
 
 function splitParticipants(value?: string) {

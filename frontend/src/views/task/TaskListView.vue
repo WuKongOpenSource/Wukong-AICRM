@@ -1,16 +1,16 @@
 <template>
   <div class="h-full flex bg-background-light overflow-hidden">
     <!-- Task List Section -->
-    <div class="flex-1 overflow-y-auto px-4 py-6 md:px-6">
+    <div class="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-6 md:px-6">
       <div
-        class="space-y-6 transition-[max-width]"
+        class="flex min-h-0 flex-1 flex-col gap-6 transition-[max-width]"
         :class="effectiveTaskViewMode === 'list' ? 'w-full' : 'mx-auto max-w-4xl'"
       >
         <!-- Header -->
-        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div class="flex shrink-0 flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div class="min-w-0">
             <div class="flex items-center justify-between gap-3 md:block">
-              <h2 class="min-w-0 text-xl font-bold text-slate-900 md:text-[22px]">AI 优先行动中心</h2>
+              <h2 class="min-w-0 text-xl font-bold text-slate-900 md:text-[22px]">任务</h2>
               <button
                 class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-lg shadow-primary/20 transition-colors hover:bg-primary/90 md:hidden"
                 type="button"
@@ -20,7 +20,7 @@
                 <span class="material-symbols-outlined wk-plus-button-icon">add</span>
               </button>
             </div>
-            <p class="text-[13px] text-slate-500 mt-1">基于客户价值与成交概率，AI 已为您自动排序今日任务。</p>
+            <p class="text-[13px] text-slate-500 mt-1">统一查看普通任务和项目任务，支持按状态、优先级和 AI 评分处理。</p>
           </div>
           <!-- Add task button -->
           <button
@@ -34,7 +34,7 @@
         </div>
 
         <!-- Status Filter Tabs and list controls -->
-        <div class="wk-task-list-toolbar flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div class="wk-task-list-toolbar flex shrink-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div class="flex items-center gap-2 md:hidden">
             <el-select
               class="wk-task-status-select min-w-0 flex-1"
@@ -122,7 +122,7 @@
 
         <div
           v-if="taskStore.highValueFallbackActive"
-          class="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          class="flex shrink-0 items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
         >
           <span class="material-symbols-outlined text-base leading-none mt-0.5">info</span>
           <p>
@@ -131,28 +131,29 @@
         </div>
 
         <!-- Loading -->
-        <div v-if="taskStore.loading" class="text-center py-16">
+        <div v-if="taskStore.loading" class="flex min-h-0 flex-1 items-center justify-center py-16 text-center">
           <span class="material-symbols-outlined text-4xl text-slate-300 animate-spin">progress_activity</span>
         </div>
 
         <!-- Empty State -->
-        <div v-else-if="displayedTasks.length === 0" class="text-center py-16 text-slate-400">
+        <div v-else-if="displayedTasks.length === 0" class="flex min-h-0 flex-1 flex-col items-center justify-center py-16 text-center text-slate-400">
           <span class="material-symbols-outlined text-5xl">task_alt</span>
           <p class="mt-4 text-sm">暂无任务</p>
         </div>
 
         <!-- Task List View -->
-        <div v-else-if="effectiveTaskViewMode === 'list'" class="wk-task-list-table overflow-hidden rounded-2xl border shadow-sm">
-          <div class="overflow-x-auto">
-            <div class="wk-task-list-table__header task-list-grid min-w-[1180px] px-5 py-3 text-sm font-bold">
+        <div v-else-if="effectiveTaskViewMode === 'list'" class="wk-task-list-table flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border shadow-sm">
+          <div class="wk-task-list-table__scroller min-h-0 flex-1 overflow-auto">
+            <div class="wk-task-list-table__header task-list-grid px-5 py-3 text-sm font-bold">
               <div>AI评分/任务标题</div>
               <div>关联客户</div>
+              <div>所属项目</div>
               <div>优先级</div>
               <div>状态</div>
               <div>截止日期</div>
               <div>类别</div>
               <div>负责人</div>
-              <div class="text-right">操作</div>
+              <div class="whitespace-nowrap text-right">操作</div>
             </div>
 
             <div
@@ -161,7 +162,7 @@
               role="button"
               tabindex="0"
               :class="[
-                'group wk-task-list-table__row task-list-grid min-w-[1180px] cursor-pointer items-center px-5 py-4 transition-colors last:border-b-0',
+                'group wk-task-list-table__row task-list-grid cursor-pointer items-center px-5 py-4 transition-colors last:border-b-0',
                 selectedTask?.taskId === task.taskId ? 'is-selected ring-1 ring-inset ring-primary/20' : '',
                 task.status === 'COMPLETED' ? 'opacity-75' : ''
               ]"
@@ -200,9 +201,14 @@
                 {{ task.customerName || '-' }}
               </div>
 
+              <div class="min-w-0 text-sm text-slate-600" :title="getProjectDisplayName(task)">
+                <div class="truncate text-slate-900">{{ getProjectDisplayName(task) }}</div>
+                <div v-if="task.laneName" class="mt-0.5 truncate text-xs text-slate-400">{{ task.laneName }}</div>
+              </div>
+
               <div>
                 <span
-                  class="inline-flex h-6 items-center rounded-full px-2.5 text-sm"
+                  class="wk-task-list-table__badge inline-flex h-6 items-center rounded-full px-2.5"
                   :class="getPriorityBadgeClass(task.priority)"
                 >
                   {{ getPriorityLabel(task.priority) }}
@@ -211,7 +217,7 @@
 
               <div>
                 <span
-                  class="inline-flex h-6 items-center rounded-md px-2.5 text-sm"
+                  class="wk-task-list-table__badge inline-flex h-6 items-center rounded-md px-2.5"
                   :class="getStatusBadgeClass(task)"
                 >
                   {{ getStatusLabel(task) }}
@@ -224,7 +230,7 @@
 
               <div>
                 <span
-                  class="inline-flex h-6 max-w-full items-center rounded-md px-2.5 text-sm"
+                  class="wk-task-list-table__badge inline-flex h-6 max-w-full items-center rounded-md px-2.5"
                   :class="getTaskTypeBadgeClass(task.taskType)"
                   :title="getTaskTypeLabel(task.taskType)"
                 >
@@ -236,11 +242,11 @@
                 {{ getTaskOwnerName(task) }}
               </div>
 
-              <div class="flex items-center justify-end gap-2" @click.stop @keyup.stop>
+              <div class="wk-task-list-table__actions flex items-center justify-end gap-2" @click.stop @keyup.stop>
                 <button
                   v-if="task.status === 'PENDING'"
                   type="button"
-                  class="inline-flex h-8 items-center rounded-lg bg-blue-50 px-3 text-sm text-blue-600 transition-colors hover:bg-blue-100"
+                  class="wk-task-list-table__action-button inline-flex h-8 items-center rounded-lg bg-blue-50 px-3 text-blue-600 transition-colors hover:bg-blue-100"
                   @click="handleStartTask(task)"
                 >
                   开始处理
@@ -248,62 +254,62 @@
                 <button
                   v-if="task.status !== 'COMPLETED'"
                   type="button"
-                  class="inline-flex h-8 items-center rounded-lg bg-emerald-50 px-3 text-sm text-emerald-600 transition-colors hover:bg-emerald-100"
+                  class="wk-task-list-table__action-button inline-flex h-8 items-center rounded-lg bg-emerald-50 px-3 text-emerald-600 transition-colors hover:bg-emerald-100"
                   @click="handleToggleComplete(task)"
                 >
                   标记完成
                 </button>
-                <span v-else class="inline-flex h-8 items-center px-2 text-sm text-slate-400">已完成</span>
+                <span v-else class="wk-task-list-table__action-button inline-flex h-8 items-center px-2 text-slate-400">已完成</span>
               </div>
             </div>
+          </div>
 
-            <div
-              v-if="showPagination"
-              class="wk-task-list-table__footer flex min-w-[1180px] items-center justify-end border-t px-5 py-4"
-            >
-              <span class="text-sm text-[var(--wk-text-muted)]">
-                共 {{ taskStore.totalCount }} 个任务
-                <span class="hidden md:inline">（第 {{ currentPage }} / {{ totalPages }} 页）</span>
-              </span>
-              <div class="flex items-center gap-1">
-                <button
-                  class="flex size-8 items-center justify-center rounded border border-[var(--wk-border-subtle)] bg-[var(--wk-bg-surface)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-                  :disabled="currentPage <= 1"
-                  title="上一页"
-                  aria-label="上一页"
-                  @click="handlePageChange(currentPage - 1)"
-                >
-                  <span class="material-symbols-outlined text-lg leading-none">chevron_left</span>
-                </button>
-                <button
-                  v-for="p in visiblePages"
-                  :key="p"
-                  class="flex size-8 items-center justify-center rounded border text-xs font-bold"
-                  :class="p === currentPage
-                    ? 'border-primary bg-primary text-white'
-                    : 'border-[var(--wk-border-subtle)] bg-[var(--wk-bg-surface)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-surface-hover)]'"
-                  :aria-current="p === currentPage ? 'page' : undefined"
-                  :aria-label="`第 ${p} 页`"
-                  @click="handlePageChange(p)"
-                >
-                  {{ p }}
-                </button>
-                <button
-                  class="flex size-8 items-center justify-center rounded border border-[var(--wk-border-subtle)] bg-[var(--wk-bg-surface)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-                  :disabled="currentPage >= totalPages"
-                  title="下一页"
-                  aria-label="下一页"
-                  @click="handlePageChange(currentPage + 1)"
-                >
-                  <span class="material-symbols-outlined text-lg leading-none">chevron_right</span>
-                </button>
-              </div>
+          <div
+            v-if="showPagination"
+            class="wk-task-list-table__footer flex items-center justify-end border-t px-5 py-4"
+          >
+            <span class="text-sm text-[var(--wk-text-muted)]">
+              共 {{ taskStore.totalCount }} 个任务
+              <span class="hidden md:inline">（第 {{ currentPage }} / {{ totalPages }} 页）</span>
+            </span>
+            <div class="flex items-center gap-1">
+              <button
+                class="flex size-8 items-center justify-center rounded border border-[var(--wk-border-subtle)] bg-[var(--wk-bg-surface)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="currentPage <= 1"
+                title="上一页"
+                aria-label="上一页"
+                @click="handlePageChange(currentPage - 1)"
+              >
+                <span class="material-symbols-outlined text-lg leading-none">chevron_left</span>
+              </button>
+              <button
+                v-for="p in visiblePages"
+                :key="p"
+                class="flex size-8 items-center justify-center rounded border text-xs font-bold"
+                :class="p === currentPage
+                  ? 'border-primary bg-primary text-white'
+                  : 'border-[var(--wk-border-subtle)] bg-[var(--wk-bg-surface)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-surface-hover)]'"
+                :aria-current="p === currentPage ? 'page' : undefined"
+                :aria-label="`第 ${p} 页`"
+                @click="handlePageChange(p)"
+              >
+                {{ p }}
+              </button>
+              <button
+                class="flex size-8 items-center justify-center rounded border border-[var(--wk-border-subtle)] bg-[var(--wk-bg-surface)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="currentPage >= totalPages"
+                title="下一页"
+                aria-label="下一页"
+                @click="handlePageChange(currentPage + 1)"
+              >
+                <span class="material-symbols-outlined text-lg leading-none">chevron_right</span>
+              </button>
             </div>
           </div>
         </div>
 
         <!-- Task Cards -->
-        <div v-else class="space-y-4">
+        <div v-else class="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
           <div
             v-for="task in displayedTasks"
             :key="task.taskId"
@@ -394,6 +400,9 @@
                 <div class="flex items-center gap-2 mb-3 flex-wrap">
                   <span v-if="task.customerName" class="text-xs font-medium text-slate-500 truncate max-w-[150px]">{{ task.customerName }}</span>
                   <span v-if="task.customerName" class="size-1 rounded-full bg-slate-200"></span>
+                  <span class="text-xs font-medium text-slate-500 truncate max-w-[180px]">{{ getProjectDisplayName(task) }}</span>
+                  <span v-if="task.laneName" class="text-xs font-medium text-slate-400 truncate max-w-[120px]">/ {{ task.laneName }}</span>
+                  <span class="size-1 rounded-full bg-slate-200"></span>
                   <span
                     v-if="task.generatedByAi"
                     class="text-xs font-bold px-2 py-0.5 rounded uppercase bg-blue-50 text-blue-600"
@@ -458,7 +467,7 @@
         </div>
 
         <!-- Pagination -->
-        <div v-if="showPagination && effectiveTaskViewMode !== 'list'" class="mt-6 flex justify-center">
+        <div v-if="showPagination && effectiveTaskViewMode !== 'list'" class="mt-6 flex shrink-0 justify-center">
           <div class="flex items-center gap-2">
             <button
               class="size-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -836,6 +845,10 @@ function getTaskOwnerName(task: Task): string {
   return task.assignedToName || task.createUserName || '未分配'
 }
 
+function getProjectDisplayName(task: Task): string {
+  return task.projectName || '未关联项目'
+}
+
 // Check if task is overdue
 function isOverdue(task: Task): boolean {
   if (typeof task.overdue === 'boolean') return task.overdue
@@ -876,12 +889,22 @@ function getRelativeTime(dateStr: string): string {
 
 <style scoped>
 .wk-task-list-table {
+  --wk-task-list-table-min-width: 1440px;
+  --wk-task-list-table-width: max(100%, var(--wk-task-list-table-min-width));
   background: var(--wk-bg-surface);
   border-color: var(--wk-border-subtle);
   color: var(--wk-text-secondary);
 }
 
+.wk-task-list-table__scroller {
+  background: var(--wk-bg-surface);
+  scrollbar-gutter: auto;
+}
+
 .wk-task-list-table__header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   background: var(--wk-bg-surface-subtle);
   color: var(--wk-text-muted);
   border-bottom: 1px solid var(--wk-border-muted);
@@ -893,6 +916,12 @@ function getRelativeTime(dateStr: string): string {
 }
 
 .wk-task-list-table__footer {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  gap: 12px;
+  overflow: hidden;
   background: var(--wk-bg-surface-subtle);
   border-color: var(--wk-border-subtle);
 }
@@ -904,15 +933,35 @@ function getRelativeTime(dateStr: string): string {
 
 .task-list-grid {
   display: grid;
+  width: var(--wk-task-list-table-width);
+  min-width: var(--wk-task-list-table-min-width);
   grid-template-columns:
     minmax(300px, 2.25fr)
     minmax(170px, 1.35fr)
+    minmax(160px, 1.15fr)
     minmax(82px, 0.6fr)
     minmax(92px, 0.65fr)
     minmax(150px, 1fr)
     minmax(74px, 0.55fr)
     minmax(90px, 0.65fr)
-    minmax(150px, 1fr);
+    190px;
   gap: 18px;
+}
+
+.wk-task-list-table__actions {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.wk-task-list-table__badge {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.wk-task-list-table__action-button {
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
 }
 </style>

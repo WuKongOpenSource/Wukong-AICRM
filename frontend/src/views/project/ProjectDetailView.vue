@@ -1,6 +1,10 @@
 <template>
   <div class="flex h-full flex-col overflow-hidden bg-[#f6f7f4]">
-    <div v-if="project && canViewProject" class="flex flex-1 flex-col overflow-hidden">
+    <div v-if="projectRouteLoading" class="flex flex-1 items-center justify-center px-6 text-center">
+      <span class="material-symbols-outlined animate-spin text-5xl text-slate-300">progress_activity</span>
+    </div>
+
+    <div v-else-if="project && canViewProject" class="flex flex-1 flex-col overflow-hidden">
       <header v-if="!isProjectChatView" class="border-b border-slate-200 bg-white px-4 py-2 md:px-6">
         <div class="flex w-full flex-col gap-2">
           <div class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
@@ -148,7 +152,7 @@
       </header>
 
       <main class="flex flex-1 flex-col overflow-hidden">
-        <div v-if="viewMode === 'ai'" class="wk-project-chat-shell">
+        <div v-if="viewMode === 'ai'" ref="projectChatShellRef" class="wk-project-chat-shell">
           <section class="flex min-h-0 flex-1 flex-col overflow-hidden">
             <div class="wk-project-chat-header">
               <div class="wk-project-chat-header__inner">
@@ -354,6 +358,7 @@
                     :disabled="chatStore.currentSessionIsStreaming"
                     @send="handleSendAiMessage"
                   />
+                  <p class="!mt-[10px] text-center text-xs uppercase text-[#5d5d5d]">内容由AI生成，请核查重要信息</p>
                   <div v-if="false" class="wk-project-chat-composer relative flex min-w-0 items-center rounded-[28px] p-[6px]">
                     <div class="w-full min-w-0">
                       <textarea
@@ -407,7 +412,20 @@
               </div>
             </div>
           </section>
-          <aside v-if="showProjectLanePanelShell && projectLanePanelVisible" class="wk-project-chat-lanes-panel">
+          <aside
+            v-if="showProjectLanePanelShell && projectLanePanelVisible"
+            class="wk-project-chat-lanes-panel"
+            :class="{ 'select-none': projectLanePanelResizing }"
+            :style="projectLanePanelStyle"
+          >
+            <div
+              class="wk-project-chat-lanes-panel__resizer group"
+              aria-label="拖拽调整宽度"
+              title="拖拽调整宽度"
+              @mousedown="startProjectLanePanelResize"
+            >
+              <span></span>
+            </div>
             <div class="wk-project-chat-lanes-panel__header">
               <div class="min-w-0">
                 <h2 class="truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">任务泳道图</h2>
@@ -499,16 +517,25 @@
                   </div>
                 </div>
               </div>
-              <button
-                v-if="showTaskDetailPanelShell && taskDetailPanelVisible"
-                type="button"
-                class="wk-project-object-panel-toggle wk-project-object-panel-toggle--inside"
-                aria-label="收起任务详情栏"
-                @click="taskDetailPanelVisible = false"
-              >
-                <span class="material-symbols-outlined text-[20px] leading-none">dock_to_right</span>
-                <span class="wk-project-object-panel-tooltip" role="tooltip">收起任务详情栏</span>
-              </button>
+              <div class="wk-project-task-chat-actions">
+                <button
+                  type="button"
+                  class="wk-project-task-list-return"
+                  @click="backToProject"
+                >
+                  返回
+                </button>
+                <button
+                  v-if="showTaskDetailPanelShell && taskDetailPanelVisible"
+                  type="button"
+                  class="wk-project-object-panel-toggle wk-project-object-panel-toggle--inside"
+                  aria-label="收起任务详情栏"
+                  @click="taskDetailPanelVisible = false"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">dock_to_right</span>
+                  <span class="wk-project-object-panel-tooltip" role="tooltip">收起任务详情栏</span>
+                </button>
+              </div>
             </div>
 
             <div ref="projectChatMessagesContainerRef" class="wk-project-task-chat-messages">
@@ -628,6 +655,7 @@
                     :disabled="chatStore.currentSessionIsStreaming"
                     @send="handleSendTaskAiMessage"
                   />
+                  <p class="!mt-[10px] text-center text-xs uppercase text-[#5d5d5d]">内容由AI生成，请核查重要信息</p>
                   <div v-if="false" class="wk-project-chat-composer relative flex min-w-0 items-center rounded-[28px] p-[6px]">
                     <div class="w-full min-w-0">
                       <textarea
@@ -782,22 +810,55 @@
                 </section>
 
                 <section class="wk-project-task-detail-section">
-                  <p class="wk-project-task-detail-section__title">执行资料</p>
-                  <div class="mt-3 grid grid-cols-3 gap-2">
-                    <div class="wk-project-task-detail-stat">
-                      <span>{{ currentTaskConversation.attachments.length }}</span>
-                      <p>附件</p>
-                    </div>
-                    <div class="wk-project-task-detail-stat">
-                      <span>{{ currentTaskConversation.schedules.length }}</span>
-                      <p>日程</p>
-                    </div>
-                    <div class="wk-project-task-detail-stat">
-                      <span>{{ currentTaskConversation.notes.length }}</span>
-                      <p>备注</p>
-                    </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <p class="wk-project-task-detail-section__title">附件</p>
+                    <button
+                      v-if="canUploadCurrentTaskAttachment"
+                      type="button"
+                      class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--wk-input-border)] bg-white px-2.5 py-1.5 text-[12px] font-semibold text-[#5f5f5f] transition-colors hover:border-slate-300 hover:bg-[#f5f5f5]"
+                      :disabled="taskAttachmentUploading"
+                      @click="triggerTaskAttachmentUpload"
+                    >
+                      <span class="material-symbols-outlined text-[15px] leading-none">attach_file</span>
+                      {{ taskAttachmentUploading ? '上传中' : '上传' }}
+                    </button>
+                    <input
+                      ref="taskAttachmentInputRef"
+                      type="file"
+                      multiple
+                      class="hidden"
+                      @change="handleTaskAttachmentUploadChange"
+                    />
                   </div>
+                  <div v-if="currentTaskConversation.attachments.length" class="mt-3 space-y-2">
+                    <article
+                      v-for="attachment in currentTaskConversation.attachments"
+                      :key="attachment.attachmentId"
+                      class="rounded-xl border border-[var(--wk-border-subtle)] bg-white px-3 py-2.5"
+                    >
+                      <a
+                        v-if="attachment.fileUrl"
+                        :href="attachment.fileUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="flex items-center gap-2 text-[13px] font-medium text-[#0d0d0d] hover:text-primary"
+                      >
+                        <span class="material-symbols-outlined text-[17px] text-[#8f8f8f]">draft</span>
+                        <span class="min-w-0 flex-1 truncate">{{ attachment.name }}</span>
+                      </a>
+                      <div v-else class="flex items-center gap-2 text-[13px] font-medium text-[#0d0d0d]">
+                        <span class="material-symbols-outlined text-[17px] text-[#8f8f8f]">draft</span>
+                        <span class="min-w-0 flex-1 truncate">{{ attachment.name }}</span>
+                      </div>
+                      <p class="mt-1 text-[12px] leading-5 text-[#8f8f8f]">
+                        {{ attachment.createdByName || '系统' }} · {{ formatDateTime(attachment.createTime) }}
+                        <template v-if="attachment.fileSize"> · {{ formatFileSize(attachment.fileSize) }}</template>
+                      </p>
+                    </article>
+                  </div>
+                  <p v-else class="mt-3 text-[13px] leading-5 text-[#8f8f8f]">暂无附件</p>
                 </section>
+
               </div>
             </div>
           </aside>
@@ -928,24 +989,8 @@
                         </p>
                       </div>
 
-                      <div class="mt-4 flex items-center justify-between">
-                        <div class="flex items-center gap-2 text-slate-400">
-                          <span
-                            class="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1"
-                            :class="task.hasAttachments ? 'text-primary' : ''"
-                          >
-                            <span class="material-symbols-outlined text-[14px]">attach_file</span>
-                            附件
-                          </span>
-                          <span
-                            class="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1"
-                            :class="task.hasSchedule ? 'text-emerald-600' : ''"
-                          >
-                            <span class="material-symbols-outlined text-[14px]">calendar_month</span>
-                            日程
-                          </span>
-                        </div>
-                        <span v-if="task.generatedByAi" class="inline-flex items-center gap-1 text-primary">
+                      <div v-if="task.generatedByAi" class="mt-4 flex justify-end">
+                        <span class="inline-flex items-center gap-1 text-primary">
                           <span class="material-symbols-outlined text-[14px]">auto_awesome</span>
                           AI
                         </span>
@@ -1033,57 +1078,6 @@
                   </tr>
                 </tbody>
               </table>
-            </div>
-          </div>
-        </div>
-
-        <div v-else-if="viewMode === 'cards'" class="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3 md:px-6">
-          <div class="flex w-full flex-col gap-4">
-            <div v-if="filteredProjectTasks.length === 0" class="rounded-[30px] border border-[var(--wk-input-border)] bg-white px-6 py-20 text-center text-slate-400 shadow-sm">
-              <span class="material-symbols-outlined text-5xl">view_cozy</span>
-              <p class="mt-4 text-sm">{{ projectTaskSearchKeyword.trim() ? '没有匹配的任务。' : '当前项目还没有可查看的任务。' }}</p>
-            </div>
-
-            <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <article
-                v-for="task in filteredProjectTasks"
-                :key="task.taskId"
-                class="group cursor-pointer rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-slate-200/60"
-                @click="enterTaskConversation(task)"
-              >
-                <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0">
-                    <h3 class="line-clamp-2 text-base font-bold leading-6 text-slate-900 transition-colors group-hover:text-primary">
-                      {{ task.title }}
-                    </h3>
-                    <p class="mt-2 text-xs text-slate-400">{{ laneName(task.laneId) }} · {{ task.status }}</p>
-                  </div>
-                  <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-bold" :class="projectTaskPriorityClass(task.priority)">
-                    {{ projectTaskPriorityLabel(task.priority) }}
-                  </span>
-                </div>
-                <p class="mt-4 line-clamp-3 min-h-[4.5rem] text-sm leading-6 text-slate-500">
-                  {{ task.description || '暂无任务描述，可进入任务对话继续补充资料和执行方案。' }}
-                </p>
-                <div class="mt-5 grid grid-cols-2 gap-2 text-xs text-slate-500">
-                  <div class="rounded-2xl bg-slate-50 px-3 py-2">
-                    <p class="text-slate-400">负责人</p>
-                    <p class="mt-1 truncate font-semibold text-slate-800">{{ task.ownerName || '未指定' }}</p>
-                  </div>
-                  <div class="rounded-2xl bg-slate-50 px-3 py-2">
-                    <p class="text-slate-400">截止时间</p>
-                    <p class="mt-1 truncate font-semibold text-slate-800">{{ task.dueDate ? formatDateTime(task.dueDate) : '未设置' }}</p>
-                  </div>
-                </div>
-                <div class="mt-4 flex items-center justify-between text-xs text-slate-400">
-                  <span class="truncate">{{ task.customerName || project.customerName || '未关联客户' }}</span>
-                  <span class="inline-flex items-center gap-2">
-                    <span :class="task.hasAttachments ? 'text-primary' : ''" class="material-symbols-outlined text-[15px]">attach_file</span>
-                    <span :class="task.hasSchedule ? 'text-emerald-600' : ''" class="material-symbols-outlined text-[15px]">calendar_month</span>
-                    <span v-if="task.generatedByAi" class="material-symbols-outlined text-[15px] text-primary">auto_awesome</span>
-                  </span>
-                </div>
-              </article>
             </div>
           </div>
         </div>
@@ -1278,6 +1272,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { useResponsive } from '@/composables/useResponsive'
 import { useProjectStore } from '@/stores/project'
 import { useChatStore } from '@/stores/chat'
@@ -1285,6 +1280,7 @@ import { renderMarkdown } from '@/utils/markdown'
 import { getAssistantMessagePlaceholder, normalizeAssistantMessageContent } from '@/utils/chatMessage'
 import { formatFileSize } from '@/utils/formatFileSize'
 import { appEvents, APP_EVENT } from '@/utils/events'
+import { isRequestErrorHandled } from '@/utils/requestError'
 import type {
   ProjectMember,
   ProjectPermission,
@@ -1317,7 +1313,7 @@ const projectStore = useProjectStore()
 const chatStore = useChatStore()
 
 type ProjectTab = {
-  value: 'board' | 'list' | 'cards'
+  value: 'board' | 'list'
   label: string
   icon: string
 }
@@ -1334,24 +1330,47 @@ type ProjectChatComposerSendPayload = {
 
 const projectTabs: ProjectTab[] = [
   { value: 'board', label: '泳道视图', icon: 'view_kanban' },
-  { value: 'list', label: '列表视图', icon: 'list' },
-  { value: 'cards', label: '卡片视图', icon: 'grid_view' }
+  { value: 'list', label: '列表视图', icon: 'list' }
 ]
 
-const viewMode = ref<ProjectViewMode>('board')
-const lastProjectViewMode = ref<Exclude<ProjectViewMode, 'task_ai'>>('board')
+const projectViewValues = new Set<Exclude<ProjectViewMode, 'task_ai'>>(['board', 'list', 'ai', 'members'])
+
+function resolveProjectViewFromRoute(): Exclude<ProjectViewMode, 'task_ai'> {
+  const raw = route.query.view
+  const value = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : ''
+  return projectViewValues.has(value as Exclude<ProjectViewMode, 'task_ai'>)
+    ? value as Exclude<ProjectViewMode, 'task_ai'>
+    : 'board'
+}
+
+function resolveInitialProjectViewMode(): ProjectViewMode {
+  const routeTaskId = typeof route.query.taskId === 'string' ? route.query.taskId : ''
+  return routeTaskId ? 'task_ai' : resolveProjectViewFromRoute()
+}
+
+const initialProjectViewMode = resolveInitialProjectViewMode()
+const viewMode = ref<ProjectViewMode>(initialProjectViewMode)
+const lastProjectViewMode = ref<Exclude<ProjectViewMode, 'task_ai'>>(
+  initialProjectViewMode === 'task_ai' ? resolveProjectViewFromRoute() : initialProjectViewMode
+)
 const aiInput = ref('')
 const taskAiInput = ref('')
 const projectAiComposerInputRef = ref<HTMLTextAreaElement | null>(null)
 const taskAiComposerInputRef = ref<HTMLTextAreaElement | null>(null)
+const projectChatShellRef = ref<HTMLElement | null>(null)
 const projectChatMessagesContainerRef = ref<HTMLElement | null>(null)
 const collapsedProjectChatLaneIds = ref<Set<string>>(new Set())
 const projectLanePanelVisible = ref(true)
+const projectLanePanelWidth = ref(380)
+const projectLanePanelResizing = ref(false)
+const projectRouteLoading = ref(true)
 const showProjectDialog = ref(false)
 const showTaskDialog = ref(false)
 const showTaskDrawer = ref(false)
 const showMemberDialog = ref(false)
 const taskDetailPanelVisible = ref(true)
+const taskAttachmentInputRef = ref<HTMLInputElement | null>(null)
+const taskAttachmentUploading = ref(false)
 const draggingTaskId = ref('')
 const dragOverLaneId = ref('')
 const defaultLaneId = ref('')
@@ -1363,30 +1382,44 @@ const projectTaskSearchKeyword = ref('')
 const projectTaskSearchLoading = ref(false)
 let projectTaskSearchTimer: number | null = null
 
-const projectViewValues = new Set<Exclude<ProjectViewMode, 'task_ai'>>(['board', 'list', 'cards', 'ai', 'members'])
+const projectId = computed(() => String(route.params.id || ''))
+const project = computed(() => projectStore.getProjectById(projectId.value))
 
-function resolveProjectViewFromRoute(): Exclude<ProjectViewMode, 'task_ai'> {
-  const raw = route.query.view
-  const value = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : ''
-  return projectViewValues.has(value as Exclude<ProjectViewMode, 'task_ai'>)
-    ? value as Exclude<ProjectViewMode, 'task_ai'>
-    : 'board'
+const PROJECT_LANE_PANEL_MIN_WIDTH = 320
+const PROJECT_LANE_PANEL_MAX_WIDTH_RATIO = 0.5
+
+let projectRouteLoadToken = 0
+
+async function loadCurrentProjectRoute() {
+  const currentProjectId = projectId.value
+  const token = ++projectRouteLoadToken
+  projectRouteLoading.value = true
+  try {
+    await projectStore.ensureInitialized()
+    if (currentProjectId) {
+      await projectStore.loadProject(currentProjectId)
+    }
+    if (token === projectRouteLoadToken) {
+      syncTaskConversationFromRoute()
+    }
+  } finally {
+    if (token === projectRouteLoadToken) {
+      projectRouteLoading.value = false
+    }
+  }
 }
 
-onMounted(async () => {
-  await projectStore.ensureInitialized()
-  if (projectId.value) {
-    await projectStore.loadProject(projectId.value)
-  }
-  syncTaskConversationFromRoute()
+onMounted(() => {
+  void loadCurrentProjectRoute()
+})
+
+watch(projectId, () => {
+  void loadCurrentProjectRoute()
 })
 
 watch(() => [route.query.taskId, route.query.view], () => {
   syncTaskConversationFromRoute()
 })
-
-const projectId = computed(() => String(route.params.id || ''))
-const project = computed(() => projectStore.getProjectById(projectId.value))
 
 watch(projectTaskSearchKeyword, keyword => {
   if (projectTaskSearchTimer) {
@@ -1398,6 +1431,7 @@ watch(projectTaskSearchKeyword, keyword => {
 })
 
 onBeforeUnmount(() => {
+  stopProjectLanePanelResize()
   if (projectTaskSearchTimer) {
     window.clearTimeout(projectTaskSearchTimer)
   }
@@ -1464,12 +1498,20 @@ const currentTaskConversation = computed(() =>
 )
 const isTaskConversation = computed(() => viewMode.value === 'task_ai')
 const isProjectChatView = computed(() => viewMode.value === 'ai' || viewMode.value === 'task_ai')
-const showTaskViewToolbar = computed(() => viewMode.value === 'board' || viewMode.value === 'list' || viewMode.value === 'cards')
+const showTaskViewToolbar = computed(() => viewMode.value === 'board' || viewMode.value === 'list')
 const canUseCurrentTaskAi = computed(() =>
   currentTaskConversation.value ? projectStore.canCurrentUserUseTaskAi(projectId.value, currentTaskConversation.value) : false
 )
+const canUploadCurrentTaskAttachment = computed(() =>
+  currentTaskConversation.value ? projectStore.canCurrentUserUploadTaskAttachment(projectId.value, currentTaskConversation.value) : false
+)
 const showProjectLanePanelShell = computed(() => !isMobile.value && viewMode.value === 'ai')
 const showTaskDetailPanelShell = computed(() => !isMobile.value && isTaskConversation.value && Boolean(currentTaskConversation.value))
+const projectLanePanelStyle = computed(() => ({
+  width: `${projectLanePanelWidth.value}px`,
+  minWidth: `min(${PROJECT_LANE_PANEL_MIN_WIDTH}px, ${PROJECT_LANE_PANEL_MAX_WIDTH_RATIO * 100}%)`,
+  maxWidth: `${PROJECT_LANE_PANEL_MAX_WIDTH_RATIO * 100}%`
+}))
 const projectChatMessages = computed(() => chatStore.messages)
 const projectLastChatMessage = computed(() => {
   const messages = projectChatMessages.value
@@ -1719,6 +1761,48 @@ function toggleProjectChatLane(laneId: string) {
   collapsedProjectChatLaneIds.value = next
 }
 
+function getProjectLanePanelContainerWidth(): number {
+  const width = projectChatShellRef.value?.clientWidth || 0
+  return width > 0 ? width : window.innerWidth
+}
+
+function resolveProjectLanePanelWidth(width: number, containerWidth = getProjectLanePanelContainerWidth()): number {
+  if (containerWidth <= 0) return Math.max(PROJECT_LANE_PANEL_MIN_WIDTH, width)
+  const maxWidth = containerWidth * PROJECT_LANE_PANEL_MAX_WIDTH_RATIO
+  const minWidth = Math.min(PROJECT_LANE_PANEL_MIN_WIDTH, maxWidth)
+  return Math.min(maxWidth, Math.max(minWidth, width))
+}
+
+function applyProjectLanePanelWidth(width: number) {
+  projectLanePanelWidth.value = resolveProjectLanePanelWidth(width)
+}
+
+function handleProjectLanePanelResize(event: MouseEvent) {
+  if (!projectLanePanelResizing.value) return
+  const rect = projectChatShellRef.value?.getBoundingClientRect()
+  const rawWidth = rect ? rect.right - event.clientX : window.innerWidth - event.clientX
+  applyProjectLanePanelWidth(rawWidth)
+}
+
+function stopProjectLanePanelResize() {
+  if (!projectLanePanelResizing.value) return
+  projectLanePanelResizing.value = false
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+  window.removeEventListener('mousemove', handleProjectLanePanelResize)
+  window.removeEventListener('mouseup', stopProjectLanePanelResize)
+}
+
+function startProjectLanePanelResize(event: MouseEvent) {
+  event.preventDefault()
+  projectLanePanelVisible.value = true
+  projectLanePanelResizing.value = true
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  window.addEventListener('mousemove', handleProjectLanePanelResize)
+  window.addEventListener('mouseup', stopProjectLanePanelResize)
+}
+
 function laneName(laneId: string) {
   return orderedLanes.value.find(lane => lane.laneId === laneId)?.name || '未分配泳道'
 }
@@ -1813,6 +1897,12 @@ async function handleSubmitTask(payload: {
   customerName?: string
   hasAttachments: boolean
   hasSchedule: boolean
+  attachments?: {
+    fileName: string
+    filePath: string
+    fileSize?: number
+    mimeType?: string
+  }[]
 }) {
   if (!project.value) return
   if (editingTask.value) {
@@ -1954,6 +2044,42 @@ async function handleDeleteLane(laneId: string) {
     ElMessage.success('泳道已删除')
   } catch {
     // noop
+  }
+}
+
+function triggerTaskAttachmentUpload() {
+  if (!canUploadCurrentTaskAttachment.value || taskAttachmentUploading.value) return
+  taskAttachmentInputRef.value?.click()
+}
+
+async function handleTaskAttachmentUploadChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  input.value = ''
+  if (!files.length || !project.value || !currentTaskConversation.value || !canUploadCurrentTaskAttachment.value) return
+
+  const activeProjectId = project.value.projectId
+  const activeTaskId = currentTaskConversation.value.taskId
+  taskAttachmentUploading.value = true
+  try {
+    for (const file of files) {
+      const presigned = await getPresignedUploadUrl(file.name, file.type)
+      await uploadToMinIO(file, presigned.uploadUrl)
+      await projectStore.addTaskAttachment(activeProjectId, activeTaskId, {
+        fileName: file.name,
+        filePath: presigned.objectKey,
+        fileSize: file.size,
+        mimeType: file.type || 'application/octet-stream'
+      })
+    }
+    ElMessage.success(files.length > 1 ? '附件已上传' : '附件上传成功')
+  } catch (error) {
+    console.error('项目任务附件上传失败:', error)
+    if (!isRequestErrorHandled(error)) {
+      ElMessage.error('附件上传失败，请重试')
+    }
+  } finally {
+    taskAttachmentUploading.value = false
   }
 }
 
@@ -2405,15 +2531,46 @@ function memberActionLabel(action: string) {
 }
 
 .wk-project-chat-lanes-panel {
+  position: relative;
   display: flex;
-  width: 300px;
-  min-width: 280px;
-  max-width: 35%;
+  width: 380px;
+  min-width: 320px;
+  max-width: 50%;
   min-height: 0;
   flex-shrink: 0;
   flex-direction: column;
   border-left: 1px solid var(--wk-border-subtle);
   background: color-mix(in srgb, var(--wk-bg-surface) 96%, transparent);
+}
+
+.wk-project-chat-lanes-panel__resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  width: 12px;
+  cursor: col-resize;
+  transition: background-color 160ms ease;
+}
+
+.wk-project-chat-lanes-panel__resizer:hover {
+  background: rgb(13 13 13 / 0.05);
+}
+
+.wk-project-chat-lanes-panel__resizer span {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 1px;
+  height: 40px;
+  transform: translateY(-50%);
+  background: transparent;
+  transition: background-color 160ms ease;
+}
+
+.wk-project-chat-lanes-panel__resizer:hover span {
+  background: #cfcfcf;
 }
 
 .wk-project-chat-lanes-panel__header {
@@ -2549,12 +2706,6 @@ function memberActionLabel(action: string) {
   color: #8f8f8f;
   font-size: 13px;
   line-height: 20px;
-}
-
-@media (min-width: 1440px) {
-  .wk-project-chat-lanes-panel {
-    width: 340px;
-  }
 }
 
 @media (max-width: 960px) {
@@ -2811,14 +2962,53 @@ function memberActionLabel(action: string) {
   justify-content: space-between;
   gap: 12px;
   padding-left: 1rem;
-  padding-right: 3.5rem;
+  padding-right: 9.75rem;
 }
 
 @media (min-width: 768px) {
   .wk-project-task-chat-header__inner {
     padding-left: 2rem;
-    padding-right: 4rem;
+    padding-right: 10.5rem;
   }
+}
+
+.wk-project-task-chat-actions {
+  position: absolute;
+  top: 50%;
+  right: 1rem;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transform: translateY(-50%);
+}
+
+.wk-project-task-list-return {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #111827;
+  padding: 0 12px;
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.wk-project-task-list-return:hover {
+  background: #1f2937;
+}
+
+.wk-project-task-chat-actions .wk-project-object-panel-toggle--inside {
+  position: relative;
+  top: auto;
+  right: auto;
+  transform: none;
 }
 
 .wk-project-task-chat-messages {

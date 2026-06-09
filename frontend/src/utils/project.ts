@@ -40,6 +40,8 @@ export const PROJECT_ROLE_OPTIONS: Array<{ value: ProjectRole; label: string }> 
   { value: 'EXTERNAL', label: '外部协作人' }
 ]
 
+export const SYSTEM_PROJECT_ROLE_VALUES = new Set<ProjectRole>(PROJECT_ROLE_OPTIONS.map(option => option.value))
+
 export const PROJECT_MEMBER_STATUS_OPTIONS: Array<{ value: ProjectMemberStatus; label: string }> = [
   { value: 'ACTIVE', label: '正常' },
   { value: 'REMOVED', label: '已移除' },
@@ -167,7 +169,17 @@ export function projectTaskPriorityClass(priority: ProjectTaskPriority): string 
 }
 
 export function projectRoleLabel(role: ProjectRole): string {
-  return PROJECT_ROLE_OPTIONS.find(option => option.value === role)?.label || '项目成员'
+  return PROJECT_ROLE_OPTIONS.find(option => option.value === role)?.label || role || '项目成员'
+}
+
+export function getProjectRoleOptions(config: ProjectRolePermissionConfig = runtimeRolePermissions): Array<{ value: ProjectRole; label: string }> {
+  const customOptions = Object.keys(config)
+    .filter(role => role.trim() && !SYSTEM_PROJECT_ROLE_VALUES.has(role))
+    .map(role => ({
+      value: role,
+      label: projectRoleLabel(role)
+    }))
+  return [...PROJECT_ROLE_OPTIONS, ...customOptions]
 }
 
 export function projectMemberStatusLabel(status: ProjectMemberStatus): string {
@@ -219,14 +231,28 @@ function normalizeRolePermissions(config?: Partial<Record<ProjectRole, ProjectPe
       next.OWNER = [...DEFAULT_ROLE_PERMISSIONS.OWNER]
     }
   })
+  Object.entries(config || {}).forEach(([role, permissions]) => {
+    const normalizedRole = role.trim()
+    if (!normalizedRole || SYSTEM_PROJECT_ROLE_VALUES.has(normalizedRole)) return
+    const normalizedPermissions = Array.from(new Set((permissions || []).filter(permission => allowedPermissions.has(permission))))
+    if (!normalizedPermissions.includes('VIEW_PROJECT')) {
+      normalizedPermissions.unshift('VIEW_PROJECT')
+    }
+    next[normalizedRole] = normalizedPermissions
+  })
   return next
 }
 
 function cloneRolePermissions(config: Record<ProjectRole, ProjectPermission[]>): ProjectRolePermissionConfig {
-  return PROJECT_ROLE_OPTIONS.reduce((result, roleOption) => {
-    result[roleOption.value] = [...(config[roleOption.value] || [])]
-    return result
+  const result = PROJECT_ROLE_OPTIONS.reduce((next, roleOption) => {
+    next[roleOption.value] = [...(config[roleOption.value] || [])]
+    return next
   }, {} as ProjectRolePermissionConfig)
+  Object.entries(config).forEach(([role, permissions]) => {
+    if (!role.trim() || SYSTEM_PROJECT_ROLE_VALUES.has(role)) return
+    result[role] = [...permissions]
+  })
+  return result
 }
 
 export function getDefaultLaneId(project: ProjectEntity): string {

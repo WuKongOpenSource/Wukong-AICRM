@@ -93,6 +93,15 @@ public class ProjectBO {
         private Boolean hasSchedule;
         private Boolean generatedByAi;
         private String aiSourceText;
+        private List<TaskAttachmentSave> attachments;
+    }
+
+    @Data
+    public static class TaskAttachmentSave {
+        private String fileName;
+        private String filePath;
+        private Long fileSize;
+        private String mimeType;
     }
 
     @Data

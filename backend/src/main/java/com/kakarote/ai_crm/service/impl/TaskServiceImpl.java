@@ -31,6 +31,7 @@ import com.kakarote.ai_crm.service.ITaskService;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -80,6 +81,9 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
     @Lazy
     private ICustomFieldService customFieldService;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final int HIGH_VALUE_THRESHOLD = 72;
@@ -126,10 +130,12 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         if (task.getGeneratedByAi() == null) {
             task.setGeneratedByAi(0);
         }
+        normalizeProjectBinding(task);
         save(task);
         refreshValuePriority(task.getTaskId());
         globalSearchIndexService.refreshTaskIndex(task.getTaskId());
         refreshCustomerActivity(task.getCustomerId());
+        touchProject(task.getProjectId());
         return task.getTaskId();
     }
 
@@ -144,11 +150,14 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         }
         validateOwnedRelation(taskUpdateBO.getRelationId());
         Long previousCustomerId = task.getCustomerId();
+        Long previousProjectId = task.getProjectId();
         BeanUtil.copyProperties(taskUpdateBO, task, "taskId", "createUserId", "createTime");
+        normalizeProjectBinding(task);
         updateById(task);
         refreshValuePriority(task.getTaskId());
         globalSearchIndexService.refreshTaskIndex(task.getTaskId());
         refreshCustomerActivities(previousCustomerId, task.getCustomerId());
+        touchProjects(previousProjectId, task.getProjectId());
     }
 
     /**
@@ -161,9 +170,11 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "任务不存在");
         }
         Long customerId = task.getCustomerId();
+        Long projectId = task.getProjectId();
         removeById(taskId);
         globalSearchIndexService.deleteByEntity("task", taskId);
         refreshCustomerActivity(customerId);
+        touchProject(projectId);
     }
 
     /**
@@ -191,14 +202,106 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         if (ObjectUtil.isNull(task)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "任务不存在");
         }
-        task.setStatus(status);
-        if ("completed".equals(status)) {
+        task.setStatus(normalizeTaskStatus(status));
+        if ("completed".equals(task.getStatus())) {
             task.setCompletedTime(new Date());
         }
         updateById(task);
         refreshValuePriority(taskId);
         globalSearchIndexService.refreshTaskIndex(taskId);
         refreshCustomerActivity(task.getCustomerId());
+        touchProject(task.getProjectId());
+    }
+
+    private void normalizeProjectBinding(Task task) {
+        task.setStatus(normalizeTaskStatus(task.getStatus()));
+        if (task.getProjectId() == null) {
+            task.setLaneId(null);
+            return;
+        }
+
+        ensureProjectExists(task.getProjectId());
+        LaneInfo lane = task.getLaneId() == null
+                ? defaultProjectLane(task.getProjectId())
+                : findProjectLane(task.getProjectId(), task.getLaneId());
+        task.setLaneId(lane.laneId());
+        task.setStatus(laneToTaskStatus(lane));
+    }
+
+    private String normalizeTaskStatus(String status) {
+        return StrUtil.blankToDefault(status, "pending").trim().toLowerCase();
+    }
+
+    private void ensureProjectExists(Long projectId) {
+        Long tenantId = UserUtil.getTenantId();
+        Long count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(1)
+                FROM crm_project
+                WHERE project_id = ? AND (tenant_id = ? OR ? IS NULL)
+                """, Long.class, projectId, tenantId, tenantId);
+        if (count == null || count == 0) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_DATA_DOES_NOT_EXIST, "项目不存在或无权访问");
+        }
+    }
+
+    private LaneInfo defaultProjectLane(Long projectId) {
+        List<LaneInfo> lanes = loadProjectLanes(projectId);
+        return lanes.stream()
+                .filter(lane -> "not-started".equals(lane.code()))
+                .findFirst()
+                .orElseGet(() -> lanes.stream().findFirst()
+                        .orElseThrow(() -> new BusinessException(SystemCodeEnum.SYSTEM_DATA_DOES_NOT_EXIST, "项目泳道不存在")));
+    }
+
+    private LaneInfo findProjectLane(Long projectId, Long laneId) {
+        return loadProjectLanes(projectId).stream()
+                .filter(lane -> Objects.equals(lane.laneId(), laneId))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(SystemCodeEnum.SYSTEM_DATA_DOES_NOT_EXIST, "项目泳道不存在"));
+    }
+
+    private List<LaneInfo> loadProjectLanes(Long projectId) {
+        return jdbcTemplate.query("""
+                SELECT lane_id, name, code
+                FROM crm_project_lane
+                WHERE project_id = ?
+                ORDER BY sort_order ASC, create_time ASC
+                """, (rs, rowNum) -> new LaneInfo(
+                rs.getLong("lane_id"),
+                rs.getString("name"),
+                rs.getString("code")
+        ), projectId);
+    }
+
+    private String laneToTaskStatus(LaneInfo lane) {
+        if ("in-progress".equals(lane.code())) {
+            return "in_progress";
+        }
+        if ("completed".equals(lane.code())) {
+            return "completed";
+        }
+        if ("not-started".equals(lane.code())) {
+            return "pending";
+        }
+        return StrUtil.blankToDefault(lane.name(), "pending");
+    }
+
+    private void touchProject(Long projectId) {
+        if (projectId == null) {
+            return;
+        }
+        jdbcTemplate.update("""
+                UPDATE crm_project
+                SET update_user_id = ?, update_time = CURRENT_TIMESTAMP
+                WHERE project_id = ?
+                """, UserUtil.getUserId(), projectId);
+    }
+
+    private void touchProjects(Long previousProjectId, Long currentProjectId) {
+        touchProject(previousProjectId);
+        if (!Objects.equals(previousProjectId, currentProjectId)) {
+            touchProject(currentProjectId);
+        }
     }
 
     /**
@@ -1155,6 +1258,13 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         String tier,
         String reason,
         boolean highValue
+    ) {
+    }
+
+    private record LaneInfo(
+        Long laneId,
+        String name,
+        String code
     ) {
     }
 }
