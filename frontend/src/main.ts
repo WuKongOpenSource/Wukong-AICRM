@@ -4,6 +4,7 @@ import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
+import { Capacitor } from '@capacitor/core'
 // 本地字体
 import '@fontsource/inter/300.css'
 import '@fontsource/inter/400.css'
@@ -17,6 +18,7 @@ import '@fontsource-variable/noto-sans-sc'
 import 'material-symbols/outlined.css'
 import WkIcon from '@/components/common/WkIcon.vue'
 import { useTheme } from '@/composables/useTheme'
+import { scheduleCapacitorUpdateCheck } from '@/utils/capacitorUpdate'
 
 import App from './App.vue'
 import router from './router'
@@ -32,14 +34,7 @@ if (typeof window !== 'undefined') {
     window.innerWidth < 768 ||
     (typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches)
 
-  const cap = (window as any).Capacitor
-  const isNativePlatform =
-    !!cap &&
-    (typeof cap.isNativePlatform === 'function'
-      ? cap.isNativePlatform()
-      : typeof cap.getPlatform === 'function'
-        ? cap.getPlatform() !== 'web'
-        : false)
+  const isNativePlatform = Capacitor.isNativePlatform()
 
   if (isMobile && isNativePlatform) {
     document.documentElement.classList.add('wk-native-mobile')
@@ -56,4 +51,5 @@ app.component('WkIcon', WkIcon)
 // Wait for router to be ready before mounting to prevent duplicate initial navigation
 router.isReady().then(() => {
   app.mount('#app')
+  scheduleCapacitorUpdateCheck()
 })

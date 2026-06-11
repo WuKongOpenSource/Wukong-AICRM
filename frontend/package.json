@@ -1,6 +1,6 @@
 {
   "name": "wk-ai-crm-frontend",
-  "version": "1.0.0",
+  "version": "1.0.35",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,6 +10,8 @@
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix"
   },
   "dependencies": {
+    "@capawesome/capacitor-live-update": "^8.3.0",
+    "@capacitor/core": "^8.4.0",
     "@element-plus/icons-vue": "^2.3.1",
     "@fontsource-variable/noto-sans-sc": "^5.2.10",
     "@fontsource/inter": "^5.2.8",

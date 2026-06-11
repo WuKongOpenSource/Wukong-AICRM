@@ -53,6 +53,8 @@ interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string
   /** 数据同步服务 API 根地址；默认使用 /syncapi 代理 */
   readonly VITE_SYNC_API_BASE_URL?: string
+  /** Vue 前端项目版本号；由 Vite 从 package.json 注入 */
+  readonly VITE_APP_VERSION?: string
   /** Capacitor 原生壳版本清单地址；未配置时跳过热更新检查 */
   readonly VITE_UPDATE_VERSION_URL?: string
 }

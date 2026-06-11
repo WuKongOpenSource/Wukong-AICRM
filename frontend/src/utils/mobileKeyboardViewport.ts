@@ -9,6 +9,12 @@ type MobileKeyboardInsetOptions = {
   threshold?: number
 }
 
+export type ScrollRestoreMetrics = {
+  scrollTop: number
+  scrollHeight: number
+  clientHeight: number
+}
+
 const DEFAULT_GAP_PX = 8
 const DEFAULT_THRESHOLD_PX = 24
 
@@ -27,4 +33,13 @@ export function resolveMobileKeyboardInset(
   const keyboardHeight = Math.max(0, layoutHeight - visualHeight)
 
   return keyboardHeight > threshold ? Math.round(keyboardHeight + gap) : 0
+}
+
+export function resolveMobileViewportTopOffset(metrics: MobileKeyboardViewportMetrics): number {
+  return Math.max(0, Math.round(toFiniteNumber(metrics.offsetTop ?? 0)))
+}
+
+export function resolveRestoredScrollTop(metrics: ScrollRestoreMetrics): number {
+  const maxScrollTop = Math.max(0, toFiniteNumber(metrics.scrollHeight) - toFiniteNumber(metrics.clientHeight))
+  return Math.min(maxScrollTop, Math.max(0, Math.round(toFiniteNumber(metrics.scrollTop))))
 }

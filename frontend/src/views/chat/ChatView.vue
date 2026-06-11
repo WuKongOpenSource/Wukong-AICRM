@@ -2,6 +2,15 @@
   <div ref="chatViewRef" class="flex h-full" :class="{ 'flex-col': isMobile }">
     <Teleport to="body">
       <div
+        v-if="showMobileTopViewportShield"
+        class="wk-mobile-chat-top-viewport-shield"
+        :style="mobileTopViewportShieldStyle"
+        aria-hidden="true"
+      ></div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
         v-if="showMobileFloatingBar"
         class="wk-mobile-chat-floating-bar pointer-events-none px-4 py-3"
         :style="mobileTopFixedLayerStyle"
@@ -766,6 +775,8 @@
             class="wk-chat-composer-wrap shrink-0 pb-2 md:pb-2 px-2"
             :class="isCenteredEmptyChat ? 'bg-transparent pt-0' : ''"
             :style="chatComposerWrapStyle"
+            @pointerdown.capture="captureMobileKeyboardOpeningScroll"
+            @touchstart.capture="captureMobileKeyboardOpeningScroll"
           >
             <div class="mx-auto space-y-8 w-[calc(100%-20px)] max-w-4xl md:w-full">
 
@@ -2333,7 +2344,11 @@ import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import { formatFileSize, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { shouldShowMobileCustomerSummaryAction } from '@/utils/chatMobileActions'
-import { resolveMobileKeyboardInset } from '@/utils/mobileKeyboardViewport'
+import {
+  resolveMobileKeyboardInset,
+  resolveMobileViewportTopOffset,
+  resolveRestoredScrollTop
+} from '@/utils/mobileKeyboardViewport'
 import { resolveRelationTypeLabel as resolveRelationTypeDisplayLabel } from '@/views/relation/constants'
 import {
   canCaptureMobileAudioFile,
@@ -2423,6 +2438,8 @@ const messagesContainer = ref<HTMLElement | null>(null)
 const chatComposerWrapRef = ref<HTMLElement | null>(null)
 const showScrollToBottomButton = ref(false)
 const mobileKeyboardInset = ref(0)
+const mobileViewportTopOffset = ref(0)
+const mobileKeyboardOpeningActive = ref(false)
 const mobilePanel = ref<'sessions' | 'chat'>('chat')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 /** 桌面端多行输入（模板中 v-if="!isMobile" 的 textarea） */
@@ -2607,6 +2624,8 @@ const MOBILE_KEYBOARD_TRACK_INTERVAL_MS = 80
 let chatCustomerAiPollTimer: ReturnType<typeof setTimeout> | null = null
 let mobileKeyboardInsetTimer: ReturnType<typeof setTimeout> | null = null
 let mobileKeyboardInsetTrackTimer: ReturnType<typeof setTimeout> | null = null
+let mobileKeyboardScrollRestoreFrameId: number | null = null
+let mobileKeyboardMessagesScrollTopSnapshot: number | null = null
 let chatCustomerAiPollAttempts = 0
 let offSelectedCustomerDetailRefresh: (() => void) | null = null
 let customerSummaryDragStartY = 0
@@ -2628,8 +2647,16 @@ const chatComposerWrapStyle = computed(() => (
     ? { transform: `translate3d(0, -${mobileKeyboardInset.value}px, 0)` }
     : undefined
 ))
+const mobileTopViewportShieldStyle = computed(() => ({
+  '--wk-mobile-viewport-top-offset': `${mobileViewportTopOffset.value}px`
+}))
 const mobileTopFixedLayerStyle = computed(() => (
-  undefined
+  isMobile.value && mobileViewportTopOffset.value > 0
+    ? {
+        transform: `translate3d(0, ${mobileViewportTopOffset.value}px, 0)`,
+        willChange: 'transform'
+      }
+    : undefined
 ))
 
 const CUSTOMER_STAGE_FLOW_FALLBACK = [
@@ -3130,6 +3157,16 @@ const showMobileFloatingBar = computed(() =>
   && mobilePanel.value === 'chat'
   && !isObjectContextChat.value
 )
+const showMobileTopChrome = computed(() =>
+  showMobileFloatingBar.value
+  || showMobileCustomerHeader.value
+  || showMobileEmployeeHeader.value
+  || showMobileRelationHeader.value
+)
+const showMobileTopViewportShield = computed(() =>
+  showMobileTopChrome.value
+  && (mobileViewportTopOffset.value > 0 || mobileKeyboardOpeningActive.value)
+)
 const showMobileCustomerSummaryAction = computed(() =>
   shouldShowMobileCustomerSummaryAction({
     isMobile: isMobile.value,
@@ -3282,6 +3319,51 @@ function getMessagesDistanceToBottom(el: HTMLElement) {
   return el.scrollHeight - (el.scrollTop + el.clientHeight)
 }
 
+function captureMobileKeyboardOpeningScroll() {
+  if (!isMobile.value) return
+  mobileKeyboardOpeningActive.value = true
+  const el = messagesContainer.value
+  mobileKeyboardMessagesScrollTopSnapshot = el ? el.scrollTop : null
+}
+
+function ensureMobileKeyboardOpeningScrollCaptured() {
+  if (mobileKeyboardMessagesScrollTopSnapshot != null) return
+  captureMobileKeyboardOpeningScroll()
+}
+
+function restoreMessagesScrollForMobileKeyboard() {
+  if (mobileKeyboardMessagesScrollTopSnapshot == null) return
+  const el = messagesContainer.value
+  if (!el) return
+  el.scrollTop = resolveRestoredScrollTop({
+    scrollTop: mobileKeyboardMessagesScrollTopSnapshot,
+    scrollHeight: el.scrollHeight,
+    clientHeight: el.clientHeight
+  })
+  updateScrollToBottomVisibility()
+}
+
+function cancelMobileKeyboardMessagesScrollRestoreFrame() {
+  if (mobileKeyboardScrollRestoreFrameId == null) return
+  cancelAnimationFrame(mobileKeyboardScrollRestoreFrameId)
+  mobileKeyboardScrollRestoreFrameId = null
+}
+
+function scheduleMobileKeyboardMessagesScrollRestore() {
+  if (typeof window === 'undefined' || mobileKeyboardMessagesScrollTopSnapshot == null) return
+  cancelMobileKeyboardMessagesScrollRestoreFrame()
+  mobileKeyboardScrollRestoreFrameId = requestAnimationFrame(() => {
+    mobileKeyboardScrollRestoreFrameId = null
+    restoreMessagesScrollForMobileKeyboard()
+  })
+}
+
+function resetMobileKeyboardMessagesScrollRestore() {
+  cancelMobileKeyboardMessagesScrollRestoreFrame()
+  mobileKeyboardMessagesScrollTopSnapshot = null
+  mobileKeyboardOpeningActive.value = false
+}
+
 function updateScrollToBottomVisibility() {
   const el = messagesContainer.value
   if (!el || chatStore.messages.length === 0) {
@@ -3304,6 +3386,7 @@ function dismissMobileKeyboardForConversationScroll() {
   mobileChatInputRef.value?.blur()
   clearMobileKeyboardInsetTracking()
   mobileKeyboardInset.value = 0
+  resetMobileKeyboardMessagesScrollRestore()
 }
 
 function scrollToBottomSmooth() {
@@ -3874,7 +3957,28 @@ function isMobileComposerFocused(): boolean {
   return activeElement === mobileChatInputRef.value || Boolean(chatComposerWrapRef.value?.contains(activeElement))
 }
 
+function updateMobileViewportTopOffset() {
+  if (!isMobile.value || typeof window === 'undefined') {
+    mobileViewportTopOffset.value = 0
+    return
+  }
+
+  const visualViewport = window.visualViewport
+  if (!visualViewport) {
+    mobileViewportTopOffset.value = 0
+    return
+  }
+
+  mobileViewportTopOffset.value = resolveMobileViewportTopOffset({
+    layoutHeight: window.innerHeight,
+    visualHeight: visualViewport.height,
+    offsetTop: visualViewport.offsetTop
+  })
+}
+
 function updateMobileKeyboardInset() {
+  updateMobileViewportTopOffset()
+
   if (!isMobile.value || typeof window === 'undefined' || !isMobileComposerFocused()) {
     mobileKeyboardInset.value = 0
     return
@@ -3897,6 +4001,7 @@ function updateMobileKeyboardInset() {
       threshold: MOBILE_KEYBOARD_VISIBLE_THRESHOLD_PX
     }
   )
+  restoreMessagesScrollForMobileKeyboard()
 }
 
 function clearMobileKeyboardInsetTracking() {
@@ -3904,17 +4009,22 @@ function clearMobileKeyboardInsetTracking() {
     clearTimeout(mobileKeyboardInsetTrackTimer)
     mobileKeyboardInsetTrackTimer = null
   }
+  cancelMobileKeyboardMessagesScrollRestoreFrame()
 }
 
 function startMobileKeyboardInsetTracking() {
   if (!isMobile.value) return
   clearMobileKeyboardInsetTracking()
+  ensureMobileKeyboardOpeningScrollCaptured()
   const stopAt = Date.now() + MOBILE_KEYBOARD_TRACK_DURATION_MS
 
   const tick = () => {
     updateMobileKeyboardInset()
+    scheduleMobileKeyboardMessagesScrollRestore()
     if (!isMobile.value || !isMobileComposerFocused() || Date.now() >= stopAt) {
       mobileKeyboardInsetTrackTimer = null
+      restoreMessagesScrollForMobileKeyboard()
+      resetMobileKeyboardMessagesScrollRestore()
       return
     }
     mobileKeyboardInsetTrackTimer = setTimeout(tick, MOBILE_KEYBOARD_TRACK_INTERVAL_MS)
@@ -3924,9 +4034,13 @@ function startMobileKeyboardInsetTracking() {
 }
 
 function scheduleMobileKeyboardInsetUpdate(trackKeyboardOpening: boolean | Event = false) {
+  if (trackKeyboardOpening === true) {
+    ensureMobileKeyboardOpeningScrollCaptured()
+  }
   updateMobileKeyboardInset()
   if (!isMobileComposerFocused()) {
     clearMobileKeyboardInsetTracking()
+    resetMobileKeyboardMessagesScrollRestore()
   }
   if (mobileKeyboardInsetTimer != null) {
     clearTimeout(mobileKeyboardInsetTimer)
@@ -3934,6 +4048,7 @@ function scheduleMobileKeyboardInsetUpdate(trackKeyboardOpening: boolean | Event
   mobileKeyboardInsetTimer = setTimeout(() => {
     mobileKeyboardInsetTimer = null
     updateMobileKeyboardInset()
+    scheduleMobileKeyboardMessagesScrollRestore()
   }, 260)
   if (trackKeyboardOpening === true) {
     startMobileKeyboardInsetTracking()
@@ -3943,6 +4058,7 @@ function scheduleMobileKeyboardInsetUpdate(trackKeyboardOpening: boolean | Event
 function registerMobileKeyboardInsetListeners() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return
   window.visualViewport?.addEventListener('resize', scheduleMobileKeyboardInsetUpdate)
+  window.visualViewport?.addEventListener('scroll', scheduleMobileKeyboardInsetUpdate)
   window.addEventListener('orientationchange', scheduleMobileKeyboardInsetUpdate)
   document.addEventListener('focusin', scheduleMobileKeyboardInsetUpdate, true)
   document.addEventListener('focusout', scheduleMobileKeyboardInsetUpdate, true)
@@ -3951,6 +4067,7 @@ function registerMobileKeyboardInsetListeners() {
 function unregisterMobileKeyboardInsetListeners() {
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     window.visualViewport?.removeEventListener('resize', scheduleMobileKeyboardInsetUpdate)
+    window.visualViewport?.removeEventListener('scroll', scheduleMobileKeyboardInsetUpdate)
     window.removeEventListener('orientationchange', scheduleMobileKeyboardInsetUpdate)
     document.removeEventListener('focusin', scheduleMobileKeyboardInsetUpdate, true)
     document.removeEventListener('focusout', scheduleMobileKeyboardInsetUpdate, true)
@@ -3961,6 +4078,8 @@ function unregisterMobileKeyboardInsetListeners() {
   }
   clearMobileKeyboardInsetTracking()
   mobileKeyboardInset.value = 0
+  mobileViewportTopOffset.value = 0
+  resetMobileKeyboardMessagesScrollRestore()
 }
 
 onMounted(async () => {
@@ -5292,6 +5411,7 @@ void sendQuickMessage
   --wk-chat-messages-scrollbar-offset: 0px;
   /* background: var(--wk-bg-page); */
   overflow-x: hidden;
+  overflow-anchor: none;
 }
 
 .wk-chat-shell {
@@ -5407,6 +5527,17 @@ void sendQuickMessage
     display: block;
     height: calc(45px + max(8px, env(safe-area-inset-top)));
   }
+}
+
+.wk-mobile-chat-top-viewport-shield {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 89;
+  height: calc(64px + max(8px, env(safe-area-inset-top)) + var(--wk-mobile-viewport-top-offset, 0px));
+  pointer-events: none;
+  background: var(--wk-bg-surface);
 }
 
 .wk-scroll-to-bottom-button {

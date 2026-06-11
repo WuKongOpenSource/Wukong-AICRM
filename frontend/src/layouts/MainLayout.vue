@@ -884,6 +884,16 @@
                 <span class="material-symbols-outlined inline-flex size-6 shrink-0 items-center justify-center text-[24px] leading-none text-rose-400 transition-colors group-hover:text-rose-600">logout</span>
                 <span class="text-sm font-medium">退出登录</span>
               </button>
+
+              <button
+                type="button"
+                class="mx-3 flex items-center justify-between rounded-[8px] px-3 py-2 text-xs text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:cursor-wait disabled:opacity-70"
+                :disabled="checkingAppUpdate"
+                @click="handleManualUpdateCheck"
+              >
+                <span>当前版本</span>
+                <span class="font-medium tabular-nums">{{ checkingAppUpdate ? '检查中...' : `v${currentAppVersion}` }}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -1522,6 +1532,16 @@
                       <span class="material-symbols-outlined inline-flex size-5 shrink-0 items-center justify-center text-[20px] leading-none">logout</span>
                       <span class="min-w-0 flex-1 truncate text-[1rem] font-medium">退出登录</span>
                     </button>
+
+                    <button
+                      type="button"
+                      class="flex w-full items-center justify-between border-t border-[#ededed] py-3.5 text-[#8a8a92] transition-colors active:text-[#0d0d0d] disabled:cursor-wait disabled:opacity-70"
+                      :disabled="checkingAppUpdate"
+                      @click="handleManualUpdateCheck"
+                    >
+                      <span class="text-[0.95rem]">当前版本</span>
+                      <span class="text-[0.95rem] tabular-nums">{{ checkingAppUpdate ? '检查中...' : `v${currentAppVersion}` }}</span>
+                    </button>
                   </div>
                 </section>
               </div>
@@ -1596,6 +1616,16 @@
               >
                 <span class="material-symbols-outlined text-rose-400 transition-colors group-hover:text-rose-600">logout</span>
                 <span class="text-sm font-medium">退出登录</span>
+              </button>
+
+              <button
+                type="button"
+                class="mx-3 flex items-center justify-between rounded-xl px-3 py-2 text-xs text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:cursor-wait disabled:opacity-70"
+                :disabled="checkingAppUpdate"
+                @click="handleManualUpdateCheck"
+              >
+                <span>当前版本</span>
+                <span class="font-medium tabular-nums">{{ checkingAppUpdate ? '检查中...' : `v${currentAppVersion}` }}</span>
               </button>
             </div>
           </div>
@@ -1901,6 +1931,7 @@ import { useEnumStore } from '@/stores/enums'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import { shouldCloseMobileDrawerFromSwipe, type SwipePoint } from '@/utils/mobileDrawerSwipe'
+import { checkForUpdates, DEFAULT_CURRENT_VERSION, getCurrentVersion } from '@/utils/capacitorUpdate'
 import {
   DEFAULT_SIDEBAR_MODULE_ORDER,
   normalizeSidebarModuleOrder,
@@ -2645,6 +2676,8 @@ const sidebarRelationsPage = ref(1)
 const sidebarRelationsTotal = ref(0)
 const sidebarRelationsHasMore = ref(true)
 const showUserMenu = ref(false)
+const currentAppVersion = ref(DEFAULT_CURRENT_VERSION)
+const checkingAppUpdate = ref(false)
 const showAccountSettingsModal = ref(false)
 const showCreateCustomer = ref(false)
 const showCreateRelation = ref(false)
@@ -2931,6 +2964,42 @@ const showMobileConfigSection = computed(() => MOBILE_CONFIG_SECTION_VISIBLE && 
 const userDisplayName = computed(() => userStore.realname || userStore.username || '用户')
 const userAccountName = computed(() => userStore.username || userStore.userInfo?.email || userStore.userInfo?.mobile || '用户')
 const userAvatarInitials = computed(() => userDisplayName.value.trim().slice(0, 2).toUpperCase() || 'U')
+
+async function loadCurrentAppVersion() {
+  try {
+    currentAppVersion.value = await getCurrentVersion()
+  } catch (error) {
+    console.warn('获取当前版本号失败:', error)
+    currentAppVersion.value = DEFAULT_CURRENT_VERSION
+  }
+}
+
+async function handleManualUpdateCheck() {
+  if (checkingAppUpdate.value) return
+
+  checkingAppUpdate.value = true
+  try {
+    await loadCurrentAppVersion()
+    const result = await checkForUpdates()
+
+    if (result === 'none') {
+      ElMessage.success('当前已是最新版本')
+      return
+    }
+
+    if (result === 'unsupported') {
+      ElMessage.info('当前环境暂不支持应用内更新检查')
+      return
+    }
+
+    if (result === 'failed') {
+      ElMessage.error('检查更新失败，请稍后重试')
+    }
+  } finally {
+    checkingAppUpdate.value = false
+  }
+}
+
 const showMobileDrawerNewChatButton = computed(() =>
   isMobile.value && drawerVisible.value && !chatDrawerOpen.value && !customerSearchDialogVisible.value && !showUserMenu.value
 )
@@ -3265,6 +3334,7 @@ function updatePrimaryNavScrollbar() {
 onMounted(() => {
   enterpriseStore.loadConfig()
   void chatStore.fetchSessions()
+  void loadCurrentAppVersion()
   void handleExternalAuthBindingReturn()
   if (showSidebarCustomers.value) {
     void fetchSidebarCustomers({ reset: true })
