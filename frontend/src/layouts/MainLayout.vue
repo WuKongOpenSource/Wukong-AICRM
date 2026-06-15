@@ -119,7 +119,7 @@
     </aside>
 
     <!-- Mobile Top Bar -->
-    <div v-if="isMobile" class="fixed top-0 left-0 right-0 z-50 h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4">
+    <div v-if="isMobile" class="wk-mobile-top-bar fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-200 flex items-center justify-between px-4">
       <button @click="drawerVisible = true" class="size-10 flex items-center justify-center text-slate-600 hover:bg-slate-100 rounded-lg">
         <span class="material-symbols-outlined">menu</span>
       </button>
@@ -143,8 +143,8 @@
         <div v-if="isMobile && drawerVisible" class="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm" @click="drawerVisible = false"></div>
       </Transition>
       <Transition name="drawer-panel">
-        <aside v-if="isMobile && drawerVisible" class="fixed left-0 top-0 bottom-0 w-72 bg-white flex flex-col shadow-2xl z-[101]">
-          <div class="p-6 flex items-center gap-3">
+        <aside v-if="isMobile && drawerVisible" class="wk-mobile-drawer-panel fixed left-0 top-0 bottom-0 w-72 bg-white flex flex-col shadow-2xl z-[101]">
+          <div class="wk-mobile-drawer-header p-6 flex items-center gap-3">
             <div v-if="enterpriseStore.hasLogo" class="size-10 flex-shrink-0 rounded-xl overflow-hidden bg-transparent border border-slate-200">
               <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
             </div>
@@ -156,7 +156,7 @@
               <p class="text-slate-500 text-xs uppercase tracking-widest">{{ enterpriseStore.displayDescription }}</p>
             </div>
           </div>
-          <nav class="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+          <nav class="wk-mobile-drawer-nav flex-1 px-4 py-4 space-y-1 overflow-y-auto">
             <button
               v-for="item in mainNavItems"
               :key="item.route"
@@ -188,7 +188,7 @@
     </Teleport>
 
     <!-- Main Content Area -->
-    <div class="flex-1 flex flex-col overflow-hidden" :class="{ 'pt-14': isMobile }">
+    <div class="flex-1 flex flex-col overflow-hidden" :class="{ 'wk-mobile-top-bar-spacer': isMobile }">
       <!-- Header -->
       <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-10 shrink-0">
         <div class="flex items-center gap-4 flex-1">
@@ -405,6 +405,29 @@ function handleCreateCustomerSuccess() {
 </script>
 
 <style scoped>
+.wk-mobile-top-bar {
+  box-sizing: border-box;
+  height: calc(3.5rem + var(--wk-safe-top));
+  padding-top: var(--wk-safe-top);
+}
+
+.wk-mobile-top-bar-spacer {
+  padding-top: calc(3.5rem + var(--wk-safe-top));
+}
+
+.wk-mobile-drawer-panel {
+  box-sizing: border-box;
+  padding-left: var(--wk-safe-left);
+}
+
+.wk-mobile-drawer-header {
+  padding-top: calc(1.5rem + var(--wk-safe-top));
+}
+
+.wk-mobile-drawer-nav {
+  padding-bottom: calc(1rem + var(--wk-safe-bottom));
+}
+
 /* Drawer animations */
 .drawer-overlay-enter-active,
 .drawer-overlay-leave-active {

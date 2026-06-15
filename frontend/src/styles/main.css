@@ -16,6 +16,17 @@ html, body, #app {
   overflow: hidden;
 }
 
+:root {
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
+  --wk-safe-top: var(--safe-area-inset-top);
+  --wk-safe-right: var(--safe-area-inset-right);
+  --wk-safe-bottom: var(--safe-area-inset-bottom);
+  --wk-safe-left: var(--safe-area-inset-left);
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -224,6 +235,73 @@ html, body, #app {
 .el-dialog__footer {
   border-top: 1px solid #e2e8f0;
   padding: 1rem 1.5rem !important;
+}
+
+@media (max-width: 767px) {
+  .el-dialog:not(.is-fullscreen) {
+    display: flex;
+    flex-direction: column;
+    width: calc(100vw - 2rem - var(--wk-safe-left) - var(--wk-safe-right)) !important;
+    max-width: calc(100vw - 2rem - var(--wk-safe-left) - var(--wk-safe-right));
+    max-height: calc(100dvh - 2rem - var(--wk-safe-top) - var(--wk-safe-bottom));
+    margin: calc(1rem + var(--wk-safe-top)) auto calc(1rem + var(--wk-safe-bottom)) !important;
+    overflow: hidden;
+  }
+
+  .el-dialog.is-fullscreen {
+    width: calc(100vw - var(--wk-safe-left) - var(--wk-safe-right)) !important;
+    height: calc(100dvh - var(--wk-safe-top) - var(--wk-safe-bottom)) !important;
+    margin: var(--wk-safe-top) var(--wk-safe-right) var(--wk-safe-bottom) var(--wk-safe-left) !important;
+    overflow: hidden;
+  }
+
+  .el-dialog .el-dialog__header,
+  .el-dialog .el-dialog__footer {
+    flex-shrink: 0;
+  }
+
+  .el-dialog .el-dialog__body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .el-drawer {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .el-drawer.rtl,
+  .el-drawer.ltr {
+    top: var(--wk-safe-top) !important;
+    bottom: var(--wk-safe-bottom) !important;
+    height: calc(100dvh - var(--wk-safe-top) - var(--wk-safe-bottom)) !important;
+    max-height: calc(100dvh - var(--wk-safe-top) - var(--wk-safe-bottom));
+    max-width: calc(100vw - var(--wk-safe-left) - var(--wk-safe-right));
+  }
+
+  .el-drawer.rtl {
+    right: var(--wk-safe-right) !important;
+  }
+
+  .el-drawer.ltr {
+    left: var(--wk-safe-left) !important;
+  }
+
+  .el-drawer__header,
+  .el-drawer__footer {
+    flex-shrink: 0;
+  }
+
+  .el-drawer__body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
 }
 
 /* Dialog variant: remove default paddings, let content control spacing */
