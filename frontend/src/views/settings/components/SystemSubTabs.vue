@@ -1,11 +1,11 @@
 <template>
-  <div class="max-w-4xl mx-auto mb-6">
+  <div class="system-sub-tabs max-w-4xl mx-auto mb-6">
     <div class="flex gap-2 overflow-x-auto">
       <button
         v-for="tab in SYSTEM_SETTINGS_TABS"
         :key="tab.value"
-        class="px-4 py-1.5 text-xs font-bold rounded-full transition-all whitespace-nowrap"
-        :class="activeTab === tab.value ? 'bg-primary text-white' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'"
+        class="system-sub-tabs__button"
+        :class="{ 'is-active': activeTab === tab.value }"
         @click="$emit('update:activeTab', tab.value)"
       >
         {{ tab.label }}
@@ -26,3 +26,32 @@ defineEmits<{
   (e: 'update:activeTab', value: SystemSettingsTab): void
 }>()
 </script>
+
+<style scoped>
+.system-sub-tabs__button {
+  white-space: nowrap;
+  border: 1px solid var(--wk-border-subtle);
+  border-radius: 999px;
+  background: var(--wk-bg-surface);
+  padding: 0.375rem 1rem;
+  color: var(--wk-text-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 700;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.system-sub-tabs__button:hover {
+  background: var(--wk-bg-surface-hover);
+  color: var(--wk-text-secondary);
+}
+
+.system-sub-tabs__button.is-active {
+  border-color: var(--wk-primary);
+  background: var(--wk-primary);
+  color: #fff;
+}
+</style>

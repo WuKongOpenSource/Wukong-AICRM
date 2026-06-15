@@ -7,6 +7,7 @@ import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.kakarote.ai_crm.common.BasePage;
+import com.kakarote.ai_crm.common.enums.EmployeeStatusEnum;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.ResetUsernameBO;
@@ -101,6 +102,7 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
             } else {
                 manageUser.setStatus(1);
             }
+            manageUser.setEmployeeStatus(EmployeeStatusEnum.normalize(userAddBO.getEmployeeStatus()));
             manageUser.setCreateTime(new Date());
             save(manageUser);
             // 关联角色
@@ -136,6 +138,7 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         }
         BasePage<ManageUserVO> page = baseMapper.queryPageList(userQueryBO.parse(), userQueryBO);
         fillRoleInfo(page.getRecords());
+        fillEmployeeStatusName(page.getRecords());
         fillImgUrl(page.getRecords());
         return page;
     }
@@ -177,6 +180,15 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         }
     }
 
+    private void fillEmployeeStatusName(List<ManageUserVO> users) {
+        if (CollUtil.isEmpty(users)) return;
+        users.forEach(user -> {
+            String status = EmployeeStatusEnum.normalize(user.getEmployeeStatus());
+            user.setEmployeeStatus(status);
+            user.setEmployeeStatusName(EmployeeStatusEnum.getName(status));
+        });
+    }
+
     /**
      * 修改用户
      *
@@ -215,6 +227,9 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
             }
             if (ObjectUtil.isNotNull(updateBO.getStatus())){
                 userEntity.setStatus(updateBO.getStatus());
+            }
+            if (ObjectUtil.isNotNull(updateBO.getEmployeeStatus())) {
+                userEntity.setEmployeeStatus(EmployeeStatusEnum.normalize(updateBO.getEmployeeStatus()));
             }
             if (updateBO.getParentId() != null){
                 Long parentId = normalizeParentUserId(updateBO.getParentId());

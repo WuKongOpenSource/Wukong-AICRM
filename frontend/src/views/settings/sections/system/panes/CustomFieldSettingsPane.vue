@@ -13,6 +13,8 @@
     <el-tabs v-model="activeEntityType" class="mb-4" @tab-change="loadCustomFields">
       <el-tab-pane label="客户字段" name="customer" />
       <el-tab-pane label="联系人字段" name="contact" />
+      <el-tab-pane label="关系字段" name="relation" />
+      <el-tab-pane label="产品字段" name="product" />
     </el-tabs>
 
     <div v-if="loadingFields" class="text-center py-8">
@@ -25,9 +27,27 @@
       <div
         v-for="field in customFields"
         :key="field.fieldId"
-        class="flex items-center justify-between p-4 bg-white rounded-lg border border-slate-200"
+        class="flex items-center justify-between p-4 bg-white rounded-lg border border-slate-200 transition-colors"
+        :class="{
+          'border-primary/50 bg-primary/5': dragOverFieldId === field.fieldId,
+          'opacity-70': sortingFields && draggedFieldId === field.fieldId
+        }"
+        draggable="true"
+        @dragstart="handleDragStart($event, field)"
+        @dragenter.prevent="handleDragOver($event, field)"
+        @dragover.prevent="handleDragOver($event, field)"
+        @drop.prevent="handleDrop($event, field)"
+        @dragend="handleDragEnd"
       >
         <div class="flex items-center flex-1">
+          <button
+            v-if="false"
+            type="button"
+            class="mr-3 text-slate-400 hover:text-slate-600 cursor-grab active:cursor-grabbing"
+            title="拖动排序"
+          >
+            <span class="material-symbols-outlined text-lg">drag_indicator</span>
+          </button>
           <div class="mr-4">
             <div class="font-medium">
               {{ field.fieldLabel }}
@@ -36,9 +56,13 @@
             </div>
             <div class="text-sm text-slate-500 mt-1">
               <el-tag size="small">{{ getFieldTypeLabel(field.fieldType) }}</el-tag>
-              <span v-if="field.options && field.options.length > 0" class="ml-2">
-                选项: {{ field.options.map((item) => item.label).join(', ') }}
-              </span>
+              <el-tag
+                size="small"
+                :type="field.fieldSource === 'system' ? 'warning' : 'success'"
+                class="ml-2"
+              >
+                {{ field.fieldSource === 'system' ? '系统字段' : '自定义字段' }}
+              </el-tag>
             </div>
           </div>
         </div>
@@ -50,7 +74,7 @@
           <el-button text @click="handleEditField(field)">
             <span class="material-symbols-outlined text-base">edit</span>
           </el-button>
-          <el-button text type="danger" @click="confirmDeleteField(field)">
+          <el-button v-if="field.fieldSource !== 'system'" text type="danger" @click="confirmDeleteField(field)">
             <span class="material-symbols-outlined text-base">delete</span>
           </el-button>
         </div>
@@ -78,15 +102,18 @@ import {
   getFieldsByEntity,
   addCustomField,
   updateCustomField,
+  updateFieldSort,
   deleteCustomField,
   enableCustomField,
   disableCustomField
 } from '@/api/customField'
 import type { CustomField, EntityType, FieldOption, FieldType } from '@/types/customField'
+import { useEnumStore } from '@/stores/enums'
 import { SYSTEM_FIELD_TYPE_LABELS } from '../constants'
 import CustomFieldDialog from './components/CustomFieldDialog.vue'
 
 const { isMobile } = useResponsive()
+const enumStore = useEnumStore()
 
 const showFieldDialog = ref(false)
 const activeEntityType = ref<EntityType>('customer')
@@ -94,6 +121,9 @@ const customFields = ref<CustomField[]>([])
 const loadingFields = ref(false)
 const editingField = ref<CustomField | null>(null)
 const submitting = ref(false)
+const sortingFields = ref(false)
+const draggedFieldId = ref<string | null>(null)
+const dragOverFieldId = ref<string | null>(null)
 
 const fieldForm = reactive({
   fieldLabel: '',
@@ -123,6 +153,65 @@ async function loadCustomFields() {
     // Error handled by interceptor
   } finally {
     loadingFields.value = false
+  }
+}
+
+function handleDragStart(event: DragEvent, field: CustomField) {
+  if (sortingFields.value) return
+  draggedFieldId.value = field.fieldId
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.dropEffect = 'move'
+    event.dataTransfer.setData('text/plain', field.fieldId)
+  }
+}
+
+function handleDragOver(event: DragEvent, field: CustomField) {
+  if (!draggedFieldId.value || draggedFieldId.value === field.fieldId) return
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+  dragOverFieldId.value = field.fieldId
+}
+
+function handleDragEnd() {
+  draggedFieldId.value = null
+  dragOverFieldId.value = null
+}
+
+async function handleDrop(event: DragEvent, targetField: CustomField) {
+  const sourceFieldId = draggedFieldId.value || event.dataTransfer?.getData('text/plain') || null
+  handleDragEnd()
+
+  if (!sourceFieldId || sourceFieldId === targetField.fieldId || sortingFields.value) {
+    return
+  }
+
+  const sourceIndex = customFields.value.findIndex(field => field.fieldId === sourceFieldId)
+  const targetIndex = customFields.value.findIndex(field => field.fieldId === targetField.fieldId)
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
+    return
+  }
+
+  const nextFields = [...customFields.value]
+  const [movedField] = nextFields.splice(sourceIndex, 1)
+  nextFields.splice(targetIndex, 0, movedField)
+  nextFields.forEach((field, index) => {
+    field.sortOrder = (index + 1) * 10
+  })
+  customFields.value = nextFields
+
+  sortingFields.value = true
+  try {
+    await updateFieldSort(nextFields.map(field => ({
+      fieldId: field.fieldId,
+      sortOrder: field.sortOrder
+    })))
+    ElMessage.success('字段排序已更新')
+  } catch {
+    await loadCustomFields()
+  } finally {
+    sortingFields.value = false
   }
 }
 
@@ -157,7 +246,7 @@ function handleEditField(field: CustomField) {
     isRequired: field.isRequired,
     isSearchable: field.isSearchable,
     isShowInList: field.isShowInList,
-    isUnique: field.isUnique,
+    isUnique: field.isUnique ?? false,
     options: field.options ? [...field.options] : []
   })
   showFieldDialog.value = true
@@ -177,6 +266,8 @@ function handleFieldTypeChange(newType: FieldType) {
 }
 
 async function handleSaveField() {
+  const isEditingSystemField = editingField.value?.fieldSource === 'system'
+
   if (!fieldForm.fieldLabel.trim()) {
     ElMessage.warning('请输入字段标签')
     return
@@ -184,7 +275,8 @@ async function handleSaveField() {
 
   if (['select', 'multiselect'].includes(fieldForm.fieldType)) {
     const validOptions = fieldForm.options.filter((option) => option.value.trim() && option.label.trim())
-    if (validOptions.length === 0) {
+    // 系统字段内置选项由后端校验保留；自定义字段要求至少一个有效选项
+    if (!isEditingSystemField && validOptions.length === 0) {
       ElMessage.warning('请至少添加一个有效选项')
       return
     }
@@ -224,6 +316,8 @@ async function handleSaveField() {
     showFieldDialog.value = false
     resetFieldForm()
     await loadCustomFields()
+    // 选项可能变化（stage/level/relation 等），刷新枚举真相源缓存让各页面立即生效
+    enumStore.refreshAll()
   } catch {
     // Error handled by interceptor
   } finally {
@@ -245,6 +339,11 @@ async function handleToggleFieldStatus(field: CustomField, enabled: boolean) {
 }
 
 async function confirmDeleteField(field: CustomField) {
+  if (field.fieldSource === 'system') {
+    ElMessage.warning('系统字段不支持删除')
+    return
+  }
+
   try {
     await ElMessageBox.confirm('删除字段后该字段数据将不再展示，确定继续吗？', '提示', {
       type: 'warning',

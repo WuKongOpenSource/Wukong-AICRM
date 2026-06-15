@@ -13,11 +13,11 @@
         <el-icon class="is-loading"><Loading /></el-icon>
       </div>
       <div v-else class="space-y-6">
-        <div class="flex items-center gap-4 p-4 bg-slate-50 rounded-lg">
+        <div class="flex flex-wrap md:flex-nowrap items-center gap-4 p-4 bg-slate-50 rounded-lg">
           <div class="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center">
             <el-icon :size="24" class="text-orange-500"><Box /></el-icon>
           </div>
-          <div class="flex-1">
+          <div class="flex-1 min-w-0">
             <div class="font-medium">MinIO 管理控制台</div>
             <div class="text-sm text-slate-500 mt-1">
               {{ minioConfig.consoleUrl || '未配置' }}

@@ -17,25 +17,28 @@
       <div
         v-for="agent in agentStore.allAgents"
         :key="agent.agentId"
-        class="flex items-center justify-between p-4 bg-white rounded-lg border border-slate-200"
+        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-white rounded-lg border border-slate-200"
       >
-        <div class="flex items-center">
+        <div class="flex items-center w-full sm:w-auto">
           <el-icon :size="24" class="text-primary"><Promotion /></el-icon>
-          <div class="ml-3">
+          <div class="ml-3 min-w-0">
             <div class="font-medium">{{ agent.label }}</div>
-            <div class="text-sm text-slate-500 truncate max-w-md">{{ agent.prompt }}</div>
+            <div class="text-sm text-slate-500 truncate w-full max-w-[70vw] sm:max-w-none sm:whitespace-normal sm:break-words sm:overflow-visible sm:text-clip">
+              {{ agent.prompt }}
+            </div>
           </div>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 sm:gap-3 self-end sm:self-auto">
           <el-switch
             :model-value="!!agent.enabled"
             :disabled="agentStore.updating"
+            :size="isMobile ? 'small' : 'default'"
             @change="(value: boolean) => handleToggleAgent(agent.agentId, value)"
           />
-          <el-button text @click="handleEditAgent(agent)">
+          <el-button text :size="isMobile ? 'small' : 'default'" @click="handleEditAgent(agent)">
             <el-icon><Edit /></el-icon>
           </el-button>
-          <el-button text type="danger" @click="handleDeleteAgent(agent)">
+          <el-button text type="danger" :size="isMobile ? 'small' : 'default'" @click="handleDeleteAgent(agent)">
             <el-icon><Delete /></el-icon>
           </el-button>
         </div>

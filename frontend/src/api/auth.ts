@@ -79,6 +79,7 @@ export function addUser(data: {
   post?: string
   parentId?: number | string
   status?: number
+  employeeStatus?: string
   roleIds?: (number | string)[]
 }): Promise<void> {
   return post('/managerUser/addUser', data)
@@ -96,6 +97,7 @@ export function updateUserInfo(data: {
   post?: string
   sex?: number
   status?: number
+  employeeStatus?: string
   password?: string
   parentId?: number | string
   roleIds?: (number | string)[]

@@ -15,26 +15,8 @@ import {
 import type { PermItem, RolePermissionVO, RoleVO } from '@/types/role'
 import { ROLE_AVATAR_COLORS, ROLE_DATA_SCOPE_OPTIONS } from './constants'
 
-const ROLE_PERMISSION_MODULE_ORDER = [
-  'customer',
-  'contact',
-  'followup',
-  'task',
-  'schedule',
-  'project',
-  'product',
-  'relation',
-  'addressBook',
-  'mail',
-  'knowledge',
-  'chat',
-  'agent',
-  'user',
-  'dept',
-  'role',
-  'config',
-  'customField'
-]
+const ROLE_PERMISSION_MODULE_ORDER = ['customer', 'product', 'addressBook', 'contact', 'followup', 'task', 'schedule', 'knowledge', 'chat', 'agent', 'user', 'dept', 'role', 'config', 'customField']
+const PRODUCT_PERMISSION_ACTIONS_WITHOUT_SCOPE = new Set(['category_manage', 'settings'])
 
 function sortRolePermissions(permissionList: RolePermissionVO[]): RolePermissionVO[] {
   return [...permissionList].sort((left, right) => {
@@ -49,6 +31,28 @@ function sortRolePermissions(permissionList: RolePermissionVO[]): RolePermission
 
     return left.moduleName.localeCompare(right.moduleName, 'zh-CN')
   })
+}
+
+function normalizeRolePermissions(permissionList: RolePermissionVO[]): RolePermissionVO[] {
+  return sortRolePermissions(permissionList.map(moduleGroup => {
+    const actions = moduleGroup.actions
+      .filter(action => !(moduleGroup.module === 'product' && action.action === 'settings'))
+      .map(action => {
+        if (moduleGroup.module !== 'product' || !PRODUCT_PERMISSION_ACTIONS_WITHOUT_SCOPE.has(action.action)) {
+          return action
+        }
+        return {
+          ...action,
+          dataScope: null,
+          hasScopeOption: false
+        }
+      })
+
+    return {
+      ...moduleGroup,
+      actions
+    }
+  }))
 }
 
 export function useRoleManagement() {
@@ -123,7 +127,7 @@ export function useRoleManagement() {
     permissionRole.value = roleDrawerRole.value
     loadingPermissions.value = true
     try {
-      permissionList.value = sortRolePermissions(await getRolePermissions(roleDrawerRole.value.roleId))
+      permissionList.value = normalizeRolePermissions(await getRolePermissions(roleDrawerRole.value.roleId))
     } catch {
       // Error handled by interceptor
     } finally {
@@ -229,7 +233,7 @@ export function useRoleManagement() {
     permissionRole.value = role
     loadingPermissions.value = true
     try {
-      permissionList.value = sortRolePermissions(await getRolePermissions(role.roleId))
+      permissionList.value = normalizeRolePermissions(await getRolePermissions(role.roleId))
     } catch {
       // Error handled by interceptor
     } finally {

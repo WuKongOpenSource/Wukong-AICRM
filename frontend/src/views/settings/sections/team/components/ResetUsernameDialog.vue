@@ -2,9 +2,9 @@
   <el-dialog
     v-model="dialogVisible"
     title="重置用户名"
-    :width="isMobile ? '95%' : '460px'"
-    :fullscreen="isMobile"
-    class="wk-dialog--flush wk-crm-el-field-scope"
+    :width="isMobile ? 'calc(100vw - 2rem)' : '460px'"
+    append-to-body
+    class="wk-dialog--flush wk-crm-el-field-scope wk-reset-username-dialog wk-mobile-inset-dialog"
   >
     <div class="space-y-5">
       <div class="flex items-center gap-3">
@@ -25,19 +25,6 @@
             class="w-full wk-crm-el-field-input"
             size="large"
             clearable
-            @keydown.enter.prevent="$emit('save')"
-          />
-        </el-form-item>
-
-        <el-form-item v-if="requiresPassword" label="当前登录密码" required>
-          <el-input
-            v-model="form.currentPassword"
-            type="password"
-            show-password
-            autocomplete="current-password"
-            placeholder="请输入当前登录密码"
-            class="w-full wk-crm-el-field-input"
-            size="large"
             @keydown.enter.prevent="$emit('save')"
           />
         </el-form-item>
@@ -67,7 +54,6 @@ const props = defineProps<{
     currentPassword: string
   }
   submitting: boolean
-  requiresPassword: boolean
 }>()
 
 const emit = defineEmits<{
@@ -80,3 +66,38 @@ const dialogVisible = computed({
   set: (value: boolean) => emit('update:visible', value)
 })
 </script>
+
+<style>
+.el-dialog.wk-reset-username-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  margin-top: 5vh !important;
+}
+
+.el-dialog.wk-reset-username-dialog.is-fullscreen {
+  max-height: none;
+  height: 100%;
+  margin: 0 !important;
+}
+
+.el-dialog.wk-reset-username-dialog .el-dialog__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.el-dialog.wk-reset-username-dialog .el-dialog__footer {
+  flex-shrink: 0;
+}
+
+@media (max-width: 767px) {
+  .el-dialog.wk-reset-username-dialog.wk-mobile-inset-dialog {
+    --wk-reset-username-dialog-top: max(96px, calc(var(--wk-safe-top) + 72px));
+    --wk-reset-username-dialog-bottom: max(16px, var(--wk-safe-bottom));
+
+    max-height: calc(100dvh - var(--wk-reset-username-dialog-top) - var(--wk-reset-username-dialog-bottom));
+    margin: var(--wk-reset-username-dialog-top) auto var(--wk-reset-username-dialog-bottom) !important;
+  }
+}
+</style>

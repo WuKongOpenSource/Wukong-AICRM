@@ -2,9 +2,9 @@
   <el-dialog
     v-model="dialogVisible"
     :title="editingMember ? '编辑员工' : '新增员工'"
-    :width="isMobile ? '95%' : '650px'"
-    :fullscreen="isMobile"
-    class="wk-dialog--flush wk-member-dialog wk-crm-el-field-scope"
+    :width="isMobile ? 'calc(100vw - 2rem)' : '650px'"
+    append-to-body
+    class="wk-dialog--flush wk-member-dialog wk-crm-el-field-scope wk-mobile-inset-dialog"
   >
     <el-form :model="memberForm" label-position="top">
       <el-row :gutter="16">
@@ -95,12 +95,22 @@
       </el-row>
     </el-form>
 
-    <div class="mb-4">
-      <label class="text-sm font-medium text-slate-700 mb-2 block">状态</label>
-      <el-radio-group v-model="memberForm.status">
-        <el-radio :value="1">活跃</el-radio>
-        <el-radio :value="0">离职/停用</el-radio>
-      </el-radio-group>
+    <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div>
+        <label class="text-sm font-medium text-slate-700 mb-2 block">员工状态</label>
+        <el-radio-group v-model="memberForm.employeeStatus">
+          <el-radio value="active">在职</el-radio>
+          <el-radio value="resigned">离职</el-radio>
+          <el-radio value="disabled">停用</el-radio>
+        </el-radio-group>
+      </div>
+      <div>
+        <label class="text-sm font-medium text-slate-700 mb-2 block">账号状态</label>
+        <el-radio-group v-model="memberForm.status">
+          <el-radio :value="1">活跃</el-radio>
+          <el-radio :value="0">禁用</el-radio>
+        </el-radio-group>
+      </div>
     </div>
 
     <div class="mt-4">
@@ -151,6 +161,7 @@ const props = defineProps<{
     deptId: number | string | null
     parentId: number | string | null
     status: number
+    employeeStatus: string
     roleIds: string[]
   }
   deptTree: DeptVO[]
@@ -195,5 +206,15 @@ const dialogVisible = computed({
 
 .el-dialog.wk-member-dialog .wk-member-dialog__role-scroll {
   overscroll-behavior: contain;
+}
+
+@media (max-width: 767px) {
+  .el-dialog.wk-member-dialog.wk-mobile-inset-dialog {
+    --wk-member-dialog-top: max(96px, calc(var(--wk-safe-top) + 72px));
+    --wk-member-dialog-bottom: max(16px, var(--wk-safe-bottom));
+
+    max-height: calc(100dvh - var(--wk-member-dialog-top) - var(--wk-member-dialog-bottom));
+    margin: var(--wk-member-dialog-top) auto var(--wk-member-dialog-bottom) !important;
+  }
 }
 </style>

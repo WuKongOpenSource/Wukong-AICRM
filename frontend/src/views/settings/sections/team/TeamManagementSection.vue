@@ -1,6 +1,9 @@
 <template>
-  <div class="h-full min-h-0">
-    <div class="flex h-full min-h-0 bg-slate-50/50 overflow-hidden" :class="{ 'flex-col': isMobile }">
+  <div class="min-h-0 max-md:h-auto md:h-full">
+    <div
+      class="flex min-h-0 bg-slate-50/50 max-md:h-auto max-md:overflow-visible md:h-full md:overflow-hidden"
+      :class="{ 'flex-col': isMobile }"
+    >
       <DepartmentTreePanel
         v-if="!isMobile"
         variant="desktop"
@@ -20,11 +23,17 @@
         :loading-members="loadingMembers"
         :member-search="memberSearch"
         :member-role-id="memberRoleId"
+        :member-page="memberPage"
+        :member-page-size="memberPageSize"
+        :member-total="memberTotal"
+        :member-total-pages="memberTotalPages"
+        :visible-member-pages="visibleMemberPages"
         :all-role-options="allRoleOptions"
         :dept-count="deptCount"
         :get-avatar-color="getAvatarColor"
         @update:member-search="memberSearch = $event"
         @update:member-role-id="memberRoleId = $event"
+        @page-change="handleMemberPageChange"
         @open-dept-drawer="showDeptDrawer = true"
         @add-member="handleAddMember"
         @row-click="handleMemberRowClick"
@@ -52,6 +61,7 @@
       :is-mobile="isMobile"
       :editing-dept="editingDept"
       :dept-form="deptForm"
+      :parent-dept-options="parentDeptOptions"
       :submitting="submittingDept"
       @update:visible="showDeptDialog = $event"
       @save="handleSaveDept"
@@ -86,7 +96,6 @@
       :member="resetUsernameMember"
       :form="resetUsernameForm"
       :submitting="resettingUsername"
-      :requires-password="resetUsernameRequiresPassword"
       @update:visible="showResetUsernameDialog = $event"
       @save="handleSaveResetUsername"
     />
@@ -112,12 +121,18 @@ const {
   showDeptDrawer,
   memberSearch,
   memberRoleId,
+  memberPage,
+  memberPageSize,
+  memberTotal,
   filteredMembers,
+  memberTotalPages,
+  visibleMemberPages,
   deptCount,
   showDeptDialog,
   submittingDept,
   editingDept,
   deptForm,
+  parentDeptOptions,
   showAddMemberDialog,
   submittingMember,
   editingMember,
@@ -126,13 +141,13 @@ const {
   resettingUsername,
   resetUsernameMember,
   resetUsernameForm,
-  resetUsernameRequiresPassword,
   allRoleOptions,
   parentOptions,
   showMemberDetailDrawer,
   detailMember,
   getAvatarColor,
   handleDeptClick,
+  handleMemberPageChange,
   handleDeptCommand,
   handleAddDept,
   handleSaveDept,

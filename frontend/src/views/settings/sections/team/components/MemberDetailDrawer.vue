@@ -56,6 +56,14 @@
               <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">直属上级</p>
               <p class="text-sm font-bold text-slate-700">{{ member.parentName || '无' }}</p>
             </div>
+            <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">员工状态</p>
+              <p class="text-sm font-bold" :class="employeeStatusTextClass">{{ employeeStatusLabel }}</p>
+            </div>
+            <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">账号状态</p>
+              <p class="text-sm font-bold text-slate-700">{{ member.status === 1 ? '活跃' : member.status === 0 ? '禁用' : '未激活' }}</p>
+            </div>
             <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 col-span-2">
               <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">登录账号</p>
               <p class="text-sm font-bold text-slate-700">{{ member.username }}</p>
@@ -118,7 +126,7 @@
       <div class="flex gap-3 border-t border-slate-100 px-4 py-3">
         <el-button class="flex-1" type="primary" size="large" @click="$emit('edit', member)">
           <span class="material-symbols-outlined text-base mr-1">edit</span>
-          编辑资料
+          编辑
         </el-button>
         <el-button size="large" type="danger" plain class="!px-3" @click="$emit('delete', member)">
           <span class="material-symbols-outlined text-base">delete</span>
@@ -147,6 +155,24 @@ const emit = defineEmits<{
 const drawerVisible = computed({
   get: () => props.visible,
   set: (value: boolean) => emit('update:visible', value)
+})
+
+const employeeStatus = computed(() => {
+  const value = String(props.member?.employeeStatus || '').trim()
+  return value === 'resigned' || value === 'disabled' ? value : 'active'
+})
+
+const employeeStatusLabel = computed(() => {
+  if (props.member?.employeeStatusName) return props.member.employeeStatusName
+  if (employeeStatus.value === 'resigned') return '离职'
+  if (employeeStatus.value === 'disabled') return '停用'
+  return '在职'
+})
+
+const employeeStatusTextClass = computed(() => {
+  if (employeeStatus.value === 'resigned') return 'text-slate-500'
+  if (employeeStatus.value === 'disabled') return 'text-amber-600'
+  return 'text-emerald-600'
 })
 </script>
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="max-w-4xl mx-auto space-y-8">
+  <div class="enterprise-settings-pane max-w-4xl mx-auto space-y-8">
     <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
       <h3 class="text-base font-bold mb-6 flex items-center gap-2">
         <span class="w-1 h-4 bg-primary rounded-full"></span>
@@ -10,7 +10,7 @@
       </h3>
 
       <div class="mb-6">
-        <label class="block text-sm font-medium text-slate-700 mb-2">企业 Logo</label>
+        <label class="block text-sm font-medium text-slate-700 mb-2">公司 Logo</label>
         <div class="flex items-center gap-6">
           <div
             class="size-20 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-all overflow-hidden"
@@ -21,7 +21,7 @@
               v-if="enterpriseForm.logoUrl"
               :src="enterpriseForm.logoUrl"
               class="w-full h-full object-cover"
-              alt="企业Logo"
+              alt="公司Logo"
             />
             <div v-else class="text-center">
               <el-icon :size="24" class="text-slate-400"><Upload /></el-icon>
@@ -52,18 +52,18 @@
       </div>
 
       <el-form label-position="top">
-        <el-form-item label="企业名称">
+        <el-form-item label="公司名称">
           <el-input
             v-model="enterpriseForm.name"
-            placeholder="请输入企业名称"
+            placeholder="请输入公司名称"
             maxlength="50"
             show-word-limit
           />
         </el-form-item>
-        <el-form-item label="企业说明">
+        <el-form-item label="公司说明">
           <el-input
             v-model="enterpriseForm.description"
-            placeholder="请输入企业说明（显示在侧边栏企业名称下方）"
+            placeholder="请输入公司说明（显示在侧边栏公司名称下方）"
             maxlength="50"
             show-word-limit
           />
@@ -182,3 +182,9 @@ async function saveEnterpriseConfig() {
   }
 }
 </script>
+
+<style scoped>
+.enterprise-settings-pane :deep(.el-input__inner::placeholder) {
+  font-size: 12px;
+}
+</style>

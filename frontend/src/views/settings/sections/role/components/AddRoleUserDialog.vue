@@ -2,10 +2,9 @@
   <el-dialog
     v-model="dialogVisible"
     title="添加用户到角色"
-    :width="isMobile ? '95%' : '460px'"
-    :fullscreen="isMobile"
+    :width="isMobile ? 'calc(100vw - 2rem)' : '460px'"
     append-to-body
-    class="wk-dialog--flush"
+    class="wk-dialog--flush wk-mobile-inset-dialog"
   >
     <el-input v-model="searchValue" placeholder="搜索用户..." clearable class="mb-3" />
     <div class="max-h-64 overflow-auto space-y-1">
@@ -16,7 +15,11 @@
         @click="$emit('toggle-user', user.userId)"
       >
         <div class="flex items-center gap-2">
-          <el-checkbox :model-value="selectedUserIds.includes(String(user.userId))" @click.stop />
+          <el-checkbox
+            :model-value="selectedUserIds.includes(String(user.userId))"
+            @click.stop
+            @change="$emit('toggle-user', user.userId)"
+          />
           <div class="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-medium" :class="getAvatarColor(user.realname || user.username)">
             {{ (user.realname || user.username || '?').charAt(0) }}
           </div>

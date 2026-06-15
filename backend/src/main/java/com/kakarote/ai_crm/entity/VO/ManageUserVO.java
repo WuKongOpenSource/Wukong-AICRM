@@ -51,6 +51,12 @@ public class ManageUserVO {
     @Schema(description = "状态,0禁用,1正常,2未激活")
     private Integer status;
 
+    @Schema(description = "员工状态: active, resigned, disabled")
+    private String employeeStatus;
+
+    @Schema(description = "员工状态名称")
+    private String employeeStatusName;
+
     @Schema(description = "直属上级ID")
     private Long parentId;
 

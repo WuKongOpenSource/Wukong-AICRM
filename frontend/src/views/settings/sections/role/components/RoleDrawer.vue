@@ -20,7 +20,7 @@
           leave-to-class="translate-x-full"
         >
           <div v-if="visible" class="fixed inset-y-0 right-0 w-full max-w-3xl bg-slate-50 shadow-2xl flex flex-col">
-            <div class="bg-white px-8 pt-8 pb-0 border-b border-slate-200 shrink-0">
+            <div class="bg-white px-5 pt-6 pb-0 border-b border-slate-200 shrink-0 md:px-8 md:pt-8">
               <div class="flex items-start justify-between mb-6">
                 <div>
                   <div class="flex items-center gap-3 mb-2">
@@ -61,20 +61,20 @@
               </div>
             </div>
 
-            <div class="flex-1 overflow-y-auto p-8">
+            <div class="flex-1 overflow-y-auto p-5 md:p-8">
               <div v-if="activeRoleDrawerTab === 'members'" class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-white">
-                  <div class="relative">
+                <div class="p-4 border-b border-slate-100 flex flex-col gap-3 bg-white sm:flex-row sm:items-center sm:justify-between md:p-5">
+                  <div class="relative w-full sm:w-auto">
                     <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
                     <input
                       v-model="roleUserSearchValue"
                       type="text"
                       placeholder="搜索成员姓名或邮箱..."
-                      class="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white outline-none w-72 transition-all"
+                      class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white outline-none transition-all sm:w-72"
                     />
                   </div>
                   <button
-                    class="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-sm shadow-primary/20"
+                    class="w-full bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 whitespace-nowrap sm:w-auto"
                     @click="$emit('open-add-user')"
                   >
                     <span class="material-symbols-outlined wk-plus-button-icon">person_add</span>
@@ -123,13 +123,13 @@
               </div>
 
               <div v-else class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-                <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                <div class="p-4 border-b border-slate-100 flex flex-col gap-3 bg-white sticky top-0 z-10 sm:flex-row sm:items-center sm:justify-between md:p-5">
                   <div>
                     <h3 class="text-base font-bold text-slate-900">功能权限配置</h3>
                     <p class="text-xs text-slate-500 mt-1">配置该角色在各个业务模块中的操作权限及数据可见范围。</p>
                   </div>
                   <button
-                    class="bg-primary text-white px-5 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50"
+                    class="w-full shrink-0 bg-primary text-white px-5 py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 whitespace-nowrap sm:w-auto"
                     :disabled="savingPermissions"
                     @click="$emit('save-permissions')"
                   >

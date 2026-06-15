@@ -41,6 +41,9 @@ public class UserAddBO {
     @Schema(description = "状态,0禁用,1正常")
     private Integer status;
 
+    @Schema(description = "员工状态: active, resigned, disabled")
+    private String employeeStatus;
+
     @Schema(description = "角色ID列表")
     private List<Long> roleIds;
 }

@@ -9,6 +9,16 @@ import type { DeptVO } from '@/types/dept'
 import type { RoleVO } from '@/types/role'
 import { TEAM_AVATAR_COLORS } from './constants'
 
+// Keep in sync with com.kakarote.ai_crm.common.Const.AUTH_DATA_RECURSION_NUM
+const AUTH_DATA_RECURSION_NUM = 20
+const MEMBER_PAGE_SIZE = 10
+
+interface DeptOption {
+  label: string
+  value: string
+  depth: number
+}
+
 export function useTeamManagement() {
   const { isMobile } = useResponsive()
   const userStore = useUserStore()
@@ -22,10 +32,12 @@ export function useTeamManagement() {
   const showDeptDrawer = ref(false)
   const memberSearch = ref('')
   const memberRoleId = ref('0')
+  const memberPage = ref(1)
+  const memberPageSize = ref(MEMBER_PAGE_SIZE)
+  const memberTotal = ref(0)
   const showDeptDialog = ref(false)
   const submittingDept = ref(false)
   const editingDept = ref<DeptVO | null>(null)
-  const deptFormParentId = ref<number | string>(0)
   const showAddMemberDialog = ref(false)
   const submittingMember = ref(false)
   const editingMember = ref<any>(null)
@@ -40,6 +52,7 @@ export function useTeamManagement() {
 
   const deptForm = reactive({
     deptName: '',
+    parentId: '0',
     sortOrder: 0
   })
 
@@ -53,6 +66,7 @@ export function useTeamManagement() {
     deptId: null as number | string | null,
     parentId: null as number | string | null,
     status: 1 as number,
+    employeeStatus: 'active',
     roleIds: [] as string[]
   })
 
@@ -61,18 +75,23 @@ export function useTeamManagement() {
     currentPassword: ''
   })
 
-  const resetUsernameRequiresPassword = computed(() =>
-    String(resetUsernameMember.value?.userId || '') === String(userStore.userId || '')
-  )
-
   const filteredMembers = computed(() => {
-    const list = memberList.value || []
-    const keyword = memberSearch.value.trim().toLowerCase()
-    return list.filter((member: any) => {
-      return !keyword || [member.realname, member.username, member.email, member.mobile]
-        .filter(Boolean)
-        .some((value: string) => String(value).toLowerCase().includes(keyword))
-    })
+    return memberList.value || []
+  })
+
+  const memberTotalPages = computed(() => Math.max(1, Math.ceil(memberTotal.value / memberPageSize.value)))
+
+  const visibleMemberPages = computed(() => {
+    const total = memberTotalPages.value
+    const current = memberPage.value
+    const maxVisible = 5
+    const start = Math.max(1, Math.min(current - Math.floor(maxVisible / 2), total - maxVisible + 1))
+    const end = Math.min(total, start + maxVisible - 1)
+    const pages: number[] = []
+    for (let i = start; i <= end; i++) {
+      pages.push(i)
+    }
+    return pages
   })
 
   const deptCount = computed(() => countDepts(deptTree.value))
@@ -84,12 +103,31 @@ export function useTeamManagement() {
     )
   })
 
+  const parentDeptOptions = computed(() => {
+    const excludedDeptIds = new Set<string>()
+
+    if (editingDept.value) {
+      excludedDeptIds.add(String(editingDept.value.deptId))
+      collectDeptIds(editingDept.value.children || [], excludedDeptIds)
+    }
+
+    return flattenDeptOptions(deptTree.value).filter((option) => !excludedDeptIds.has(option.value))
+  })
+
   onMounted(async () => {
     await Promise.all([loadDeptTree(), loadRoleOptions()])
   })
 
   watch(memberRoleId, () => {
     if (selectedDept.value) {
+      memberPage.value = 1
+      loadMembers()
+    }
+  })
+
+  watch(memberSearch, () => {
+    if (selectedDept.value) {
+      memberPage.value = 1
       loadMembers()
     }
   })
@@ -100,23 +138,80 @@ export function useTeamManagement() {
     return TEAM_AVATAR_COLORS[index]
   }
 
-  function countDepts(tree: any[]): number {
+  function countDepts(tree: any[], depth = AUTH_DATA_RECURSION_NUM, visited = new Set<string>()): number {
+    if (depth <= 0) {
+      return 0
+    }
+
     let count = 0
     for (const node of tree) {
+      const deptId = node?.deptId != null ? String(node.deptId) : null
+      if (deptId && visited.has(deptId)) {
+        continue
+      }
+      if (deptId) {
+        visited.add(deptId)
+      }
+
       count++
       if (node.children) {
-        count += countDepts(node.children)
+        count += countDepts(node.children, depth - 1, visited)
       }
     }
     return count
+  }
+
+  function normalizeDeptId(value?: string | number | null): string {
+    if (value === null || value === undefined || value === '') {
+      return '0'
+    }
+    return String(value)
+  }
+
+  function findDeptById(tree: DeptVO[], deptId: string | number): DeptVO | null {
+    const targetId = String(deptId)
+    for (const node of tree) {
+      if (String(node.deptId) === targetId) {
+        return node
+      }
+      const child = findDeptById(node.children || [], deptId)
+      if (child) {
+        return child
+      }
+    }
+    return null
+  }
+
+  function flattenDeptOptions(tree: DeptVO[], depth = 0): DeptOption[] {
+    return tree.flatMap((node) => {
+      return [
+        {
+          label: node.deptName,
+          value: String(node.deptId),
+          depth
+        },
+        ...flattenDeptOptions(node.children || [], depth + 1)
+      ]
+    })
+  }
+
+  function collectDeptIds(tree: DeptVO[], ids: Set<string>) {
+    for (const node of tree) {
+      ids.add(String(node.deptId))
+      collectDeptIds(node.children || [], ids)
+    }
   }
 
   async function loadDeptTree() {
     loadingDeptTree.value = true
     try {
       deptTree.value = await fetchDeptTree()
-      if (deptTree.value.length > 0 && !selectedDept.value) {
+      if (selectedDept.value) {
+        selectedDept.value = findDeptById(deptTree.value, selectedDept.value.deptId) || deptTree.value[0] || null
+      } else if (deptTree.value.length > 0) {
         selectedDept.value = deptTree.value[0]
+      } else {
+        selectedDept.value = null
       }
       await loadMembers()
     } catch {
@@ -130,6 +225,7 @@ export function useTeamManagement() {
     if (!selectedDept.value) {
       deptMemberList.value = []
       memberList.value = []
+      memberTotal.value = 0
       return
     }
 
@@ -137,27 +233,45 @@ export function useTeamManagement() {
     loadingMembers.value = true
 
     try {
-      const query = { deptId: selectedDept.value.deptId, limit: 200 }
+      const deptQuery = { deptId: selectedDept.value.deptId, limit: 500 }
+      const listQuery: Parameters<typeof queryUserList>[0] = {
+        deptId: selectedDept.value.deptId,
+        page: memberPage.value,
+        limit: memberPageSize.value
+      }
+      const keyword = memberSearch.value.trim()
       const roleId = String(memberRoleId.value || '0')
-      const deptMembersPromise = queryUserList(query)
-      const roleMembersPromise = roleId === '0' ? null : queryUserList({ ...query, roleId })
-      const deptRes = await deptMembersPromise
+      if (keyword) {
+        listQuery.search = keyword
+      }
+      if (roleId !== '0') {
+        listQuery.roleId = roleId
+      }
 
+      const [deptRes, listRes] = await Promise.all([
+        queryUserList(deptQuery),
+        queryUserList(listQuery)
+      ])
       if (memberListRequestId !== requestId) return
 
       deptMemberList.value = deptRes?.list || deptRes?.records || deptRes || []
+      const nextMembers = listRes?.list || listRes?.records || (Array.isArray(listRes) ? listRes : [])
+      const nextTotal = Number(listRes?.totalRow ?? listRes?.total ?? nextMembers.length)
+      const nextTotalPages = Math.max(1, Math.ceil(nextTotal / memberPageSize.value))
 
-      if (roleMembersPromise) {
-        const roleRes = await roleMembersPromise
-        if (memberListRequestId !== requestId) return
-        memberList.value = roleRes?.list || roleRes?.records || roleRes || []
-      } else {
-        memberList.value = deptMemberList.value
+      if (nextTotal > 0 && memberPage.value > nextTotalPages) {
+        memberPage.value = nextTotalPages
+        await loadMembers()
+        return
       }
+
+      memberList.value = nextMembers
+      memberTotal.value = nextTotal
     } catch {
       if (memberListRequestId === requestId) {
         deptMemberList.value = []
         memberList.value = []
+        memberTotal.value = 0
       }
     } finally {
       if (memberListRequestId === requestId) {
@@ -168,6 +282,14 @@ export function useTeamManagement() {
 
   function handleDeptClick(dept: DeptVO) {
     selectedDept.value = dept
+    memberPage.value = 1
+    loadMembers()
+  }
+
+  function handleMemberPageChange(page: number) {
+    if (page < 1 || page > memberTotalPages.value) return
+    if (memberPage.value === page) return
+    memberPage.value = page
     loadMembers()
   }
 
@@ -187,15 +309,17 @@ export function useTeamManagement() {
 
   function handleAddDept(parentId: string | number) {
     editingDept.value = null
-    deptFormParentId.value = parentId
-    Object.assign(deptForm, { deptName: '', sortOrder: 0 })
+    Object.assign(deptForm, { deptName: '', parentId: normalizeDeptId(parentId), sortOrder: 0 })
     showDeptDialog.value = true
   }
 
   function handleEditDept(dept: DeptVO) {
     editingDept.value = dept
-    deptFormParentId.value = dept.parentId
-    Object.assign(deptForm, { deptName: dept.deptName, sortOrder: dept.sortOrder || 0 })
+    Object.assign(deptForm, {
+      deptName: dept.deptName,
+      parentId: normalizeDeptId(dept.parentId),
+      sortOrder: dept.sortOrder || 0
+    })
     showDeptDialog.value = true
   }
 
@@ -215,27 +339,29 @@ export function useTeamManagement() {
   }
 
   async function handleSaveDept() {
-    if (!deptForm.deptName.trim()) {
+    const deptName = deptForm.deptName.trim()
+
+    if (!deptName) {
       ElMessage.warning('请输入部门名称')
       return
     }
 
     submittingDept.value = true
     try {
+      const payload = {
+        deptName,
+        parentId: normalizeDeptId(deptForm.parentId),
+        sortOrder: deptForm.sortOrder
+      }
+
       if (editingDept.value) {
         await updateDept({
           deptId: editingDept.value.deptId,
-          deptName: deptForm.deptName,
-          parentId: deptFormParentId.value,
-          sortOrder: deptForm.sortOrder
+          ...payload
         })
         ElMessage.success('部门更新成功')
       } else {
-        await addDept({
-          deptName: deptForm.deptName,
-          parentId: deptFormParentId.value,
-          sortOrder: deptForm.sortOrder
-        })
+        await addDept(payload)
         ElMessage.success('部门添加成功')
       }
       showDeptDialog.value = false
@@ -259,6 +385,7 @@ export function useTeamManagement() {
       deptId: selectedDept.value ? selectedDept.value.deptId : null,
       parentId: null,
       status: 1,
+      employeeStatus: 'active',
       roleIds: []
     })
   }
@@ -301,6 +428,7 @@ export function useTeamManagement() {
       deptId: member.deptId || null,
       parentId: member.parentId || null,
       status: member.status ?? 1,
+      employeeStatus: member.employeeStatus || 'active',
       roleIds: (member.roleIds || []).map(String)
     })
     showAddMemberDialog.value = true
@@ -314,7 +442,7 @@ export function useTeamManagement() {
       }
       submittingMember.value = true
       try {
-        await updateUserInfo({
+        const payload: Parameters<typeof updateUserInfo>[0] = {
           userId: editingMember.value.userId,
           realname: memberForm.realname,
           mobile: memberForm.mobile || undefined,
@@ -322,10 +450,12 @@ export function useTeamManagement() {
           post: memberForm.post || undefined,
           deptId: memberForm.deptId || undefined,
           parentId: memberForm.parentId || 0,
-          status: memberForm.status,
-          password: memberForm.password || undefined,
-          roleIds: memberForm.roleIds
-        })
+          employeeStatus: memberForm.employeeStatus,
+          password: memberForm.password || undefined
+        }
+        payload.status = memberForm.status
+        payload.roleIds = memberForm.roleIds
+        await updateUserInfo(payload)
         ElMessage.success('员工更新成功')
         showAddMemberDialog.value = false
         editingMember.value = null
@@ -356,6 +486,7 @@ export function useTeamManagement() {
         post: memberForm.post || undefined,
         parentId: memberForm.parentId || undefined,
         status: memberForm.status,
+        employeeStatus: memberForm.employeeStatus,
         roleIds: memberForm.roleIds.length > 0 ? memberForm.roleIds : undefined
       })
       ElMessage.success('员工添加成功')
@@ -410,17 +541,11 @@ export function useTeamManagement() {
       ElMessage.warning('新用户名不能与当前用户名相同')
       return
     }
-    if (resetUsernameRequiresPassword.value && !resetUsernameForm.currentPassword.trim()) {
-      ElMessage.warning('请输入当前登录密码')
-      return
-    }
-
     resettingUsername.value = true
     try {
       await resetUsername({
         userId: member.userId,
-        username,
-        currentPassword: resetUsernameRequiresPassword.value ? resetUsernameForm.currentPassword : undefined
+        username
       })
       ElMessage.success('用户名已重置')
       showResetUsernameDialog.value = false
@@ -464,12 +589,18 @@ export function useTeamManagement() {
     showDeptDrawer,
     memberSearch,
     memberRoleId,
+    memberPage,
+    memberPageSize,
+    memberTotal,
     filteredMembers,
+    memberTotalPages,
+    visibleMemberPages,
     deptCount,
     showDeptDialog,
     submittingDept,
     editingDept,
     deptForm,
+    parentDeptOptions,
     showAddMemberDialog,
     submittingMember,
     editingMember,
@@ -478,7 +609,6 @@ export function useTeamManagement() {
     resettingUsername,
     resetUsernameMember,
     resetUsernameForm,
-    resetUsernameRequiresPassword,
     allRoleOptions,
     parentOptions,
     showMemberDetailDrawer,
@@ -486,6 +616,7 @@ export function useTeamManagement() {
     getAvatarColor,
     loadMembers,
     handleDeptClick,
+    handleMemberPageChange,
     handleDeptCommand,
     handleAddDept,
     handleSaveDept,
