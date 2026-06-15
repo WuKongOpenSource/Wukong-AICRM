@@ -1,7 +1,46 @@
 <template>
   <div class="flex h-full" :class="{ 'flex-col': isMobile }">
+    <Teleport to="body">
+      <div
+        v-if="showMobileTopViewportShield"
+        class="wk-mobile-chat-top-viewport-shield"
+        aria-hidden="true"
+      ></div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="showMobileFloatingBar"
+        class="wk-mobile-chat-floating-bar pointer-events-none px-4 py-3"
+      >
+        <button
+          type="button"
+          class="wk-mobile-chat-menu-fab pointer-events-auto"
+          aria-label="打开菜单"
+          title="打开菜单"
+          @click="openMobileMainMenu"
+        >
+          <span class="material-symbols-outlined text-[22px] leading-none">menu</span>
+        </button>
+        <div v-if="showMobileChatFloatingActions" class="pointer-events-auto flex items-center justify-end gap-3">
+          <div class="wk-mobile-chat-actions" :class="{ 'wk-mobile-chat-actions--single': mobileChatFloatingActionCount === 1 }">
+            <button
+              v-if="showMobileNewSessionAction"
+              type="button"
+              class="wk-mobile-chat-actions__btn"
+              aria-label="新建会话"
+              title="新建会话"
+              @click="handleNewSession"
+            >
+              <span class="material-symbols-outlined text-[20px] leading-none">edit_square</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <MobileChatTopHeader
-      :visible="showMobileChatHeader"
+      :visible="showMobileObjectHeader"
       :kind="mobileChatHeaderKind"
       :title="mobileChatHeaderTitle"
       :avatar-url="mobileChatHeaderAvatarUrl"
@@ -226,7 +265,7 @@
           <div
             ref="messagesContainer"
             class="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 scroll-smooth pb-4"
-            :class="{ 'wk-chat-messages--mobile-header': showMobileChatHeader }"
+            :class="{ 'wk-chat-messages--mobile-header': showMobileTopChrome }"
             @scroll="handleMessagesScroll"
           >
             <!-- Welcome Section (no messages) -->
@@ -1171,6 +1210,23 @@ const showDesktopObjectPanel = computed(() =>
 const showMobileChatHeader = computed(() =>
   isMobile.value && mobilePanel.value === 'chat' && currentView.value === 'chat'
 )
+const showMobileObjectHeader = computed(() =>
+  showMobileChatHeader.value && Boolean(chatObjectKind.value)
+)
+const showMobileFloatingBar = computed(() =>
+  showMobileChatHeader.value && !chatObjectKind.value
+)
+const showMobileTopChrome = computed(() =>
+  showMobileObjectHeader.value || showMobileFloatingBar.value
+)
+const showMobileTopViewportShield = computed(() => showMobileTopChrome.value)
+const showMobileNewSessionAction = computed(() =>
+  showMobileFloatingBar.value && Boolean(chatStore.currentSessionId)
+)
+const mobileChatFloatingActionCount = computed(() =>
+  showMobileNewSessionAction.value ? 1 : 0
+)
+const showMobileChatFloatingActions = computed(() => mobileChatFloatingActionCount.value > 0)
 const mobileChatHeaderKind = computed<'chat' | 'customer' | 'employee' | 'relation' | 'product'>(() =>
   chatObjectKind.value || 'chat'
 )
@@ -2512,6 +2568,94 @@ function resolveChatAppIcon(code: string): string {
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+.wk-mobile-chat-top-viewport-shield {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 89;
+  height: calc(64px + max(8px, var(--safe-area-inset-top)));
+  pointer-events: none;
+  background: var(--wk-bg-surface, #fff);
+}
+
+.wk-mobile-chat-floating-bar {
+  display: flex;
+  position: fixed;
+  top: var(--safe-area-inset-top);
+  right: var(--safe-area-inset-right);
+  left: var(--safe-area-inset-left);
+  z-index: 90;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.wk-mobile-chat-menu-fab {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(255 255 255 / 0.78);
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.72);
+  color: #0d0d0d;
+  box-shadow:
+    0 16px 42px rgb(15 23 42 / 0.14),
+    inset 0 1px 0 rgb(255 255 255 / 0.92);
+  backdrop-filter: blur(18px);
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.wk-mobile-chat-menu-fab:active {
+  transform: scale(0.94);
+}
+
+.wk-mobile-chat-menu-fab:hover {
+  background: rgb(255 255 255 / 0.88);
+}
+
+.wk-mobile-chat-actions {
+  display: inline-flex;
+  height: 42px;
+  min-width: 116px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.75);
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.5);
+  box-shadow:
+    0 18px 50px rgb(15 23 42 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.9);
+  backdrop-filter: blur(18px);
+}
+
+.wk-mobile-chat-actions--single {
+  min-width: 58px;
+}
+
+.wk-mobile-chat-actions__btn {
+  display: inline-flex;
+  width: 56px;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  color: #0d0d0d;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.wk-mobile-chat-actions__btn:active {
+  transform: scale(0.94);
+}
+
+.wk-mobile-chat-actions__btn:hover {
+  background: rgb(13 13 13 / 0.05);
 }
 
 .wk-scroll-to-bottom-button {
