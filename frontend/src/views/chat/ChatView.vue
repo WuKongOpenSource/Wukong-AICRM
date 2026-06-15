@@ -526,21 +526,57 @@
                     class="hidden"
                     @change="handleFileSelect"
                   />
-                  <button
-                    class="size-10 flex items-center justify-center text-slate-400 hover:text-primary transition-colors"
+                  <el-popover
+                    v-model:visible="chatUploadMenuVisible"
+                    placement="top-start"
+                    trigger="click"
+                    :width="224"
+                    :teleported="true"
                     :disabled="isUploading"
-                    @click="handleUpload"
+                    popper-class="wk-chat-upload-menu-popper"
                   >
-                    <span class="material-symbols-outlined">attach_file</span>
-                  </button>
-                  <button
-                    class="size-10 flex items-center justify-center text-slate-400 hover:text-primary transition-colors disabled:opacity-50"
-                    :disabled="isUploading || selectedFiles.length + selectedKnowledgeItems.length >= MAX_FILE_COUNT"
-                    title="选择知识库文件"
-                    @click="openKnowledgePicker"
-                  >
-                    <span class="material-symbols-outlined">menu_book</span>
-                  </button>
+                    <template #reference>
+                      <button
+                        type="button"
+                        class="size-10 flex items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-50 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                        :disabled="isUploading"
+                        aria-label="添加附件"
+                        title="添加附件"
+                      >
+                        <span class="material-symbols-outlined">add_circle</span>
+                      </button>
+                    </template>
+                    <div class="wk-chat-upload-menu">
+                      <button
+                        type="button"
+                        class="wk-chat-upload-menu__item"
+                        :disabled="selectedFiles.length + selectedKnowledgeItems.length >= MAX_FILE_COUNT"
+                        @click="handleUploadMenuAddFile"
+                      >
+                        <span class="wk-chat-upload-menu__icon">
+                          <span class="material-symbols-outlined text-[19px] leading-none">attach_file</span>
+                        </span>
+                        <span class="min-w-0 flex-1">
+                          <span class="block truncate text-sm font-semibold text-[#0d0d0d]">上传本地文件</span>
+                          <span class="block truncate text-xs text-slate-400">图片、文档或音视频</span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        class="wk-chat-upload-menu__item"
+                        :disabled="selectedFiles.length + selectedKnowledgeItems.length >= MAX_FILE_COUNT"
+                        @click="handleUploadMenuChooseKnowledge"
+                      >
+                        <span class="wk-chat-upload-menu__icon">
+                          <span class="material-symbols-outlined text-[19px] leading-none">menu_book</span>
+                        </span>
+                        <span class="min-w-0 flex-1">
+                          <span class="block truncate text-sm font-semibold text-[#0d0d0d]">选择知识库文件</span>
+                          <span class="block truncate text-xs text-slate-400">引用已上传资料</span>
+                        </span>
+                      </button>
+                    </div>
+                  </el-popover>
                   <textarea
                     ref="chatInputRef"
                     v-model="inputText"
@@ -927,6 +963,7 @@ const chatInputRef = ref<HTMLTextAreaElement | null>(null)
 const selectedFiles = ref<File[]>([])
 const selectedKnowledgeItems = ref<Knowledge[]>([])
 const chatModelPopoverVisible = ref(false)
+const chatUploadMenuVisible = ref(false)
 const chatModelImageLoadFailed = ref<Record<string, boolean>>({})
 const isRecording = ref(false)
 const isTranscribing = ref(false)
@@ -1887,6 +1924,20 @@ function openKnowledgePicker() {
   chatKnowledgePickerVisible.value = true
 }
 
+function closeChatUploadMenu() {
+  chatUploadMenuVisible.value = false
+}
+
+function handleUploadMenuAddFile() {
+  closeChatUploadMenu()
+  handleUpload()
+}
+
+function handleUploadMenuChooseKnowledge() {
+  closeChatUploadMenu()
+  openKnowledgePicker()
+}
+
 function handleKnowledgePickerConfirm(items: Knowledge[]) {
   const room = MAX_FILE_COUNT - selectedFiles.value.length - selectedKnowledgeItems.value.length
   if (room <= 0) {
@@ -2438,6 +2489,48 @@ function resolveChatAppIcon(code: string): string {
   line-height: 1.6;
 }
 
+.wk-chat-upload-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+}
+
+.wk-chat-upload-menu__item {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  border-radius: 12px;
+  padding: 10px;
+  text-align: left;
+  transition:
+    background-color 160ms ease,
+    opacity 160ms ease;
+}
+
+.wk-chat-upload-menu__item:hover:not(:disabled) {
+  background: #f5f5f5;
+}
+
+.wk-chat-upload-menu__item:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.wk-chat-upload-menu__icon {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
 .wk-recording-indicator {
   position: relative;
   display: inline-flex;
@@ -2586,6 +2679,16 @@ function resolveChatAppIcon(code: string): string {
 }
 
 .wk-chat-model-popper .el-popper__arrow::before {
+  border-color: #e5e7eb !important;
+}
+
+.wk-chat-upload-menu-popper.el-popper {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 16px !important;
+  box-shadow: 0 18px 60px rgb(15 23 42 / 0.16) !important;
+}
+
+.wk-chat-upload-menu-popper .el-popper__arrow::before {
   border-color: #e5e7eb !important;
 }
 </style>
