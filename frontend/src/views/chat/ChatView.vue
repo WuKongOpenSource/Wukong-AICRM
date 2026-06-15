@@ -577,6 +577,50 @@
       </template>
     </div>
 
+    <aside
+      v-if="showDesktopObjectPanel"
+      class="hidden w-[360px] shrink-0 border-l border-slate-100 bg-white lg:flex lg:flex-col"
+    >
+      <div v-if="objectPanelLoading" class="flex flex-1 items-center justify-center text-slate-400">
+        <span class="material-symbols-outlined animate-spin text-2xl">progress_activity</span>
+      </div>
+      <div v-else-if="objectPanelError" class="flex flex-1 items-center justify-center px-6 text-center text-sm text-slate-400">
+        {{ objectPanelError }}
+      </div>
+      <CustomerChatInfoPanel
+        v-else-if="chatObjectKind === 'customer' && currentObjectId"
+        :customer-id="currentObjectId"
+      />
+      <EmployeeChatInfoPanel
+        v-else-if="chatObjectKind === 'employee' && employeeDetail"
+        :employee="employeeDetail"
+        @add-task="handleObjectAddTask"
+        @add-schedule="handleObjectAddSchedule"
+        @add-attachment="handleObjectAddAttachment"
+        @view-task="handleObjectViewTask"
+        @view-schedule="handleObjectViewSchedule"
+        @view-attachment="handleObjectViewAttachment"
+      />
+      <RelationChatInfoPanel
+        v-else-if="chatObjectKind === 'relation' && relationDetail"
+        :detail="relationDetail"
+        @add-task="handleObjectAddTask"
+        @add-schedule="handleObjectAddSchedule"
+        @add-attachment="handleObjectAddAttachment"
+        @view-task="handleObjectViewTask"
+        @view-schedule="handleObjectViewSchedule"
+        @view-attachment="handleObjectViewAttachment"
+      />
+      <ProductChatInfoPanel
+        v-else-if="chatObjectKind === 'product' && productDetail"
+        :product="productDetail"
+        @edit="handleObjectEditProduct"
+      />
+      <div v-else class="flex flex-1 items-center justify-center px-6 text-center text-sm text-slate-400">
+        暂无关联对象详情
+      </div>
+    </aside>
+
     <ApiKeySetupModal
       :model-value="isApiKeyModalOpen"
       :loading="savingApiKey"
@@ -603,8 +647,15 @@ import { useResponsive } from '@/composables/useResponsive'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { getAiConfig, getAiConfigDetail, updateAiConfig } from '@/api/systemConfig'
+import { getAddressBookDetail } from '@/api/addressBook'
+import { getRelationDetail } from '@/api/relation'
+import { getProductDetail } from '@/api/product'
 import ApiKeySetupModal from '@/components/common/ApiKeySetupModal.vue'
 import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
+import CustomerChatInfoPanel from './components/CustomerChatInfoPanel.vue'
+import EmployeeChatInfoPanel from './components/EmployeeChatInfoPanel.vue'
+import ProductChatInfoPanel from './components/ProductChatInfoPanel.vue'
+import RelationChatInfoPanel from './components/RelationChatInfoPanel.vue'
 import { renderMarkdown } from '@/utils/markdown'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { isRequestErrorHandled } from '@/utils/requestError'
@@ -615,7 +666,11 @@ import {
   extractClipboardFiles,
   mergeChatFiles
 } from '@/utils/chatAttachment'
-import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge } from '@/types/common'
+import type { ScheduleVO } from '@/api/schedule'
+import type { AddressBookDetail } from '@/types/addressBook'
+import type { ProductVO } from '@/types/product'
+import type { RelationDetailVO } from '@/types/relation'
+import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, Task } from '@/types/common'
 import type { AiConfig, AiConfigUpdateBO, AiProvider, AiProviderPreset } from '@/types/systemConfig'
 
 const chatStore = useChatStore()
@@ -642,6 +697,12 @@ const apiKeySetupInitialConfig = ref<Partial<AiConfigUpdateBO> | null>(null)
 const apiKeySetupProviderOptions = ref<AiProviderPreset[]>([])
 const savingApiKey = ref(false)
 const resumeSendAfterApiKeySave = ref(false)
+const employeeDetail = ref<AddressBookDetail | null>(null)
+const relationDetail = ref<RelationDetailVO | null>(null)
+const productDetail = ref<ProductVO | null>(null)
+const objectPanelLoading = ref(false)
+const objectPanelError = ref('')
+let objectDetailRequestId = 0
 
 const MAX_FILE_COUNT = MAX_CHAT_ATTACHMENT_COUNT
 const DEFAULT_CHAT_AI_CONFIG: AiConfigUpdateBO = {
@@ -742,6 +803,28 @@ const aiStatusBadgeClass = computed(() => {
 })
 const showUserAvatarImage = computed(() => Boolean(userStore.avatar) && !userAvatarLoadFailed.value)
 const userAvatarFallback = computed(() => (userStore.realname || userStore.username || 'U').charAt(0).toUpperCase())
+const currentChatSession = computed(() => chatStore.currentSession)
+const chatObjectKind = computed<'customer' | 'employee' | 'relation' | 'product' | ''>(() => {
+  const session = currentChatSession.value
+  if (!session) return ''
+  if (session.customerId) return 'customer'
+  if (session.employeeId) return 'employee'
+  if (session.relationId) return 'relation'
+  if (session.productId) return 'product'
+  return ''
+})
+const currentObjectId = computed(() => {
+  const session = currentChatSession.value
+  if (!session) return ''
+  if (chatObjectKind.value === 'customer') return String(session.customerId || '')
+  if (chatObjectKind.value === 'employee') return String(session.employeeId || '')
+  if (chatObjectKind.value === 'relation') return String(session.relationId || '')
+  if (chatObjectKind.value === 'product') return String(session.productId || '')
+  return ''
+})
+const showDesktopObjectPanel = computed(() =>
+  !isMobile.value && currentView.value === 'chat' && Boolean(chatObjectKind.value && currentObjectId.value)
+)
 
 onMounted(async () => {
   await Promise.all([
@@ -781,6 +864,59 @@ watch(
     userAvatarLoadFailed.value = false
   }
 )
+
+watch(
+  () => [chatObjectKind.value, currentObjectId.value] as const,
+  () => {
+    void loadObjectPanelDetail()
+  },
+  { immediate: true }
+)
+
+async function loadObjectPanelDetail() {
+  const kind = chatObjectKind.value
+  const id = currentObjectId.value
+  const requestId = ++objectDetailRequestId
+
+  employeeDetail.value = null
+  relationDetail.value = null
+  productDetail.value = null
+  objectPanelError.value = ''
+
+  if (!kind || !id || kind === 'customer') {
+    objectPanelLoading.value = false
+    return
+  }
+
+  objectPanelLoading.value = true
+  try {
+    if (kind === 'employee') {
+      const detail = await getAddressBookDetail(id)
+      if (requestId === objectDetailRequestId) {
+        employeeDetail.value = detail
+      }
+    } else if (kind === 'relation') {
+      const detail = await getRelationDetail(id)
+      if (requestId === objectDetailRequestId) {
+        relationDetail.value = detail
+      }
+    } else if (kind === 'product') {
+      const detail = await getProductDetail(id)
+      if (requestId === objectDetailRequestId) {
+        productDetail.value = detail
+      }
+    }
+  } catch (error) {
+    console.error('Load chat object detail failed:', error)
+    if (requestId === objectDetailRequestId) {
+      objectPanelError.value = '关联对象详情加载失败'
+    }
+  } finally {
+    if (requestId === objectDetailRequestId) {
+      objectPanelLoading.value = false
+    }
+  }
+}
 
 function normalizeAiConfig(config?: Partial<AiConfig> | Partial<AiConfigUpdateBO> | null): AiConfig {
   return {
@@ -1172,6 +1308,34 @@ async function handleToggleSessionPin(session: ChatSession) {
       ElMessage.error('操作失败，请稍后重试')
     }
   }
+}
+
+function handleObjectAddTask() {
+  void router.push('/task')
+}
+
+function handleObjectAddSchedule() {
+  void router.push('/calendar')
+}
+
+function handleObjectAddAttachment() {
+  void router.push('/knowledge')
+}
+
+function handleObjectViewTask(task: Task) {
+  void router.push({ path: '/task', query: { openTaskId: String(task.taskId) } })
+}
+
+function handleObjectViewSchedule(schedule: ScheduleVO) {
+  void router.push({ path: '/calendar', query: { openScheduleId: String(schedule.scheduleId) } })
+}
+
+function handleObjectViewAttachment(attachment: Knowledge) {
+  void router.push({ path: '/knowledge', query: { openKnowledgeId: String(attachment.knowledgeId) } })
+}
+
+function handleObjectEditProduct(product: ProductVO) {
+  void router.push({ path: '/product', query: { editProductId: String(product.productId) } })
 }
 
 function formatSessionTime(dateStr: string): string {
