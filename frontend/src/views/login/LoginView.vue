@@ -1,250 +1,422 @@
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
-    <div class="w-full max-w-md">
-      <div class="mb-8 text-center">
-        <h1 class="text-3xl font-bold text-gray-900">AI CRM</h1>
-        <p class="mt-2 text-gray-600">{{ copy.subtitle }}</p>
-      </div>
-
-      <el-card class="shadow-lg">
-        <template #header>
-          <span class="text-lg font-semibold">{{ copy.login }}</span>
-        </template>
-
-        <el-form
-          ref="formRef"
-          :model="formData"
-          :rules="rules"
-          label-position="top"
-          @submit.prevent="handleLogin"
-        >
-          <el-form-item :label="copy.username" prop="username">
-            <el-input
-              v-model="formData.username"
-              :placeholder="copy.usernamePlaceholder"
-              :prefix-icon="User"
-              size="large"
-            />
-          </el-form-item>
-
-          <el-form-item :label="copy.password" prop="password">
-            <el-input
-              v-model="formData.password"
-              type="password"
-              :placeholder="copy.passwordPlaceholder"
-              :prefix-icon="Lock"
-              size="large"
-              show-password
-              @keyup.enter="handleLogin"
-            />
-          </el-form-item>
-
-          <el-form-item>
-            <div class="agreement-consent">
-              <el-checkbox v-model="agreementAccepted">
-                <span>我已阅读并同意</span>
-              </el-checkbox>
-              <RouterLink :to="userAgreementRoute">《用户协议》</RouterLink>
-              <span>和</span>
-              <RouterLink :to="privacyPolicyRoute">《隐私声明》</RouterLink>
-            </div>
-          </el-form-item>
-
-          <el-form-item>
-            <el-button
-              type="primary"
-              size="large"
-              class="w-full"
-              :loading="loading"
-              @click="handleLogin"
-            >
-              {{ loading ? copy.loggingIn : copy.login }}
-            </el-button>
-          </el-form-item>
-        </el-form>
-
-        <div v-if="enabledExternalProviders.length" class="mt-5">
-          <div class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase text-gray-400">
-            <span class="h-px flex-1 bg-gray-200"></span>
-            <span>{{ copy.externalLogin }}</span>
-            <span class="h-px flex-1 bg-gray-200"></span>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <el-button
-              v-for="provider in enabledExternalProviders"
-              :key="provider.provider"
-              class="!ml-0"
-              :loading="externalLoadingProvider === provider.provider"
-              @click="startExternalLogin(provider.provider)"
-            >
-              <span class="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-primary">
-                {{ providerMark(provider.provider) }}
-              </span>
-              {{ provider.name }}
-            </el-button>
-          </div>
-        </div>
-
-        <div class="mt-4 text-center text-sm text-gray-500">
-          <p>{{ copy.testAccount }}</p>
-        </div>
-      </el-card>
-
-      <el-dialog
-        v-model="showAgreementDialog"
-        title="用户协议与隐私保护"
-        width="420px"
-      >
-        <p class="agreement-dialog-copy">
-          为保障您的个人权益，请先阅读并同意
-          <RouterLink :to="agreementDialogUserAgreementRoute">《用户协议》</RouterLink>
-          与
-          <RouterLink :to="agreementDialogPrivacyPolicyRoute">《隐私声明》</RouterLink>
-          ，了解我们对个人信息的收集、保存、使用和保护方式。
-        </p>
-        <template #footer>
-          <div class="agreement-dialog-actions">
-            <el-button @click="handleAgreementReject">拒绝</el-button>
-            <el-button type="primary" @click="handleAgreementAgreeLogin">同意并继续</el-button>
-          </div>
-        </template>
-      </el-dialog>
-
-      <SliderCaptchaDialog
-        v-model="showCaptchaDialog"
-        @verified="handleCaptchaVerified"
-      />
+  <div class="auth-page relative bg-slate-50">
+    <div class="pointer-events-none absolute inset-0 overflow-hidden">
+      <div class="absolute -left-24 -top-24 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
+      <div class="absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-indigo-500/5 blur-3xl" />
     </div>
+
+    <div class="auth-shell relative z-10">
+      <div class="auth-card">
+        <section class="auth-brand-panel">
+          <div class="pointer-events-none absolute inset-0 opacity-20">
+            <div class="absolute left-1/4 top-1/4 h-64 w-64 rounded-full bg-primary blur-[100px]" />
+            <div class="absolute bottom-1/4 right-1/4 h-64 w-64 rounded-full bg-indigo-500 blur-[100px]" />
+          </div>
+
+          <div class="relative z-10">
+            <div class="mb-12 flex items-center gap-3">
+              <div class="auth-logo-shell">
+                <img
+                  :src="logoImg"
+                  alt="悟空AI CRM"
+                  class="size-[1.65rem] object-contain"
+                  width="26"
+                  height="26"
+                  decoding="async"
+                />
+              </div>
+              <span class="text-xl font-bold tracking-tight">悟空AI CRM</span>
+            </div>
+
+            <div class="space-y-6">
+              <h1 class="text-4xl font-bold leading-tight">
+                赋能销售团队<br />
+                <span class="text-white">开启智能管理新时代</span>
+              </h1>
+              <p class="max-w-md text-lg leading-relaxed text-slate-400">
+                集成 AI 智能解析、自动化跟进与深度数据分析，助您轻松掌控每一个商机。
+              </p>
+            </div>
+          </div>
+
+          <div class="relative z-10 space-y-8">
+            <div class="flex items-center gap-4">
+              <div class="auth-feature-icon">
+                <el-icon class="text-white" :size="24"><CircleCheck /></el-icon>
+              </div>
+              <div>
+                <h4 class="text-sm font-bold">数据安全保障</h4>
+                <p class="text-xs text-slate-500">多重加密，守护您的核心客户资产</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div class="auth-feature-icon">
+                <el-icon class="text-white" :size="24"><MagicStick /></el-icon>
+              </div>
+              <div>
+                <h4 class="text-sm font-bold">AI 驱动的洞察</h4>
+                <p class="text-xs text-slate-500">自动识别需求，智能生成跟进建议</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="auth-form-panel">
+          <div class="auth-form-scroll">
+            <div class="auth-form-content auth-form-content--with-fixed-consent">
+              <div class="mb-8 flex items-center justify-center gap-3 lg:hidden">
+                <img
+                  :src="logoImg"
+                  alt="悟空AI CRM"
+                  class="size-10 rounded-xl bg-white object-contain p-1 shadow-lg shadow-slate-300/40 ring-1 ring-slate-200/80"
+                />
+                <span class="text-[1.5rem] font-bold text-slate-900">悟空AI CRM</span>
+              </div>
+
+              <div class="mb-10">
+                <h2 class="mb-2 text-2xl font-bold text-slate-900">欢迎回来</h2>
+                <p class="text-sm text-slate-500">请输入您的账号信息以登录系统</p>
+              </div>
+
+              <el-form
+                ref="loginFormRef"
+                :model="loginForm"
+                :rules="loginRules"
+                class="auth-form space-y-5"
+                label-position="top"
+                hide-required-asterisk
+                @submit.prevent="handleLogin"
+              >
+                <el-form-item prop="username">
+                  <template #label>
+                    <span class="label-upper">用户名</span>
+                  </template>
+                  <el-input
+                    v-model="loginForm.username"
+                    size="large"
+                    placeholder="请输入用户名"
+                    class="auth-el-input"
+                  >
+                    <template #prefix>
+                      <el-icon class="text-slate-400"><User /></el-icon>
+                    </template>
+                  </el-input>
+                </el-form-item>
+
+                <el-form-item prop="password">
+                  <template #label>
+                    <span class="label-upper">密码</span>
+                  </template>
+                  <el-input
+                    v-model="loginForm.password"
+                    type="password"
+                    size="large"
+                    placeholder="请输入密码"
+                    show-password
+                    class="auth-el-input"
+                    @keyup.enter="handleLogin"
+                  >
+                    <template #prefix>
+                      <el-icon class="text-slate-400"><Lock /></el-icon>
+                    </template>
+                  </el-input>
+                </el-form-item>
+
+                <div class="desktop-agreement-consent">
+                  <label class="desktop-agreement-consent__check">
+                    <input
+                      v-model="agreementAccepted"
+                      type="checkbox"
+                      aria-label="同意用户协议和隐私声明"
+                    />
+                    <span class="desktop-agreement-consent__box" aria-hidden="true">
+                      <el-icon v-if="agreementAccepted" :size="13"><Check /></el-icon>
+                    </span>
+                  </label>
+                  <p class="desktop-agreement-consent__text">
+                    我已阅读并同意
+                    <a :href="userAgreementHref">《用户协议》</a>
+                    和
+                    <a :href="privacyPolicyHref">《隐私声明》</a>
+                  </p>
+                </div>
+
+                <el-form-item class="!mb-0">
+                  <button
+                    type="submit"
+                    class="auth-login-submit group flex w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[1rem] font-bold text-white transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="loading"
+                  >
+                    <span
+                      v-if="loading"
+                      class="inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                    />
+                    <template v-else>
+                      立即登录
+                      <el-icon class="transition-transform group-hover:translate-x-1"><Right /></el-icon>
+                    </template>
+                  </button>
+                </el-form-item>
+              </el-form>
+
+              <div v-if="enabledExternalProviders.length" class="external-auth-panel">
+                <div class="external-auth-divider">
+                  <span>第三方登录</span>
+                </div>
+                <div class="external-auth-grid">
+                  <button
+                    v-for="provider in enabledExternalProviders"
+                    :key="provider.provider"
+                    type="button"
+                    class="external-auth-btn"
+                    :disabled="externalLoadingProvider === provider.provider"
+                    @click="startExternalLogin(provider.provider)"
+                  >
+                    <span class="external-auth-btn__icon" aria-hidden="true">
+                      <svg
+                        v-if="provider.provider === 'google'"
+                        viewBox="0 0 24 24"
+                        focusable="false"
+                      >
+                        <path
+                          fill="#4285f4"
+                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        />
+                        <path
+                          fill="#34a853"
+                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C4 20.53 7.7 23 12 23z"
+                        />
+                        <path
+                          fill="#fbbc05"
+                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                        />
+                        <path
+                          fill="#ea4335"
+                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 4 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                        />
+                      </svg>
+                      <span v-else class="external-auth-btn__fallback">{{ providerMark(provider.provider) }}</span>
+                    </span>
+                    <span>{{ providerDisplayName(provider) }}</span>
+                    <span
+                      v-if="externalLoadingProvider === provider.provider"
+                      class="size-4 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-primary"
+                    />
+                  </button>
+                </div>
+              </div>
+
+              <p class="mt-5 text-center text-xs font-medium text-slate-400">
+                测试账号: admin / 123456a
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="mobile-agreement-consent lg:hidden">
+      <label class="mobile-agreement-consent__check">
+        <input
+          v-model="agreementAccepted"
+          type="checkbox"
+          aria-label="同意用户协议和隐私声明"
+        />
+        <span class="mobile-agreement-consent__box" aria-hidden="true">
+          <el-icon v-if="agreementAccepted" :size="13"><Check /></el-icon>
+        </span>
+      </label>
+      <p class="mobile-agreement-consent__text">
+        点击登录即表示您已同意并接受
+        <a :href="userAgreementHref">《用户协议》</a>
+        和
+        <a :href="privacyPolicyHref">《隐私声明》</a>
+      </p>
+    </div>
+
+    <Teleport to="body">
+      <div
+        v-if="showAgreementDialog"
+        class="agreement-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="agreement-modal-title"
+      >
+        <div class="agreement-modal__backdrop" aria-hidden="true" />
+        <div class="agreement-modal__panel">
+          <div class="agreement-modal__header">
+            <span class="agreement-modal__icon" aria-hidden="true">
+              <el-icon :size="22"><Lock /></el-icon>
+            </span>
+            <div class="agreement-modal__heading">
+              <h2 id="agreement-modal-title" class="agreement-modal__title">用户协议与隐私保护</h2>
+            </div>
+          </div>
+          <p class="agreement-modal__copy">
+            感谢您选择悟空AI CRM。为保障您的个人权益，请先阅读并同意
+            <a :href="agreementDialogUserAgreementHref">《悟空AI CRM用户协议》</a>
+            与
+            <a :href="agreementDialogPrivacyPolicyHref">《悟空AI CRM隐私声明》</a>
+            ，了解我们对个人信息的收集、保存、使用、对外提供和保护方式。
+          </p>
+          <div class="agreement-modal__actions">
+            <button
+              type="button"
+              class="agreement-modal__button agreement-modal__button--ghost"
+              @click="handleAgreementReject"
+            >
+              拒绝
+            </button>
+            <button
+              type="button"
+              class="agreement-modal__button agreement-modal__button--primary"
+              :disabled="loading"
+              @click="handleAgreementAgreeLogin"
+            >
+              <span
+                v-if="loading"
+                class="inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-white"
+              />
+              <span>同意并登录</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <SliderCaptchaDialog v-model="showCaptchaDialog" @verified="handleCaptchaVerified" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { Check, CircleCheck, Lock, MagicStick, Right, User } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { Lock, User } from '@element-plus/icons-vue'
 import {
   exchangeExternalLoginTicket,
   getExternalAuthAuthorizeUrl,
   getExternalAuthProviders,
   getOidcSessionToken
 } from '@/api/auth'
-import { useUserStore } from '@/stores/user'
+import logoImg from '@/assets/images/logo.png'
 import SliderCaptchaDialog from '@/components/auth/SliderCaptchaDialog.vue'
+import { useUserStore } from '@/stores/user'
 import type { ExternalAuthProvider, ExternalAuthProviderCode } from '@/types/api'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 
-const formRef = ref<FormInstance>()
+const loginFormRef = ref<FormInstance>()
 const loading = ref(false)
 const showCaptchaDialog = ref(false)
 const showAgreementDialog = ref(false)
 const externalProviders = ref<ExternalAuthProvider[]>([])
 const externalLoadingProvider = ref<ExternalAuthProviderCode | ''>('')
+const externalLoginTicketProcessing = ref(false)
+
+const LAST_LOGIN_USERNAME_STORAGE_KEY = 'wk_ai_crm:last_login_username:v1'
 const AGREEMENT_ACCEPTED_STORAGE_KEY = 'wk_ai_crm:agreement_accepted:v1'
 const AGREEMENT_DIALOG_QUERY_KEY = 'agreementDialog'
 
-const formData = reactive({
-  username: '',
+const loginForm = reactive({
+  username: readLastLoginUsername(),
   password: ''
 })
 
 const agreementAccepted = ref(readAgreementAccepted())
 
-const copy = {
-  subtitle: '\u667a\u80fd\u5ba2\u6237\u5173\u7cfb\u7ba1\u7406\u7cfb\u7edf',
-  login: '\u767b\u5f55',
-  loggingIn: '\u767b\u5f55\u4e2d...',
-  username: '\u7528\u6237\u540d',
-  usernamePlaceholder: '\u8bf7\u8f93\u5165\u7528\u6237\u540d',
-  password: '\u5bc6\u7801',
-  passwordPlaceholder: '\u8bf7\u8f93\u5165\u5bc6\u7801',
-  passwordMin: '\u5bc6\u7801\u81f3\u5c116\u4f4d',
-  loginSuccess: '\u767b\u5f55\u6210\u529f',
-  externalLogin: '\u5916\u90e8\u767b\u5f55',
-  testAccount: '\u6d4b\u8bd5\u8d26\u53f7: admin / 123456a'
-}
+const enabledExternalProviders = computed(() =>
+  externalProviders.value.filter((provider) => provider.enabled && isSupportedExternalProvider(provider))
+)
+const userAgreementHref = computed(() => router.resolve({ name: 'UserAgreement' }).href)
+const privacyPolicyHref = computed(() => router.resolve({ name: 'PrivacyPolicy' }).href)
+const agreementDialogUserAgreementHref = computed(() =>
+  router.resolve({
+    name: 'UserAgreement',
+    query: buildAgreementDialogReturnQuery()
+  }).href
+)
+const agreementDialogPrivacyPolicyHref = computed(() =>
+  router.resolve({
+    name: 'PrivacyPolicy',
+    query: buildAgreementDialogReturnQuery()
+  }).href
+)
 
-const rules: FormRules = {
-  username: [{ required: true, message: copy.usernamePlaceholder, trigger: 'blur' }],
+const loginRules: FormRules = {
+  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [
-    { required: true, message: copy.passwordPlaceholder, trigger: 'blur' },
-    { min: 6, message: copy.passwordMin, trigger: 'blur' }
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码至少6位', trigger: 'blur' }
   ]
 }
 
-const enabledExternalProviders = computed(() => externalProviders.value.filter((provider) => provider.enabled))
-const userAgreementRoute = computed(() => ({ name: 'UserAgreement' }))
-const privacyPolicyRoute = computed(() => ({ name: 'PrivacyPolicy' }))
-const agreementDialogUserAgreementRoute = computed(() => ({
-  name: 'UserAgreement',
-  query: buildAgreementDialogReturnQuery()
-}))
-const agreementDialogPrivacyPolicyRoute = computed(() => ({
-  name: 'PrivacyPolicy',
-  query: buildAgreementDialogReturnQuery()
-}))
-
 onMounted(async () => {
   restoreAgreementDialogFromQuery()
-  await handleExternalAuthQuery()
-  await loadExternalProviders()
+  const handledExternalAuth = await handleExternalAuthQuery()
+  if (!handledExternalAuth) {
+    await loadExternalProviders()
+  }
 })
 
 watch(agreementAccepted, (accepted) => {
   persistAgreementAccepted(accepted)
 })
 
-async function handleLogin() {
-  if (!formRef.value) return
-
+function readLastLoginUsername(): string {
+  if (typeof window === 'undefined') return ''
   try {
-    await formRef.value.validate()
-    if (!agreementAccepted.value) {
-      showAgreementDialog.value = true
-      return
-    }
-    showCaptchaDialog.value = true
-  } catch (error) {
-    console.error('Login validation error:', error)
+    return window.localStorage.getItem(LAST_LOGIN_USERNAME_STORAGE_KEY)?.trim() || ''
+  } catch {
+    return ''
   }
 }
 
-function handleAgreementAgreeLogin() {
-  agreementAccepted.value = true
-  showAgreementDialog.value = false
-  showCaptchaDialog.value = true
-}
-
-function handleAgreementReject() {
-  showAgreementDialog.value = false
-}
-
-async function handleCaptchaVerified(captchaVerification: string) {
+function rememberSuccessfulLoginUsername() {
+  const username = loginForm.username.trim()
+  if (!username || typeof window === 'undefined') return
   try {
-    loading.value = true
-    await userStore.login({
-      username: formData.username,
-      password: formData.password,
-      captchaVerification
-    })
-
-    ElMessage.success(copy.loginSuccess)
-    await completeLoginRedirect()
-  } catch (error) {
-    console.error('Login error:', error)
-  } finally {
-    loading.value = false
+    window.localStorage.setItem(LAST_LOGIN_USERNAME_STORAGE_KEY, username)
+  } catch {
+    // Ignore storage failures.
   }
+}
+
+function readAgreementAccepted(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem(AGREEMENT_ACCEPTED_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function persistAgreementAccepted(accepted: boolean) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(AGREEMENT_ACCEPTED_STORAGE_KEY, accepted ? '1' : '0')
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function isSupportedExternalProvider(provider: ExternalAuthProvider): boolean {
+  return provider.provider === 'google' || provider.provider === 'wechat'
 }
 
 function providerMark(provider: ExternalAuthProviderCode): string {
   if (provider === 'google') return 'G'
-  if (provider === 'wechat') return 'W'
+  if (provider === 'wechat') return '微'
   return '?'
+}
+
+function providerDisplayName(provider: ExternalAuthProvider): string {
+  if (provider.provider === 'google') return 'Google'
+  if (provider.provider === 'wechat') return '微信'
+  return provider.name
 }
 
 async function loadExternalProviders() {
@@ -277,41 +449,54 @@ async function startExternalLogin(provider: ExternalAuthProviderCode) {
   }
 }
 
-async function handleExternalAuthQuery() {
+async function handleExternalAuthQuery(): Promise<boolean> {
   const externalError = typeof route.query.externalAuthError === 'string' ? route.query.externalAuthError : ''
   if (externalError) {
+    const provider = typeof route.query.provider === 'string' ? route.query.provider : ''
+    const providerName = provider === 'wechat' ? '微信' : provider === 'google' ? 'Google' : '第三方'
     const messageMap: Record<string, string> = {
-      unbound: 'No local account is bound to this external account',
-      invalid_state: 'External login state is expired',
-      denied: 'External login was cancelled',
-      failed: 'External login failed'
+      unbound: `当前${providerName}账号尚未绑定本地用户`,
+      invalid_state: '第三方登录状态已过期，请重新登录',
+      denied: '第三方登录已取消',
+      failed: '第三方登录失败'
     }
-    ElMessage.error(messageMap[externalError] || 'External login failed')
+    ElMessage.error(messageMap[externalError] || `${providerName}登录失败`)
     await clearExternalAuthQuery()
-    return
+    return true
   }
 
   const loginTicket = typeof route.query.externalLoginTicket === 'string' ? route.query.externalLoginTicket : ''
-  if (!loginTicket) return
+  if (!loginTicket) {
+    return false
+  }
 
+  if (externalLoginTicketProcessing.value) {
+    return true
+  }
+
+  externalLoginTicketProcessing.value = true
   loading.value = true
+  const redirectValue = route.query.redirect
+  await clearExternalAuthQuery()
+
   try {
     const result = await exchangeExternalLoginTicket({ ticket: loginTicket })
     await userStore.applyLoginResult(result)
-    await clearExternalAuthQuery()
-    ElMessage.success(copy.loginSuccess)
-    await completeLoginRedirect()
+    await completeLoginRedirect(redirectValue)
   } catch (error) {
     console.error('External login ticket exchange failed:', error)
   } finally {
     loading.value = false
+    externalLoginTicketProcessing.value = false
   }
+  return true
 }
 
 async function clearExternalAuthQuery() {
   const query = { ...route.query }
   delete query.externalAuthError
   delete query.externalLoginTicket
+  delete query.message
   delete query.provider
   await router.replace({ path: route.path, query })
 }
@@ -336,80 +521,676 @@ function restoreAgreementDialogFromQuery() {
   }
 }
 
-function readAgreementAccepted(): boolean {
+async function handleLogin() {
+  if (loading.value || !loginFormRef.value) return
+
   try {
-    return window.localStorage.getItem(AGREEMENT_ACCEPTED_STORAGE_KEY) === '1'
-  } catch {
-    return false
+    await loginFormRef.value.validate()
+  } catch (error) {
+    console.error('Login validation error:', error)
+    return
+  }
+
+  if (!agreementAccepted.value) {
+    showAgreementDialog.value = true
+    return
+  }
+
+  showCaptchaDialog.value = true
+}
+
+function handleAgreementAgreeLogin() {
+  if (loading.value) return
+  agreementAccepted.value = true
+  showAgreementDialog.value = false
+  showCaptchaDialog.value = true
+}
+
+function handleAgreementReject() {
+  showAgreementDialog.value = false
+}
+
+async function handleCaptchaVerified(captchaVerification: string) {
+  try {
+    loading.value = true
+    await userStore.login({
+      username: loginForm.username,
+      password: loginForm.password,
+      captchaVerification
+    })
+    await completeLoginRedirect(route.query.redirect)
+  } catch (error) {
+    console.error('Login error:', error)
+  } finally {
+    loading.value = false
   }
 }
 
-function persistAgreementAccepted(accepted: boolean) {
-  try {
-    window.localStorage.setItem(AGREEMENT_ACCEPTED_STORAGE_KEY, accepted ? '1' : '0')
-  } catch {
-    // Ignore storage failures.
-  }
+function normalizeLoginRedirect(value: unknown): string {
+  const raw = typeof value === 'string' && value.trim() ? value.trim() : '/'
+  return raw === '/login' || raw.startsWith('/login?') ? '/' : raw
 }
 
-async function completeLoginRedirect() {
-  let redirect = (route.query.redirect as string) || '/'
+function isLazyRouteLoadError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error || '')
+  return (
+    message.includes('Failed to fetch dynamically imported module') ||
+    message.includes('Importing a module script failed') ||
+    message.includes('error loading dynamically imported module') ||
+    message.includes('Loading chunk')
+  )
+}
+
+function reloadToHashRoute(redirect: string): void {
+  const target = redirect.startsWith('/') ? redirect : '/'
+  window.location.assign(`${window.location.origin}${window.location.pathname}${window.location.search}#${target}`)
+}
+
+async function completeLoginRedirect(redirectValue: unknown) {
+  rememberSuccessfulLoginUsername()
+
+  let redirect = normalizeLoginRedirect(redirectValue)
+
   if (redirect.includes('/oauth2/authorize')) {
     try {
       const { sessionToken } = await getOidcSessionToken()
       const url = new URL(redirect)
       url.searchParams.set('session_token', sessionToken)
       redirect = url.toString()
-    } catch (e) {
-      console.error('Failed to get OIDC session token:', e)
+    } catch (error) {
+      console.error('Failed to get OIDC session token:', error)
     }
   }
 
   if (redirect.startsWith('http://') || redirect.startsWith('https://')) {
+    ElMessage.success('登录成功')
     window.location.href = redirect
-  } else {
+    return
+  }
+
+  try {
     await router.push(redirect)
+    ElMessage.success('登录成功')
+  } catch (error) {
+    console.error('Login redirect failed:', error)
+    if (isLazyRouteLoadError(error)) {
+      reloadToHashRoute(redirect)
+      return
+    }
+    throw error
   }
 }
 </script>
 
 <style scoped>
-.el-card {
-  border-radius: 12px;
+.auth-page {
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
 }
 
-.agreement-consent {
+.auth-shell {
   display: flex;
-  flex-wrap: wrap;
+  min-height: 100%;
   align-items: center;
-  gap: 0.25rem 0.35rem;
-  color: #6b7280;
-  font-size: 0.875rem;
-  line-height: 1.5;
+  justify-content: center;
+  padding: clamp(1rem, 2vw, 2rem);
 }
 
-.agreement-consent a,
-.agreement-dialog-copy a {
-  color: #2563eb;
-  font-weight: 600;
+.auth-card {
+  position: relative;
+  display: flex;
+  width: min(100%, 1040px);
+  max-height: calc(100vh - clamp(2rem, 4vw, 3rem));
+  margin-inline: auto;
+  overflow: hidden;
+  border: 1px solid rgb(241 245 249);
+  border-radius: 32px;
+  background: rgb(255 255 255);
+  box-shadow: 0 28px 80px rgba(148, 163, 184, 0.22);
+}
+
+.auth-brand-panel {
+  position: relative;
+  display: none;
+  width: 46%;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  background: #0f172a;
+  padding: 3rem;
+  color: #fff;
+}
+
+.auth-logo-shell {
+  display: flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: #fff;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.2);
+}
+
+.auth-feature-icon {
+  display: flex;
+  width: 3rem;
+  height: 3rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.auth-form-panel {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  background: rgb(255 255 255);
+}
+
+.auth-form-panel::before,
+.auth-form-panel::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  height: 28px;
+  pointer-events: none;
+}
+
+.auth-form-panel::before {
+  top: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0) 100%);
+}
+
+.auth-form-panel::after {
+  bottom: 0;
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0) 100%);
+}
+
+.auth-form-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+}
+
+.auth-form-content {
+  width: min(100%, 456px);
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.label-upper {
+  color: rgb(148 163 184);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.auth-form :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+.auth-form :deep(.el-form-item__label) {
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+
+.auth-login-submit {
+  box-sizing: border-box;
+  height: 48px;
+  min-height: 48px;
+  padding: 0;
+  line-height: 1;
+}
+
+.auth-form :deep(.el-input.auth-el-input .el-input__wrapper) {
+  height: 46px;
+  min-height: 46px;
+  align-items: center;
+  border: none !important;
+  border-radius: var(--wk-input-radius) !important;
+  background-color: var(--wk-input-bg) !important;
+  box-shadow:
+    0 0 0 1px var(--wk-input-border) inset,
+    var(--wk-input-shadow) !important;
+  padding-left: 12px !important;
+  transition:
+    box-shadow 0.2s ease,
+    background-color 0.2s ease !important;
+}
+
+.auth-form :deep(.el-input.auth-el-input .el-input__wrapper:hover) {
+  background-color: var(--wk-input-bg) !important;
+  box-shadow:
+    0 0 0 1px var(--wk-input-border-hover) inset,
+    var(--wk-input-shadow) !important;
+}
+
+.auth-form :deep(.el-input.auth-el-input .el-input__wrapper.is-focus) {
+  background-color: var(--wk-input-bg) !important;
+  box-shadow:
+    0 0 0 1px var(--wk-input-border-focus) inset,
+    var(--wk-input-focus-shadow) !important;
+}
+
+.auth-form :deep(.el-input.auth-el-input .el-input__inner) {
+  height: 46px !important;
+  line-height: 46px !important;
+}
+
+.auth-form :deep(.el-input.auth-el-input .el-input__prefix),
+.auth-form :deep(.el-input.auth-el-input .el-input__suffix) {
+  min-height: 46px;
+  align-items: center;
+}
+
+.desktop-agreement-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  color: #64748b;
+  font-size: 0.86rem;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.desktop-agreement-consent__check,
+.mobile-agreement-consent__check {
+  position: relative;
+  display: inline-flex;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.desktop-agreement-consent__check input,
+.mobile-agreement-consent__check input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.desktop-agreement-consent__box,
+.mobile-agreement-consent__box {
+  display: inline-flex;
+  width: 1.05rem;
+  height: 1.05rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d1d5db;
+  border-radius: 0.25rem;
+  background: #fff;
+  color: #137fec;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.desktop-agreement-consent__check input:checked + .desktop-agreement-consent__box,
+.mobile-agreement-consent__check input:checked + .mobile-agreement-consent__box {
+  border-color: #137fec;
+  background: #eef6ff;
+}
+
+.desktop-agreement-consent__check input:focus-visible + .desktop-agreement-consent__box,
+.mobile-agreement-consent__check input:focus-visible + .mobile-agreement-consent__box {
+  box-shadow: 0 0 0 3px rgba(19, 127, 236, 0.14);
+}
+
+.desktop-agreement-consent__text,
+.mobile-agreement-consent__text {
+  margin: 0;
+}
+
+.desktop-agreement-consent__text a,
+.mobile-agreement-consent__text a,
+.agreement-modal__copy a {
+  color: #1d5fc4;
   text-decoration: none;
 }
 
-.agreement-consent a:hover,
-.agreement-dialog-copy a:hover {
+.desktop-agreement-consent__text a:hover,
+.mobile-agreement-consent__text a:hover,
+.agreement-modal__copy a:hover {
   text-decoration: underline;
 }
 
-.agreement-dialog-copy {
+.external-auth-panel {
+  margin-top: 1.25rem;
+}
+
+.external-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.external-auth-divider::before,
+.external-auth-divider::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: #e2e8f0;
+}
+
+.external-auth-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.external-auth-btn {
+  display: inline-flex;
+  min-width: 132px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding: 0.625rem 1rem;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease;
+}
+
+.external-auth-btn:hover:not(:disabled) {
+  border-color: rgba(19, 127, 236, 0.45);
+  color: #137fec;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.external-auth-btn:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.external-auth-btn__icon {
+  display: inline-flex;
+  width: 1.45rem;
+  height: 1.45rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.external-auth-btn__icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.external-auth-btn__fallback {
+  display: inline-flex;
+  width: 1.45rem;
+  height: 1.45rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #137fec;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.mobile-agreement-consent {
+  display: none;
+}
+
+.mobile-agreement-consent__text {
+  color: #8f96a3;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.agreement-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.agreement-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(2px);
+}
+
+.agreement-modal__panel {
+  position: relative;
+  width: min(100%, 27rem);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 1.5rem;
+  background: #fff;
+  padding: 1.75rem;
+  color: #0f172a;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.28);
+}
+
+.agreement-modal__header {
+  display: flex;
+  align-items: center;
+  gap: 0.95rem;
+}
+
+.agreement-modal__icon {
+  display: inline-flex;
+  width: 3rem;
+  height: 3rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(19, 127, 236, 0.14), rgba(19, 127, 236, 0.06));
+  color: #137fec;
+  box-shadow: 0 12px 24px rgba(19, 127, 236, 0.12);
+}
+
+.agreement-modal__heading {
+  min-width: 0;
+}
+
+.agreement-modal__title {
   margin: 0;
-  color: #374151;
-  font-size: 0.95rem;
+  color: #0f172a;
+  font-size: 1.18rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.agreement-modal__copy {
+  margin: 1.35rem 0 0;
+  color: #334155;
+  font-size: 0.96rem;
+  font-weight: 500;
   line-height: 1.8;
 }
 
-.agreement-dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
+.agreement-modal__actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.9rem;
+  margin-top: 1.5rem;
+}
+
+.agreement-modal__button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 1rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.2;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease,
+    opacity 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.agreement-modal__button--ghost {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+}
+
+.agreement-modal__button--ghost:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.agreement-modal__button--primary {
+  border: 1px solid #0f172a;
+  background: #0f172a;
+  color: #fff;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.18);
+}
+
+.agreement-modal__button--primary:hover:not(:disabled) {
+  border-color: #1e293b;
+  background: #1e293b;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.24);
+}
+
+.agreement-modal__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+@media (min-width: 1024px) {
+  .auth-brand-panel {
+    display: flex;
+  }
+
+  .auth-card {
+    min-height: 620px;
+  }
+
+  .auth-form-content {
+    padding: 3rem 3.5rem;
+  }
+}
+
+@media (max-width: 1023px) {
+  .auth-page {
+    overflow: hidden;
+  }
+
+  .auth-shell {
+    min-height: 100vh;
+    height: 100vh;
+    align-items: stretch;
+    overflow-y: auto;
+    padding: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .auth-card {
+    min-height: 100%;
+    max-height: none;
+    flex-direction: column;
+    border-radius: 0;
+  }
+
+  .auth-form-panel::before,
+  .auth-form-panel::after {
+    display: none;
+  }
+
+  .auth-form-content {
+    width: 100%;
+    max-width: 480px;
+    padding-inline: 1.5rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .auth-form-content--with-fixed-consent {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  .desktop-agreement-consent {
+    display: none;
+  }
+
+  .mobile-agreement-consent {
+    position: fixed;
+    z-index: 40;
+    left: 50%;
+    bottom: calc(1.5rem + env(safe-area-inset-bottom));
+    display: flex;
+    width: min(calc(100% - 2rem), 480px);
+    align-items: flex-start;
+    gap: 0.55rem;
+    margin-top: 0;
+    transform: translateX(-50%);
+  }
+
+  .agreement-modal {
+    padding: 1.75rem 1.35rem;
+  }
+
+  .agreement-modal__panel {
+    width: min(100%, 23.5rem);
+    border-radius: 1.25rem;
+    padding: 1.4rem;
+  }
+
+  .agreement-modal__icon {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.9rem;
+  }
+
+  .agreement-modal__title {
+    font-size: 1.12rem;
+  }
+
+  .agreement-modal__copy {
+    font-size: 0.92rem;
+    line-height: 1.75;
+  }
+
+  .agreement-modal__actions {
+    gap: 0.75rem;
+  }
 }
 </style>
