@@ -4,6 +4,7 @@ import {
   createSession,
   getSessionList,
   deleteSession,
+  updateSessionPin,
   getMessageList,
   sendMessageStream,
   sendMessageSync
@@ -79,6 +80,11 @@ export const useChatStore = defineStore('chat', () => {
       currentSessionId.value = null
       messages.value = []
     }
+  }
+
+  async function setSessionPinned(sessionId: string, pinned: boolean) {
+    await updateSessionPin(sessionId, pinned)
+    await fetchSessions()
   }
 
   async function sendMessage(
@@ -232,6 +238,7 @@ export const useChatStore = defineStore('chat', () => {
     startNewSession,
     selectSession,
     removeSession,
+    setSessionPinned,
     sendMessage,
     sendMessageWithSync,
     clearMessages,

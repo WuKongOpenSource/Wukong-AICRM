@@ -68,6 +68,15 @@
                   :title="session.title || '新对话'"
                 >{{ session.title || '新对话' }}</span>
                 <span
+                  class="material-symbols-outlined inline-flex w-5 shrink-0 items-center justify-center text-[14px] leading-none transition-all"
+                  :class="session.pinned
+                    ? 'text-primary opacity-100'
+                    : isSessionActive(session.sessionId)
+                      ? 'text-slate-400 opacity-100 hover:text-primary'
+                      : 'pointer-events-none text-slate-300 opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 hover:text-primary'"
+                  @click.stop="handleToggleSessionPin(session)"
+                >push_pin</span>
+                <span
                   class="material-symbols-outlined inline-flex w-5 shrink-0 items-center justify-center text-[14px] leading-none text-slate-300 transition-all"
                   :class="isSessionActive(session.sessionId)
                     ? 'pointer-events-auto opacity-100'
@@ -98,6 +107,15 @@
                   :title="session.title || '新对话'"
                 >{{ session.title || '新对话' }}</span>
                 <span
+                  class="material-symbols-outlined inline-flex w-5 shrink-0 items-center justify-center text-[14px] leading-none transition-all"
+                  :class="session.pinned
+                    ? 'text-primary opacity-100'
+                    : isSessionActive(session.sessionId)
+                      ? 'text-slate-400 opacity-100 hover:text-primary'
+                      : 'pointer-events-none text-slate-300 opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 hover:text-primary'"
+                  @click.stop="handleToggleSessionPin(session)"
+                >push_pin</span>
+                <span
                   class="material-symbols-outlined inline-flex w-5 shrink-0 items-center justify-center text-[14px] leading-none text-slate-300 transition-all"
                   :class="isSessionActive(session.sessionId)
                     ? 'pointer-events-auto opacity-100'
@@ -127,6 +145,15 @@
                   :class="isSessionActive(session.sessionId) ? 'text-primary' : 'text-slate-700'"
                   :title="session.title || '新对话'"
                 >{{ session.title || '新对话' }}</span>
+                <span
+                  class="material-symbols-outlined inline-flex w-5 shrink-0 items-center justify-center text-[14px] leading-none transition-all"
+                  :class="session.pinned
+                    ? 'text-primary opacity-100'
+                    : isSessionActive(session.sessionId)
+                      ? 'text-slate-400 opacity-100 hover:text-primary'
+                      : 'pointer-events-none text-slate-300 opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 hover:text-primary'"
+                  @click.stop="handleToggleSessionPin(session)"
+                >push_pin</span>
                 <span
                   class="material-symbols-outlined inline-flex w-5 shrink-0 items-center justify-center text-[14px] leading-none text-slate-300 transition-all"
                   :class="isSessionActive(session.sessionId)
@@ -999,6 +1026,17 @@ async function handleDeleteSession(sessionId: string) {
     ElMessage.success('对话已删除')
   } catch {
     // User cancelled
+  }
+}
+
+async function handleToggleSessionPin(session: ChatSession) {
+  try {
+    await chatStore.setSessionPinned(session.sessionId, !session.pinned)
+  } catch (error: unknown) {
+    console.error('Toggle chat session pin failed:', error)
+    if (!isRequestErrorHandled(error)) {
+      ElMessage.error('操作失败，请稍后重试')
+    }
   }
 }
 

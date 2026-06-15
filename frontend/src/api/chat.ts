@@ -26,6 +26,10 @@ export function deleteSession(id: string): Promise<void> {
   return post(`/chat/session/delete/${id}`)
 }
 
+export function updateSessionPin(id: string, pinned: boolean): Promise<void> {
+  return post(`/chat/session/pin/${id}`, { pinned })
+}
+
 /**
  * Get message list
  */

@@ -2,6 +2,7 @@ package com.kakarote.ai_crm.service;
 
 import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.SessionCreateBO;
+import com.kakarote.ai_crm.entity.BO.SessionPinBO;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
 import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
 import reactor.core.publisher.Flux;
@@ -27,6 +28,8 @@ public interface IChatService {
      * 删除会话
      */
     void deleteSession(Long sessionId);
+
+    void updateSessionPin(Long sessionId, SessionPinBO pinBO);
 
     /**
      * 获取会话消息历史

@@ -44,11 +44,20 @@ public class ChatSession implements Serializable {
     @Schema(description = "关联客户ID")
     private Long customerId;
 
+    @Schema(description = "Application code")
+    private String appCode;
+
     /**
      * 会话标题
      */
     @Schema(description = "会话标题")
     private String title;
+
+    @Schema(description = "Pinned")
+    private Boolean pinned;
+
+    @Schema(description = "Pinned time")
+    private Date pinnedTime;
 
     /**
      * 状态: 0-已归档, 1-活跃

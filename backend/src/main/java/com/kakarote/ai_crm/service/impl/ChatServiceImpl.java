@@ -14,6 +14,7 @@ import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.SessionCreateBO;
+import com.kakarote.ai_crm.entity.BO.SessionPinBO;
 import com.kakarote.ai_crm.entity.PO.ChatAttachment;
 import com.kakarote.ai_crm.entity.PO.ChatMessage;
 import com.kakarote.ai_crm.entity.PO.ChatSession;
@@ -201,6 +202,8 @@ public class ChatServiceImpl implements IChatService {
         session.setTitle(sessionCreateBO.getTitle());
         session.setAgentId(sessionCreateBO.getAgentId());
         session.setCustomerId(sessionCreateBO.getCustomerId());
+        session.setAppCode(StrUtil.blankToDefault(sessionCreateBO.getAppCode(), "general"));
+        session.setPinned(false);
         session.setUserId(UserUtil.getUserId());
         session.setCreateTime(new Date());
         session.setUpdateTime(new Date());
@@ -214,6 +217,8 @@ public class ChatServiceImpl implements IChatService {
         List<ChatSession> sessions = chatSessionMapper.selectList(
             new LambdaQueryWrapper<ChatSession>()
                 .eq(ChatSession::getUserId, userId)
+                .orderByDesc(ChatSession::getPinned)
+                .orderByDesc(ChatSession::getPinnedTime)
                 .orderByDesc(ChatSession::getUpdateTime)
         );
         return BeanUtil.copyToList(sessions, ChatSessionVO.class);
@@ -234,6 +239,21 @@ public class ChatServiceImpl implements IChatService {
         pendingCustomerCreationStore.clear(sessionId);
         weKnoraClient.clearConversationSession(sessionId);
         AiContextHolder.clearSession(sessionId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateSessionPin(Long sessionId, SessionPinBO pinBO) {
+        ChatSession session = chatSessionMapper.selectById(sessionId);
+        Long userId = UserUtil.getUserId();
+        if (ObjectUtil.isNull(session) || !Objects.equals(session.getUserId(), userId)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "会话不存在");
+        }
+
+        boolean pinned = Boolean.TRUE.equals(pinBO.getPinned());
+        session.setPinned(pinned);
+        session.setPinnedTime(pinned ? new Date() : null);
+        chatSessionMapper.updateById(session);
     }
 
     @Override

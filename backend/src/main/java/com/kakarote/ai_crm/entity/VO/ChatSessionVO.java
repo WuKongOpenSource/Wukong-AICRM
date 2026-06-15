@@ -30,8 +30,17 @@ public class ChatSessionVO {
     @Schema(description = "关联客户名称")
     private String customerName;
 
+    @Schema(description = "Application code")
+    private String appCode;
+
     @Schema(description = "会话标题")
     private String title;
+
+    @Schema(description = "Pinned")
+    private Boolean pinned;
+
+    @Schema(description = "Pinned time")
+    private Date pinnedTime;
 
     @Schema(description = "状态")
     private Integer status;

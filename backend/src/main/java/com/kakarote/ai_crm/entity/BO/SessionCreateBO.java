@@ -16,6 +16,9 @@ public class SessionCreateBO {
     @Schema(description = "关联客户ID")
     private Long customerId;
 
+    @Schema(description = "Application code")
+    private String appCode;
+
     @Schema(description = "会话标题")
     private String title;
 }

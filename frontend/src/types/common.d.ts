@@ -133,6 +133,9 @@ export interface ChatSession {
   title?: string
   agentId?: string
   customerId?: string
+  appCode?: string
+  pinned?: boolean
+  pinnedTime?: string
   createTime: string
   updateTime: string
 }
