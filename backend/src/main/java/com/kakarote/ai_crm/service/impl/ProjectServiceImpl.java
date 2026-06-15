@@ -25,10 +25,14 @@ import com.kakarote.ai_crm.mapper.ProjectMapper;
 import com.kakarote.ai_crm.mapper.ProjectScheduleMapper;
 import com.kakarote.ai_crm.mapper.ProjectTaskAttachmentMapper;
 import com.kakarote.ai_crm.mapper.ProjectTaskMapper;
+import com.kakarote.ai_crm.service.IKnowledgeService;
 import com.kakarote.ai_crm.service.IProjectService;
 import com.kakarote.ai_crm.utils.UserUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Locale;
@@ -36,6 +40,7 @@ import java.util.Objects;
 import java.util.Set;
 
 @Service
+@Slf4j
 public class ProjectServiceImpl implements IProjectService {
 
     private static final String STATUS_NOT_STARTED = "NOT_STARTED";
@@ -54,6 +59,7 @@ public class ProjectServiceImpl implements IProjectService {
     private final ProjectScheduleMapper projectScheduleMapper;
     private final ManageUserMapper manageUserMapper;
     private final CustomerMapper customerMapper;
+    private final IKnowledgeService knowledgeService;
 
     public ProjectServiceImpl(ProjectMapper projectMapper,
                               ProjectLaneMapper projectLaneMapper,
@@ -62,7 +68,8 @@ public class ProjectServiceImpl implements IProjectService {
                               ProjectAttachmentMapper projectAttachmentMapper,
                               ProjectScheduleMapper projectScheduleMapper,
                               ManageUserMapper manageUserMapper,
-                              CustomerMapper customerMapper) {
+                              CustomerMapper customerMapper,
+                              IKnowledgeService knowledgeService) {
         this.projectMapper = projectMapper;
         this.projectLaneMapper = projectLaneMapper;
         this.projectTaskMapper = projectTaskMapper;
@@ -71,6 +78,7 @@ public class ProjectServiceImpl implements IProjectService {
         this.projectScheduleMapper = projectScheduleMapper;
         this.manageUserMapper = manageUserMapper;
         this.customerMapper = customerMapper;
+        this.knowledgeService = knowledgeService;
     }
 
     @Override
@@ -469,6 +477,43 @@ public class ProjectServiceImpl implements IProjectService {
         attachment.setCreateUserId(UserUtil.getUserId());
         attachment.setCreateUserName(currentUserDisplayName());
         projectTaskAttachmentMapper.insert(attachment);
+        scheduleTaskAttachmentKnowledgeSync(projectId, taskId, name, filePath, attachment.getFileSize(), attachment.getMimeType());
+    }
+
+    private void scheduleTaskAttachmentKnowledgeSync(Long projectId, Long taskId, String fileName,
+                                                     String filePath, Long fileSize, String mimeType) {
+        if (StrUtil.isBlank(filePath)) {
+            return;
+        }
+        Runnable sync = () -> syncTaskAttachmentToKnowledge(projectId, taskId, fileName, filePath, fileSize, mimeType);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    sync.run();
+                }
+            });
+            return;
+        }
+        sync.run();
+    }
+
+    private void syncTaskAttachmentToKnowledge(Long projectId, Long taskId, String fileName,
+                                               String filePath, Long fileSize, String mimeType) {
+        try {
+            Project project = getProjectEntity(projectId);
+            ProjectTask task = getProjectTask(projectId, taskId);
+            Long customerId = firstNonNull(task.getCustomerId(), project.getCustomerId());
+            String summary = "项目任务附件自动同步。项目：" + project.getName() + "；任务：" + task.getTitle();
+            knowledgeService.archiveExistingStandaloneFile(fileName, filePath, fileSize, mimeType, customerId, summary);
+        } catch (Exception e) {
+            log.warn("项目任务附件同步知识库失败: projectId={}, taskId={}, fileName={}, error={}",
+                    projectId, taskId, fileName, e.getMessage(), e);
+        }
+    }
+
+    private Long firstNonNull(Long first, Long second) {
+        return first != null ? first : second;
     }
 
     private void fillTaskAttachments(ProjectVO.ProjectTaskVO task) {

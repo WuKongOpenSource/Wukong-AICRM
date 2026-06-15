@@ -47,6 +47,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
@@ -154,6 +155,47 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         // Async upload to WeKnora (only for supported file types)
         if (weKnoraClient.isEnabled() && weKnoraSupported) {
             self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), relativePath, file.getOriginalFilename());
+        }
+
+        return knowledge.getKnowledgeId();
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public Long archiveExistingStandaloneFile(String fileName, String filePath, Long fileSize, String mimeType, Long customerId, String summary) {
+        if (customerId != null) {
+            Customer customer = customerMapper.selectById(customerId);
+            if (ObjectUtil.isNull(customer)) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在或无权限访问");
+            }
+        }
+        if (StrUtil.isBlank(filePath)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "文件路径不能为空");
+        }
+
+        String normalizedFileName = StrUtil.blankToDefault(StrUtil.trim(fileName), FileUtil.getName(filePath));
+        Knowledge knowledge = new Knowledge();
+        knowledge.setName(normalizedFileName);
+        knowledge.setType("document");
+        knowledge.setCustomerId(customerId);
+        knowledge.setFilePath(filePath);
+        knowledge.setFileSize(fileSize);
+        knowledge.setMimeType(mimeType);
+        knowledge.setSummary(summary);
+        knowledge.setUploadUserId(UserUtil.getUserId());
+
+        boolean weKnoraSupported = weKnoraClient.isSupportedFileType(normalizedFileName);
+        if (weKnoraSupported) {
+            knowledge.setWeKnoraParseStatus("pending");
+        } else {
+            knowledge.setWeKnoraParseStatus("unsupported");
+            log.info("任务附件类型不被 WeKnora 支持，跳过 RAG 处理: {}", normalizedFileName);
+        }
+
+        save(knowledge);
+
+        if (weKnoraClient.isEnabled() && weKnoraSupported) {
+            self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), filePath, normalizedFileName);
         }
 
         return knowledge.getKnowledgeId();

@@ -261,6 +261,67 @@
         <el-form-item label="描述">
           <el-input v-model="taskForm.description" type="textarea" :rows="4" maxlength="1000" show-word-limit />
         </el-form-item>
+        <el-form-item label="附件">
+          <div class="w-full space-y-3">
+            <input
+              ref="taskAttachmentInputRef"
+              class="hidden"
+              type="file"
+              multiple
+              @change="handleTaskAttachmentChange"
+            />
+            <button
+              type="button"
+              class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition hover:border-primary/40 hover:text-primary disabled:opacity-50"
+              :disabled="taskAttachmentUploading"
+              @click="taskAttachmentInputRef?.click()"
+            >
+              <span class="material-symbols-outlined text-[18px] leading-none">{{ taskAttachmentUploading ? 'progress_activity' : 'attach_file' }}</span>
+              {{ taskAttachmentUploading ? '上传中...' : '上传附件' }}
+            </button>
+
+            <div v-if="editingTask?.attachments?.length" class="space-y-2">
+              <div
+                v-for="attachment in editingTask.attachments"
+                :key="attachment.attachmentId"
+                class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+              >
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-medium text-slate-800">{{ attachment.name || '未命名附件' }}</p>
+                  <p class="mt-0.5 text-xs text-slate-400">{{ formatFileSize(attachment.fileSize) }}</p>
+                </div>
+                <div class="flex shrink-0 items-center gap-1">
+                  <button class="project-icon-button" type="button" title="下载" @click="handleDownloadTaskAttachment(attachment)">
+                    <span class="material-symbols-outlined text-[18px] leading-none">download</span>
+                  </button>
+                  <button class="project-icon-button text-rose-500 hover:bg-rose-50" type="button" title="删除" @click="handleDeleteTaskAttachment(attachment)">
+                    <span class="material-symbols-outlined text-[18px] leading-none">delete</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="draftTaskAttachments.length" class="space-y-2">
+              <div
+                v-for="(attachment, index) in draftTaskAttachments"
+                :key="`${attachment.filePath}-${index}`"
+                class="flex items-center justify-between gap-3 rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2"
+              >
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-medium text-slate-800">{{ attachment.fileName || '未命名附件' }}</p>
+                  <p class="mt-0.5 text-xs text-slate-400">{{ formatFileSize(attachment.fileSize) }}</p>
+                </div>
+                <button class="project-icon-button text-rose-500 hover:bg-rose-50" type="button" title="移除" @click="removeDraftTaskAttachment(index)">
+                  <span class="material-symbols-outlined text-[18px] leading-none">close</span>
+                </button>
+              </div>
+            </div>
+
+            <p v-if="!editingTask?.attachments?.length && !draftTaskAttachments.length" class="text-xs text-slate-400">
+              暂无附件
+            </p>
+          </div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <div class="flex justify-between gap-2">
@@ -281,21 +342,33 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
+  addProjectTaskAttachment,
   addProject,
   addProjectLane,
   addProjectTask,
   archiveProject,
   deleteProject,
+  deleteProjectTaskAttachment,
   deleteProjectTask,
+  downloadProjectTaskAttachment,
   getProjectDetail,
   queryProjectPageList,
   restoreProject,
   updateProject,
   updateProjectTask
 } from '@/api/project'
+import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { useResponsive } from '@/composables/useResponsive'
 import { isRequestErrorHandled } from '@/utils/requestError'
-import type { ProjectCreate, ProjectStatus, ProjectTaskSave, ProjectTaskVO, ProjectVO } from '@/types/project'
+import type {
+  ProjectCreate,
+  ProjectStatus,
+  ProjectTaskAttachment,
+  ProjectTaskAttachmentPayload,
+  ProjectTaskSave,
+  ProjectTaskVO,
+  ProjectVO
+} from '@/types/project'
 
 const { isMobile } = useResponsive()
 const projects = ref<ProjectVO[]>([])
@@ -314,6 +387,9 @@ const currentProject = ref<ProjectVO | null>(null)
 const taskDialogVisible = ref(false)
 const savingTask = ref(false)
 const editingTask = ref<ProjectTaskVO | null>(null)
+const taskAttachmentUploading = ref(false)
+const taskAttachmentInputRef = ref<HTMLInputElement | null>(null)
+const draftTaskAttachments = ref<ProjectTaskAttachmentPayload[]>([])
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const projectForm = reactive<ProjectCreate & { projectId?: string }>({
@@ -521,6 +597,8 @@ function openTaskDialog(task?: ProjectTaskVO) {
   taskForm.ownerName = task?.ownerName || ''
   taskForm.priority = task?.priority || 'MEDIUM'
   taskForm.dueDate = task?.dueDate || ''
+  draftTaskAttachments.value = []
+  taskForm.attachments = []
   taskDialogVisible.value = true
 }
 
@@ -538,7 +616,8 @@ async function saveTask() {
     laneId: taskForm.laneId || undefined,
     ownerName: taskForm.ownerName?.trim() || undefined,
     priority: taskForm.priority || 'MEDIUM',
-    dueDate: taskForm.dueDate || undefined
+    dueDate: taskForm.dueDate || undefined,
+    attachments: draftTaskAttachments.value.length ? [...draftTaskAttachments.value] : undefined
   }
   try {
     currentProject.value = editingTask.value
@@ -554,6 +633,96 @@ async function saveTask() {
   } finally {
     savingTask.value = false
   }
+}
+
+async function handleTaskAttachmentChange(event: Event) {
+  if (!currentProject.value) return
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  if (!files.length) return
+
+  taskAttachmentUploading.value = true
+  try {
+    const uploadedAttachments = await Promise.all(files.map(uploadProjectTaskAttachmentFile))
+    if (editingTask.value?.taskId) {
+      for (const attachment of uploadedAttachments) {
+        currentProject.value = await addProjectTaskAttachment(currentProject.value.projectId, editingTask.value.taskId, attachment)
+      }
+      syncEditingTaskFromCurrent()
+      ElMessage.success('附件已上传')
+    } else {
+      draftTaskAttachments.value.push(...uploadedAttachments)
+      taskForm.attachments = [...draftTaskAttachments.value]
+      ElMessage.success('附件已添加')
+    }
+  } catch (error) {
+    if (!isRequestErrorHandled(error)) {
+      ElMessage.error('附件上传失败')
+    }
+  } finally {
+    taskAttachmentUploading.value = false
+    input.value = ''
+  }
+}
+
+async function uploadProjectTaskAttachmentFile(file: File): Promise<ProjectTaskAttachmentPayload> {
+  const presigned = await getPresignedUploadUrl(file.name, file.type || 'application/octet-stream')
+  await uploadToMinIO(file, presigned.uploadUrl)
+  return {
+    fileName: file.name,
+    filePath: presigned.objectKey,
+    fileSize: file.size,
+    mimeType: file.type || 'application/octet-stream'
+  }
+}
+
+async function handleDownloadTaskAttachment(attachment: ProjectTaskAttachment) {
+  if (!currentProject.value || !editingTask.value) return
+  try {
+    await downloadProjectTaskAttachment(
+      currentProject.value.projectId,
+      editingTask.value.taskId,
+      attachment.attachmentId,
+      attachment.name || '附件'
+    )
+  } catch (error) {
+    if (!isRequestErrorHandled(error)) {
+      ElMessage.error('附件下载失败')
+    }
+  }
+}
+
+async function handleDeleteTaskAttachment(attachment: ProjectTaskAttachment) {
+  if (!currentProject.value || !editingTask.value) return
+  try {
+    await ElMessageBox.confirm(`确定删除附件“${attachment.name || '未命名附件'}”？`, '删除附件', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    currentProject.value = await deleteProjectTaskAttachment(
+      currentProject.value.projectId,
+      editingTask.value.taskId,
+      attachment.attachmentId
+    )
+    syncEditingTaskFromCurrent()
+    ElMessage.success('附件已删除')
+    await loadProjects()
+  } catch (error) {
+    if (!isRequestErrorHandled(error) && error !== 'cancel' && error !== 'close') {
+      ElMessage.error('删除附件失败')
+    }
+  }
+}
+
+function removeDraftTaskAttachment(index: number) {
+  draftTaskAttachments.value.splice(index, 1)
+  taskForm.attachments = [...draftTaskAttachments.value]
+}
+
+function syncEditingTaskFromCurrent() {
+  if (!currentProject.value || !editingTask.value) return
+  editingTask.value = (currentProject.value.tasks || []).find(task => String(task.taskId) === String(editingTask.value?.taskId)) || editingTask.value
 }
 
 async function handleDeleteTask() {
@@ -610,6 +779,13 @@ function formatDate(value?: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })
+}
+
+function formatFileSize(value?: number) {
+  if (!value || value <= 0) return '大小未知'
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+  return `${(value / 1024 / 1024).toFixed(1)} MB`
 }
 </script>
 

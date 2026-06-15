@@ -19,6 +19,7 @@ import com.kakarote.ai_crm.mapper.ProjectMapper;
 import com.kakarote.ai_crm.mapper.ProjectScheduleMapper;
 import com.kakarote.ai_crm.mapper.ProjectTaskAttachmentMapper;
 import com.kakarote.ai_crm.mapper.ProjectTaskMapper;
+import com.kakarote.ai_crm.service.IKnowledgeService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -64,6 +66,9 @@ class ProjectServiceImplTest {
     @Mock
     private CustomerMapper customerMapper;
 
+    @Mock
+    private IKnowledgeService knowledgeService;
+
     private ProjectServiceImpl projectService;
 
     @BeforeEach
@@ -76,7 +81,8 @@ class ProjectServiceImplTest {
             projectAttachmentMapper,
             projectScheduleMapper,
             manageUserMapper,
-            customerMapper
+            customerMapper,
+            knowledgeService
         );
         setCurrentUser(1001L);
     }
@@ -145,10 +151,16 @@ class ProjectServiceImplTest {
 
     @Test
     void addTaskAttachmentStoresFileMetadataAndReturnsProjectDetail() {
+        Project project = new Project();
+        project.setProjectId(2001L);
+        project.setName("Implementation");
+        project.setCustomerId(5001L);
         ProjectTask task = new ProjectTask();
         task.setTaskId(3001L);
         task.setProjectId(2001L);
+        task.setTitle("Prepare proposal");
         when(projectTaskMapper.selectById(3001L)).thenReturn(task);
+        when(projectMapper.selectById(2001L)).thenReturn(project);
         when(projectMapper.getProjectById(2001L)).thenReturn(projectDetail(2001L));
         when(projectLaneMapper.selectList(any())).thenReturn(List.of());
         when(projectTaskMapper.selectProjectTasks(2001L, null)).thenReturn(List.of(taskVO(3001L)));
@@ -173,6 +185,14 @@ class ProjectServiceImplTest {
         assertThat(saved.getMimeType()).isEqualTo("application/pdf");
         assertThat(saved.getCreateUserId()).isEqualTo(1001L);
         assertThat(result.getProjectId()).isEqualTo(2001L);
+        verify(knowledgeService).archiveExistingStandaloneFile(
+                eq("proposal.pdf"),
+                eq("project/2001/proposal.pdf"),
+                eq(1234L),
+                eq("application/pdf"),
+                eq(5001L),
+                eq("项目任务附件自动同步。项目：Implementation；任务：Prepare proposal")
+        );
     }
 
     @Test
