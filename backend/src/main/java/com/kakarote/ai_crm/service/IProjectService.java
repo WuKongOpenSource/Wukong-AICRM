@@ -53,4 +53,20 @@ public interface IProjectService {
     ProjectVO deleteTask(Long projectId, Long taskId);
 
     ProjectVO moveTask(Long projectId, ProjectBO.TaskMove moveBO);
+
+    ProjectVO.ProjectRolePermissionConfigVO getProjectRolePermissionConfig();
+
+    ProjectVO.ProjectRolePermissionConfigVO updateProjectRolePermissionConfig(ProjectBO.RolePermissionConfig configBO);
+
+    ProjectVO addMember(Long projectId, ProjectBO.MemberSave memberBO);
+
+    ProjectVO updateMemberRole(Long projectId, ProjectBO.MemberRole roleBO);
+
+    ProjectVO updateMemberPermissions(Long projectId, ProjectBO.MemberPermissions permissionsBO);
+
+    ProjectVO updateMemberStatus(Long projectId, ProjectBO.MemberStatus statusBO);
+
+    ProjectVO handleProjectAiCommand(Long projectId, ProjectBO.AiCommand commandBO);
+
+    ProjectVO handleTaskAiCommand(Long projectId, Long taskId, ProjectBO.AiCommand commandBO);
 }

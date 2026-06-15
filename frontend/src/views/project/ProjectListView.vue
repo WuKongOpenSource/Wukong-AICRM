@@ -1,829 +1,604 @@
 <template>
-  <div class="flex h-full flex-col gap-5 bg-slate-50 px-4 py-5 md:px-8">
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+  <div class="flex h-full flex-col gap-4 overflow-hidden bg-slate-50/30 px-4 py-6 md:px-6">
+    <header class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div class="min-w-0">
-        <h1 class="text-xl font-bold text-slate-900">项目管理</h1>
-        <p class="mt-1 text-sm text-slate-500">共 {{ total }} 个项目</p>
+        <h2 class="text-[22px] font-bold text-slate-900">项目列表</h2>
       </div>
-
-      <div class="flex flex-col gap-3 md:flex-row md:items-center">
-        <div class="relative">
-          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-          <input
-            v-model="keyword"
-            type="text"
-            placeholder="搜索项目、客户或描述"
-            class="h-10 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 md:w-80"
-            @input="debouncedLoadProjects"
-            @keydown.enter="loadProjects"
-          />
-        </div>
-        <select
-          v-model="status"
-          class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-600 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-          @change="applyFilters"
-        >
-          <option value="">全部状态</option>
-          <option value="NOT_STARTED">未开始</option>
-          <option value="IN_PROGRESS">进行中</option>
-          <option value="COMPLETED">已完成</option>
-          <option value="PAUSED">已暂停</option>
-          <option value="ARCHIVED">已归档</option>
-        </select>
+      <div
+        class="wk-native-input-shell flex h-10 w-full min-w-0 items-center rounded-xl border border-[#dbe8f8] bg-[#f8fbff] px-1.5 transition-all focus-within:border-primary/60 sm:ml-auto sm:w-[360px]"
+      >
+        <span class="material-symbols-outlined shrink-0 pl-2 pr-1 text-[22px] leading-none text-[#8fa6c5]">search</span>
+        <input
+          v-model="keyword"
+          type="text"
+          placeholder="搜索项目名称、描述或客户"
+          class="min-w-0 flex-1 border-none bg-transparent px-1 text-[13px] leading-5 text-slate-900 outline-none placeholder:text-[#8fa6c5] focus:ring-0"
+          @input="debouncedLoadProjects"
+          @keydown.enter="handleSearch"
+        />
+      </div>
+      <button
+        type="button"
+        class="inline-flex h-10 shrink-0 items-center gap-2 self-start rounded-xl bg-primary px-4 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 sm:self-auto"
+        @click="openCreateDialog"
+      >
+        <span class="material-symbols-outlined text-[20px] leading-none">add</span>
+        <span>新建项目</span>
+      </button>
+      <el-dropdown trigger="click" placement="bottom-end">
         <button
           type="button"
-          class="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white shadow-sm transition hover:bg-primary/90"
-          @click="openCreateDialog"
+          class="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] text-[#284462] transition-all hover:border-[var(--wk-input-border-hover)] hover:text-primary sm:self-auto"
+          title="更多项目设置"
+          aria-label="更多项目设置"
         >
-          <span class="material-symbols-outlined text-[18px] leading-none">add_task</span>
-          新建项目
+          <span class="material-symbols-outlined text-[22px] leading-none">more_horiz</span>
+        </button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item @click="showRolePermissionDialog = true">
+              <span class="inline-flex items-center gap-2">
+                <span class="material-symbols-outlined text-[16px]">admin_panel_settings</span>
+                <span>项目角色权限设置</span>
+              </span>
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </header>
+
+    <div class="flex min-w-0 flex-wrap items-center justify-between gap-3">
+      <div class="flex min-w-0 flex-wrap items-center gap-2">
+        <button
+          v-for="filter in statusFilters"
+          :key="filter.value"
+          type="button"
+          :class="[
+            'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-all',
+            statusFilter === filter.value
+              ? 'border-primary/25 bg-primary/10 text-primary'
+              : 'border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] text-[#284462] hover:border-[var(--wk-input-border-hover)] hover:text-primary'
+          ]"
+          @click="handleStatusFilter(filter.value)"
+        >
+          <span class="material-symbols-outlined text-[17px] leading-none">{{ filter.icon }}</span>
+          {{ filter.label }}（{{ filter.count }}）
+        </button>
+      </div>
+
+      <div class="flex shrink-0 items-center gap-2">
+        <div class="inline-flex h-9 shrink-0 items-center rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1">
+        <button
+          type="button"
+          class="inline-flex size-7 items-center justify-center rounded-md transition-all"
+          :class="viewMode === 'card' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-[#8aa1c2] hover:text-primary'"
+          title="卡片视图"
+          @click="viewMode = 'card'"
+        >
+          <span class="material-symbols-outlined text-[20px] leading-none">grid_view</span>
+        </button>
+        <button
+          type="button"
+          class="inline-flex size-7 items-center justify-center rounded-md transition-all"
+          :class="viewMode === 'table' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-[#8aa1c2] hover:text-primary'"
+          title="表格视图"
+          @click="viewMode = 'table'"
+        >
+          <span class="material-symbols-outlined text-[20px] leading-none">list</span>
+        </button>
+        </div>
+      </div>
+    </div>
+
+    <main class="min-h-0 flex-1 overflow-y-auto" v-loading="showListLoading">
+      <div v-if="projects.length === 0" class="flex h-full min-h-[280px] flex-col items-center justify-center text-center text-slate-400">
+        <span class="material-symbols-outlined text-5xl">folder_open</span>
+        <p class="mt-4 text-sm">{{ keyword.trim() ? '没有匹配的项目' : '还没有项目，先创建一个项目开始管理任务吧。' }}</p>
+      </div>
+
+      <div v-else-if="viewMode === 'card'" class="grid grid-cols-1 gap-4 pb-2 xl:grid-cols-2">
+        <article
+          v-for="project in projects"
+          :key="project.projectId"
+          class="group cursor-pointer rounded-[8px] border border-[var(--wk-input-border)] bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-slate-200/60"
+          role="button"
+          tabindex="0"
+          @click="goToProject(project.projectId)"
+          @keydown.enter.prevent="goToProject(project.projectId)"
+          @keydown.space.prevent="goToProject(project.projectId)"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <div class="flex min-w-0 items-center gap-2">
+                <h3 class="truncate text-base font-bold text-slate-900 transition-colors group-hover:text-primary">
+                  {{ project.name }}
+                </h3>
+                <span class="inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-bold" :class="projectStatusClass(project.status)">
+                  {{ projectStatusLabel(project.status) }}
+                </span>
+              </div>
+              <p class="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
+                {{ project.description || '暂无项目描述' }}
+              </p>
+            </div>
+            <button
+              v-if="canEditProject(project) && !isArchivedProject(project)"
+              type="button"
+              class="flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-50 hover:text-primary"
+              title="编辑项目"
+              @click.stop="openEditDialog(project)"
+            >
+              <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
+            </button>
+          </div>
+
+          <div class="mt-5 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-slate-100 pt-4 text-sm">
+            <div class="min-w-0">
+              <p class="text-xs text-slate-400">负责人</p>
+              <p class="mt-1 truncate font-semibold text-slate-900">{{ project.ownerName || '未指定' }}</p>
+            </div>
+            <div class="min-w-0">
+              <p class="text-xs text-slate-400">关联客户</p>
+              <p class="mt-1 truncate font-semibold text-slate-900">{{ project.customerName || '未关联' }}</p>
+            </div>
+            <div class="min-w-0">
+              <p class="text-xs text-slate-400">最近更新</p>
+              <p class="mt-1 truncate font-semibold text-slate-900">{{ formatDateTime(project.updateTime) }}</p>
+            </div>
+            <div class="min-w-0">
+              <p class="text-xs text-slate-400">项目任务</p>
+              <p class="mt-1 truncate font-semibold text-slate-900">
+                {{ project.taskCount || 0 }} 个
+                <span class="text-slate-400">/ 未完成 {{ project.incompleteTaskCount || 0 }} 个</span>
+              </p>
+            </div>
+          </div>
+
+          <div class="mt-5 flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              class="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors"
+              :class="isArchivedProject(project)
+                ? 'border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                : 'bg-slate-900 text-white hover:bg-slate-700'"
+              @click.stop="goToProject(project.projectId)"
+            >
+              进入项目
+              <span class="material-symbols-outlined text-[16px] leading-none">arrow_forward</span>
+            </button>
+            <button
+              v-if="isArchivedProject(project) && canRestoreProject(project)"
+              type="button"
+              class="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
+              @click.stop="handleRestoreProject(project)"
+            >
+              恢复项目
+            </button>
+            <button
+              v-if="isArchivedProject(project) && canDeleteProject(project)"
+              type="button"
+              class="inline-flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100"
+              @click.stop="handleDeleteProject(project)"
+            >
+              删除项目
+            </button>
+          </div>
+        </article>
+      </div>
+
+      <div v-else class="wk-project-list-table-shell overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div class="overflow-x-auto">
+          <table class="wk-project-list-table min-w-[920px] text-sm">
+            <thead class="text-left">
+              <tr>
+                <th class="px-5 py-3 font-semibold">项目名称</th>
+                <th class="px-5 py-3 font-semibold">状态</th>
+                <th class="px-5 py-3 font-semibold">负责人</th>
+                <th class="px-5 py-3 font-semibold">关联客户</th>
+                <th class="px-5 py-3 font-semibold">任务</th>
+                <th class="px-5 py-3 font-semibold">更新时间</th>
+                <th class="px-5 py-3 font-semibold">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="project in projects"
+                :key="project.projectId"
+                class="cursor-pointer transition-colors"
+                @click="goToProject(project.projectId)"
+              >
+                <td class="max-w-[280px] px-5 py-4">
+                  <p class="truncate font-semibold text-slate-900 transition-colors hover:text-primary hover:underline hover:decoration-primary underline-offset-2">{{ project.name }}</p>
+                  <p v-if="project.description" class="mt-1 line-clamp-1 text-xs text-slate-400">{{ project.description }}</p>
+                </td>
+                <td class="px-5 py-4">
+                  <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold" :class="projectStatusClass(project.status)">
+                    {{ projectStatusLabel(project.status) }}
+                  </span>
+                </td>
+                <td class="px-5 py-4 text-slate-600">{{ project.ownerName || '未指定' }}</td>
+                <td class="px-5 py-4 text-slate-600">{{ project.customerName || '未关联' }}</td>
+                <td class="px-5 py-4 text-slate-600">
+                  {{ project.taskCount || 0 }} / 未完成 {{ project.incompleteTaskCount || 0 }}
+                </td>
+                <td class="px-5 py-4 text-slate-600">{{ formatDateTime(project.updateTime) }}</td>
+                <td class="px-5 py-4">
+                  <div class="flex items-center justify-start gap-1" @click.stop>
+                    <button
+                      type="button"
+                      class="flex size-8 items-center justify-center rounded-lg text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-bg-surface-hover)] hover:text-primary"
+                      title="进入项目"
+                      @click="goToProject(project.projectId)"
+                    >
+                      <span class="material-symbols-outlined text-[18px] leading-none">open_in_new</span>
+                    </button>
+                    <button
+                      v-if="canEditProject(project) && !isArchivedProject(project)"
+                      type="button"
+                      class="flex size-8 items-center justify-center rounded-lg text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-bg-surface-hover)] hover:text-primary"
+                      title="编辑项目"
+                      @click.stop="openEditDialog(project)"
+                    >
+                      <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
+                    </button>
+                    <button
+                      v-if="isArchivedProject(project) && canRestoreProject(project)"
+                      type="button"
+                      class="flex size-8 items-center justify-center rounded-lg text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-bg-surface-hover)] hover:text-primary"
+                      title="恢复项目"
+                      @click.stop="handleRestoreProject(project)"
+                    >
+                      <span class="material-symbols-outlined text-[18px] leading-none">restore</span>
+                    </button>
+                    <button
+                      v-if="isArchivedProject(project) && canDeleteProject(project)"
+                      type="button"
+                      class="flex size-8 items-center justify-center rounded-lg text-red-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                      title="删除项目"
+                      @click.stop="handleDeleteProject(project)"
+                    >
+                      <span class="material-symbols-outlined text-[18px] leading-none">delete</span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <div v-if="total > 0" class="flex shrink-0 items-center justify-between border-t border-slate-200 bg-slate-50/50 px-1 py-4 text-sm text-slate-500 md:px-0">
+      <span>共 {{ total }} 个<span class="hidden md:inline">项目</span></span>
+      <div class="flex items-center gap-1">
+        <button class="flex size-8 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 disabled:opacity-50" :disabled="page <= 1" @click="changePage(page - 1)">
+          <span class="material-symbols-outlined text-lg leading-none">chevron_left</span>
+        </button>
+        <button
+          v-for="pageNum in visiblePages"
+          :key="pageNum"
+          class="flex size-8 items-center justify-center rounded border text-xs font-bold"
+          :class="pageNum === page
+            ? 'border-primary bg-primary text-white'
+            : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'"
+          @click="changePage(pageNum)"
+        >
+          {{ pageNum }}
+        </button>
+        <span v-if="totalPages > 5" class="px-1 text-xs text-slate-400">...</span>
+        <button class="flex size-8 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 disabled:opacity-50" :disabled="page >= totalPages" @click="changePage(page + 1)">
+          <span class="material-symbols-outlined text-lg leading-none">chevron_right</span>
         </button>
       </div>
     </div>
 
-    <div class="min-h-0 flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white" v-loading="loading">
-      <el-table
-        v-if="!isMobile"
-        :data="projects"
-        height="100%"
-        row-key="projectId"
-        table-layout="fixed"
-        empty-text="暂无项目"
-        @row-click="openDetail"
-      >
-        <el-table-column label="项目" min-width="260">
-          <template #default="{ row }">
-            <div class="min-w-0">
-              <p class="truncate text-sm font-semibold text-slate-900">{{ row.name }}</p>
-              <p class="mt-1 truncate text-xs text-slate-400">{{ row.description || '暂无描述' }}</p>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="120">
-          <template #default="{ row }">
-            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium" :class="statusClass(row.status)">
-              {{ statusLabel(row.status) }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="客户" min-width="170">
-          <template #default="{ row }">
-            <span class="block truncate text-sm text-slate-600">{{ row.customerName || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="负责人" width="130">
-          <template #default="{ row }">
-            <span class="block truncate text-sm text-slate-600">{{ row.ownerName || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="任务" width="120">
-          <template #default="{ row }">
-            <span class="text-sm text-slate-600">{{ row.incompleteTaskCount || 0 }} / {{ row.taskCount || 0 }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="截止时间" width="150">
-          <template #default="{ row }">
-            <span class="text-sm text-slate-500">{{ formatDate(row.dueDate) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="130" fixed="right">
-          <template #default="{ row }">
-            <div class="flex items-center gap-1" @click.stop>
-              <button class="project-icon-button" title="编辑" type="button" @click="openEditDialog(row)">
-                <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
-              </button>
-              <button class="project-icon-button" :title="row.status === 'ARCHIVED' ? '恢复' : '归档'" type="button" @click="toggleArchive(row)">
-                <span class="material-symbols-outlined text-[18px] leading-none">{{ row.status === 'ARCHIVED' ? 'unarchive' : 'archive' }}</span>
-              </button>
-              <button class="project-icon-button text-rose-500 hover:bg-rose-50" title="删除" type="button" @click="handleDeleteProject(row)">
-                <span class="material-symbols-outlined text-[18px] leading-none">delete</span>
-              </button>
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div v-else class="h-full overflow-y-auto px-3 py-3">
-        <div v-if="projects.length === 0" class="py-16 text-center text-slate-400">
-          <span class="material-symbols-outlined text-5xl">view_kanban</span>
-          <p class="mt-3 text-sm">{{ keyword.trim() ? '未找到匹配项目' : '暂无项目' }}</p>
-        </div>
-        <div v-else class="flex flex-col gap-3">
-          <button
-            v-for="project in projects"
-            :key="project.projectId"
-            type="button"
-            class="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-left transition active:bg-slate-100"
-            @click="openDetail(project)"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0 flex-1">
-                <div class="truncate text-sm font-bold text-slate-900">{{ project.name }}</div>
-                <p class="mt-1 truncate text-xs text-slate-400">{{ project.customerName || '未关联客户' }}</p>
-              </div>
-              <span class="inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium" :class="statusClass(project.status)">
-                {{ statusLabel(project.status) }}
-              </span>
-            </div>
-            <div class="mt-3 text-sm text-slate-600">任务 {{ project.incompleteTaskCount || 0 }} / {{ project.taskCount || 0 }}</div>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="total > 0" class="flex items-center justify-between text-sm text-slate-500">
-      <span>第 {{ page }} / {{ totalPages }} 页</span>
-      <div class="flex items-center gap-2">
-        <button class="rounded-lg border border-slate-200 bg-white px-3 py-2 disabled:opacity-40" :disabled="page <= 1" @click="changePage(page - 1)">上一页</button>
-        <button class="rounded-lg border border-slate-200 bg-white px-3 py-2 disabled:opacity-40" :disabled="page >= totalPages" @click="changePage(page + 1)">下一页</button>
-      </div>
-    </div>
-
-    <el-dialog
-      v-model="projectDialogVisible"
-      :fullscreen="isMobile"
-      :width="isMobile ? '100%' : '560px'"
-      :title="editingProject ? '编辑项目' : '新建项目'"
-      destroy-on-close
-    >
-      <el-form label-position="top" @submit.prevent>
-        <el-form-item label="项目名称" required>
-          <el-input v-model="projectForm.name" maxlength="255" placeholder="请输入项目名称" />
-        </el-form-item>
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <el-form-item label="客户名称">
-            <el-input v-model="projectForm.customerName" maxlength="255" placeholder="选填" />
-          </el-form-item>
-          <el-form-item label="状态">
-            <el-select v-model="projectForm.status" class="w-full">
-              <el-option label="未开始" value="NOT_STARTED" />
-              <el-option label="进行中" value="IN_PROGRESS" />
-              <el-option label="已完成" value="COMPLETED" />
-              <el-option label="已暂停" value="PAUSED" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="开始时间">
-            <el-date-picker v-model="projectForm.startDate" class="w-full" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" />
-          </el-form-item>
-          <el-form-item label="截止时间">
-            <el-date-picker v-model="projectForm.dueDate" class="w-full" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" />
-          </el-form-item>
-        </div>
-        <el-form-item label="描述">
-          <el-input v-model="projectForm.description" type="textarea" :rows="4" maxlength="1000" show-word-limit placeholder="项目目标、范围或交付说明" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <button type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100" @click="projectDialogVisible = false">取消</button>
-          <button type="button" class="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50" :disabled="savingProject" @click="saveProject">
-            {{ savingProject ? '保存中...' : '保存' }}
-          </button>
-        </div>
-      </template>
-    </el-dialog>
-
-    <el-drawer v-model="detailVisible" :size="isMobile ? '100%' : '880px'" title="项目看板" append-to-body>
-      <div v-loading="detailLoading" class="flex h-full min-h-0 flex-col gap-4">
-        <template v-if="currentProject">
-          <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div class="min-w-0">
-              <h2 class="truncate text-lg font-bold text-slate-900">{{ currentProject.name }}</h2>
-              <p class="mt-1 text-sm text-slate-500">{{ currentProject.description || '暂无描述' }}</p>
-            </div>
-            <div class="flex gap-2">
-              <button type="button" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600" @click="createLane">新增泳道</button>
-              <button type="button" class="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-white" @click="openTaskDialog()">新增任务</button>
-            </div>
-          </div>
-
-          <div class="min-h-0 flex-1 overflow-x-auto">
-            <div class="grid min-w-[760px] grid-cols-3 gap-3">
-              <section v-for="lane in boardLanes" :key="lane.laneId" class="flex min-h-[420px] flex-col rounded-lg border border-slate-200 bg-slate-50">
-                <header class="flex items-center justify-between border-b border-slate-200 px-3 py-2">
-                  <span class="text-sm font-bold text-slate-800">{{ lane.name }}</span>
-                  <span class="rounded-full bg-white px-2 py-0.5 text-xs text-slate-500">{{ tasksByLane(lane.laneId).length }}</span>
-                </header>
-                <div class="flex flex-1 flex-col gap-2 overflow-y-auto p-3">
-                  <button
-                    v-for="task in tasksByLane(lane.laneId)"
-                    :key="task.taskId"
-                    type="button"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-3 text-left shadow-sm transition hover:border-primary/40"
-                    @click="openTaskDialog(task)"
-                  >
-                    <div class="flex items-start justify-between gap-2">
-                      <p class="line-clamp-2 text-sm font-semibold text-slate-900">{{ task.title }}</p>
-                      <span class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium" :class="priorityClass(task.priority)">
-                        {{ priorityLabel(task.priority) }}
-                      </span>
-                    </div>
-                    <p v-if="task.description" class="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{{ task.description }}</p>
-                    <div class="mt-3 flex items-center justify-between text-xs text-slate-400">
-                      <span>{{ task.ownerName || '未分配' }}</span>
-                      <span>{{ formatDate(task.dueDate) }}</span>
-                    </div>
-                  </button>
-                </div>
-              </section>
-            </div>
-          </div>
-        </template>
-      </div>
-    </el-drawer>
-
-    <el-dialog v-model="taskDialogVisible" :width="isMobile ? '100%' : '520px'" :fullscreen="isMobile" :title="editingTask ? '编辑任务' : '新增任务'" append-to-body>
-      <el-form label-position="top" @submit.prevent>
-        <el-form-item label="任务标题" required>
-          <el-input v-model="taskForm.title" maxlength="255" placeholder="请输入任务标题" />
-        </el-form-item>
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <el-form-item label="泳道">
-            <el-select v-model="taskForm.laneId" class="w-full">
-              <el-option v-for="lane in boardLanes" :key="lane.laneId" :label="lane.name" :value="lane.laneId" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="优先级">
-            <el-select v-model="taskForm.priority" class="w-full">
-              <el-option label="低" value="LOW" />
-              <el-option label="中" value="MEDIUM" />
-              <el-option label="高" value="HIGH" />
-              <el-option label="紧急" value="URGENT" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="负责人">
-            <el-input v-model="taskForm.ownerName" maxlength="100" placeholder="选填" />
-          </el-form-item>
-          <el-form-item label="截止时间">
-            <el-date-picker v-model="taskForm.dueDate" class="w-full" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" />
-          </el-form-item>
-        </div>
-        <el-form-item label="描述">
-          <el-input v-model="taskForm.description" type="textarea" :rows="4" maxlength="1000" show-word-limit />
-        </el-form-item>
-        <el-form-item label="附件">
-          <div class="w-full space-y-3">
-            <input
-              ref="taskAttachmentInputRef"
-              class="hidden"
-              type="file"
-              multiple
-              @change="handleTaskAttachmentChange"
-            />
-            <button
-              type="button"
-              class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition hover:border-primary/40 hover:text-primary disabled:opacity-50"
-              :disabled="taskAttachmentUploading"
-              @click="taskAttachmentInputRef?.click()"
-            >
-              <span class="material-symbols-outlined text-[18px] leading-none">{{ taskAttachmentUploading ? 'progress_activity' : 'attach_file' }}</span>
-              {{ taskAttachmentUploading ? '上传中...' : '上传附件' }}
-            </button>
-
-            <div v-if="editingTask?.attachments?.length" class="space-y-2">
-              <div
-                v-for="attachment in editingTask.attachments"
-                :key="attachment.attachmentId"
-                class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
-              >
-                <div class="min-w-0">
-                  <p class="truncate text-sm font-medium text-slate-800">{{ attachment.name || '未命名附件' }}</p>
-                  <p class="mt-0.5 text-xs text-slate-400">{{ formatFileSize(attachment.fileSize) }}</p>
-                </div>
-                <div class="flex shrink-0 items-center gap-1">
-                  <button class="project-icon-button" type="button" title="预览" @click="openTaskAttachmentPreview(attachment)">
-                    <span class="material-symbols-outlined text-[18px] leading-none">visibility</span>
-                  </button>
-                  <button class="project-icon-button" type="button" title="下载" @click="handleDownloadTaskAttachment(attachment)">
-                    <span class="material-symbols-outlined text-[18px] leading-none">download</span>
-                  </button>
-                  <button class="project-icon-button text-rose-500 hover:bg-rose-50" type="button" title="删除" @click="handleDeleteTaskAttachment(attachment)">
-                    <span class="material-symbols-outlined text-[18px] leading-none">delete</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="draftTaskAttachments.length" class="space-y-2">
-              <div
-                v-for="(attachment, index) in draftTaskAttachments"
-                :key="`${attachment.filePath}-${index}`"
-                class="flex items-center justify-between gap-3 rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2"
-              >
-                <div class="min-w-0">
-                  <p class="truncate text-sm font-medium text-slate-800">{{ attachment.fileName || '未命名附件' }}</p>
-                  <p class="mt-0.5 text-xs text-slate-400">{{ formatFileSize(attachment.fileSize) }}</p>
-                </div>
-                <button class="project-icon-button text-rose-500 hover:bg-rose-50" type="button" title="移除" @click="removeDraftTaskAttachment(index)">
-                  <span class="material-symbols-outlined text-[18px] leading-none">close</span>
-                </button>
-              </div>
-            </div>
-
-            <p v-if="!editingTask?.attachments?.length && !draftTaskAttachments.length" class="text-xs text-slate-400">
-              暂无附件
-            </p>
-          </div>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="flex justify-between gap-2">
-          <button v-if="editingTask" type="button" class="rounded-lg border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600" @click="handleDeleteTask">删除</button>
-          <div class="ml-auto flex gap-2">
-            <button type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100" @click="taskDialogVisible = false">取消</button>
-            <button type="button" class="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50" :disabled="savingTask" @click="saveTask">
-              {{ savingTask ? '保存中...' : '保存' }}
-            </button>
-          </div>
-        </div>
-      </template>
-    </el-dialog>
-
-    <ProjectTaskAttachmentPreviewModal
-      v-model="taskAttachmentPreviewVisible"
-      :attachment="previewingTaskAttachment"
-      :project-id="currentProject?.projectId || ''"
-      :task-id="previewingTaskId"
+    <ProjectUpsertDialog
+      v-model="showDialog"
+      :editing-project="editingProject"
+      @submit="handleSubmitProject"
     />
+    <ProjectRolePermissionDialog v-model="showRolePermissionDialog" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import {
-  addProjectTaskAttachment,
-  addProject,
-  addProjectLane,
-  addProjectTask,
-  archiveProject,
-  deleteProject,
-  deleteProjectTaskAttachment,
-  deleteProjectTask,
-  downloadProjectTaskAttachment,
-  getProjectDetail,
-  queryProjectPageList,
-  restoreProject,
-  updateProject,
-  updateProjectTask
-} from '@/api/project'
-import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
-import { useResponsive } from '@/composables/useResponsive'
-import { isRequestErrorHandled } from '@/utils/requestError'
-import ProjectTaskAttachmentPreviewModal from './ProjectTaskAttachmentPreviewModal.vue'
+import { queryProjectPageList } from '@/api/project'
+import ProjectRolePermissionDialog from '@/views/project/components/ProjectRolePermissionDialog.vue'
+import ProjectUpsertDialog from '@/views/project/components/ProjectUpsertDialog.vue'
+import { useProjectStore } from '@/stores/project'
 import type {
-  ProjectCreate,
-  ProjectStatus,
-  ProjectTaskAttachment,
-  ProjectTaskAttachmentPayload,
-  ProjectTaskSave,
-  ProjectTaskVO,
-  ProjectVO
+  ProjectEntity,
+  ProjectListStats,
+  ProjectListStatusFilter,
+  ProjectPermission,
+  ProjectListViewMode
 } from '@/types/project'
+import {
+  formatDateTime,
+  projectStatusClass,
+  projectStatusLabel
+} from '@/utils/project'
 
-const { isMobile } = useResponsive()
-const projects = ref<ProjectVO[]>([])
+const router = useRouter()
+const projectStore = useProjectStore()
+
+const projects = ref<ProjectEntity[]>([])
 const loading = ref(false)
 const keyword = ref('')
-const status = ref<ProjectStatus | ''>('')
+const statusFilter = ref<ProjectListStatusFilter>('all')
+const viewMode = ref<ProjectListViewMode>('card')
 const page = ref(1)
-const limit = ref(20)
+const limit = ref(10)
 const total = ref(0)
-const projectDialogVisible = ref(false)
-const savingProject = ref(false)
-const editingProject = ref<ProjectVO | null>(null)
-const detailVisible = ref(false)
-const detailLoading = ref(false)
-const currentProject = ref<ProjectVO | null>(null)
-const taskDialogVisible = ref(false)
-const savingTask = ref(false)
-const editingTask = ref<ProjectTaskVO | null>(null)
-const taskAttachmentUploading = ref(false)
-const taskAttachmentInputRef = ref<HTMLInputElement | null>(null)
-const draftTaskAttachments = ref<ProjectTaskAttachmentPayload[]>([])
-const taskAttachmentPreviewVisible = ref(false)
-const previewingTaskAttachment = ref<ProjectTaskAttachment | null>(null)
-const previewingTaskId = ref('')
-let searchTimer: ReturnType<typeof setTimeout> | null = null
-
-const projectForm = reactive<ProjectCreate & { projectId?: string }>({
-  name: '',
-  description: '',
-  customerName: '',
-  startDate: '',
-  dueDate: '',
-  status: 'NOT_STARTED'
+const stats = ref<ProjectListStats>({
+  all: 0,
+  inProgress: 0,
+  completed: 0,
+  archived: 0
 })
-
-const taskForm = reactive<ProjectTaskSave>({
-  title: '',
-  description: '',
-  laneId: '',
-  ownerName: '',
-  priority: 'MEDIUM',
-  dueDate: ''
-})
+const showDialog = ref(false)
+const showRolePermissionDialog = ref(false)
+const editingProject = ref<ProjectEntity | null>(null)
+let searchTimer: number | null = null
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / limit.value)))
-const boardLanes = computed(() => currentProject.value?.lanes || [])
-
-onMounted(() => {
-  loadProjects()
+const showListLoading = computed(() => loading.value && projects.value.length === 0)
+const visiblePages = computed(() => {
+  const totalPageCount = totalPages.value
+  const current = page.value
+  const pages: number[] = []
+  const maxVisible = 5
+  const start = Math.max(1, Math.min(current - 2, totalPageCount - maxVisible + 1))
+  const end = Math.min(totalPageCount, start + maxVisible - 1)
+  for (let i = start; i <= end; i += 1) {
+    pages.push(i)
+  }
+  return pages
 })
 
+const statusFilters = computed(() => [
+  { value: 'all' as const, label: '全部', icon: 'folder', count: stats.value.all },
+  { value: 'IN_PROGRESS' as const, label: '进行中', icon: 'play_circle', count: stats.value.inProgress },
+  { value: 'COMPLETED' as const, label: '已完成', icon: 'check_circle', count: stats.value.completed },
+  { value: 'ARCHIVED' as const, label: '已归档', icon: 'archive', count: stats.value.archived }
+])
+
+onMounted(() => {
+  void loadProjects()
+})
+
+onBeforeUnmount(() => {
+  if (searchTimer) window.clearTimeout(searchTimer)
+})
+
+watch(
+  () => projectStore.accessibleProjectSummaries,
+  () => {
+    if (keyword.value.trim()) return
+    applyProjectsFromStore()
+  }
+)
+
+function buildProjectStats(source: ProjectEntity[]): ProjectListStats {
+  const activeProjects = source.filter(project => project.status !== 'ARCHIVED')
+  return {
+    all: activeProjects.length,
+    inProgress: source.filter(project => project.status === 'IN_PROGRESS').length,
+    completed: source.filter(project => project.status === 'COMPLETED').length,
+    archived: source.filter(project => project.status === 'ARCHIVED').length
+  }
+}
+
+function matchesStatusFilter(project: ProjectEntity) {
+  if (statusFilter.value === 'all') return project.status !== 'ARCHIVED'
+  return project.status === statusFilter.value
+}
+
+function applyProjectsFromStore() {
+  const cachedProjects = projectStore.accessibleProjectSummaries
+  stats.value = buildProjectStats(cachedProjects)
+
+  const filteredProjects = cachedProjects.filter(matchesStatusFilter)
+  total.value = filteredProjects.length
+
+  const lastPage = Math.max(1, Math.ceil(total.value / limit.value))
+  if (page.value > lastPage) {
+    page.value = lastPage
+  }
+
+  const start = (page.value - 1) * limit.value
+  projects.value = filteredProjects.slice(start, start + limit.value)
+}
+
 async function loadProjects() {
+  if (!keyword.value.trim()) {
+    loading.value = !projectStore.initialized
+    try {
+      await projectStore.ensureInitialized()
+      applyProjectsFromStore()
+    } finally {
+      loading.value = false
+    }
+    return
+  }
+
   loading.value = true
   try {
     const result = await queryProjectPageList({
-      keyword: keyword.value.trim() || undefined,
-      status: status.value,
+      keyword: keyword.value,
+      status: statusFilter.value,
       page: page.value,
       limit: limit.value
     })
-    projects.value = result.list || []
-    total.value = result.totalRow || 0
-  } catch (error) {
-    if (!isRequestErrorHandled(error)) {
-      ElMessage.error('加载项目列表失败')
+    projects.value = result.list
+    total.value = Number(result.totalRow || 0)
+    stats.value = normalizeStats(result.extraData)
+
+    const lastPage = Math.max(1, Math.ceil(total.value / limit.value))
+    if (page.value > lastPage) {
+      page.value = lastPage
+      await loadProjects()
     }
   } finally {
     loading.value = false
   }
 }
 
+function normalizeStats(extraData: unknown): ProjectListStats {
+  const raw = (extraData && typeof extraData === 'object' ? extraData : {}) as Partial<Record<keyof ProjectListStats, unknown>>
+  return {
+    all: Number(raw.all ?? 0),
+    inProgress: Number(raw.inProgress ?? 0),
+    completed: Number(raw.completed ?? 0),
+    archived: Number(raw.archived ?? 0)
+  }
+}
+
 function debouncedLoadProjects() {
-  if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
+  if (searchTimer) window.clearTimeout(searchTimer)
+  searchTimer = window.setTimeout(() => {
     page.value = 1
-    loadProjects()
+    void loadProjects()
   }, 300)
 }
 
-function applyFilters() {
+function handleSearch() {
+  if (searchTimer) window.clearTimeout(searchTimer)
   page.value = 1
-  loadProjects()
+  void loadProjects()
+}
+
+function handleStatusFilter(value: ProjectListStatusFilter) {
+  if (statusFilter.value === value) return
+  statusFilter.value = value
+  page.value = 1
+  void loadProjects()
 }
 
 function changePage(nextPage: number) {
   if (nextPage < 1 || nextPage > totalPages.value || nextPage === page.value) return
   page.value = nextPage
-  loadProjects()
+  void loadProjects()
 }
 
 function openCreateDialog() {
   editingProject.value = null
-  resetProjectForm()
-  projectDialogVisible.value = true
+  showDialog.value = true
 }
 
-function openEditDialog(project: ProjectVO) {
+function openEditDialog(project: ProjectEntity) {
   editingProject.value = project
-  projectForm.projectId = project.projectId
-  projectForm.name = project.name || ''
-  projectForm.description = project.description || ''
-  projectForm.customerName = project.customerName || ''
-  projectForm.startDate = project.startDate || ''
-  projectForm.dueDate = project.dueDate || ''
-  projectForm.status = project.status || 'NOT_STARTED'
-  projectDialogVisible.value = true
+  showDialog.value = true
 }
 
-function resetProjectForm() {
-  projectForm.projectId = undefined
-  projectForm.name = ''
-  projectForm.description = ''
-  projectForm.customerName = ''
-  projectForm.startDate = ''
-  projectForm.dueDate = ''
-  projectForm.status = 'NOT_STARTED'
-}
-
-async function saveProject() {
-  if (!projectForm.name.trim()) {
-    ElMessage.warning('请输入项目名称')
-    return
-  }
-  savingProject.value = true
-  const payload: ProjectCreate = {
-    name: projectForm.name.trim(),
-    description: projectForm.description?.trim() || undefined,
-    customerName: projectForm.customerName?.trim() || undefined,
-    startDate: projectForm.startDate || undefined,
-    dueDate: projectForm.dueDate || undefined,
-    status: projectForm.status
-  }
-  try {
-    if (editingProject.value && projectForm.projectId) {
-      await updateProject({ ...payload, projectId: projectForm.projectId })
-      ElMessage.success('项目已更新')
-    } else {
-      await addProject(payload)
-      ElMessage.success('项目已创建')
-    }
-    projectDialogVisible.value = false
-    await loadProjects()
-  } catch (error) {
-    if (!isRequestErrorHandled(error)) {
-      ElMessage.error('保存项目失败')
-    }
-  } finally {
-    savingProject.value = false
-  }
-}
-
-async function openDetail(project: ProjectVO) {
-  detailVisible.value = true
-  detailLoading.value = true
-  currentProject.value = project
-  try {
-    currentProject.value = await getProjectDetail(project.projectId)
-  } catch (error) {
-    if (!isRequestErrorHandled(error)) {
-      ElMessage.error('加载项目详情失败')
-    }
-  } finally {
-    detailLoading.value = false
-  }
-}
-
-async function refreshDetail() {
-  if (!currentProject.value) return
-  currentProject.value = await getProjectDetail(currentProject.value.projectId)
-}
-
-async function toggleArchive(project: ProjectVO) {
-  try {
-    if (project.status === 'ARCHIVED') {
-      await restoreProject(project.projectId)
-      ElMessage.success('项目已恢复')
-    } else {
-      await archiveProject(project.projectId)
-      ElMessage.success('项目已归档')
-    }
-    await loadProjects()
-  } catch (error) {
-    if (!isRequestErrorHandled(error)) {
-      ElMessage.error('更新项目状态失败')
-    }
-  }
-}
-
-async function handleDeleteProject(project: ProjectVO) {
-  try {
-    await ElMessageBox.confirm(`确定删除“${project.name}”？`, '删除项目', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning'
+async function handleSubmitProject(payload: {
+  name: string
+  description?: string
+  customerId?: string
+  customerName?: string
+  ownerId?: string
+  ownerName?: string
+  startDate?: string
+  dueDate?: string
+  status: ProjectEntity['status']
+}) {
+  if (editingProject.value) {
+    await projectStore.updateProject({
+      projectId: editingProject.value.projectId,
+      ...payload
     })
-    await deleteProject(project.projectId)
-    ElMessage.success('项目已删除')
-    await loadProjects()
-  } catch (error) {
-    if (!isRequestErrorHandled(error) && error !== 'cancel' && error !== 'close') {
-      ElMessage.error('删除项目失败')
-    }
+    ElMessage.success('项目信息已更新')
+  } else {
+    await projectStore.createProject(payload)
+    ElMessage.success('项目创建成功')
   }
+  showDialog.value = false
+  await loadProjects()
 }
 
-async function createLane() {
-  if (!currentProject.value) return
-  try {
-    const result = await ElMessageBox.prompt('请输入泳道名称', '新增泳道', {
-      confirmButtonText: '创建',
-      cancelButtonText: '取消',
-      inputValidator: value => !!value?.trim() || '泳道名称不能为空'
-    })
-    currentProject.value = await addProjectLane(currentProject.value.projectId, { name: result.value.trim() })
-    ElMessage.success('泳道已创建')
-  } catch (error) {
-    if (!isRequestErrorHandled(error) && error !== 'cancel' && error !== 'close') {
-      ElMessage.error('创建泳道失败')
-    }
-  }
+function canEditProject(project: ProjectEntity) {
+  return hasProjectActionPermission(project, 'EDIT_PROJECT')
 }
 
-function openTaskDialog(task?: ProjectTaskVO) {
-  editingTask.value = task || null
-  taskForm.taskId = task?.taskId
-  taskForm.title = task?.title || ''
-  taskForm.description = task?.description || ''
-  taskForm.laneId = task?.laneId || boardLanes.value[0]?.laneId || ''
-  taskForm.ownerName = task?.ownerName || ''
-  taskForm.priority = task?.priority || 'MEDIUM'
-  taskForm.dueDate = task?.dueDate || ''
-  draftTaskAttachments.value = []
-  taskForm.attachments = []
-  taskDialogVisible.value = true
+function canRestoreProject(project: ProjectEntity) {
+  return hasProjectActionPermission(project, 'ARCHIVE_PROJECT')
 }
 
-async function saveTask() {
-  if (!currentProject.value) return
-  if (!taskForm.title.trim()) {
-    ElMessage.warning('请输入任务标题')
-    return
-  }
-  savingTask.value = true
-  const payload: ProjectTaskSave = {
-    taskId: taskForm.taskId,
-    title: taskForm.title.trim(),
-    description: taskForm.description?.trim() || undefined,
-    laneId: taskForm.laneId || undefined,
-    ownerName: taskForm.ownerName?.trim() || undefined,
-    priority: taskForm.priority || 'MEDIUM',
-    dueDate: taskForm.dueDate || undefined,
-    attachments: draftTaskAttachments.value.length ? [...draftTaskAttachments.value] : undefined
-  }
-  try {
-    currentProject.value = editingTask.value
-      ? await updateProjectTask(currentProject.value.projectId, payload)
-      : await addProjectTask(currentProject.value.projectId, payload)
-    taskDialogVisible.value = false
-    ElMessage.success('任务已保存')
-    await loadProjects()
-  } catch (error) {
-    if (!isRequestErrorHandled(error)) {
-      ElMessage.error('保存任务失败')
-    }
-  } finally {
-    savingTask.value = false
-  }
+function canDeleteProject(project: ProjectEntity) {
+  return hasProjectActionPermission(project, 'DELETE_PROJECT')
 }
 
-async function handleTaskAttachmentChange(event: Event) {
-  if (!currentProject.value) return
-  const input = event.target as HTMLInputElement
-  const files = Array.from(input.files || [])
-  if (!files.length) return
-
-  taskAttachmentUploading.value = true
-  try {
-    const uploadedAttachments = await Promise.all(files.map(uploadProjectTaskAttachmentFile))
-    if (editingTask.value?.taskId) {
-      for (const attachment of uploadedAttachments) {
-        currentProject.value = await addProjectTaskAttachment(currentProject.value.projectId, editingTask.value.taskId, attachment)
-      }
-      syncEditingTaskFromCurrent()
-      ElMessage.success('附件已上传')
-    } else {
-      draftTaskAttachments.value.push(...uploadedAttachments)
-      taskForm.attachments = [...draftTaskAttachments.value]
-      ElMessage.success('附件已添加')
-    }
-  } catch (error) {
-    if (!isRequestErrorHandled(error)) {
-      ElMessage.error('附件上传失败')
-    }
-  } finally {
-    taskAttachmentUploading.value = false
-    input.value = ''
-  }
+function hasProjectActionPermission(project: ProjectEntity, permission: ProjectPermission) {
+  return Boolean(
+    project.systemAdmin
+    || project.currentUserPermissions?.includes(permission)
+    || project.currentUserRole === 'OWNER'
+    || project.currentUserRole === 'ADMIN'
+  )
 }
 
-async function uploadProjectTaskAttachmentFile(file: File): Promise<ProjectTaskAttachmentPayload> {
-  const presigned = await getPresignedUploadUrl(file.name, file.type || 'application/octet-stream')
-  await uploadToMinIO(file, presigned.uploadUrl)
-  return {
-    fileName: file.name,
-    filePath: presigned.objectKey,
-    fileSize: file.size,
-    mimeType: file.type || 'application/octet-stream'
-  }
+function isArchivedProject(project: ProjectEntity) {
+  return project.status === 'ARCHIVED'
 }
 
-async function handleDownloadTaskAttachment(attachment: ProjectTaskAttachment) {
-  if (!currentProject.value || !editingTask.value) return
-  try {
-    await downloadProjectTaskAttachment(
-      currentProject.value.projectId,
-      editingTask.value.taskId,
-      attachment.attachmentId,
-      attachment.name || '附件'
-    )
-  } catch (error) {
-    if (!isRequestErrorHandled(error)) {
-      ElMessage.error('附件下载失败')
-    }
-  }
+async function handleRestoreProject(project: ProjectEntity) {
+  await projectStore.restoreProject(project.projectId)
+  ElMessage.success('项目已恢复')
+  await loadProjects()
 }
 
-function openTaskAttachmentPreview(attachment: ProjectTaskAttachment) {
-  if (!currentProject.value || !editingTask.value) return
-  previewingTaskAttachment.value = attachment
-  previewingTaskId.value = editingTask.value.taskId
-  taskAttachmentPreviewVisible.value = true
+async function handleDeleteProject(project: ProjectEntity) {
+  await ElMessageBox.confirm(`确定删除项目“${project.name}”吗？删除后项目及任务将不可恢复。`, '提示', { type: 'warning' })
+  await projectStore.deleteProject(project.projectId)
+  ElMessage.success('项目已删除')
+  await loadProjects()
 }
 
-async function handleDeleteTaskAttachment(attachment: ProjectTaskAttachment) {
-  if (!currentProject.value || !editingTask.value) return
-  try {
-    await ElMessageBox.confirm(`确定删除附件“${attachment.name || '未命名附件'}”？`, '删除附件', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-    currentProject.value = await deleteProjectTaskAttachment(
-      currentProject.value.projectId,
-      editingTask.value.taskId,
-      attachment.attachmentId
-    )
-    syncEditingTaskFromCurrent()
-    ElMessage.success('附件已删除')
-    await loadProjects()
-  } catch (error) {
-    if (!isRequestErrorHandled(error) && error !== 'cancel' && error !== 'close') {
-      ElMessage.error('删除附件失败')
-    }
-  }
-}
-
-function removeDraftTaskAttachment(index: number) {
-  draftTaskAttachments.value.splice(index, 1)
-  taskForm.attachments = [...draftTaskAttachments.value]
-}
-
-function syncEditingTaskFromCurrent() {
-  if (!currentProject.value || !editingTask.value) return
-  editingTask.value = (currentProject.value.tasks || []).find(task => String(task.taskId) === String(editingTask.value?.taskId)) || editingTask.value
-}
-
-async function handleDeleteTask() {
-  if (!currentProject.value || !editingTask.value) return
-  try {
-    await deleteProjectTask(currentProject.value.projectId, editingTask.value.taskId)
-    taskDialogVisible.value = false
-    ElMessage.success('任务已删除')
-    await refreshDetail()
-    await loadProjects()
-  } catch (error) {
-    if (!isRequestErrorHandled(error)) {
-      ElMessage.error('删除任务失败')
-    }
-  }
-}
-
-function tasksByLane(laneId: string) {
-  return (currentProject.value?.tasks || []).filter(task => String(task.laneId || '') === String(laneId))
-}
-
-function statusLabel(value?: string) {
-  if (value === 'IN_PROGRESS') return '进行中'
-  if (value === 'COMPLETED') return '已完成'
-  if (value === 'PAUSED') return '已暂停'
-  if (value === 'ARCHIVED') return '已归档'
-  return '未开始'
-}
-
-function statusClass(value?: string) {
-  if (value === 'IN_PROGRESS') return 'bg-blue-50 text-blue-600'
-  if (value === 'COMPLETED') return 'bg-emerald-50 text-emerald-600'
-  if (value === 'PAUSED') return 'bg-amber-50 text-amber-600'
-  if (value === 'ARCHIVED') return 'bg-slate-100 text-slate-500'
-  return 'bg-slate-50 text-slate-600'
-}
-
-function priorityLabel(value?: string) {
-  if (value === 'LOW') return '低'
-  if (value === 'HIGH') return '高'
-  if (value === 'URGENT') return '紧急'
-  return '中'
-}
-
-function priorityClass(value?: string) {
-  if (value === 'LOW') return 'bg-slate-100 text-slate-500'
-  if (value === 'HIGH') return 'bg-orange-50 text-orange-600'
-  if (value === 'URGENT') return 'bg-rose-50 text-rose-600'
-  return 'bg-blue-50 text-blue-600'
-}
-
-function formatDate(value?: string) {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })
-}
-
-function formatFileSize(value?: number) {
-  if (!value || value <= 0) return '大小未知'
-  if (value < 1024) return `${value} B`
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
-  return `${(value / 1024 / 1024).toFixed(1)} MB`
+function goToProject(projectId: string) {
+  router.push({ name: 'ProjectDetail', params: { id: projectId }, query: { view: 'ai' } })
 }
 </script>
 
 <style scoped>
-.project-icon-button {
-  display: inline-flex;
-  width: 32px;
-  height: 32px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  color: rgb(100 116 139);
-  transition: background-color 0.15s ease, color 0.15s ease;
+.wk-project-list-table-shell {
+  background: var(--wk-bg-surface);
 }
 
-.project-icon-button:hover {
-  background: rgb(241 245 249);
-  color: rgb(15 23 42);
+.wk-project-list-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: var(--wk-text-secondary);
+  background: var(--wk-bg-surface);
+}
+
+.wk-project-list-table th {
+  border-bottom: 1px solid var(--wk-border-muted);
+  background: var(--wk-bg-surface-subtle);
+  color: var(--wk-text-muted);
+  padding: 16px 20px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.wk-project-list-table td {
+  border-bottom: 1px solid var(--wk-border-subtle);
+  padding: 16px 20px;
+  color: var(--wk-text-secondary);
+  vertical-align: middle;
+}
+
+.wk-project-list-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.wk-project-list-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--wk-primary) 11%, var(--wk-bg-surface));
 }
 </style>

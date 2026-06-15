@@ -28,10 +28,16 @@ public class ProjectVO {
     private Date updateTime;
     private Integer taskCount;
     private Integer incompleteTaskCount;
+    private List<String> currentUserPermissions = new ArrayList<>();
+    private String currentUserRole;
+    private Boolean systemAdmin = false;
     private List<ProjectLaneVO> lanes = new ArrayList<>();
     private List<ProjectTaskVO> tasks = new ArrayList<>();
     private List<ProjectAttachmentVO> attachments = new ArrayList<>();
     private List<ProjectScheduleVO> schedules = new ArrayList<>();
+    private List<ProjectChatMessageVO> chatMessages = new ArrayList<>();
+    private List<ProjectMemberVO> members = new ArrayList<>();
+    private List<ProjectMemberLogVO> memberLogs = new ArrayList<>();
 
     @Data
     public static class ProjectLaneVO {
@@ -58,14 +64,21 @@ public class ProjectVO {
         @JsonSerialize(using = ToStringSerializer.class)
         private Long ownerId;
         private String ownerName;
+        private List<Long> participantIds = new ArrayList<>();
+        private List<String> participantNames = new ArrayList<>();
         private String priority;
         @JsonSerialize(using = ToStringSerializer.class)
         private Long customerId;
         private String customerName;
         private Boolean hasAttachments;
+        private Boolean hasSchedule;
         private Boolean generatedByAi;
+        private String source;
         private String aiSourceText;
         private List<ProjectTaskAttachmentVO> attachments = new ArrayList<>();
+        private List<ProjectTaskScheduleVO> schedules = new ArrayList<>();
+        private List<ProjectTaskNoteVO> notes = new ArrayList<>();
+        private List<ProjectChatMessageVO> chatMessages = new ArrayList<>();
         private Date createTime;
         private Date updateTime;
     }
@@ -101,5 +114,71 @@ public class ProjectVO {
         private Date scheduleTime;
         private Date createTime;
         private String createdByName;
+    }
+
+    @Data
+    public static class ProjectTaskScheduleVO {
+        @JsonSerialize(using = ToStringSerializer.class)
+        private Long scheduleId;
+        private String title;
+        private Date scheduleTime;
+        private Date createTime;
+        private String createdByName;
+    }
+
+    @Data
+    public static class ProjectTaskNoteVO {
+        @JsonSerialize(using = ToStringSerializer.class)
+        private Long noteId;
+        private String content;
+        private Date createTime;
+        private String createdByName;
+    }
+
+    @Data
+    public static class ProjectChatMessageVO {
+        @JsonSerialize(using = ToStringSerializer.class)
+        private Long messageId;
+        private String role;
+        private String content;
+        private Date createTime;
+    }
+
+    @Data
+    public static class ProjectMemberVO {
+        @JsonSerialize(using = ToStringSerializer.class)
+        private Long memberId;
+        @JsonSerialize(using = ToStringSerializer.class)
+        private Long userId;
+        private String memberName;
+        private String account;
+        private String role;
+        private String deptName;
+        private Date joinedAt;
+        private Date lastActionTime;
+        private String status;
+        private List<String> permissions = new ArrayList<>();
+        private String remark;
+    }
+
+    @Data
+    public static class ProjectMemberLogVO {
+        @JsonSerialize(using = ToStringSerializer.class)
+        private Long logId;
+        private String actionType;
+        @JsonSerialize(using = ToStringSerializer.class)
+        private Long operatorId;
+        private String operatorName;
+        @JsonSerialize(using = ToStringSerializer.class)
+        private Long targetUserId;
+        private String targetUserName;
+        private String beforeSummary;
+        private String afterSummary;
+        private Date createTime;
+    }
+
+    @Data
+    public static class ProjectRolePermissionConfigVO {
+        private java.util.Map<String, List<String>> rolePermissions = new java.util.LinkedHashMap<>();
     }
 }

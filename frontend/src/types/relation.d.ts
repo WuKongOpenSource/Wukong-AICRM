@@ -63,3 +63,4 @@ export interface RelationForm {
 }
 
 export type RelationPageResult = PageResult<Relation>
+export type RelationVO = Relation

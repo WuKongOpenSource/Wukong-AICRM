@@ -1,88 +1,339 @@
 import { download, get, post } from '@/utils/request'
+import type { PageResult } from '@/types/api'
+import type { ChatAttachmentDTO } from '@/types/common'
 import type {
-  ProjectCreate,
-  ProjectAttachmentPayload,
-  ProjectLaneSave,
-  ProjectPageResult,
-  ProjectQuery,
-  ProjectSchedulePayload,
+  ProjectCreatePayload,
+  ProjectAttachment,
+  ProjectEntity,
+  ProjectLane,
+  ProjectListQuery,
+  ProjectMember,
+  ProjectMemberPayload,
+  ProjectPermission,
+  ProjectRolePermissionConfig,
+  ProjectRolePermissionConfigPayload,
+  ProjectRolePermissionConfigVO,
+  ProjectSchedule,
+  ProjectTask,
   ProjectTaskAttachmentPayload,
-  ProjectTaskMove,
-  ProjectTaskSave,
-  ProjectUpdate,
-  ProjectVO
+  ProjectTaskPayload,
+  ProjectTaskUpdatePayload,
+  ProjectUpdatePayload
 } from '@/types/project'
 
-export function queryProjectPageList(query: ProjectQuery): Promise<ProjectPageResult> {
-  return post('/project/queryPageList', query)
+const PROJECT_ROLE_PERMISSION_PATHS = ['/project/role-permissions', '/project/rolePermissions'] as const
+
+type RawProject = Record<string, any>
+
+export interface ProjectAiCommandPayload {
+  content: string
+  attachments?: ChatAttachmentDTO[]
+  knowledgeIds?: string[]
+  modelProvider?: string
+  modelName?: string
+  modelSource?: string
 }
 
-export function getProjectDetail(projectId: string, taskKeyword?: string): Promise<ProjectVO> {
-  return get(`/project/detail/${projectId}`, { params: { taskKeyword } })
+function id(value: unknown): string | undefined {
+  if (value === null || value === undefined || value === '') return undefined
+  return String(value)
 }
 
-export function addProject(data: ProjectCreate): Promise<ProjectVO> {
-  return post('/project/add', data)
+function date(value: unknown): string | undefined {
+  if (value === null || value === undefined || value === '') return undefined
+  if (typeof value === 'number') return new Date(value).toISOString()
+  return String(value)
 }
 
-export function updateProject(data: ProjectUpdate): Promise<ProjectVO> {
-  return post('/project/update', data)
+function list<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value as T[] : []
 }
 
-export function archiveProject(projectId: string): Promise<ProjectVO> {
-  return post(`/project/archive/${projectId}`)
+function isProjectWelcomeMessage(content: string) {
+  return content.startsWith('已进入项目「') && content.includes('上下文') && content.includes('创建任务')
 }
 
-export function restoreProject(projectId: string): Promise<ProjectVO> {
-  return post(`/project/restore/${projectId}`)
+function isTaskWelcomeMessage(content: string) {
+  return content.startsWith('当前对话对象：任务 - ') && content.includes('修改截止时间') && content.includes('追加备注')
 }
 
-export function addProjectAttachment(projectId: string, data: ProjectAttachmentPayload): Promise<ProjectVO> {
-  return post(`/project/${projectId}/attachment/add`, data)
+export function normalizeProject(raw: RawProject): ProjectEntity {
+  return {
+    projectId: id(raw.projectId) || '',
+    name: String(raw.name || ''),
+    description: raw.description || '',
+    customerId: id(raw.customerId),
+    customerName: raw.customerName || '',
+    ownerId: id(raw.ownerId),
+    ownerName: raw.ownerName || '',
+    startDate: date(raw.startDate),
+    dueDate: date(raw.dueDate),
+    status: raw.status || 'NOT_STARTED',
+    createTime: date(raw.createTime) || new Date().toISOString(),
+    updateTime: date(raw.updateTime) || new Date().toISOString(),
+    taskCount: Number(raw.taskCount ?? raw.tasks?.length ?? 0),
+    incompleteTaskCount: Number(raw.incompleteTaskCount ?? 0),
+    currentUserPermissions: list<ProjectPermission>(raw.currentUserPermissions),
+    currentUserRole: raw.currentUserRole,
+    systemAdmin: Boolean(raw.systemAdmin),
+    lanes: list<any>(raw.lanes).map((lane): ProjectLane => ({
+      laneId: id(lane.laneId) || '',
+      name: lane.name || '',
+      order: Number(lane.order ?? 0),
+      system: Boolean(lane.system)
+    })),
+    tasks: list<any>(raw.tasks).map((task): ProjectTask => ({
+      taskId: id(task.taskId) || '',
+      projectId: id(task.projectId) || id(raw.projectId) || '',
+      title: task.title || '',
+      description: task.description || '',
+      laneId: id(task.laneId) || '',
+      status: task.status || '',
+      dueDate: date(task.dueDate),
+      ownerId: id(task.ownerId),
+      ownerName: task.ownerName || '',
+      participantIds: list<any>(task.participantIds).map(item => String(item)),
+      participantNames: list<string>(task.participantNames),
+      priority: task.priority || 'MEDIUM',
+      customerId: id(task.customerId),
+      customerName: task.customerName || raw.customerName || '',
+      hasAttachments: Boolean(task.hasAttachments),
+      hasSchedule: Boolean(task.hasSchedule),
+      generatedByAi: Boolean(task.generatedByAi),
+      source: task.source || (task.generatedByAi ? 'ai' : 'manual'),
+      aiSourceText: task.aiSourceText,
+      attachments: list<any>(task.attachments).map(item => ({
+        attachmentId: id(item.attachmentId) || '',
+        name: item.name || '',
+        fileUrl: item.fileUrl || '',
+        filePath: item.filePath || '',
+        fileSize: item.fileSize === null || item.fileSize === undefined ? undefined : Number(item.fileSize),
+        mimeType: item.mimeType || '',
+        createTime: date(item.createTime) || new Date().toISOString(),
+        createdByName: item.createdByName || ''
+      })),
+      schedules: list<any>(task.schedules).map(item => ({
+        scheduleId: id(item.scheduleId) || '',
+        title: item.title || '',
+        scheduleTime: date(item.scheduleTime),
+        createTime: date(item.createTime) || new Date().toISOString(),
+        createdByName: item.createdByName || ''
+      })),
+      notes: list<any>(task.notes).map(item => ({
+        noteId: id(item.noteId) || '',
+        content: item.content || '',
+        createTime: date(item.createTime) || new Date().toISOString(),
+        createdByName: item.createdByName || ''
+      })),
+      chatMessages: list<any>(task.chatMessages)
+        .filter(item => !isTaskWelcomeMessage(String(item.content || '')))
+        .map(item => ({
+          messageId: id(item.messageId) || '',
+          role: item.role === 'user' ? 'user' : 'assistant',
+          content: item.content || '',
+          createTime: date(item.createTime) || new Date().toISOString()
+        })),
+      createTime: date(task.createTime) || new Date().toISOString(),
+      updateTime: date(task.updateTime) || new Date().toISOString()
+    })),
+    attachments: list<any>(raw.attachments).map((item): ProjectAttachment => ({
+      attachmentId: id(item.attachmentId) || '',
+      name: item.name || '',
+      fileUrl: item.fileUrl || '',
+      createTime: date(item.createTime) || new Date().toISOString(),
+      createdByName: item.createdByName || ''
+    })),
+    schedules: list<any>(raw.schedules).map((item): ProjectSchedule => ({
+      scheduleId: id(item.scheduleId) || '',
+      title: item.title || '',
+      scheduleTime: date(item.scheduleTime),
+      createTime: date(item.createTime) || new Date().toISOString(),
+      createdByName: item.createdByName || ''
+    })),
+    chatMessages: list<any>(raw.chatMessages)
+      .filter(item => !isProjectWelcomeMessage(String(item.content || '')))
+      .map(item => ({
+        messageId: id(item.messageId) || '',
+        role: item.role === 'user' ? 'user' : 'assistant',
+        content: item.content || '',
+        createTime: date(item.createTime) || new Date().toISOString()
+      })),
+    members: list<any>(raw.members).map((member): ProjectMember => ({
+      memberId: id(member.memberId) || '',
+      userId: id(member.userId) || '',
+      memberName: member.memberName || '',
+      account: member.account || '',
+      role: member.role || 'MEMBER',
+      deptName: member.deptName || '',
+      joinedAt: date(member.joinedAt) || new Date().toISOString(),
+      lastActionTime: date(member.lastActionTime) || new Date().toISOString(),
+      status: member.status || 'ACTIVE',
+      permissions: list<ProjectPermission>(member.permissions),
+      remark: member.remark || ''
+    })),
+    memberLogs: list<any>(raw.memberLogs).map(item => ({
+      logId: id(item.logId) || '',
+      actionType: item.actionType,
+      operatorId: id(item.operatorId) || '',
+      operatorName: item.operatorName || '',
+      targetUserId: id(item.targetUserId) || '',
+      targetUserName: item.targetUserName || '',
+      beforeSummary: item.beforeSummary,
+      afterSummary: item.afterSummary,
+      createTime: date(item.createTime) || new Date().toISOString()
+    }))
+  }
 }
 
-export function deleteProjectAttachment(projectId: string, attachmentId: string): Promise<ProjectVO> {
-  return post(`/project/${projectId}/attachment/delete/${attachmentId}`)
+function projectPayload(payload: ProjectCreatePayload | ProjectUpdatePayload) {
+  return {
+    ...payload,
+    customerId: payload.customerId || undefined,
+    ownerId: payload.ownerId || undefined
+  }
 }
 
-export function addProjectSchedule(projectId: string, data: ProjectSchedulePayload): Promise<ProjectVO> {
-  return post(`/project/${projectId}/schedule/add`, data)
+function taskPayload(payload: ProjectTaskPayload | ProjectTaskUpdatePayload) {
+  return {
+    ...payload,
+    taskId: 'taskId' in payload && payload.taskId ? payload.taskId : undefined,
+    laneId: payload.laneId || undefined,
+    ownerId: payload.ownerId || undefined,
+    customerId: payload.customerId || undefined,
+    participantIds: payload.participantIds
+  }
 }
 
-export function deleteProjectSchedule(projectId: string, scheduleId: string): Promise<ProjectVO> {
-  return post(`/project/${projectId}/schedule/delete/${scheduleId}`)
+function memberPayload(payload: ProjectMemberPayload) {
+  return {
+    ...payload,
+    userId: payload.userId
+  }
+}
+
+async function unwrapProject(request: Promise<RawProject>): Promise<ProjectEntity> {
+  return normalizeProject(await request)
+}
+
+export async function queryProjectList(): Promise<ProjectEntity[]> {
+  const projects = await get<RawProject[]>('/project/list')
+  return list<RawProject>(projects).map(normalizeProject)
+}
+
+export async function queryProjectPageList(query: ProjectListQuery = {}): Promise<PageResult<ProjectEntity>> {
+  const result = await post<PageResult<RawProject>>('/project/queryPageList', {
+    page: query.page || 1,
+    limit: query.limit || 10,
+    keyword: query.keyword?.trim() || undefined,
+    status: query.status && query.status !== 'all' ? query.status : undefined
+  })
+  return {
+    ...result,
+    list: list<RawProject>(result.list).map(normalizeProject)
+  }
+}
+
+export function getProjectDetail(projectId: string, taskKeyword?: string): Promise<ProjectEntity> {
+  const keyword = taskKeyword?.trim()
+  return unwrapProject(get(`/project/detail/${projectId}`, keyword ? { params: { taskKeyword: keyword } } : undefined))
+}
+
+export function createProject(payload: ProjectCreatePayload): Promise<ProjectEntity> {
+  return unwrapProject(post('/project/add', projectPayload(payload)))
+}
+
+export function updateProject(payload: ProjectUpdatePayload): Promise<ProjectEntity> {
+  return unwrapProject(post('/project/update', {
+    ...projectPayload(payload),
+    projectId: payload.projectId
+  }))
+}
+
+export function archiveProject(projectId: string): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/archive/${projectId}`))
+}
+
+export function restoreProject(projectId: string): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/restore/${projectId}`))
 }
 
 export function deleteProject(projectId: string): Promise<void> {
   return post(`/project/delete/${projectId}`)
 }
 
-export function addProjectLane(projectId: string, data: ProjectLaneSave): Promise<ProjectVO> {
-  return post(`/project/${projectId}/lane/add`, data)
+function normalizeRolePermissionConfig(raw: any): ProjectRolePermissionConfig {
+  const source = raw?.rolePermissions && typeof raw.rolePermissions === 'object' ? raw.rolePermissions : {}
+  return Object.entries(source).reduce((config, [role, permissions]) => {
+    if (!role.trim()) return config
+    config[role] = list<ProjectPermission>(permissions)
+    return config
+  }, {} as ProjectRolePermissionConfig)
 }
 
-export function addProjectTask(projectId: string, data: ProjectTaskSave): Promise<ProjectVO> {
-  return post(`/project/${projectId}/task/add`, data)
+export async function getProjectRolePermissionConfig(): Promise<ProjectRolePermissionConfigVO> {
+  const raw = await requestProjectRolePermissionConfig(path => get(path))
+  return {
+    rolePermissions: normalizeRolePermissionConfig(raw)
+  }
 }
 
-export function updateProjectTask(projectId: string, data: ProjectTaskSave): Promise<ProjectVO> {
-  return post(`/project/${projectId}/task/update`, data)
+export async function updateProjectRolePermissionConfig(
+  payload: ProjectRolePermissionConfigPayload
+): Promise<ProjectRolePermissionConfigVO> {
+  const raw = await requestProjectRolePermissionConfig(path => post(path, payload))
+  return {
+    rolePermissions: normalizeRolePermissionConfig(raw)
+  }
+}
+
+async function requestProjectRolePermissionConfig<T>(
+  request: (path: string) => Promise<T>
+): Promise<T> {
+  let lastError: unknown
+  for (const path of PROJECT_ROLE_PERMISSION_PATHS) {
+    try {
+      return await request(path)
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError
+}
+
+export function addLane(projectId: string, name: string): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/${projectId}/lane/add`, { name }))
+}
+
+export function updateLane(projectId: string, laneId: string, name: string): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/${projectId}/lane/update`, { laneId, name }))
+}
+
+export function deleteLane(projectId: string, laneId: string): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/${projectId}/lane/delete/${laneId}`))
+}
+
+export function createProjectTask(projectId: string, payload: ProjectTaskPayload): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/${projectId}/task/add`, taskPayload(payload)))
+}
+
+export function updateProjectTask(projectId: string, payload: ProjectTaskUpdatePayload): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/${projectId}/task/update`, taskPayload(payload)))
 }
 
 export function addProjectTaskAttachment(
   projectId: string,
   taskId: string,
-  data: ProjectTaskAttachmentPayload
-): Promise<ProjectVO> {
-  return post(`/project/${projectId}/task/${taskId}/attachment/add`, data)
+  payload: ProjectTaskAttachmentPayload
+): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/${projectId}/task/${taskId}/attachment/add`, payload))
 }
 
 export function deleteProjectTaskAttachment(
   projectId: string,
   taskId: string,
   attachmentId: string
-): Promise<ProjectVO> {
-  return post(`/project/${projectId}/task/${taskId}/attachment/delete/${attachmentId}`)
+): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/${projectId}/task/${taskId}/attachment/delete/${attachmentId}`))
 }
 
 export function getProjectTaskAttachmentBlob(
@@ -93,19 +344,55 @@ export function getProjectTaskAttachmentBlob(
   return get(`/project/${projectId}/task/${taskId}/attachment/${attachmentId}/download`, { responseType: 'blob' })
 }
 
+export function getProjectTaskAttachmentPreviewHtml(
+  projectId: string,
+  taskId: string,
+  attachmentId: string
+): Promise<string> {
+  return get(`/project/${projectId}/task/${taskId}/attachment/${attachmentId}/preview-html`)
+}
+
 export function downloadProjectTaskAttachment(
   projectId: string,
   taskId: string,
   attachmentId: string,
-  filename?: string
+  filename: string
 ): Promise<void> {
   return download(`/project/${projectId}/task/${taskId}/attachment/${attachmentId}/download`, filename)
 }
 
-export function moveProjectTask(projectId: string, data: ProjectTaskMove): Promise<ProjectVO> {
-  return post(`/project/${projectId}/task/move`, data)
+export function deleteProjectTask(projectId: string, taskId: string): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/${projectId}/task/delete/${taskId}`))
 }
 
-export function deleteProjectTask(projectId: string, taskId: string): Promise<ProjectVO> {
-  return post(`/project/${projectId}/task/delete/${taskId}`)
+export function moveProjectTask(projectId: string, taskId: string, laneId: string): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/${projectId}/task/move`, { taskId, laneId }))
+}
+
+export function addProjectMember(projectId: string, payload: ProjectMemberPayload): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/${projectId}/member/add`, memberPayload(payload)))
+}
+
+export function updateProjectMemberRole(projectId: string, userId: string, role: string): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/${projectId}/member/role`, { userId, role }))
+}
+
+export function updateProjectMemberPermissions(projectId: string, userId: string, permissions: ProjectPermission[]): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/${projectId}/member/permissions`, { userId, permissions }))
+}
+
+export function updateProjectMemberStatus(projectId: string, userId: string, status: string): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/${projectId}/member/status`, { userId, status }))
+}
+
+function aiCommandPayload(payload: ProjectAiCommandPayload | string): ProjectAiCommandPayload {
+  return typeof payload === 'string' ? { content: payload } : payload
+}
+
+export function sendProjectAiCommand(projectId: string, payload: ProjectAiCommandPayload | string): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/${projectId}/ai-command`, aiCommandPayload(payload)))
+}
+
+export function sendTaskAiCommand(projectId: string, taskId: string, payload: ProjectAiCommandPayload | string): Promise<ProjectEntity> {
+  return unwrapProject(post(`/project/${projectId}/task/${taskId}/ai-command`, aiCommandPayload(payload)))
 }

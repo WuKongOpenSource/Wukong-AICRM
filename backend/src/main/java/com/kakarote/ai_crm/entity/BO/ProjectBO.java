@@ -7,6 +7,7 @@ import lombok.Data;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 public class ProjectBO {
 
@@ -25,6 +26,9 @@ public class ProjectBO {
         private Long customerId;
         private String customerName;
         private Long ownerId;
+        private String ownerName;
+        private String ownerAccount;
+        private String ownerDeptName;
         private Date startDate;
         private Date dueDate;
         private String status;
@@ -56,9 +60,13 @@ public class ProjectBO {
         private Date dueDate;
         private Long ownerId;
         private String ownerName;
+        private List<Long> participantIds;
+        private List<String> participantNames;
         private String priority;
         private Long customerId;
         private String customerName;
+        private Boolean hasAttachments;
+        private Boolean hasSchedule;
         private Boolean generatedByAi;
         private String aiSourceText;
         private List<TaskAttachmentSave> attachments;
@@ -92,5 +100,67 @@ public class ProjectBO {
 
         @NotNull(message = "Lane ID is required")
         private Long laneId;
+    }
+
+    @Data
+    public static class MemberSave {
+        @NotNull(message = "Member user is required")
+        private Long userId;
+
+        @NotBlank(message = "Member name is required")
+        private String memberName;
+
+        @NotBlank(message = "Member account is required")
+        private String account;
+
+        @NotBlank(message = "Project role is required")
+        private String role;
+
+        private String deptName;
+        private List<String> permissions;
+        private String remark;
+        private String status;
+    }
+
+    @Data
+    public static class MemberRole {
+        @NotNull(message = "Member user is required")
+        private Long userId;
+
+        @NotBlank(message = "Project role is required")
+        private String role;
+    }
+
+    @Data
+    public static class MemberPermissions {
+        @NotNull(message = "Member user is required")
+        private Long userId;
+
+        private List<String> permissions;
+    }
+
+    @Data
+    public static class MemberStatus {
+        @NotNull(message = "Member user is required")
+        private Long userId;
+
+        @NotBlank(message = "Member status is required")
+        private String status;
+    }
+
+    @Data
+    public static class RolePermissionConfig {
+        private Map<String, List<String>> rolePermissions;
+    }
+
+    @Data
+    public static class AiCommand {
+        @NotBlank(message = "Command content is required")
+        private String content;
+        private List<TaskAttachmentSave> attachments;
+        private List<String> knowledgeIds;
+        private String modelProvider;
+        private String modelName;
+        private String modelSource;
     }
 }

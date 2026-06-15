@@ -88,6 +88,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '项目管理', icon: 'task_alt' }
       },
       {
+        path: 'project/:id',
+        name: 'ProjectDetail',
+        component: () => import('@/views/project/ProjectDetailView.vue'),
+        meta: { title: '项目详情', hidden: true }
+      },
+      {
         path: 'mail',
         name: 'Mail',
         component: () => import('@/views/mail/MailView.vue'),

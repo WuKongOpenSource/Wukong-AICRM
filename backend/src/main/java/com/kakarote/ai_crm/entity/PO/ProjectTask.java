@@ -29,10 +29,14 @@ public class ProjectTask implements Serializable {
     private Date dueDate;
     private Long ownerId;
     private String ownerName;
+    private String participantUserIds;
+    private String participantNames;
     private String priority;
     private Long customerId;
     private String customerName;
+    private Boolean hasSchedule;
     private Boolean generatedByAi;
+    private String source;
     private String aiSourceText;
 
     @TableField(fill = FieldFill.INSERT)

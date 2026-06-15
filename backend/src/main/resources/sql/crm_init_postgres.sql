@@ -295,6 +295,12 @@ COMMENT ON COLUMN crm_product.status IS 'active=enabled, inactive=disabled';
 -- 5.3. Project board tables (crm_project, crm_project_lane, crm_project_task)
 -- ============================================
 DROP TABLE IF EXISTS crm_project_task CASCADE;
+DROP TABLE IF EXISTS crm_project_task_schedule CASCADE;
+DROP TABLE IF EXISTS crm_project_task_note CASCADE;
+DROP TABLE IF EXISTS crm_project_task_chat_message CASCADE;
+DROP TABLE IF EXISTS crm_project_chat_message CASCADE;
+DROP TABLE IF EXISTS crm_project_member_log CASCADE;
+DROP TABLE IF EXISTS crm_project_member CASCADE;
 DROP TABLE IF EXISTS crm_project_task_attachment CASCADE;
 DROP TABLE IF EXISTS crm_project_schedule CASCADE;
 DROP TABLE IF EXISTS crm_project_attachment CASCADE;
@@ -385,10 +391,14 @@ CREATE TABLE crm_project_task (
     due_date TIMESTAMP,
     owner_id BIGINT,
     owner_name VARCHAR(100),
+    participant_user_ids TEXT,
+    participant_names TEXT,
     priority VARCHAR(32) NOT NULL DEFAULT 'MEDIUM',
     customer_id BIGINT,
     customer_name VARCHAR(255),
+    has_schedule BOOLEAN NOT NULL DEFAULT FALSE,
     generated_by_ai BOOLEAN NOT NULL DEFAULT FALSE,
+    source VARCHAR(32) DEFAULT 'manual',
     ai_source_text TEXT,
     create_user_id BIGINT,
     update_user_id BIGINT,
@@ -428,12 +438,122 @@ CREATE INDEX idx_crm_project_task_attachment_project
 CREATE INDEX idx_crm_project_task_attachment_task
     ON crm_project_task_attachment(task_id, create_time DESC);
 
+CREATE TABLE crm_project_member (
+    member_id BIGINT NOT NULL,
+    project_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    member_name VARCHAR(100) NOT NULL,
+    account VARCHAR(100),
+    role VARCHAR(32) NOT NULL,
+    dept_name VARCHAR(100),
+    joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_action_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+    permissions TEXT,
+    remark TEXT,
+    create_user_id BIGINT,
+    update_user_id BIGINT,
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (member_id)
+);
+
+CREATE UNIQUE INDEX uk_crm_project_member_user
+    ON crm_project_member(project_id, user_id);
+CREATE INDEX idx_crm_project_member_user_status
+    ON crm_project_member(user_id, status);
+
+CREATE TRIGGER trg_project_member_update_time
+    BEFORE UPDATE ON crm_project_member
+    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+CREATE TABLE crm_project_member_log (
+    log_id BIGINT NOT NULL,
+    project_id BIGINT NOT NULL,
+    operator_id BIGINT,
+    operator_name VARCHAR(100),
+    action_type VARCHAR(32) NOT NULL,
+    target_user_id BIGINT,
+    target_user_name VARCHAR(100),
+    before_summary TEXT,
+    after_summary TEXT,
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (log_id)
+);
+
+CREATE INDEX idx_crm_project_member_log_project_time
+    ON crm_project_member_log(project_id, create_time DESC);
+
+CREATE TABLE crm_project_chat_message (
+    message_id BIGINT NOT NULL,
+    project_id BIGINT NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    content TEXT NOT NULL,
+    create_user_id BIGINT,
+    create_user_name VARCHAR(100),
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (message_id)
+);
+
+CREATE INDEX idx_crm_project_chat_project_time
+    ON crm_project_chat_message(project_id, create_time);
+
+CREATE TABLE crm_project_task_chat_message (
+    message_id BIGINT NOT NULL,
+    project_id BIGINT NOT NULL,
+    task_id BIGINT NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    content TEXT NOT NULL,
+    create_user_id BIGINT,
+    create_user_name VARCHAR(100),
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (message_id)
+);
+
+CREATE INDEX idx_crm_project_task_chat_task_time
+    ON crm_project_task_chat_message(task_id, create_time);
+
+CREATE TABLE crm_project_task_note (
+    note_id BIGINT NOT NULL,
+    project_id BIGINT NOT NULL,
+    task_id BIGINT NOT NULL,
+    content TEXT NOT NULL,
+    create_user_id BIGINT,
+    create_user_name VARCHAR(100),
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (note_id)
+);
+
+CREATE INDEX idx_crm_project_task_note_task_time
+    ON crm_project_task_note(task_id, create_time DESC);
+
+CREATE TABLE crm_project_task_schedule (
+    schedule_id BIGINT NOT NULL,
+    project_id BIGINT NOT NULL,
+    task_id BIGINT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    schedule_time TIMESTAMP,
+    create_user_id BIGINT,
+    create_user_name VARCHAR(100),
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (schedule_id)
+);
+
+CREATE INDEX idx_crm_project_task_schedule_task_time
+    ON crm_project_task_schedule(task_id, schedule_time);
+
 COMMENT ON TABLE crm_project IS 'Project board';
 COMMENT ON TABLE crm_project_attachment IS 'Project attachments';
 COMMENT ON TABLE crm_project_schedule IS 'Project schedules';
 COMMENT ON TABLE crm_project_lane IS 'Project board lanes';
 COMMENT ON TABLE crm_project_task IS 'Project board tasks';
 COMMENT ON TABLE crm_project_task_attachment IS 'Project task attachments';
+COMMENT ON TABLE crm_project_member IS 'Project members';
+COMMENT ON TABLE crm_project_member_log IS 'Project member logs';
+COMMENT ON TABLE crm_project_chat_message IS 'Project chat messages';
+COMMENT ON TABLE crm_project_task_chat_message IS 'Project task chat messages';
+COMMENT ON TABLE crm_project_task_note IS 'Project task notes';
+COMMENT ON TABLE crm_project_task_schedule IS 'Project task schedules';
 COMMENT ON COLUMN crm_project_task_attachment.file_path IS 'Stored file path';
 COMMENT ON COLUMN crm_project_task_attachment.file_size IS 'File size in bytes';
 COMMENT ON COLUMN crm_project_task_attachment.mime_type IS 'File MIME type';

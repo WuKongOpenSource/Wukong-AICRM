@@ -197,6 +197,21 @@ export interface ChatAppOption {
   recommendedQuestions?: string[]
 }
 
+export interface ChatModelOption {
+  provider: string
+  providerLabel?: string
+  modelName: string
+  displayName?: string
+  modelSource?: 'custom' | 'system' | string
+  icon?: string
+  capabilities?: {
+    supportsStream?: boolean
+    supportsToolCall?: boolean
+    supportsVision?: boolean
+    supportsAudioTranscription?: boolean
+  }
+}
+
 export interface ChatMessage {
   messageId: string
   sessionId: string
@@ -238,6 +253,9 @@ export interface ChatSendBO {
   projectId?: string
   projectTaskId?: string
   knowledgeIds?: string[]
+  modelProvider?: string
+  modelName?: string
+  modelSource?: string
 }
 
 // Enum types

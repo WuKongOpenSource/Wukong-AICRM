@@ -1,5 +1,5 @@
 import { post, get, getToken, getApiBaseUrl } from '@/utils/request'
-import type { ChatSession, ChatMessage, ChatAttachmentDTO, ChatAppOption } from '@/types/common'
+import type { ChatSession, ChatMessage, ChatAttachmentDTO, ChatModelOption, ChatAppOption } from '@/types/common'
 
 /**
  * Create chat session
@@ -25,10 +25,6 @@ export function getSessionList(): Promise<ChatSession[]> {
   return get('/chat/session/list')
 }
 
-export function getChatApplications(): Promise<ChatAppOption[]> {
-  return get('/chat/applications')
-}
-
 /**
  * Delete session
  */
@@ -36,7 +32,10 @@ export function deleteSession(id: string): Promise<void> {
   return post(`/chat/session/delete/${id}`)
 }
 
-export function updateSessionPin(id: string, pinned: boolean): Promise<void> {
+/**
+ * Pin or unpin session
+ */
+export function setSessionPinned(id: string, pinned: boolean): Promise<void> {
   return post(`/chat/session/pin/${id}`, { pinned })
 }
 
@@ -47,6 +46,14 @@ export function getMessageList(sessionId: string): Promise<ChatMessage[]> {
   return get(`/chat/message/list/${sessionId}`)
 }
 
+export function getChatModelOptions(): Promise<ChatModelOption[]> {
+  return get('/chat/model/options')
+}
+
+export function getChatAppOptions(): Promise<ChatAppOption[]> {
+  return get('/chat/app/options')
+}
+
 /**
  * Send message (streaming)
  * Handles SSE (Server-Sent Events) format parsing
@@ -55,12 +62,19 @@ export async function sendMessageStream(
   sessionId: string,
   content: string,
   onChunk: (text: string) => void,
-  onComplete?: () => void,
+  onComplete?: () => void | Promise<void>,
   onError?: (error: Error) => void,
   attachments?: ChatAttachmentDTO[],
-  ragEnabled?: boolean,
   appCode?: string,
-  knowledgeIds?: string[]
+  ragEnabled?: boolean,
+  modelProvider?: string,
+  modelName?: string,
+  modelSource?: string,
+  knowledgeIds?: string[],
+  projectId?: string,
+  projectTaskId?: string,
+  productId?: string,
+  signal?: AbortSignal
 ): Promise<void> {
   const token = getToken()
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
@@ -85,13 +99,23 @@ export async function sendMessageStream(
         'Accept': 'text/event-stream',
         ...(token ? { 'Manager-Token': token } : {})
       },
+      signal,
       body: JSON.stringify({
         sessionId,
         content,
         attachments: attachments || undefined,
+        appCode: appCode || undefined,
         ragEnabled,
-        appCode,
-        knowledgeIds: knowledgeIds?.length ? knowledgeIds : undefined
+        modelProvider: modelProvider || undefined,
+        modelName: modelName || undefined,
+        modelSource: modelSource || undefined,
+        productId: productId || undefined,
+        projectId: projectId || undefined,
+        projectTaskId: projectTaskId || undefined,
+        knowledgeIds:
+          knowledgeIds?.length && knowledgeIds.length > 0
+            ? knowledgeIds
+            : undefined
       })
     })
 
@@ -115,7 +139,7 @@ export async function sendMessageStream(
         // Process any remaining buffer content
         if (buffer.trim()) {
           const parsedContent = parseSSEEvent(buffer)
-          if (parsedContent) {
+          if (parsedContent !== null) {
             onChunk(parsedContent)
           }
         }
@@ -132,17 +156,21 @@ export async function sendMessageStream(
 
       for (const event of events) {
         const parsedContent = parseSSEEvent(event)
-        if (parsedContent) {
+        if (parsedContent !== null) {
           onChunk(parsedContent)
         }
       }
     }
 
     // Stream completed successfully
-    onComplete?.()
+    await onComplete?.()
   } catch (error) {
-    onError?.(error as Error)
-    throw error
+    const err = error instanceof Error ? error : new Error(String(error))
+    if (err.name === 'AbortError') {
+      return
+    }
+    onError?.(err)
+    throw err
   } finally {
     cleanup()
   }
@@ -177,16 +205,31 @@ export function sendMessageSync(
   sessionId: string,
   content: string,
   attachments?: ChatAttachmentDTO[],
-  ragEnabled?: boolean,
   appCode?: string,
-  knowledgeIds?: string[]
+  ragEnabled?: boolean,
+  modelProvider?: string,
+  modelName?: string,
+  modelSource?: string,
+  knowledgeIds?: string[],
+  projectId?: string,
+  projectTaskId?: string,
+  productId?: string
 ): Promise<string> {
   return post('/chat/sendSync', {
     sessionId,
     content,
     attachments: attachments || undefined,
+    appCode: appCode || undefined,
     ragEnabled,
-    appCode,
-    knowledgeIds: knowledgeIds?.length ? knowledgeIds : undefined
+    modelProvider: modelProvider || undefined,
+    modelName: modelName || undefined,
+    modelSource: modelSource || undefined,
+    productId: productId || undefined,
+    projectId: projectId || undefined,
+    projectTaskId: projectTaskId || undefined,
+    knowledgeIds:
+      knowledgeIds?.length && knowledgeIds.length > 0
+        ? knowledgeIds
+        : undefined
   })
 }

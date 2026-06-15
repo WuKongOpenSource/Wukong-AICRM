@@ -4,10 +4,12 @@ import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.SessionCreateBO;
 import com.kakarote.ai_crm.entity.BO.SessionPinBO;
+import com.kakarote.ai_crm.entity.VO.AiConfigVO;
 import com.kakarote.ai_crm.entity.VO.ChatAppOptionVO;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
 import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
 import com.kakarote.ai_crm.service.IChatService;
+import com.kakarote.ai_crm.service.ISystemConfigService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -17,7 +19,9 @@ import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * AI聊天控制器
@@ -29,6 +33,9 @@ public class ChatController {
 
     @Autowired
     private IChatService chatService;
+
+    @Autowired
+    private ISystemConfigService systemConfigService;
 
     @PostMapping("/session/create")
     @Operation(summary = "创建会话")
@@ -47,6 +54,31 @@ public class ChatController {
     @Operation(summary = "List chat applications")
     public Result<List<ChatAppOptionVO>> listChatApplications() {
         return Result.ok(chatService.listChatApplications());
+    }
+
+    @GetMapping("/app/options")
+    @Operation(summary = "List chat application options")
+    public Result<List<ChatAppOptionVO>> listChatAppOptions() {
+        return Result.ok(chatService.listChatApplications());
+    }
+
+    @GetMapping("/model/options")
+    @Operation(summary = "List chat model options")
+    public Result<List<Map<String, Object>>> listChatModelOptions() {
+        AiConfigVO config = systemConfigService.getAiConfig();
+        if (config == null || !Boolean.TRUE.equals(config.getReady()) || config.getModel() == null || config.getModel().isBlank()) {
+            return Result.ok(List.of());
+        }
+        Map<String, Object> option = new LinkedHashMap<>();
+        option.put("provider", config.getProvider());
+        option.put("providerLabel", config.getProviderLabel());
+        option.put("modelName", config.getModel());
+        option.put("displayName", config.getProviderLabel() == null || config.getProviderLabel().isBlank()
+                ? config.getModel()
+                : config.getProviderLabel() + " / " + config.getModel());
+        option.put("modelSource", "custom");
+        option.put("capabilities", config.getCapabilities());
+        return Result.ok(List.of(option));
     }
 
     @PostMapping("/session/delete/{id}")

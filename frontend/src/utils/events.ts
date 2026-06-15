@@ -18,5 +18,12 @@ export const appEvents = new AppEventBus()
 
 export const APP_EVENT = {
   CUSTOMER_LIST_REFRESH: 'customer:list:refresh',
+  CUSTOMER_SIDEBAR_REFRESH: 'customer:sidebar:refresh',
+  PRODUCT_SIDEBAR_REFRESH: 'product:sidebar:refresh',
+  PROJECT_SIDEBAR_REFRESH: 'project:sidebar:refresh',
+  CUSTOMER_DETAIL_REFRESH: 'customer:detail:refresh',
+  RELATION_SIDEBAR_REFRESH: 'relation:sidebar:refresh',
+  CHAT_COMPOSER_NARROW_CHANGE: 'chat:composer:narrow-change',
+  MOBILE_MAIN_MENU_OPEN: 'mobile:main-menu:open',
+  MOBILE_MAIN_MENU_DRAG: 'mobile:main-menu:drag',
 } as const
-

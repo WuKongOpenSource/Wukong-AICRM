@@ -4,6 +4,10 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
@@ -27,15 +31,24 @@ import com.kakarote.ai_crm.mapper.ProjectTaskAttachmentMapper;
 import com.kakarote.ai_crm.mapper.ProjectTaskMapper;
 import com.kakarote.ai_crm.service.IKnowledgeService;
 import com.kakarote.ai_crm.service.IProjectService;
+import com.kakarote.ai_crm.service.ISystemConfigService;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -50,6 +63,37 @@ public class ProjectServiceImpl implements IProjectService {
     private static final String TASK_STATUS_TODO = "TODO";
     private static final String TASK_STATUS_COMPLETED = "COMPLETED";
     private static final String PRIORITY_MEDIUM = "MEDIUM";
+    private static final String PROJECT_ROLE_PERMISSION_CONFIG_KEY = "project.role.permissions";
+    private static final String ROLE_OWNER = "OWNER";
+    private static final String ROLE_ADMIN = "ADMIN";
+    private static final String ROLE_MEMBER = "MEMBER";
+    private static final String ROLE_READONLY = "READONLY";
+    private static final String ROLE_EXTERNAL = "EXTERNAL";
+    private static final String MEMBER_STATUS_ACTIVE = "ACTIVE";
+    private static final List<String> PROJECT_ROLES = List.of(ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER, ROLE_READONLY, ROLE_EXTERNAL);
+    private static final List<String> ALL_PERMISSIONS = List.of(
+            "VIEW_PROJECT",
+            "EDIT_PROJECT",
+            "DELETE_PROJECT",
+            "ARCHIVE_PROJECT",
+            "ADD_MEMBER",
+            "REMOVE_MEMBER",
+            "MODIFY_MEMBER_PERMISSION",
+            "CREATE_TASK",
+            "EDIT_TASK",
+            "DELETE_TASK",
+            "MOVE_TASK",
+            "ADD_LANE",
+            "EDIT_LANE",
+            "DELETE_LANE",
+            "USE_AI_CHAT",
+            "AI_CREATE_TASK",
+            "UPLOAD_ATTACHMENT",
+            "DELETE_ATTACHMENT",
+            "CREATE_SCHEDULE",
+            "VIEW_STATISTICS"
+    );
+    private static final Map<String, List<String>> DEFAULT_ROLE_PERMISSIONS = createDefaultRolePermissions();
 
     private final ProjectMapper projectMapper;
     private final ProjectLaneMapper projectLaneMapper;
@@ -60,6 +104,9 @@ public class ProjectServiceImpl implements IProjectService {
     private final ManageUserMapper manageUserMapper;
     private final CustomerMapper customerMapper;
     private final IKnowledgeService knowledgeService;
+    private final ISystemConfigService systemConfigService;
+    private final JdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper;
 
     public ProjectServiceImpl(ProjectMapper projectMapper,
                               ProjectLaneMapper projectLaneMapper,
@@ -69,7 +116,10 @@ public class ProjectServiceImpl implements IProjectService {
                               ProjectScheduleMapper projectScheduleMapper,
                               ManageUserMapper manageUserMapper,
                               CustomerMapper customerMapper,
-                              IKnowledgeService knowledgeService) {
+                              IKnowledgeService knowledgeService,
+                              ISystemConfigService systemConfigService,
+                              JdbcTemplate jdbcTemplate,
+                              ObjectMapper objectMapper) {
         this.projectMapper = projectMapper;
         this.projectLaneMapper = projectLaneMapper;
         this.projectTaskMapper = projectTaskMapper;
@@ -79,6 +129,9 @@ public class ProjectServiceImpl implements IProjectService {
         this.manageUserMapper = manageUserMapper;
         this.customerMapper = customerMapper;
         this.knowledgeService = knowledgeService;
+        this.systemConfigService = systemConfigService;
+        this.jdbcTemplate = jdbcTemplate;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -94,7 +147,9 @@ public class ProjectServiceImpl implements IProjectService {
         ProjectBO.Query query = queryBO == null ? new ProjectBO.Query() : queryBO;
         query.setStatus(normalizeProjectQueryStatus(query.getStatus()));
         query.setIncludeArchived(STATUS_ARCHIVED.equals(query.getStatus()));
-        return projectMapper.queryPageList(query.parse(), query);
+        BasePage<ProjectVO> page = projectMapper.queryPageList(query.parse(), query);
+        page.getRecords().forEach(this::fillProjectAccess);
+        return page;
     }
 
     @Override
@@ -116,10 +171,14 @@ public class ProjectServiceImpl implements IProjectService {
                 .map(this::toLaneVO)
                 .toList());
         List<ProjectVO.ProjectTaskVO> tasks = projectTaskMapper.selectProjectTasks(projectId, StrUtil.trimToNull(taskKeyword));
-        tasks.forEach(this::fillTaskAttachments);
+        tasks.forEach(this::fillTaskDetails);
         project.setTasks(tasks);
         project.setAttachments(loadProjectAttachments(projectId));
         project.setSchedules(loadProjectSchedules(projectId));
+        project.setChatMessages(loadProjectChatMessages(projectId));
+        project.setMembers(loadProjectMembers(projectId));
+        project.setMemberLogs(loadProjectMemberLogs(projectId));
+        fillProjectAccess(project);
         return project;
     }
 
@@ -147,6 +206,10 @@ public class ProjectServiceImpl implements IProjectService {
         insertLane(project.getProjectId(), "in-progress", "进行中", 1, true, currentUserId);
         insertLane(project.getProjectId(), "completed", "已完成", 2, true, currentUserId);
 
+        upsertMember(project.getProjectId(), ownerId, StrUtil.blankToDefault(owner.getRealname(), owner.getUsername()),
+                owner.getUsername(), null, ROLE_OWNER, roleDefaultPermissions(ROLE_OWNER), "项目负责人",
+                MEMBER_STATUS_ACTIVE, false);
+
         ProjectVO vo = BeanUtil.copyProperties(project, ProjectVO.class);
         vo.setOwnerName(StrUtil.blankToDefault(owner.getRealname(), owner.getUsername()));
         return vo;
@@ -166,7 +229,11 @@ public class ProjectServiceImpl implements IProjectService {
             project.setStatus(normalizeProjectStatus(updateBO.getStatus()));
         }
         if (updateBO.getOwnerId() != null) {
-            project.setOwnerId(resolveUser(updateBO.getOwnerId()).getUserId());
+            ManagerUser owner = resolveUser(updateBO.getOwnerId());
+            project.setOwnerId(owner.getUserId());
+            upsertMember(project.getProjectId(), owner.getUserId(), StrUtil.blankToDefault(owner.getRealname(), owner.getUsername()),
+                    owner.getUsername(), null, ROLE_OWNER, roleDefaultPermissions(ROLE_OWNER), "项目负责人",
+                    MEMBER_STATUS_ACTIVE, false);
         }
         if (updateBO.getCustomerId() != null || updateBO.getCustomerName() != null) {
             project.setCustomerId(updateBO.getCustomerId());
@@ -396,14 +463,119 @@ public class ProjectServiceImpl implements IProjectService {
         return getProject(projectId);
     }
 
+    @Override
+    public ProjectVO.ProjectRolePermissionConfigVO getProjectRolePermissionConfig() {
+        return buildRolePermissionConfigVO(loadProjectRolePermissions());
+    }
+
+    @Override
+    public ProjectVO.ProjectRolePermissionConfigVO updateProjectRolePermissionConfig(ProjectBO.RolePermissionConfig configBO) {
+        Map<String, List<String>> normalized = normalizeRolePermissionConfig(
+                configBO == null ? null : configBO.getRolePermissions());
+        systemConfigService.updateConfig(PROJECT_ROLE_PERMISSION_CONFIG_KEY, writeJson(normalized));
+        return buildRolePermissionConfigVO(normalized);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ProjectVO addMember(Long projectId, ProjectBO.MemberSave memberBO) {
+        getProjectEntity(projectId);
+        ManagerUser user = resolveUser(memberBO.getUserId());
+        String memberName = StrUtil.blankToDefault(normalizeOptional(memberBO.getMemberName()),
+                StrUtil.blankToDefault(user.getRealname(), user.getUsername()));
+        String account = StrUtil.blankToDefault(normalizeOptional(memberBO.getAccount()), user.getUsername());
+        String role = normalizeRole(memberBO.getRole());
+        List<String> permissions = memberBO.getPermissions() == null || memberBO.getPermissions().isEmpty()
+                ? roleDefaultPermissions(role)
+                : normalizePermissions(memberBO.getPermissions());
+        upsertMember(projectId, user.getUserId(), memberName, account, normalizeOptional(memberBO.getDeptName()),
+                role, permissions, normalizeOptional(memberBO.getRemark()), normalizeMemberStatus(memberBO.getStatus()), true);
+        return getProject(projectId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ProjectVO updateMemberRole(Long projectId, ProjectBO.MemberRole roleBO) {
+        getProjectEntity(projectId);
+        ProjectVO.ProjectMemberVO before = findMember(projectId, roleBO.getUserId());
+        String role = normalizeRole(roleBO.getRole());
+        jdbcTemplate.update("""
+                UPDATE crm_project_member
+                SET role = ?, permissions = ?, last_action_time = CURRENT_TIMESTAMP, update_user_id = ?, update_time = CURRENT_TIMESTAMP
+                WHERE project_id = ? AND user_id = ?
+                """, role, writeJson(roleDefaultPermissions(role)), UserUtil.getUserId(), projectId, roleBO.getUserId());
+        ProjectVO.ProjectMemberVO after = findMember(projectId, roleBO.getUserId());
+        appendMemberLog(projectId, "UPDATE_ROLE", roleBO.getUserId(),
+                after == null ? null : after.getMemberName(), memberSummary(before), memberSummary(after));
+        return getProject(projectId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ProjectVO updateMemberPermissions(Long projectId, ProjectBO.MemberPermissions permissionsBO) {
+        getProjectEntity(projectId);
+        ProjectVO.ProjectMemberVO before = findMember(projectId, permissionsBO.getUserId());
+        List<String> permissions = normalizePermissions(permissionsBO.getPermissions());
+        jdbcTemplate.update("""
+                UPDATE crm_project_member
+                SET permissions = ?, last_action_time = CURRENT_TIMESTAMP, update_user_id = ?, update_time = CURRENT_TIMESTAMP
+                WHERE project_id = ? AND user_id = ?
+                """, writeJson(permissions), UserUtil.getUserId(), projectId, permissionsBO.getUserId());
+        ProjectVO.ProjectMemberVO after = findMember(projectId, permissionsBO.getUserId());
+        appendMemberLog(projectId, "UPDATE_PERMISSION", permissionsBO.getUserId(),
+                after == null ? null : after.getMemberName(), memberSummary(before), memberSummary(after));
+        return getProject(projectId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ProjectVO updateMemberStatus(Long projectId, ProjectBO.MemberStatus statusBO) {
+        getProjectEntity(projectId);
+        ProjectVO.ProjectMemberVO before = findMember(projectId, statusBO.getUserId());
+        String status = normalizeMemberStatus(statusBO.getStatus());
+        jdbcTemplate.update("""
+                UPDATE crm_project_member
+                SET status = ?, last_action_time = CURRENT_TIMESTAMP, update_user_id = ?, update_time = CURRENT_TIMESTAMP
+                WHERE project_id = ? AND user_id = ?
+                """, status, UserUtil.getUserId(), projectId, statusBO.getUserId());
+        ProjectVO.ProjectMemberVO after = findMember(projectId, statusBO.getUserId());
+        appendMemberLog(projectId, "UPDATE_STATUS", statusBO.getUserId(),
+                after == null ? null : after.getMemberName(), memberSummary(before), memberSummary(after));
+        return getProject(projectId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ProjectVO handleProjectAiCommand(Long projectId, ProjectBO.AiCommand commandBO) {
+        getProjectEntity(projectId);
+        String content = requireName(commandBO.getContent());
+        appendProjectChat(projectId, "user", content);
+        appendProjectChat(projectId, "assistant", "已记录项目指令。当前单机版项目对话不会消耗额度，可继续在项目任务中跟进处理。");
+        return getProject(projectId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ProjectVO handleTaskAiCommand(Long projectId, Long taskId, ProjectBO.AiCommand commandBO) {
+        getProjectTask(projectId, taskId);
+        String content = requireName(commandBO.getContent());
+        appendTaskChat(projectId, taskId, "user", content);
+        appendTaskChat(projectId, taskId, "assistant", "已记录任务指令。当前单机版任务对话不会消耗额度。");
+        return getProject(projectId);
+    }
+
     private void copyTaskFields(ProjectTask task, ProjectBO.TaskSave taskBO) {
         task.setTitle(requireName(taskBO.getTitle()));
         task.setDescription(normalizeOptional(taskBO.getDescription()));
         task.setDueDate(taskBO.getDueDate());
         task.setOwnerId(taskBO.getOwnerId());
         task.setOwnerName(normalizeOptional(taskBO.getOwnerName()));
+        task.setParticipantUserIds(writeJson(taskBO.getParticipantIds() == null ? Collections.emptyList() : taskBO.getParticipantIds()));
+        task.setParticipantNames(writeJson(taskBO.getParticipantNames() == null ? Collections.emptyList() : taskBO.getParticipantNames()));
         task.setCustomerId(taskBO.getCustomerId());
         task.setCustomerName(resolveCustomerName(taskBO.getCustomerId(), taskBO.getCustomerName()));
+        task.setHasSchedule(Boolean.TRUE.equals(taskBO.getHasSchedule()));
+        task.setSource(Boolean.TRUE.equals(taskBO.getGeneratedByAi()) ? "ai" : "manual");
         task.setAiSourceText(normalizeOptional(taskBO.getAiSourceText()));
     }
 
@@ -516,7 +688,14 @@ public class ProjectServiceImpl implements IProjectService {
         return first != null ? first : second;
     }
 
-    private void fillTaskAttachments(ProjectVO.ProjectTaskVO task) {
+    private void fillTaskDetails(ProjectVO.ProjectTaskVO task) {
+        ProjectTask entity = projectTaskMapper.selectById(task.getTaskId());
+        if (entity != null) {
+            task.setParticipantIds(parseLongList(entity.getParticipantUserIds()));
+            task.setParticipantNames(parseStringList(entity.getParticipantNames()));
+            task.setHasSchedule(Boolean.TRUE.equals(entity.getHasSchedule()));
+            task.setSource(StrUtil.blankToDefault(entity.getSource(), Boolean.TRUE.equals(entity.getGeneratedByAi()) ? "ai" : "manual"));
+        }
         List<ProjectVO.ProjectTaskAttachmentVO> attachments = projectTaskAttachmentMapper.selectList(
                         Wrappers.<ProjectTaskAttachment>lambdaQuery()
                                 .eq(ProjectTaskAttachment::getTaskId, task.getTaskId())
@@ -527,6 +706,9 @@ public class ProjectServiceImpl implements IProjectService {
                 .toList();
         task.setAttachments(attachments);
         task.setHasAttachments(!attachments.isEmpty());
+        task.setSchedules(loadTaskSchedules(task.getProjectId(), task.getTaskId()));
+        task.setNotes(loadTaskNotes(task.getProjectId(), task.getTaskId()));
+        task.setChatMessages(loadTaskChatMessages(task.getProjectId(), task.getTaskId()));
     }
 
     private ProjectVO.ProjectTaskAttachmentVO toTaskAttachmentVO(ProjectTaskAttachment attachment) {
@@ -540,6 +722,204 @@ public class ProjectServiceImpl implements IProjectService {
         vo.setCreatedByName(attachment.getCreateUserName());
         vo.setCreateTime(attachment.getCreateTime());
         return vo;
+    }
+
+    private List<ProjectVO.ProjectChatMessageVO> loadProjectChatMessages(Long projectId) {
+        return jdbcTemplate.query("""
+                SELECT message_id, role, content, create_time
+                FROM crm_project_chat_message
+                WHERE project_id = ?
+                ORDER BY create_time ASC, message_id ASC
+                """, (rs, rowNum) -> {
+            ProjectVO.ProjectChatMessageVO vo = new ProjectVO.ProjectChatMessageVO();
+            vo.setMessageId(rs.getLong("message_id"));
+            vo.setRole(rs.getString("role"));
+            vo.setContent(rs.getString("content"));
+            vo.setCreateTime(rs.getTimestamp("create_time"));
+            return vo;
+        }, projectId);
+    }
+
+    private List<ProjectVO.ProjectChatMessageVO> loadTaskChatMessages(Long projectId, Long taskId) {
+        return jdbcTemplate.query("""
+                SELECT message_id, role, content, create_time
+                FROM crm_project_task_chat_message
+                WHERE project_id = ? AND task_id = ?
+                ORDER BY create_time ASC, message_id ASC
+                """, (rs, rowNum) -> {
+            ProjectVO.ProjectChatMessageVO vo = new ProjectVO.ProjectChatMessageVO();
+            vo.setMessageId(rs.getLong("message_id"));
+            vo.setRole(rs.getString("role"));
+            vo.setContent(rs.getString("content"));
+            vo.setCreateTime(rs.getTimestamp("create_time"));
+            return vo;
+        }, projectId, taskId);
+    }
+
+    private List<ProjectVO.ProjectTaskScheduleVO> loadTaskSchedules(Long projectId, Long taskId) {
+        return jdbcTemplate.query("""
+                SELECT schedule_id, title, schedule_time, create_user_name, create_time
+                FROM crm_project_task_schedule
+                WHERE project_id = ? AND task_id = ?
+                ORDER BY COALESCE(schedule_time, create_time) DESC, schedule_id DESC
+                """, (rs, rowNum) -> {
+            ProjectVO.ProjectTaskScheduleVO vo = new ProjectVO.ProjectTaskScheduleVO();
+            vo.setScheduleId(rs.getLong("schedule_id"));
+            vo.setTitle(rs.getString("title"));
+            vo.setScheduleTime(rs.getTimestamp("schedule_time"));
+            vo.setCreatedByName(rs.getString("create_user_name"));
+            vo.setCreateTime(rs.getTimestamp("create_time"));
+            return vo;
+        }, projectId, taskId);
+    }
+
+    private List<ProjectVO.ProjectTaskNoteVO> loadTaskNotes(Long projectId, Long taskId) {
+        return jdbcTemplate.query("""
+                SELECT note_id, content, create_user_name, create_time
+                FROM crm_project_task_note
+                WHERE project_id = ? AND task_id = ?
+                ORDER BY create_time DESC, note_id DESC
+                """, (rs, rowNum) -> {
+            ProjectVO.ProjectTaskNoteVO vo = new ProjectVO.ProjectTaskNoteVO();
+            vo.setNoteId(rs.getLong("note_id"));
+            vo.setContent(rs.getString("content"));
+            vo.setCreatedByName(rs.getString("create_user_name"));
+            vo.setCreateTime(rs.getTimestamp("create_time"));
+            return vo;
+        }, projectId, taskId);
+    }
+
+    private List<ProjectVO.ProjectMemberVO> loadProjectMembers(Long projectId) {
+        return jdbcTemplate.query("""
+                SELECT member_id, user_id, member_name, account, role, dept_name, joined_at,
+                       last_action_time, status, permissions, remark
+                FROM crm_project_member
+                WHERE project_id = ?
+                ORDER BY CASE WHEN status = 'ACTIVE' THEN 0 ELSE 1 END, joined_at ASC, member_id ASC
+                """, (rs, rowNum) -> {
+            ProjectVO.ProjectMemberVO vo = new ProjectVO.ProjectMemberVO();
+            vo.setMemberId(rs.getLong("member_id"));
+            vo.setUserId(rs.getLong("user_id"));
+            vo.setMemberName(rs.getString("member_name"));
+            vo.setAccount(rs.getString("account"));
+            vo.setRole(rs.getString("role"));
+            vo.setDeptName(rs.getString("dept_name"));
+            vo.setJoinedAt(rs.getTimestamp("joined_at"));
+            vo.setLastActionTime(rs.getTimestamp("last_action_time"));
+            vo.setStatus(rs.getString("status"));
+            vo.setPermissions(parseStringList(rs.getString("permissions")));
+            vo.setRemark(rs.getString("remark"));
+            return vo;
+        }, projectId);
+    }
+
+    private List<ProjectVO.ProjectMemberLogVO> loadProjectMemberLogs(Long projectId) {
+        return jdbcTemplate.query("""
+                SELECT log_id, operator_id, operator_name, action_type, target_user_id, target_user_name,
+                       before_summary, after_summary, create_time
+                FROM crm_project_member_log
+                WHERE project_id = ?
+                ORDER BY create_time DESC, log_id DESC
+                """, (rs, rowNum) -> {
+            ProjectVO.ProjectMemberLogVO vo = new ProjectVO.ProjectMemberLogVO();
+            vo.setLogId(rs.getLong("log_id"));
+            vo.setOperatorId(rs.getLong("operator_id"));
+            vo.setOperatorName(rs.getString("operator_name"));
+            vo.setActionType(rs.getString("action_type"));
+            vo.setTargetUserId(rs.getLong("target_user_id"));
+            vo.setTargetUserName(rs.getString("target_user_name"));
+            vo.setBeforeSummary(rs.getString("before_summary"));
+            vo.setAfterSummary(rs.getString("after_summary"));
+            vo.setCreateTime(rs.getTimestamp("create_time"));
+            return vo;
+        }, projectId);
+    }
+
+    private void fillProjectAccess(ProjectVO project) {
+        Long currentUserId = UserUtil.getUserId();
+        boolean owner = currentUserId != null && Objects.equals(project.getOwnerId(), currentUserId);
+        if (owner) {
+            project.setCurrentUserRole(ROLE_OWNER);
+            project.setCurrentUserPermissions(new ArrayList<>(ALL_PERMISSIONS));
+            return;
+        }
+        ProjectVO.ProjectMemberVO member = findActiveMember(project.getProjectId(), currentUserId);
+        if (member != null) {
+            project.setCurrentUserRole(member.getRole());
+            project.setCurrentUserPermissions(member.getPermissions());
+        }
+    }
+
+    private ProjectVO.ProjectMemberVO findActiveMember(Long projectId, Long userId) {
+        ProjectVO.ProjectMemberVO member = findMember(projectId, userId);
+        if (member == null || !MEMBER_STATUS_ACTIVE.equalsIgnoreCase(member.getStatus())) {
+            return null;
+        }
+        return member;
+    }
+
+    private ProjectVO.ProjectMemberVO findMember(Long projectId, Long userId) {
+        if (projectId == null || userId == null) {
+            return null;
+        }
+        return loadProjectMembers(projectId).stream()
+                .filter(member -> Objects.equals(member.getUserId(), userId))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private void upsertMember(Long projectId, Long userId, String memberName, String account, String deptName,
+                              String role, List<String> permissions, String remark, String status, boolean writeLog) {
+        ProjectVO.ProjectMemberVO before = findMember(projectId, userId);
+        if (before == null) {
+            jdbcTemplate.update("""
+                    INSERT INTO crm_project_member(
+                        member_id, project_id, user_id, member_name, account, role, dept_name,
+                        status, permissions, remark, create_user_id, update_user_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, IdWorker.getId(), projectId, userId, memberName, account, role, deptName,
+                    status, writeJson(normalizePermissions(permissions)), remark, UserUtil.getUserId(), UserUtil.getUserId());
+            if (writeLog) {
+                appendMemberLog(projectId, "ADD_MEMBER", userId, memberName, null, "角色" + role);
+            }
+            return;
+        }
+        jdbcTemplate.update("""
+                UPDATE crm_project_member
+                SET member_name = ?, account = ?, role = ?, dept_name = ?, status = ?, permissions = ?,
+                    remark = ?, last_action_time = CURRENT_TIMESTAMP, update_user_id = ?, update_time = CURRENT_TIMESTAMP
+                WHERE project_id = ? AND user_id = ?
+                """, memberName, account, role, deptName, status, writeJson(normalizePermissions(permissions)),
+                remark, UserUtil.getUserId(), projectId, userId);
+        if (writeLog) {
+            ProjectVO.ProjectMemberVO after = findMember(projectId, userId);
+            appendMemberLog(projectId, "UPDATE_PERMISSION", userId, memberName, memberSummary(before), memberSummary(after));
+        }
+    }
+
+    private void appendMemberLog(Long projectId, String actionType, Long targetUserId, String targetUserName,
+                                 String beforeSummary, String afterSummary) {
+        jdbcTemplate.update("""
+                INSERT INTO crm_project_member_log(
+                    log_id, project_id, operator_id, operator_name, action_type, target_user_id,
+                    target_user_name, before_summary, after_summary
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, IdWorker.getId(), projectId, UserUtil.getUserId(), currentUserDisplayName(), actionType,
+                targetUserId, targetUserName, beforeSummary, afterSummary);
+    }
+
+    private void appendProjectChat(Long projectId, String role, String content) {
+        jdbcTemplate.update("""
+                INSERT INTO crm_project_chat_message(message_id, project_id, role, content, create_user_id, create_user_name)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, IdWorker.getId(), projectId, role, content, UserUtil.getUserId(), currentUserDisplayName());
+    }
+
+    private void appendTaskChat(Long projectId, Long taskId, String role, String content) {
+        jdbcTemplate.update("""
+                INSERT INTO crm_project_task_chat_message(message_id, project_id, task_id, role, content, create_user_id, create_user_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, IdWorker.getId(), projectId, taskId, role, content, UserUtil.getUserId(), currentUserDisplayName());
     }
 
     private void insertLane(Long projectId, String code, String name, int sortOrder, boolean systemFlag, Long userId) {
@@ -681,5 +1061,138 @@ public class ProjectServiceImpl implements IProjectService {
     private String normalizePriority(String priority) {
         String normalized = StrUtil.blankToDefault(priority, PRIORITY_MEDIUM).trim().toUpperCase(Locale.ROOT);
         return Set.of("LOW", PRIORITY_MEDIUM, "HIGH", "URGENT").contains(normalized) ? normalized : PRIORITY_MEDIUM;
+    }
+
+    private static Map<String, List<String>> createDefaultRolePermissions() {
+        Map<String, List<String>> defaults = new LinkedHashMap<>();
+        defaults.put(ROLE_OWNER, new ArrayList<>(ALL_PERMISSIONS));
+        defaults.put(ROLE_ADMIN, ALL_PERMISSIONS.stream()
+                .filter(permission -> !"DELETE_PROJECT".equals(permission))
+                .toList());
+        defaults.put(ROLE_MEMBER, List.of(
+                "VIEW_PROJECT",
+                "CREATE_TASK",
+                "EDIT_TASK",
+                "MOVE_TASK",
+                "USE_AI_CHAT",
+                "AI_CREATE_TASK",
+                "UPLOAD_ATTACHMENT",
+                "CREATE_SCHEDULE",
+                "VIEW_STATISTICS"
+        ));
+        defaults.put(ROLE_READONLY, List.of("VIEW_PROJECT", "VIEW_STATISTICS"));
+        defaults.put(ROLE_EXTERNAL, List.of("VIEW_PROJECT", "UPLOAD_ATTACHMENT"));
+        return defaults;
+    }
+
+    private ProjectVO.ProjectRolePermissionConfigVO buildRolePermissionConfigVO(Map<String, List<String>> rolePermissions) {
+        ProjectVO.ProjectRolePermissionConfigVO vo = new ProjectVO.ProjectRolePermissionConfigVO();
+        vo.setRolePermissions(normalizeRolePermissionConfig(rolePermissions));
+        return vo;
+    }
+
+    private Map<String, List<String>> loadProjectRolePermissions() {
+        String config = systemConfigService.getConfigValue(PROJECT_ROLE_PERMISSION_CONFIG_KEY);
+        if (StrUtil.isBlank(config)) {
+            return createDefaultRolePermissions();
+        }
+        try {
+            return normalizeRolePermissionConfig(objectMapper.readValue(config, new TypeReference<Map<String, List<String>>>() {}));
+        } catch (Exception e) {
+            log.warn("Failed to parse project role permission config", e);
+            return createDefaultRolePermissions();
+        }
+    }
+
+    private List<String> roleDefaultPermissions(String role) {
+        Map<String, List<String>> rolePermissions = loadProjectRolePermissions();
+        return new ArrayList<>(rolePermissions.getOrDefault(normalizeRole(role), rolePermissions.get(ROLE_MEMBER)));
+    }
+
+    private Map<String, List<String>> normalizeRolePermissionConfig(Map<String, List<String>> rolePermissions) {
+        Map<String, List<String>> source = rolePermissions == null || rolePermissions.isEmpty()
+                ? DEFAULT_ROLE_PERMISSIONS
+                : rolePermissions;
+        Map<String, List<String>> normalized = new LinkedHashMap<>();
+        PROJECT_ROLES.forEach(role -> normalized.put(role,
+                normalizePermissions(source.getOrDefault(role, DEFAULT_ROLE_PERMISSIONS.get(role)))));
+        source.forEach((role, permissions) -> {
+            String normalizedRole = normalizeRole(role);
+            if (PROJECT_ROLES.contains(normalizedRole)) {
+                return;
+            }
+            normalized.put(normalizedRole, normalizePermissions(permissions));
+        });
+        return normalized;
+    }
+
+    private String normalizeRole(String role) {
+        String normalized = StrUtil.blankToDefault(role, ROLE_MEMBER).trim().toUpperCase(Locale.ROOT);
+        return normalized.isBlank() ? ROLE_MEMBER : normalized;
+    }
+
+    private String normalizeMemberStatus(String status) {
+        String normalized = StrUtil.blankToDefault(status, MEMBER_STATUS_ACTIVE).trim().toUpperCase(Locale.ROOT);
+        return Set.of(MEMBER_STATUS_ACTIVE, "REMOVED", "DISABLED").contains(normalized) ? normalized : MEMBER_STATUS_ACTIVE;
+    }
+
+    private List<String> normalizePermissions(List<String> permissions) {
+        if (permissions == null || permissions.isEmpty()) {
+            return new ArrayList<>(DEFAULT_ROLE_PERMISSIONS.get(ROLE_MEMBER));
+        }
+        List<String> normalized = permissions.stream()
+                .filter(StrUtil::isNotBlank)
+                .map(permission -> permission.trim().toUpperCase(Locale.ROOT))
+                .filter(ALL_PERMISSIONS::contains)
+                .distinct()
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        if (!normalized.contains("VIEW_PROJECT")) {
+            normalized.add(0, "VIEW_PROJECT");
+        }
+        return normalized;
+    }
+
+    private String writeJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Failed to serialize project data");
+        }
+    }
+
+    private List<String> parseStringList(String value) {
+        if (StrUtil.isBlank(value)) {
+            return new ArrayList<>();
+        }
+        try {
+            return objectMapper.readValue(value, new TypeReference<List<String>>() {});
+        } catch (Exception ignored) {
+            return java.util.Arrays.stream(value.split(","))
+                    .map(String::trim)
+                    .filter(StrUtil::isNotBlank)
+                    .toList();
+        }
+    }
+
+    private List<Long> parseLongList(String value) {
+        if (StrUtil.isBlank(value)) {
+            return new ArrayList<>();
+        }
+        try {
+            return objectMapper.readValue(value, new TypeReference<List<Long>>() {});
+        } catch (Exception ignored) {
+            return java.util.Arrays.stream(value.split(","))
+                    .map(String::trim)
+                    .filter(StrUtil::isNotBlank)
+                    .map(Long::valueOf)
+                    .toList();
+        }
+    }
+
+    private String memberSummary(ProjectVO.ProjectMemberVO member) {
+        if (member == null) {
+            return null;
+        }
+        return "角色" + member.getRole() + "，状态" + member.getStatus() + "，权限" + member.getPermissions().size() + "项";
     }
 }

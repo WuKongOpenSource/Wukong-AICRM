@@ -120,6 +120,19 @@ public class ProjectController {
         return Result.ok();
     }
 
+    @GetMapping({"/role-permissions", "/rolePermissions"})
+    @Operation(summary = "Project role permission config")
+    public Result<ProjectVO.ProjectRolePermissionConfigVO> getRolePermissions() {
+        return Result.ok(projectService.getProjectRolePermissionConfig());
+    }
+
+    @PostMapping({"/role-permissions", "/rolePermissions"})
+    @Operation(summary = "Update project role permission config")
+    public Result<ProjectVO.ProjectRolePermissionConfigVO> updateRolePermissions(
+            @RequestBody ProjectBO.RolePermissionConfig configBO) {
+        return Result.ok(projectService.updateProjectRolePermissionConfig(configBO));
+    }
+
     @PostMapping("/{projectId}/lane/add")
     @Operation(summary = "Create project lane")
     public Result<ProjectVO> addLane(@PathVariable Long projectId, @Valid @RequestBody ProjectBO.LaneSave laneBO) {
@@ -164,6 +177,23 @@ public class ProjectController {
                                                   @PathVariable Long taskId,
                                                   @PathVariable Long attachmentId) {
         return Result.ok(projectService.deleteTaskAttachment(projectId, taskId, attachmentId));
+    }
+
+    @PostMapping("/{projectId}/task/{taskId}/attachment/{attachmentId}/delete")
+    @Operation(summary = "Delete project task attachment")
+    public Result<ProjectVO> deleteTaskAttachmentCompat(@PathVariable Long projectId,
+                                                        @PathVariable Long taskId,
+                                                        @PathVariable Long attachmentId) {
+        return Result.ok(projectService.deleteTaskAttachment(projectId, taskId, attachmentId));
+    }
+
+    @GetMapping("/{projectId}/task/{taskId}/attachment/{attachmentId}/preview-html")
+    @Operation(summary = "Preview project task attachment as HTML")
+    public Result<String> previewTaskAttachmentHtml(@PathVariable Long projectId,
+                                                    @PathVariable Long taskId,
+                                                    @PathVariable Long attachmentId) {
+        projectService.getTaskAttachment(projectId, taskId, attachmentId);
+        return Result.ok("<p>当前单机版暂不支持该文件在线预览，请下载后查看。</p>");
     }
 
     @GetMapping("/{projectId}/task/{taskId}/attachment/{attachmentId}/download")
@@ -214,5 +244,45 @@ public class ProjectController {
     @Operation(summary = "Move project task")
     public Result<ProjectVO> moveTask(@PathVariable Long projectId, @Valid @RequestBody ProjectBO.TaskMove moveBO) {
         return Result.ok(projectService.moveTask(projectId, moveBO));
+    }
+
+    @PostMapping("/{projectId}/member/add")
+    @Operation(summary = "Add or update project member")
+    public Result<ProjectVO> addMember(@PathVariable Long projectId, @Valid @RequestBody ProjectBO.MemberSave memberBO) {
+        return Result.ok(projectService.addMember(projectId, memberBO));
+    }
+
+    @PostMapping("/{projectId}/member/role")
+    @Operation(summary = "Update project member role")
+    public Result<ProjectVO> updateMemberRole(@PathVariable Long projectId, @Valid @RequestBody ProjectBO.MemberRole roleBO) {
+        return Result.ok(projectService.updateMemberRole(projectId, roleBO));
+    }
+
+    @PostMapping("/{projectId}/member/permissions")
+    @Operation(summary = "Update project member permissions")
+    public Result<ProjectVO> updateMemberPermissions(@PathVariable Long projectId,
+                                                     @Valid @RequestBody ProjectBO.MemberPermissions permissionsBO) {
+        return Result.ok(projectService.updateMemberPermissions(projectId, permissionsBO));
+    }
+
+    @PostMapping("/{projectId}/member/status")
+    @Operation(summary = "Update project member status")
+    public Result<ProjectVO> updateMemberStatus(@PathVariable Long projectId,
+                                                @Valid @RequestBody ProjectBO.MemberStatus statusBO) {
+        return Result.ok(projectService.updateMemberStatus(projectId, statusBO));
+    }
+
+    @PostMapping("/{projectId}/ai-command")
+    @Operation(summary = "Project AI command")
+    public Result<ProjectVO> projectAiCommand(@PathVariable Long projectId, @Valid @RequestBody ProjectBO.AiCommand commandBO) {
+        return Result.ok(projectService.handleProjectAiCommand(projectId, commandBO));
+    }
+
+    @PostMapping("/{projectId}/task/{taskId}/ai-command")
+    @Operation(summary = "Project task AI command")
+    public Result<ProjectVO> taskAiCommand(@PathVariable Long projectId,
+                                           @PathVariable Long taskId,
+                                           @Valid @RequestBody ProjectBO.AiCommand commandBO) {
+        return Result.ok(projectService.handleTaskAiCommand(projectId, taskId, commandBO));
     }
 }
