@@ -12,6 +12,8 @@
             s.type,
             s.customer_id,
             c.company_name AS customer_name,
+            s.relation_id,
+            r.name AS relation_name,
             s.contact_id,
             ct.name AS contact_name,
             s.location,
@@ -21,11 +23,28 @@
             s.create_time
         FROM crm_schedule s
         LEFT JOIN crm_customer c ON s.customer_id = c.customer_id
+        LEFT JOIN crm_relation r ON s.relation_id = r.relation_id
         LEFT JOIN crm_contact ct ON s.contact_id = ct.contact_id
         LEFT JOIN manager_user u ON s.create_user_id = u.user_id
         WHERE 1=1
+        <if test="query.scheduleId != null">
+            AND s.schedule_id = #{query.scheduleId}
+        </if>
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (
+                s.title LIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(s.description, '') LIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(s.location, '') LIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(c.company_name, '') LIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(r.name, '') LIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(ct.name, '') LIKE CONCAT('%', #{query.keyword}, '%')
+            )
+        </if>
         <if test="query.customerId != null">
             AND s.customer_id = #{query.customerId}
+        </if>
+        <if test="query.relationId != null">
+            AND s.relation_id = #{query.relationId}
         </if>
         <if test="query.type != null and query.type != ''">
             AND s.type = #{query.type}
@@ -55,6 +74,8 @@
             s.type,
             s.customer_id,
             c.company_name AS customer_name,
+            s.relation_id,
+            r.name AS relation_name,
             s.contact_id,
             ct.name AS contact_name,
             s.location,
@@ -92,6 +113,7 @@
         SELECT COUNT(*)
         FROM crm_schedule s
         LEFT JOIN crm_customer c ON s.customer_id = c.customer_id
+        LEFT JOIN crm_relation r ON s.relation_id = r.relation_id
         LEFT JOIN crm_contact ct ON s.contact_id = ct.contact_id
         WHERE <include refid="scheduleGlobalSearchConditions"/>
     </select>

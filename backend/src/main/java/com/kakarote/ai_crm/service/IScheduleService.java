@@ -5,6 +5,7 @@ import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.ScheduleAddBO;
 import com.kakarote.ai_crm.entity.BO.ScheduleAiParseBO;
 import com.kakarote.ai_crm.entity.BO.ScheduleQueryBO;
+import com.kakarote.ai_crm.entity.BO.ScheduleUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Schedule;
 import com.kakarote.ai_crm.entity.VO.ScheduleAiParseVO;
 import com.kakarote.ai_crm.entity.VO.ScheduleVO;
@@ -20,6 +21,11 @@ public interface IScheduleService extends IService<Schedule> {
      * 添加日程
      */
     Long addSchedule(ScheduleAddBO scheduleAddBO);
+
+    /**
+     * 更新日程
+     */
+    void updateSchedule(ScheduleUpdateBO scheduleUpdateBO);
 
     /**
      * 删除日程

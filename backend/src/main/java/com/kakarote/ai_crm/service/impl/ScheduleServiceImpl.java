@@ -13,6 +13,7 @@ import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.ScheduleAddBO;
 import com.kakarote.ai_crm.entity.BO.ScheduleAiParseBO;
 import com.kakarote.ai_crm.entity.BO.ScheduleQueryBO;
+import com.kakarote.ai_crm.entity.BO.ScheduleUpdateBO;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.PO.Schedule;
 import com.kakarote.ai_crm.entity.VO.ScheduleAiParseVO;
@@ -85,6 +86,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         schedule.setEndTime(scheduleAddBO.getEndTime());
         schedule.setType(normalizeType(scheduleAddBO.getType()));
         schedule.setCustomerId(scheduleAddBO.getCustomerId());
+        schedule.setRelationId(scheduleAddBO.getRelationId());
         schedule.setContactId(scheduleAddBO.getContactId());
         schedule.setLocation(StrUtil.emptyToNull(StrUtil.trim(scheduleAddBO.getLocation())));
         schedule.setParticipantUserIds(joinParticipantUserIds(scheduleAddBO.getParticipantUserIds()));
@@ -95,6 +97,31 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
 
         save(schedule);
         return schedule.getScheduleId();
+    }
+
+    @Override
+    public void updateSchedule(ScheduleUpdateBO scheduleUpdateBO) {
+        Schedule schedule = getById(scheduleUpdateBO.getScheduleId());
+        if (ObjectUtil.isNull(schedule)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "日程不存在");
+        }
+
+        schedule.setTitle(StrUtil.trim(scheduleUpdateBO.getTitle()));
+        schedule.setDescription(StrUtil.emptyToNull(StrUtil.trim(scheduleUpdateBO.getDescription())));
+        schedule.setStartTime(scheduleUpdateBO.getStartTime());
+        schedule.setEndTime(scheduleUpdateBO.getEndTime());
+        schedule.setType(normalizeType(scheduleUpdateBO.getType()));
+        schedule.setCustomerId(scheduleUpdateBO.getCustomerId());
+        schedule.setRelationId(scheduleUpdateBO.getRelationId());
+        schedule.setContactId(scheduleUpdateBO.getContactId());
+        schedule.setLocation(StrUtil.emptyToNull(StrUtil.trim(scheduleUpdateBO.getLocation())));
+        schedule.setParticipantUserIds(joinParticipantUserIds(scheduleUpdateBO.getParticipantUserIds()));
+
+        if (schedule.getEndTime() != null && schedule.getStartTime() != null && schedule.getEndTime().before(schedule.getStartTime())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "结束时间不能早于开始时间");
+        }
+
+        updateById(schedule);
     }
 
     @Override

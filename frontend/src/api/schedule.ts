@@ -16,6 +16,8 @@ export interface ScheduleVO {
   typeName: string
   customerId: string
   customerName: string
+  relationId?: string
+  relationName?: string
   contactId: string
   contactName: string
   location: string
@@ -33,10 +35,15 @@ export interface ScheduleAddBO {
   endTime?: string
   type?: string
   customerId?: string
+  relationId?: string
   contactId?: string
   location?: string
   description?: string
   participantUserIds?: string[]
+}
+
+export interface ScheduleUpdateBO extends ScheduleAddBO {
+  scheduleId: string
 }
 
 export interface ScheduleAiParseVO {
@@ -58,6 +65,13 @@ export interface ScheduleAiParseVO {
  */
 export function addSchedule(data: ScheduleAddBO): Promise<string> {
   return post('/schedule/add', data)
+}
+
+/**
+ * 更新日程
+ */
+export function updateSchedule(data: ScheduleUpdateBO): Promise<void> {
+  return post('/schedule/update', data)
 }
 
 /**

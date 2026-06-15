@@ -6,6 +6,7 @@ import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.ScheduleAddBO;
 import com.kakarote.ai_crm.entity.BO.ScheduleAiParseBO;
 import com.kakarote.ai_crm.entity.BO.ScheduleQueryBO;
+import com.kakarote.ai_crm.entity.BO.ScheduleUpdateBO;
 import com.kakarote.ai_crm.entity.VO.ScheduleAiParseVO;
 import com.kakarote.ai_crm.entity.VO.ScheduleVO;
 import com.kakarote.ai_crm.service.IScheduleService;
@@ -35,6 +36,14 @@ public class ScheduleController {
     public Result<Long> add(@Valid @RequestBody ScheduleAddBO scheduleAddBO) {
         Long scheduleId = scheduleService.addSchedule(scheduleAddBO);
         return Result.ok(scheduleId);
+    }
+
+    @PostMapping("/update")
+    @Operation(summary = "更新日程")
+    @RequirePermission("schedule:edit")
+    public Result<String> update(@Valid @RequestBody ScheduleUpdateBO scheduleUpdateBO) {
+        scheduleService.updateSchedule(scheduleUpdateBO);
+        return Result.ok();
     }
 
     @PostMapping("/delete/{id}")

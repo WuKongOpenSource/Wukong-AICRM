@@ -786,6 +786,41 @@ COMMENT ON TABLE crm_knowledge_tag IS '知识库标签表';
 -- ============================================
 -- 9. 任务表 (crm_task)
 -- ============================================
+-- ============================================
+-- 8.5 Schedule table (crm_schedule)
+-- ============================================
+DROP TABLE IF EXISTS crm_schedule CASCADE;
+CREATE TABLE crm_schedule (
+    schedule_id BIGINT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP,
+    type VARCHAR(20) DEFAULT 'meeting',
+    customer_id BIGINT,
+    relation_id BIGINT,
+    contact_id BIGINT,
+    location VARCHAR(255),
+    participant_user_ids TEXT,
+    create_user_id BIGINT,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (schedule_id)
+);
+
+CREATE INDEX idx_schedule_start ON crm_schedule(start_time);
+CREATE INDEX idx_schedule_customer ON crm_schedule(customer_id);
+CREATE INDEX idx_schedule_relation ON crm_schedule(relation_id);
+CREATE INDEX idx_schedule_user ON crm_schedule(create_user_id);
+
+CREATE TRIGGER trg_schedule_update_time
+    BEFORE UPDATE ON crm_schedule
+    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+COMMENT ON TABLE crm_schedule IS 'Schedule table';
+COMMENT ON COLUMN crm_schedule.relation_id IS 'Related relation ID';
+COMMENT ON COLUMN crm_schedule.participant_user_ids IS 'Comma-separated participant user IDs';
+
 DROP TABLE IF EXISTS crm_task CASCADE;
 CREATE TABLE crm_task (
     task_id BIGINT NOT NULL,

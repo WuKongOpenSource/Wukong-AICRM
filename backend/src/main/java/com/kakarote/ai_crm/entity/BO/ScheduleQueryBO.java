@@ -16,7 +16,14 @@ import java.util.Date;
 public class ScheduleQueryBO extends PageEntity {
 
     @Schema(description = "关联客户ID")
+    private Long scheduleId;
+
+    private String keyword;
+
     private Long customerId;
+
+    @Schema(description = "关系人ID")
+    private Long relationId;
 
     @Schema(description = "类型")
     private String type;
