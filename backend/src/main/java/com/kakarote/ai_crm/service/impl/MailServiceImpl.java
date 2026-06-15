@@ -438,6 +438,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         if (detail == null) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "邮件不存在或无权限访问");
         }
+        ensureMessageBody(detail);
         detail.setAttachments(mailAttachmentMapper.selectList(new LambdaQueryWrapper<MailAttachment>()
                         .eq(MailAttachment::getMessageId, messageId)
                         .orderByAsc(MailAttachment::getCreateTime))
@@ -445,6 +446,140 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                 .map(this::toAttachmentVO)
                 .toList());
         return detail;
+    }
+
+    /**
+     * 详情打开时按需补全正文：summary/metadata 模式下未存 HTML 原文，
+     * 首次打开时从邮箱服务商按 providerMessageId 拉取单封完整正文并回写缓存。
+     */
+    private void ensureMessageBody(MailMessageVO detail) {
+        if (StrUtil.isNotBlank(detail.getBodyHtml())) {
+            return;
+        }
+        if (!"received".equalsIgnoreCase(detail.getDirection())
+                || StrUtil.isBlank(detail.getProviderMessageId())
+                || BODY_SYNC_FULL.equalsIgnoreCase(detail.getBodySyncStatus())) {
+            return;
+        }
+        MailAccount account = getById(detail.getAccountId());
+        if (account == null) {
+            return;
+        }
+        try {
+            ResolvedBody body = fetchOriginalBody(account, detail.getProviderMessageId());
+            if (body == null || (StrUtil.isBlank(body.text()) && StrUtil.isBlank(body.html()))) {
+                return;
+            }
+
+            String text = StrUtil.maxLength(body.text(), 200_000);
+            String html = StrUtil.maxLength(body.html(), 200_000);
+            MailMessage update = new MailMessage();
+            update.setMessageId(detail.getMessageId());
+            if (StrUtil.isNotBlank(text)) {
+                update.setBodyText(text);
+            }
+            if (StrUtil.isNotBlank(html)) {
+                update.setBodyHtml(html);
+            }
+            update.setBodySyncStatus(BODY_SYNC_FULL);
+            mailMessageMapper.updateById(update);
+
+            if (StrUtil.isNotBlank(text)) {
+                detail.setBodyText(text);
+            }
+            if (StrUtil.isNotBlank(html)) {
+                detail.setBodyHtml(html);
+            }
+            detail.setBodySyncStatus(BODY_SYNC_FULL);
+        } catch (Exception e) {
+            log.warn("按需拉取邮件正文失败: messageId={}, providerMessageId={}, error={}",
+                    detail.getMessageId(), detail.getProviderMessageId(), e.getMessage());
+        }
+    }
+
+    private ResolvedBody fetchOriginalBody(MailAccount account, String providerMessageId) throws Exception {
+        Map<String, Object> credentials = decryptCredentials(account);
+        return switch (account.getProvider()) {
+            case PROVIDER_IMAP -> fetchImapBody(account, credentials, providerMessageId);
+            case PROVIDER_GMAIL -> fetchGmailBody(account, credentials, providerMessageId);
+            case PROVIDER_OUTLOOK -> fetchGraphBody(account, credentials, providerMessageId);
+            default -> null;
+        };
+    }
+
+    private ResolvedBody fetchImapBody(MailAccount account, Map<String, Object> credentials,
+                                       String providerMessageId) throws Exception {
+        int idx = providerMessageId.lastIndexOf(':');
+        if (idx <= 0 || idx >= providerMessageId.length() - 1) {
+            return null;
+        }
+        String folderName = providerMessageId.substring(0, idx);
+        long uid;
+        try {
+            uid = Long.parseLong(providerMessageId.substring(idx + 1));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+
+        String password = asString(credentials.get("password"));
+        Properties props = new Properties();
+        props.put("mail.store.protocol", "imap");
+        props.put("mail.imap.ssl.enable", String.valueOf(Boolean.TRUE.equals(account.getImapSsl())));
+        props.put("mail.imap.connectiontimeout", "15000");
+        props.put("mail.imap.timeout", "30000");
+        Session session = Session.getInstance(props);
+        try (Store store = session.getStore("imap")) {
+            store.connect(account.getImapHost(), resolveImapPort(account.getImapPort()), account.getUsername(), password);
+            Folder folder = store.getFolder(folderName);
+            if (folder == null || !folder.exists() || !(folder instanceof UIDFolder uidFolder)) {
+                return null;
+            }
+            folder.open(Folder.READ_ONLY);
+            try {
+                Message message = uidFolder.getMessageByUID(uid);
+                if (!(message instanceof MimeMessage mimeMessage)) {
+                    return null;
+                }
+                MailMimeParser.ParsedMail parsed = MailMimeParser.parse(mimeMessage);
+                return new ResolvedBody(parsed.text(), parsed.html());
+            } finally {
+                folder.close(false);
+            }
+        }
+    }
+
+    private ResolvedBody fetchGmailBody(MailAccount account, Map<String, Object> credentials,
+                                        String providerMessageId) throws Exception {
+        String accessToken = refreshOAuthIfNeeded(account, credentials);
+        JsonNode detail = getJson("https://gmail.googleapis.com/gmail/v1/users/me/messages/"
+                + providerMessageId + "?format=raw", accessToken);
+        String raw = detail.path("raw").asText();
+        if (StrUtil.isBlank(raw)) {
+            return null;
+        }
+        byte[] rawBytes = Base64.getUrlDecoder().decode(raw);
+        MimeMessage mimeMessage = new MimeMessage(Session.getInstance(new Properties()), new ByteArrayInputStream(rawBytes));
+        MailMimeParser.ParsedMail parsed = MailMimeParser.parse(mimeMessage);
+        return new ResolvedBody(parsed.text(), parsed.html());
+    }
+
+    private ResolvedBody fetchGraphBody(MailAccount account, Map<String, Object> credentials,
+                                        String providerMessageId) throws Exception {
+        String accessToken = refreshOAuthIfNeeded(account, credentials);
+        JsonNode node = getJson("https://graph.microsoft.com/v1.0/me/messages/"
+                + providerMessageId + "?$select=body", accessToken);
+        String bodyContent = node.path("body").path("content").asText(null);
+        String bodyType = node.path("body").path("contentType").asText("");
+        if (StrUtil.isBlank(bodyContent)) {
+            return null;
+        }
+        if ("html".equalsIgnoreCase(bodyType)) {
+            return new ResolvedBody(htmlToText(bodyContent), bodyContent);
+        }
+        return new ResolvedBody(bodyContent, null);
+    }
+
+    private record ResolvedBody(String text, String html) {
     }
 
     @Override
