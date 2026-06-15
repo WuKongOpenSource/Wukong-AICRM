@@ -1,14 +1,20 @@
 <template>
   <Teleport to="body">
     <Transition name="account-settings-overlay">
-      <div v-if="modelValue" class="fixed inset-0 z-[300] flex items-center justify-center p-4 sm:p-6">
+      <div
+        v-if="modelValue"
+        class="fixed inset-0 z-[300] flex"
+        :class="isMobile ? 'items-end justify-center p-0' : 'items-center justify-center p-4 sm:p-6'"
+      >
         <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="handleClose" />
 
         <Transition name="account-settings-panel">
           <div
             v-if="modelValue"
-            class="relative w-full bg-white shadow-2xl overflow-hidden flex flex-col"
-            :class="isMobile ? 'max-w-full max-h-full h-full rounded-none' : 'max-w-2xl max-h-[90vh] rounded-2xl'"
+            class="relative w-full overflow-hidden flex flex-col"
+            :class="isMobile
+              ? 'account-settings-panel--mobile max-h-[min(86dvh,760px)] max-w-[480px] rounded-t-[34px] border border-white/80 bg-white/95 shadow-[0_-18px_60px_rgba(15,23,42,0.18)] backdrop-blur-2xl'
+              : 'max-w-2xl max-h-[90vh] rounded-2xl bg-white shadow-2xl'"
           >
             <div class="bg-white border-b border-slate-200 px-6 md:px-8 py-5 flex items-center justify-between shrink-0">
               <div class="flex items-center gap-4">
@@ -234,7 +240,10 @@
               </div>
             </div>
 
-            <div class="bg-slate-50 border-t border-slate-200 px-6 md:px-8 py-5 flex items-center justify-end shrink-0">
+            <div
+              class="bg-slate-50 border-t border-slate-200 px-6 md:px-8 py-5 flex items-center justify-end shrink-0"
+              :class="isMobile ? 'pb-[calc(1.25rem+var(--wk-safe-bottom))]' : ''"
+            >
               <button
                 class="px-6 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-200 transition-colors"
                 type="button"
@@ -320,6 +329,11 @@ function handleClose() {
 .account-settings-panel-leave-to {
   opacity: 0;
   transform: translateY(20px) scale(0.98);
+}
+
+.account-settings-panel-enter-from.account-settings-panel--mobile,
+.account-settings-panel-leave-to.account-settings-panel--mobile {
+  transform: translateY(100%);
 }
 
 .external-binding-item {
