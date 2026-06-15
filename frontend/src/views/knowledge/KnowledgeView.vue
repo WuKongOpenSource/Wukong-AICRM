@@ -163,6 +163,60 @@
       <!-- Content Grid -->
       <div class="min-h-0 flex-1 overflow-y-auto p-6 md:p-8">
         <div class="mx-auto max-w-7xl">
+          <section
+            v-if="aiSearchLoading || aiSearchResult"
+            class="mb-6 overflow-hidden rounded-2xl border border-primary/10 bg-white shadow-sm"
+          >
+            <div class="border-b border-slate-100 bg-primary/5 px-5 py-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                  <div class="flex size-9 items-center justify-center rounded-xl bg-primary text-white">
+                    <WkIcon name="ai" class="text-lg" />
+                  </div>
+                  <div>
+                    <p class="text-sm font-bold text-slate-900">AI 搜索结果</p>
+                    <p class="text-xs text-slate-500">
+                      {{ aiSearchResult ? `${aiSearchResult.totalHits} 份引用 · 匹配度 ${aiSearchResult.matchPercent}%` : '正在检索知识库...' }}
+                    </p>
+                  </div>
+                </div>
+                <span v-if="aiSearchLoading" class="inline-flex items-center gap-2 text-xs text-primary">
+                  <span class="inline-block size-3 rounded-full border-2 border-primary/30 border-t-primary animate-spin"></span>
+                  分析中
+                </span>
+              </div>
+            </div>
+            <div class="p-5">
+              <div v-if="aiSearchLoading && !aiSearchResult" class="space-y-3">
+                <div class="h-4 w-2/3 rounded bg-slate-100"></div>
+                <div class="h-4 w-full rounded bg-slate-100"></div>
+                <div class="h-4 w-5/6 rounded bg-slate-100"></div>
+              </div>
+              <template v-else-if="aiSearchResult">
+                <div class="wk-markdown text-sm leading-7 text-slate-700" v-html="aiSearchAnswerHtml"></div>
+                <div v-if="aiSearchResult.references.length" class="mt-5 flex flex-wrap gap-3">
+                  <button
+                    v-for="reference in aiSearchResult.references"
+                    :key="'ai-ref-' + reference.knowledgeId"
+                    type="button"
+                    class="max-w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition-all hover:border-primary hover:bg-primary/5"
+                    @click="openKnowledgeById(reference.knowledgeId)"
+                  >
+                    <div class="flex items-center gap-2">
+                      <span class="material-symbols-outlined text-sm text-primary">{{ getTypeIconName(reference.type || '') }}</span>
+                      <span class="max-w-[14rem] truncate text-xs font-bold text-slate-800">{{ reference.name }}</span>
+                    </div>
+                    <div class="mt-2 flex items-center gap-3 text-[11px] text-slate-400">
+                      <span>{{ reference.matchPercent ?? 0 }}%</span>
+                      <span>{{ formatFileSize(reference.fileSize) }}</span>
+                      <span>{{ formatDate(reference.createTime) }}</span>
+                    </div>
+                  </button>
+                </div>
+              </template>
+            </div>
+          </section>
+
           <!-- Section Header -->
           <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
             <div class="flex flex-wrap items-center gap-3">
@@ -664,10 +718,11 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useResponsive } from '@/composables/useResponsive'
-import { queryKnowledgeList, uploadKnowledge, deleteKnowledge, downloadKnowledge, reparseKnowledge } from '@/api/knowledge'
+import { queryKnowledgeList, uploadKnowledge, deleteKnowledge, downloadKnowledge, reparseKnowledge, aiSearchKnowledge } from '@/api/knowledge'
 import { ElMessage, ElMessageBox, UploadInstance, UploadRequestOptions } from 'element-plus'
-import type { Knowledge, KnowledgeQueryBO, KnowledgeType } from '@/types/common'
+import type { Knowledge, KnowledgeAiSearchVO, KnowledgeQueryBO, KnowledgeType } from '@/types/common'
 import KnowledgeDetailModal from '@/components/knowledge/KnowledgeDetailModal.vue'
+import { renderMarkdown } from '@/utils/markdown'
 
 const { isMobile } = useResponsive()
 const route = useRoute()
@@ -678,12 +733,14 @@ const viewMode = ref<'card' | 'list'>(
   (localStorage.getItem('knowledge-view-mode') as 'card' | 'list') || 'card'
 )
 const loading = ref(false)
+const aiSearchLoading = ref(false)
 const uploading = ref(false)
 const showUploadDialog = ref(false)
 const showDetailModal = ref(false)
 const selectedKnowledgeId = ref('')
 const knowledgeList = ref<Knowledge[]>([])
 const totalCount = ref(0)
+const aiSearchResult = ref<KnowledgeAiSearchVO | null>(null)
 const selectedUploadFiles = ref<File[]>([])
 const uploadCompletedCount = ref(0)
 const uploadTotalCount = ref(0)
@@ -727,6 +784,11 @@ const uploadButtonText = computed(() => {
 
 const totalPages = computed(() => Math.ceil(totalCount.value / (queryParams.limit || 12)))
 
+const aiSearchAnswerHtml = computed(() => {
+  if (!aiSearchResult.value?.answer) return ''
+  return renderMarkdown(aiSearchResult.value.answer)
+})
+
 const visiblePages = computed(() => {
   const total = totalPages.value
   const current = queryParams.page || 1
@@ -749,7 +811,7 @@ watch(
   () => [route.query.knowledgeId, route.query.keyword],
   async () => {
     applyRouteQuery()
-    await fetchList()
+    await Promise.all([fetchList(), runAiSearch()])
     openKnowledgeFromRoute()
   }
 )
@@ -773,9 +835,31 @@ async function fetchList() {
   }
 }
 
+async function runAiSearch() {
+  const keyword = queryParams.keyword?.trim()
+  if (!keyword) {
+    aiSearchResult.value = null
+    return
+  }
+
+  aiSearchLoading.value = true
+  try {
+    aiSearchResult.value = await aiSearchKnowledge({
+      keyword,
+      type: queryParams.type,
+      limit: 5
+    })
+  } catch {
+    aiSearchResult.value = null
+  } finally {
+    aiSearchLoading.value = false
+  }
+}
+
 function handleSearch() {
   queryParams.page = 1
   fetchList()
+  runAiSearch()
 }
 
 function handleCategoryFilter(categoryId: string) {
@@ -783,6 +867,7 @@ function handleCategoryFilter(categoryId: string) {
   queryParams.type = categoryId === 'all' ? undefined : categoryId as KnowledgeType
   queryParams.page = 1
   fetchList()
+  runAiSearch()
 }
 
 function handlePageChange(page: number) {
@@ -854,6 +939,11 @@ async function handleConfirmUpload() {
 
 function openDetail(item: Knowledge) {
   selectedKnowledgeId.value = item.knowledgeId
+  showDetailModal.value = true
+}
+
+function openKnowledgeById(knowledgeId: string) {
+  selectedKnowledgeId.value = String(knowledgeId)
   showDetailModal.value = true
 }
 
@@ -1002,7 +1092,8 @@ function formatFileSize(bytes?: number): string {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
-function formatDate(dateStr: string): string {
+function formatDate(dateStr?: string): string {
+  if (!dateStr) return '-'
   return new Date(dateStr).toLocaleDateString('zh-CN')
 }
 
@@ -1055,6 +1146,25 @@ function getParseStatusLabel(status?: string): string {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.wk-markdown :deep(p) {
+  margin: 0 0 0.75rem;
+}
+
+.wk-markdown :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.wk-markdown :deep(ul) {
+  margin: 0.5rem 0 0.75rem;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+
+.wk-markdown :deep(strong) {
+  color: #0f172a;
+  font-weight: 700;
 }
 
 :deep(.el-upload) {

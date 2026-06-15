@@ -1,6 +1,6 @@
 import { post, get, upload, download, getToken, getApiBaseUrl } from '@/utils/request'
 import type { PageResult } from '@/types/api'
-import type { Knowledge, KnowledgeQueryBO, KnowledgeAiAnalyzeVO } from '@/types/common'
+import type { Knowledge, KnowledgeQueryBO, KnowledgeAiAnalyzeVO, KnowledgeAiSearchBO, KnowledgeAiSearchVO } from '@/types/common'
 
 /**
  * Upload file to knowledge base
@@ -31,6 +31,13 @@ export function deleteKnowledge(id: string): Promise<void> {
  */
 export function queryKnowledgeList(query: KnowledgeQueryBO): Promise<PageResult<Knowledge>> {
   return post('/knowledge/queryPageList', query)
+}
+
+/**
+ * AI search knowledge base
+ */
+export function aiSearchKnowledge(query: KnowledgeAiSearchBO): Promise<KnowledgeAiSearchVO> {
+  return post('/knowledge/ai-search', query)
 }
 
 /**

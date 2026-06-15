@@ -7,9 +7,11 @@ import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
+import com.kakarote.ai_crm.entity.BO.KnowledgeAiSearchBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
+import com.kakarote.ai_crm.entity.VO.KnowledgeAiSearchVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
@@ -78,6 +80,13 @@ public class KnowledgeController {
     @RequirePermission("knowledge:view")
     public Result<BasePage<KnowledgeVO>> queryPageList(@RequestBody KnowledgeQueryBO queryBO) {
         return Result.ok(knowledgeService.queryPageList(queryBO));
+    }
+
+    @PostMapping("/ai-search")
+    @Operation(summary = "AI search knowledge base")
+    @RequirePermission("knowledge:view")
+    public Result<KnowledgeAiSearchVO> aiSearch(@RequestBody KnowledgeAiSearchBO searchBO) {
+        return Result.ok(knowledgeService.aiSearch(searchBO));
     }
 
     @GetMapping("/detail/{id}")

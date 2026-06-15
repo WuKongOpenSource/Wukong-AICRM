@@ -86,6 +86,33 @@ export interface KnowledgeQueryBO {
   limit?: number
 }
 
+export interface KnowledgeAiSearchBO {
+  keyword: string
+  type?: KnowledgeType
+  limit?: number
+}
+
+export interface KnowledgeAiSearchReferenceItem {
+  knowledgeId: string
+  name: string
+  type?: KnowledgeType | string
+  customerName?: string
+  summary?: string
+  excerpt?: string
+  matchPercent?: number
+  fileSize?: number
+  createTime?: string
+}
+
+export interface KnowledgeAiSearchVO {
+  keyword: string
+  answer: string
+  tookMs: number
+  matchPercent: number
+  totalHits: number
+  references: KnowledgeAiSearchReferenceItem[]
+}
+
 export interface KnowledgeAiAnalyzeVO {
   coreHighlights: string
   talkingPoints: string[]

@@ -15,12 +15,15 @@ import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
+import com.kakarote.ai_crm.entity.BO.KnowledgeAiSearchBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.PO.KnowledgeTag;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
+import com.kakarote.ai_crm.entity.VO.KnowledgeAiSearchVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
+import com.kakarote.ai_crm.entity.VO.WeKnoraChunk;
 import com.kakarote.ai_crm.entity.VO.WeKnoraKnowledge;
 import com.kakarote.ai_crm.mapper.KnowledgeMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeTagMapper;
@@ -51,7 +54,11 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 知识库服务实现
@@ -84,6 +91,10 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     private DynamicChatClientProvider chatClientProvider;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private static final int DEFAULT_AI_SEARCH_LIMIT = 5;
+    private static final int MAX_AI_SEARCH_LIMIT = 8;
+    private static final int MAX_AI_SEARCH_CONTEXT_LENGTH = 1200;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -228,6 +239,317 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         BasePage<KnowledgeVO> page = queryBO.parse();
         baseMapper.queryPageList(page, queryBO);
         return page;
+    }
+
+    @Override
+    public KnowledgeAiSearchVO aiSearch(KnowledgeAiSearchBO searchBO) {
+        long startedAt = System.currentTimeMillis();
+        String keyword = searchBO == null ? null : StrUtil.trim(searchBO.getKeyword());
+        if (StrUtil.isBlank(keyword)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Search keyword is required");
+        }
+
+        String type = searchBO == null ? null : StrUtil.trimToNull(searchBO.getType());
+        int limit = normalizeAiSearchLimit(searchBO == null ? null : searchBO.getLimit());
+
+        List<KnowledgeAiSearchVO.ReferenceItem> references = buildSemanticReferences(keyword, type, limit);
+        if (references.isEmpty()) {
+            references = buildLocalReferences(keyword, type, limit);
+        }
+
+        KnowledgeAiSearchVO result = new KnowledgeAiSearchVO();
+        result.setKeyword(keyword);
+        result.setReferences(references);
+        result.setTotalHits(references.size());
+        result.setMatchPercent(calculateOverallMatchPercent(references));
+        result.setAnswer(buildAiSearchAnswer(keyword, references));
+        result.setTookMs(System.currentTimeMillis() - startedAt);
+        return result;
+    }
+
+    private int normalizeAiSearchLimit(Integer limit) {
+        if (limit == null || limit <= 0) {
+            return DEFAULT_AI_SEARCH_LIMIT;
+        }
+        return Math.min(limit, MAX_AI_SEARCH_LIMIT);
+    }
+
+    private List<KnowledgeAiSearchVO.ReferenceItem> buildSemanticReferences(String keyword, String type, int limit) {
+        if (!weKnoraClient.isEnabled()) {
+            return List.of();
+        }
+
+        try {
+            List<WeKnoraChunk> chunks = weKnoraClient.searchKnowledge(keyword);
+            if (chunks == null || chunks.isEmpty()) {
+                return List.of();
+            }
+
+            Map<String, SemanticSearchHit> hits = new LinkedHashMap<>();
+            for (WeKnoraChunk chunk : chunks) {
+                if (chunk == null || StrUtil.isBlank(chunk.getKnowledgeId())) {
+                    continue;
+                }
+                SemanticSearchHit hit = hits.computeIfAbsent(chunk.getKnowledgeId(), ignored -> new SemanticSearchHit());
+                if (StrUtil.isBlank(hit.excerpt) && StrUtil.isNotBlank(chunk.getContent())) {
+                    hit.excerpt = chunk.getContent();
+                }
+                if (chunk.getScore() != null && (hit.score == null || chunk.getScore() > hit.score)) {
+                    hit.score = chunk.getScore();
+                }
+            }
+
+            if (hits.isEmpty()) {
+                return List.of();
+            }
+
+            LambdaQueryWrapper<Knowledge> wrapper = new LambdaQueryWrapper<Knowledge>()
+                    .in(Knowledge::getWeKnoraKnowledgeId, hits.keySet())
+                    .ne(Knowledge::getStatus, 2);
+            if (StrUtil.isNotBlank(type)) {
+                wrapper.eq(Knowledge::getType, type);
+            }
+
+            List<Knowledge> knowledges = list(wrapper);
+            if (knowledges.isEmpty()) {
+                return List.of();
+            }
+
+            Map<String, Knowledge> knowledgeByWeKnoraId = new LinkedHashMap<>();
+            for (Knowledge knowledge : knowledges) {
+                if (StrUtil.isNotBlank(knowledge.getWeKnoraKnowledgeId())) {
+                    knowledgeByWeKnoraId.put(knowledge.getWeKnoraKnowledgeId(), knowledge);
+                }
+            }
+
+            Map<Long, String> customerNames = loadCustomerNameMap(knowledges);
+            List<KnowledgeAiSearchVO.ReferenceItem> references = new ArrayList<>();
+            for (Map.Entry<String, SemanticSearchHit> entry : hits.entrySet()) {
+                Knowledge knowledge = knowledgeByWeKnoraId.get(entry.getKey());
+                if (knowledge == null) {
+                    continue;
+                }
+
+                KnowledgeAiSearchVO.ReferenceItem reference = toReferenceItem(
+                        knowledge,
+                        customerNames.get(knowledge.getCustomerId())
+                );
+                SemanticSearchHit hit = entry.getValue();
+                reference.setExcerpt(StrUtil.blankToDefault(abbreviate(hit.excerpt, 360),
+                        extractSnippet(knowledge, keyword)));
+                reference.setMatchPercent(toMatchPercent(hit.score));
+                references.add(reference);
+                if (references.size() >= limit) {
+                    break;
+                }
+            }
+            return references;
+        } catch (Exception e) {
+            log.warn("Knowledge semantic search failed, falling back to local search: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private List<KnowledgeAiSearchVO.ReferenceItem> buildLocalReferences(String keyword, String type, int limit) {
+        LambdaQueryWrapper<Knowledge> wrapper = new LambdaQueryWrapper<Knowledge>()
+                .ne(Knowledge::getStatus, 2)
+                .and(query -> query.like(Knowledge::getName, keyword)
+                        .or()
+                        .like(Knowledge::getSummary, keyword)
+                        .or()
+                        .like(Knowledge::getContentText, keyword))
+                .orderByDesc(Knowledge::getCreateTime)
+                .last("LIMIT " + limit);
+        if (StrUtil.isNotBlank(type)) {
+            wrapper.eq(Knowledge::getType, type);
+        }
+
+        List<Knowledge> knowledges = list(wrapper);
+        if (knowledges.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, String> customerNames = loadCustomerNameMap(knowledges);
+        List<KnowledgeAiSearchVO.ReferenceItem> references = new ArrayList<>();
+        for (Knowledge knowledge : knowledges) {
+            KnowledgeAiSearchVO.ReferenceItem reference = toReferenceItem(
+                    knowledge,
+                    customerNames.get(knowledge.getCustomerId())
+            );
+            reference.setExcerpt(extractSnippet(knowledge, keyword));
+            reference.setMatchPercent(calculateLocalMatchPercent(knowledge, keyword));
+            references.add(reference);
+        }
+        return references;
+    }
+
+    private Map<Long, String> loadCustomerNameMap(List<Knowledge> knowledges) {
+        Set<Long> customerIds = new LinkedHashSet<>();
+        for (Knowledge knowledge : knowledges) {
+            if (knowledge.getCustomerId() != null) {
+                customerIds.add(knowledge.getCustomerId());
+            }
+        }
+        if (customerIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, String> names = new LinkedHashMap<>();
+        List<Customer> customers = customerMapper.selectBatchIds(customerIds);
+        for (Customer customer : customers) {
+            names.put(customer.getCustomerId(), customer.getCompanyName());
+        }
+        return names;
+    }
+
+    private KnowledgeAiSearchVO.ReferenceItem toReferenceItem(Knowledge knowledge, String customerName) {
+        KnowledgeAiSearchVO.ReferenceItem reference = new KnowledgeAiSearchVO.ReferenceItem();
+        reference.setKnowledgeId(knowledge.getKnowledgeId());
+        reference.setName(knowledge.getName());
+        reference.setType(knowledge.getType());
+        reference.setCustomerName(customerName);
+        reference.setSummary(StrUtil.trimToNull(knowledge.getSummary()));
+        reference.setFileSize(knowledge.getFileSize());
+        reference.setCreateTime(knowledge.getCreateTime());
+        return reference;
+    }
+
+    private String buildAiSearchAnswer(String keyword, List<KnowledgeAiSearchVO.ReferenceItem> references) {
+        if (references.isEmpty()) {
+            return "未找到与「" + keyword + "」相关的知识库内容。请尝试更换关键词，或先上传并解析相关文档。";
+        }
+        if (!chatClientProvider.isApiKeyConfigured()) {
+            return buildFallbackAiSearchAnswer(keyword, references);
+        }
+
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("You are a CRM knowledge assistant. Answer in Simplified Chinese.\n");
+        prompt.append("Use only the reference documents below. If evidence is insufficient, say so clearly.\n\n");
+        prompt.append("Question: ").append(keyword).append("\n\n");
+        prompt.append("References:\n");
+        for (int i = 0; i < references.size(); i++) {
+            KnowledgeAiSearchVO.ReferenceItem reference = references.get(i);
+            prompt.append(i + 1)
+                    .append(". Title: ").append(StrUtil.blankToDefault(reference.getName(), "-"))
+                    .append("\n   Type: ").append(StrUtil.blankToDefault(reference.getType(), "-"))
+                    .append("\n   Customer: ").append(StrUtil.blankToDefault(reference.getCustomerName(), "-"))
+                    .append("\n   Summary: ").append(StrUtil.blankToDefault(reference.getSummary(), "-"))
+                    .append("\n   Excerpt: ").append(StrUtil.blankToDefault(
+                            abbreviate(reference.getExcerpt(), MAX_AI_SEARCH_CONTEXT_LENGTH), "-"))
+                    .append("\n");
+        }
+        prompt.append("\nReturn a concise answer with key points and mention the most relevant documents.");
+
+        try {
+            String answer = chatClientProvider.getChatClient()
+                    .prompt()
+                    .user(prompt.toString())
+                    .call()
+                    .content();
+            if (StrUtil.isNotBlank(answer)) {
+                return answer.trim();
+            }
+        } catch (Exception e) {
+            log.warn("Knowledge AI search answer generation failed: {}", e.getMessage());
+        }
+        return buildFallbackAiSearchAnswer(keyword, references);
+    }
+
+    private String buildFallbackAiSearchAnswer(String keyword, List<KnowledgeAiSearchVO.ReferenceItem> references) {
+        StringBuilder answer = new StringBuilder();
+        answer.append("已找到 ").append(references.size()).append(" 份与「").append(keyword).append("」相关的知识资料。\n\n");
+        for (KnowledgeAiSearchVO.ReferenceItem reference : references) {
+            answer.append("- **").append(StrUtil.blankToDefault(reference.getName(), "未命名文档")).append("**");
+            if (reference.getMatchPercent() != null) {
+                answer.append("，匹配度 ").append(reference.getMatchPercent()).append("%");
+            }
+            String detail = StrUtil.firstNonBlank(reference.getSummary(), reference.getExcerpt());
+            if (StrUtil.isNotBlank(detail)) {
+                answer.append("：").append(abbreviate(detail, 160));
+            }
+            answer.append("\n");
+        }
+        answer.append("\n配置自建 AI Key 后，可以获得更完整的归纳和建议。");
+        return answer.toString();
+    }
+
+    private String extractSnippet(Knowledge knowledge, String keyword) {
+        String source = StrUtil.firstNonBlank(knowledge.getContentText(), knowledge.getSummary(), knowledge.getName());
+        String normalized = normalizeSearchableContent(source);
+        if (StrUtil.isBlank(normalized)) {
+            return null;
+        }
+
+        String lowerSource = normalized.toLowerCase();
+        String lowerKeyword = keyword.toLowerCase();
+        int index = lowerSource.indexOf(lowerKeyword);
+        if (index < 0) {
+            return abbreviate(normalized, 260);
+        }
+
+        int start = Math.max(0, index - 80);
+        int end = Math.min(normalized.length(), index + lowerKeyword.length() + 180);
+        String snippet = normalized.substring(start, end);
+        if (start > 0) {
+            snippet = "..." + snippet;
+        }
+        if (end < normalized.length()) {
+            snippet = snippet + "...";
+        }
+        return snippet;
+    }
+
+    private int calculateLocalMatchPercent(Knowledge knowledge, String keyword) {
+        String lowerKeyword = keyword.toLowerCase();
+        int score = 40;
+        if (StrUtil.blankToDefault(knowledge.getName(), "").toLowerCase().contains(lowerKeyword)) {
+            score += 35;
+        }
+        if (StrUtil.blankToDefault(knowledge.getSummary(), "").toLowerCase().contains(lowerKeyword)) {
+            score += 20;
+        }
+        if (StrUtil.blankToDefault(knowledge.getContentText(), "").toLowerCase().contains(lowerKeyword)) {
+            score += 15;
+        }
+        return Math.min(score, 98);
+    }
+
+    private int calculateOverallMatchPercent(List<KnowledgeAiSearchVO.ReferenceItem> references) {
+        if (references.isEmpty()) {
+            return 0;
+        }
+        int sum = 0;
+        int count = 0;
+        for (KnowledgeAiSearchVO.ReferenceItem reference : references) {
+            if (reference.getMatchPercent() != null) {
+                sum += reference.getMatchPercent();
+                count += 1;
+            }
+        }
+        return count == 0 ? 0 : Math.round((float) sum / count);
+    }
+
+    private int toMatchPercent(Double score) {
+        if (score == null) {
+            return 86;
+        }
+        double normalized = score <= 1 ? score * 100 : score;
+        return (int) Math.max(30, Math.min(99, Math.round(normalized)));
+    }
+
+    private String normalizeSearchableContent(String text) {
+        if (StrUtil.isBlank(text)) {
+            return "";
+        }
+        return text.replaceAll("\\s+", " ").trim();
+    }
+
+    private String abbreviate(String text, int maxLength) {
+        String normalized = normalizeSearchableContent(text);
+        if (normalized.length() <= maxLength) {
+            return normalized;
+        }
+        return normalized.substring(0, Math.max(0, maxLength - 3)) + "...";
     }
 
     @Override
@@ -574,5 +896,10 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
                     log.error("文档问答错误: {}", error.getMessage(), error);
                     AiContextHolder.clear();
                 });
+    }
+
+    private static final class SemanticSearchHit {
+        private String excerpt;
+        private Double score;
     }
 }
