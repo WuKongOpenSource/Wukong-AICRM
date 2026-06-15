@@ -871,8 +871,10 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         writer.writeHeadRow(headers);
 
         // 列索引常量
-        final int CUSTOMER_COL_END = 8;
-        final int CUSTOM_FIELD_COL_START = 14;
+        final int CONTACT_COL_START = headers.indexOf("联系人姓名");
+        final int CONTACT_COL_END = headers.indexOf("联系人微信");
+        final int CUSTOMER_COL_END = CONTACT_COL_START - 1;
+        final int CUSTOM_FIELD_COL_START = CONTACT_COL_END + 1;
         final int CUSTOM_FIELD_COL_END = headers.size() - 1;
 
         // 5. 写数据行，记录多联系人客户的行范围
@@ -908,12 +910,12 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 int firstRow = range[0];
                 int lastRow = firstRow + range[1] - 1;
 
-                // 合并客户列 (0-8)
+                // 合并客户列
                 for (int col = 0; col <= CUSTOMER_COL_END; col++) {
                     exportSheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, col, col));
                     applyCenteredStyle(exportSheet, wb, firstRow, col);
                 }
-                // 合并自定义字段列 (14+)
+                // 合并自定义字段列，联系人列保持逐行展示
                 for (int col = CUSTOM_FIELD_COL_START; col <= CUSTOM_FIELD_COL_END; col++) {
                     exportSheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, col, col));
                     applyCenteredStyle(exportSheet, wb, firstRow, col);
