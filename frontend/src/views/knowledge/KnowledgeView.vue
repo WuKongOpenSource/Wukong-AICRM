@@ -29,6 +29,7 @@
           :show-file-list="false"
           :before-upload="handleBeforeUpload"
           :http-request="handleUpload"
+          multiple
           accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md"
         >
           <button
@@ -203,6 +204,7 @@
                 :show-file-list="false"
                 :before-upload="handleBeforeUpload"
                 :http-request="handleUpload"
+                multiple
                 accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md"
               >
                 <button class="flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-lg">
@@ -556,30 +558,53 @@
               :http-request="handleUpload"
               :disabled="uploading"
               drag
+              multiple
               accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md"
             >
               <div
                 class="rounded-[2rem] border-2 border-dashed border-slate-200 bg-white p-8 md:p-10 text-center transition-all hover:border-primary hover:bg-primary/5"
               >
-                <template v-if="uploadingFile">
-                  <div class="mx-auto flex max-w-xl items-center gap-4 rounded-2xl bg-slate-900 p-4 text-left">
-                    <div class="size-10 rounded-xl bg-white/10 flex items-center justify-center text-white shrink-0">
-                      <span class="material-symbols-outlined text-lg">
-                        {{
-                          uploadingFile?.name?.toLowerCase().endsWith('.pdf')
-                            ? 'picture_as_pdf'
-                            : uploadingFile?.name?.toLowerCase().endsWith('.ppt') || uploadingFile?.name?.toLowerCase().endsWith('.pptx')
-                              ? 'slideshow'
-                              : 'description'
-                        }}
-                      </span>
+                <template v-if="selectedUploadFiles.length">
+                  <div class="mx-auto max-w-xl rounded-2xl bg-slate-900 p-4 text-left">
+                    <div class="flex items-center gap-4">
+                      <div class="size-10 rounded-xl bg-white/10 flex items-center justify-center text-white shrink-0">
+                        <span class="material-symbols-outlined text-lg">
+                          {{ getSelectedFileIcon(selectedUploadFiles[0].name) }}
+                        </span>
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-white truncate">已选择 {{ selectedUploadFiles.length }} 个文件</p>
+                        <p class="text-xs text-slate-300 mt-0.5">
+                          总大小 {{ selectedUploadTotalSizeText }}
+                        </p>
+                        <p class="text-xs text-slate-400 mt-2">点击继续添加文件，或拖拽更多文件到此处</p>
+                      </div>
                     </div>
-                    <div class="min-w-0 flex-1">
-                      <p class="text-sm font-bold text-white truncate">{{ uploadingFile.name }}</p>
-                      <p class="text-xs text-slate-300 mt-0.5">
-                        {{ `${(uploadingFile.size / 1024 / 1024).toFixed(2)} MB` }}
-                      </p>
-                      <p class="text-xs text-slate-400 mt-2">点击更换文件，或拖拽新文件到此处</p>
+                    <div class="mt-4 max-h-48 space-y-2 overflow-y-auto pr-1">
+                      <div
+                        v-for="file in selectedUploadFiles"
+                        :key="getFileKey(file)"
+                        class="flex items-center gap-3 rounded-xl bg-white/10 px-3 py-2"
+                      >
+                        <div class="size-8 rounded-lg bg-white/10 flex items-center justify-center text-white shrink-0">
+                          <span class="material-symbols-outlined text-base">
+                            {{ getSelectedFileIcon(file.name) }}
+                          </span>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <p class="text-xs font-bold text-white truncate">{{ file.name }}</p>
+                          <p class="text-[11px] text-slate-300 mt-0.5">{{ formatFileSize(file.size) }}</p>
+                        </div>
+                        <button
+                          type="button"
+                          class="flex size-7 shrink-0 items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                          :disabled="uploading"
+                          aria-label="移除文件"
+                          @click.stop="removeSelectedUploadFile(file)"
+                        >
+                          <span class="material-symbols-outlined text-base">close</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </template>
@@ -618,12 +643,12 @@
           </button>
           <button
             class="flex-1 py-3.5 bg-primary text-white rounded-2xl font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 text-sm disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed"
-            :disabled="uploading || !uploadingFile"
+            :disabled="uploading || selectedUploadFiles.length === 0"
             @click="handleConfirmUpload"
           >
             <span class="inline-flex items-center justify-center gap-2">
               <span v-if="uploading" class="inline-block size-4 rounded-full border-2 border-white/60 border-t-transparent animate-spin"></span>
-              {{ uploading ? '上传中...' : '开始解析' }}
+              {{ uploadButtonText }}
             </span>
           </button>
         </div>
@@ -659,7 +684,9 @@ const showDetailModal = ref(false)
 const selectedKnowledgeId = ref('')
 const knowledgeList = ref<Knowledge[]>([])
 const totalCount = ref(0)
-const uploadingFile = ref<File | null>(null)
+const selectedUploadFiles = ref<File[]>([])
+const uploadCompletedCount = ref(0)
+const uploadTotalCount = ref(0)
 const uploadRef = ref<UploadInstance>()
 const selectedCategory = ref('all')
 
@@ -683,6 +710,19 @@ const queryParams = reactive<KnowledgeQueryBO>({
 const uploadForm = reactive({
   type: 'document',
   summary: ''
+})
+
+const selectedUploadTotalSizeText = computed(() =>
+  formatFileSize(selectedUploadFiles.value.reduce((total, file) => total + file.size, 0))
+)
+
+const uploadButtonText = computed(() => {
+  if (!uploading.value) return '开始解析'
+  if (uploadTotalCount.value > 1) {
+    const current = Math.min(uploadCompletedCount.value + 1, uploadTotalCount.value)
+    return `上传中 ${current}/${uploadTotalCount.value}`
+  }
+  return '上传中...'
 })
 
 const totalPages = computed(() => Math.ceil(totalCount.value / (queryParams.limit || 12)))
@@ -714,6 +754,14 @@ watch(
   }
 )
 
+watch(showUploadDialog, (visible) => {
+  if (!visible && !uploading.value) {
+    selectedUploadFiles.value = []
+    uploadForm.type = 'document'
+    uploadForm.summary = ''
+  }
+})
+
 async function fetchList() {
   loading.value = true
   try {
@@ -744,7 +792,7 @@ function handlePageChange(page: number) {
 }
 
 function handleBeforeUpload(file: File) {
-  uploadingFile.value = file
+  selectedUploadFiles.value = appendUniqueFiles(selectedUploadFiles.value, [file])
   showUploadDialog.value = true
   return false
 }
@@ -754,24 +802,53 @@ function handleUpload(_options: UploadRequestOptions) {
 }
 
 async function handleConfirmUpload() {
-  if (!uploadingFile.value) return
+  if (selectedUploadFiles.value.length === 0) return
 
   uploading.value = true
+  uploadCompletedCount.value = 0
+  uploadTotalCount.value = selectedUploadFiles.value.length
+  const failedFiles: File[] = []
+  let successCount = 0
+
   try {
-    await uploadKnowledge(
-      uploadingFile.value,
-      uploadForm.type,
-      undefined,
-      uploadForm.summary
-    )
-    ElMessage.success('上传成功')
-    showUploadDialog.value = false
-    uploadingFile.value = null
-    uploadForm.type = 'document'
-    uploadForm.summary = ''
-    fetchList()
+    for (const file of selectedUploadFiles.value) {
+      try {
+        await uploadKnowledge(
+          file,
+          uploadForm.type,
+          undefined,
+          uploadForm.summary
+        )
+        successCount += 1
+      } catch {
+        failedFiles.push(file)
+      } finally {
+        uploadCompletedCount.value += 1
+      }
+    }
+
+    if (successCount > 0) {
+      await fetchList()
+    }
+
+    if (failedFiles.length === 0) {
+      ElMessage.success(successCount > 1 ? `成功上传 ${successCount} 个文件` : '上传成功')
+      showUploadDialog.value = false
+      selectedUploadFiles.value = []
+      uploadForm.type = 'document'
+      uploadForm.summary = ''
+    } else {
+      selectedUploadFiles.value = failedFiles
+      if (successCount > 0) {
+        ElMessage.warning(`成功上传 ${successCount} 个文件，${failedFiles.length} 个文件上传失败`)
+      } else {
+        ElMessage.error('文件上传失败，请重试')
+      }
+    }
   } finally {
     uploading.value = false
+    uploadCompletedCount.value = 0
+    uploadTotalCount.value = 0
   }
 }
 
@@ -888,8 +965,38 @@ function getTypeLabel(type: string): string {
   return labels[type] || '文档'
 }
 
+function getSelectedFileIcon(fileName: string): string {
+  const normalized = fileName.toLowerCase()
+  if (normalized.endsWith('.pdf')) return 'picture_as_pdf'
+  if (normalized.endsWith('.ppt') || normalized.endsWith('.pptx')) return 'slideshow'
+  if (normalized.endsWith('.xls') || normalized.endsWith('.xlsx')) return 'table_chart'
+  return 'description'
+}
+
+function removeSelectedUploadFile(file: File) {
+  if (uploading.value) return
+  const key = getFileKey(file)
+  selectedUploadFiles.value = selectedUploadFiles.value.filter(item => getFileKey(item) !== key)
+}
+
+function appendUniqueFiles(current: File[], files: File[]) {
+  const keys = new Set(current.map(getFileKey))
+  const next = [...current]
+  for (const file of files) {
+    const key = getFileKey(file)
+    if (keys.has(key)) continue
+    keys.add(key)
+    next.push(file)
+  }
+  return next
+}
+
+function getFileKey(file: File) {
+  return `${file.name}-${file.size}-${file.lastModified}`
+}
+
 function formatFileSize(bytes?: number): string {
-  if (!bytes) return '未知'
+  if (bytes == null) return '未知'
   if (bytes < 1024) return bytes + ' B'
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
