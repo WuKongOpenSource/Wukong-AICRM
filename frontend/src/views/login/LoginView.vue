@@ -62,7 +62,7 @@
         </section>
 
         <section class="auth-form-panel">
-          <div class="auth-form-scroll">
+          <div ref="formScrollRef" class="auth-form-scroll">
             <div class="auth-form-content auth-form-content--with-fixed-consent">
               <div class="mb-8 flex items-center justify-center gap-3 lg:hidden">
                 <img
@@ -73,142 +73,154 @@
                 <span class="text-[1.5rem] font-bold text-slate-900">悟空AI CRM</span>
               </div>
 
-              <div class="mb-10">
-                <h2 class="mb-2 text-2xl font-bold text-slate-900">欢迎回来</h2>
-                <p class="text-sm text-slate-500">请输入您的账号信息以登录系统</p>
-              </div>
-
-              <el-form
-                ref="loginFormRef"
-                :model="loginForm"
-                :rules="loginRules"
-                class="auth-form space-y-5"
-                label-position="top"
-                hide-required-asterisk
-                @submit.prevent="handleLogin"
+              <div
+                ref="stageRef"
+                class="auth-form-stage"
+                :class="{ 'auth-form-stage--instant-height': prefersInstantStageHeight }"
               >
-                <el-form-item prop="username">
-                  <template #label>
-                    <span class="label-upper">用户名</span>
-                  </template>
-                  <el-input
-                    v-model="loginForm.username"
-                    size="large"
-                    placeholder="请输入用户名"
-                    class="auth-el-input"
-                  >
-                    <template #prefix>
-                      <el-icon class="text-slate-400"><User /></el-icon>
-                    </template>
-                  </el-input>
-                </el-form-item>
+                <div
+                  ref="loginLayerRef"
+                  class="auth-form-layer auth-form-layer--active"
+                  aria-hidden="false"
+                >
+                  <div class="mb-10">
+                    <h2 class="mb-2 text-2xl font-bold text-slate-900">欢迎回来</h2>
+                    <p class="text-sm text-slate-500">请输入您的账号信息以登录系统</p>
+                  </div>
 
-                <el-form-item prop="password">
-                  <template #label>
-                    <span class="label-upper">密码</span>
-                  </template>
-                  <el-input
-                    v-model="loginForm.password"
-                    type="password"
-                    size="large"
-                    placeholder="请输入密码"
-                    show-password
-                    class="auth-el-input"
-                    @keyup.enter="handleLogin"
+                  <el-form
+                    ref="loginFormRef"
+                    :model="loginForm"
+                    :rules="loginRules"
+                    class="auth-form space-y-5"
+                    label-position="top"
+                    hide-required-asterisk
+                    @submit.prevent="handleLogin"
                   >
-                    <template #prefix>
-                      <el-icon class="text-slate-400"><Lock /></el-icon>
-                    </template>
-                  </el-input>
-                </el-form-item>
+                    <el-form-item prop="username">
+                      <template #label>
+                        <span class="label-upper">用户名</span>
+                      </template>
+                      <el-input
+                        v-model="loginForm.username"
+                        size="large"
+                        placeholder="请输入用户名"
+                        class="auth-el-input"
+                      >
+                        <template #prefix>
+                          <el-icon class="text-slate-400"><User /></el-icon>
+                        </template>
+                      </el-input>
+                    </el-form-item>
 
-                <div class="desktop-agreement-consent">
-                  <label class="desktop-agreement-consent__check">
-                    <input
-                      v-model="agreementAccepted"
-                      type="checkbox"
-                      aria-label="同意用户协议和隐私声明"
-                    />
-                    <span class="desktop-agreement-consent__box" aria-hidden="true">
-                      <el-icon v-if="agreementAccepted" :size="13"><Check /></el-icon>
-                    </span>
-                  </label>
-                  <p class="desktop-agreement-consent__text">
-                    我已阅读并同意
-                    <a :href="userAgreementHref">《用户协议》</a>
-                    和
-                    <a :href="privacyPolicyHref">《隐私声明》</a>
+                    <el-form-item prop="password">
+                      <template #label>
+                        <span class="label-upper">密码</span>
+                      </template>
+                      <el-input
+                        v-model="loginForm.password"
+                        type="password"
+                        size="large"
+                        placeholder="请输入密码"
+                        show-password
+                        class="auth-el-input"
+                        @keyup.enter="handleLogin"
+                      >
+                        <template #prefix>
+                          <el-icon class="text-slate-400"><Lock /></el-icon>
+                        </template>
+                      </el-input>
+                    </el-form-item>
+
+                    <div class="desktop-agreement-consent">
+                      <label class="desktop-agreement-consent__check">
+                        <input
+                          v-model="agreementAccepted"
+                          type="checkbox"
+                          aria-label="同意用户协议和隐私声明"
+                        />
+                        <span class="desktop-agreement-consent__box" aria-hidden="true">
+                          <el-icon v-if="agreementAccepted" :size="13"><Check /></el-icon>
+                        </span>
+                      </label>
+                      <p class="desktop-agreement-consent__text">
+                        我已阅读并同意
+                        <a :href="userAgreementHref">《用户协议》</a>
+                        和
+                        <a :href="privacyPolicyHref">《隐私声明》</a>
+                      </p>
+                    </div>
+
+                    <el-form-item class="!mb-0">
+                      <button
+                        type="submit"
+                        class="auth-login-submit group flex w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[1rem] font-bold text-white transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                        :disabled="loading"
+                      >
+                        <span
+                          v-if="loading"
+                          class="inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                        />
+                        <template v-else>
+                          立即登录
+                          <el-icon class="transition-transform group-hover:translate-x-1"><Right /></el-icon>
+                        </template>
+                      </button>
+                    </el-form-item>
+                  </el-form>
+
+                  <div v-if="enabledExternalProviders.length" class="external-auth-panel">
+                    <div class="external-auth-divider">
+                      <span>第三方登录</span>
+                    </div>
+                    <div class="external-auth-grid">
+                      <button
+                        v-for="provider in enabledExternalProviders"
+                        :key="provider.provider"
+                        type="button"
+                        class="external-auth-btn"
+                        :disabled="externalLoadingProvider === provider.provider"
+                        @click="startExternalLogin(provider.provider)"
+                      >
+                        <span class="external-auth-btn__icon" aria-hidden="true">
+                          <svg
+                            v-if="provider.provider === 'google'"
+                            viewBox="0 0 24 24"
+                            focusable="false"
+                          >
+                            <path
+                              fill="#4285f4"
+                              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                            />
+                            <path
+                              fill="#34a853"
+                              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C4 20.53 7.7 23 12 23z"
+                            />
+                            <path
+                              fill="#fbbc05"
+                              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                            />
+                            <path
+                              fill="#ea4335"
+                              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 4 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                            />
+                          </svg>
+                          <span v-else class="external-auth-btn__fallback">{{ providerMark(provider.provider) }}</span>
+                        </span>
+                        <span>{{ providerDisplayName(provider) }}</span>
+                        <span
+                          v-if="externalLoadingProvider === provider.provider"
+                          class="size-4 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-primary"
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  <p class="mt-5 text-center text-xs font-medium text-slate-400">
+                    测试账号: admin / 123456a
                   </p>
                 </div>
-
-                <el-form-item class="!mb-0">
-                  <button
-                    type="submit"
-                    class="auth-login-submit group flex w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[1rem] font-bold text-white transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="loading"
-                  >
-                    <span
-                      v-if="loading"
-                      class="inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-white"
-                    />
-                    <template v-else>
-                      立即登录
-                      <el-icon class="transition-transform group-hover:translate-x-1"><Right /></el-icon>
-                    </template>
-                  </button>
-                </el-form-item>
-              </el-form>
-
-              <div v-if="enabledExternalProviders.length" class="external-auth-panel">
-                <div class="external-auth-divider">
-                  <span>第三方登录</span>
-                </div>
-                <div class="external-auth-grid">
-                  <button
-                    v-for="provider in enabledExternalProviders"
-                    :key="provider.provider"
-                    type="button"
-                    class="external-auth-btn"
-                    :disabled="externalLoadingProvider === provider.provider"
-                    @click="startExternalLogin(provider.provider)"
-                  >
-                    <span class="external-auth-btn__icon" aria-hidden="true">
-                      <svg
-                        v-if="provider.provider === 'google'"
-                        viewBox="0 0 24 24"
-                        focusable="false"
-                      >
-                        <path
-                          fill="#4285f4"
-                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                        />
-                        <path
-                          fill="#34a853"
-                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C4 20.53 7.7 23 12 23z"
-                        />
-                        <path
-                          fill="#fbbc05"
-                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                        />
-                        <path
-                          fill="#ea4335"
-                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 4 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                        />
-                      </svg>
-                      <span v-else class="external-auth-btn__fallback">{{ providerMark(provider.provider) }}</span>
-                    </span>
-                    <span>{{ providerDisplayName(provider) }}</span>
-                    <span
-                      v-if="externalLoadingProvider === provider.provider"
-                      class="size-4 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-primary"
-                    />
-                  </button>
-                </div>
               </div>
-
-              <p class="mt-5 text-center text-xs font-medium text-slate-400">
-                测试账号: admin / 123456a
-              </p>
             </div>
           </div>
         </section>
@@ -289,7 +301,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Check, CircleCheck, Lock, MagicStick, Right, User } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -313,6 +325,9 @@ const loginFormRef = ref<FormInstance>()
 const loading = ref(false)
 const showCaptchaDialog = ref(false)
 const showAgreementDialog = ref(false)
+const formScrollRef = ref<HTMLElement>()
+const stageRef = ref<HTMLElement>()
+const loginLayerRef = ref<HTMLElement>()
 const externalProviders = ref<ExternalAuthProvider[]>([])
 const externalLoadingProvider = ref<ExternalAuthProviderCode | ''>('')
 const externalLoginTicketProcessing = ref(false)
@@ -320,6 +335,7 @@ const externalLoginTicketProcessing = ref(false)
 const LAST_LOGIN_USERNAME_STORAGE_KEY = 'wk_ai_crm:last_login_username:v1'
 const AGREEMENT_ACCEPTED_STORAGE_KEY = 'wk_ai_crm:agreement_accepted:v1'
 const AGREEMENT_DIALOG_QUERY_KEY = 'agreementDialog'
+const prefersInstantStageHeight = prefersReducedMotion() || isWebKitWithoutChromium()
 
 const loginForm = reactive({
   username: readLastLoginUsername(),
@@ -360,11 +376,24 @@ onMounted(async () => {
   if (!handledExternalAuth) {
     await loadExternalProviders()
   }
+  await syncStageHeight(false)
+  window.addEventListener('resize', snapStageHeightForResize)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', snapStageHeightForResize)
 })
 
 watch(agreementAccepted, (accepted) => {
   persistAgreementAccepted(accepted)
 })
+
+watch(
+  () => enabledExternalProviders.value.length,
+  async () => {
+    await syncStageHeight(true)
+  }
+)
 
 function readLastLoginUsername(): string {
   if (typeof window === 'undefined') return ''
@@ -401,6 +430,59 @@ function persistAgreementAccepted(accepted: boolean) {
   } catch {
     // Ignore storage failures.
   }
+}
+
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+function isWebKitWithoutChromium(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  return /AppleWebKit/i.test(ua) && !/Chrome|Chromium|Edg\//i.test(ua)
+}
+
+function measureActiveLayerHeight(): number {
+  const el = loginLayerRef.value
+  if (!el) return 0
+  return Math.ceil(el.scrollHeight)
+}
+
+async function syncStageHeight(animate: boolean) {
+  await nextTick()
+  await nextTick()
+  const stage = stageRef.value
+  if (!stage) return
+  const next = measureActiveLayerHeight()
+  if (next <= 0) return
+
+  if (!animate || prefersInstantStageHeight) {
+    stage.style.height = `${next}px`
+    return
+  }
+
+  const current = stage.getBoundingClientRect().height
+  const from = current > 0 ? current : next
+  stage.style.height = `${from}px`
+  void stage.offsetHeight
+  stage.style.height = `${next}px`
+  formScrollRef.value?.scrollTo({
+    top: 0,
+    behavior: prefersInstantStageHeight ? 'auto' : 'smooth'
+  })
+}
+
+function snapStageHeightForResize() {
+  const stage = stageRef.value
+  if (!stage) return
+  const h = measureActiveLayerHeight()
+  if (h <= 0) return
+  const prevTransition = stage.style.transition
+  stage.style.transition = 'none'
+  stage.style.height = `${h}px`
+  void stage.offsetHeight
+  stage.style.transition = prevTransition
 }
 
 function isSupportedExternalProvider(provider: ExternalAuthProvider): boolean {
@@ -729,6 +811,58 @@ async function completeLoginRedirect(redirectValue: unknown) {
   width: min(100%, 456px);
   margin: 0 auto;
   padding: 2rem 1.5rem;
+}
+
+.auth-form-stage {
+  position: relative;
+  width: 100%;
+  min-height: 200px;
+  overflow: hidden;
+  transition: height 0.52s cubic-bezier(0.25, 0.46, 0.45, 1);
+}
+
+.auth-form-stage--instant-height {
+  transition: none;
+}
+
+.auth-form-layer {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  right: 0;
+  top: 0;
+  width: 100%;
+  opacity: 0;
+  pointer-events: none;
+  backface-visibility: hidden;
+  isolation: isolate;
+  transform: translate3d(0, 6px, 0);
+  transition:
+    opacity 0.2s cubic-bezier(0.4, 0, 0.85, 1),
+    transform 0.24s cubic-bezier(0.4, 0, 0.85, 1);
+}
+
+.auth-form-layer--active {
+  z-index: 1;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0);
+  transition:
+    opacity 0.4s cubic-bezier(0.22, 0.61, 0.36, 1) 0.12s,
+    transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1) 0.12s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-form-stage,
+  .auth-form-stage--instant-height {
+    transition: none;
+  }
+
+  .auth-form-layer,
+  .auth-form-layer--active {
+    transform: none;
+    transition: none;
+  }
 }
 
 .label-upper {
