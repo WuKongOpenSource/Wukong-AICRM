@@ -87,10 +87,6 @@ export function getKnowledgeFileBlob(id: string): Promise<Blob> {
   return get(`/knowledge/download/${id}`, { responseType: 'blob' })
 }
 
-export function getKnowledgePreview(id: string): Promise<Blob> {
-  return getKnowledgeFileBlob(id)
-}
-
 /**
  * Create a short-lived Range preview URL for audio/video files
  */
