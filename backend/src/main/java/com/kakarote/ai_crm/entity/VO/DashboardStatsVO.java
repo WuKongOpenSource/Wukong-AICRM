@@ -28,12 +28,6 @@ public class DashboardStatsVO {
     @Schema(description = "本月跟进次数")
     private Long followUpsThisMonth;
 
-    @Schema(description = "总合同金额")
-    private BigDecimal totalContractAmount;
-
-    @Schema(description = "总收入金额")
-    private BigDecimal totalRevenue;
-
     @Schema(description = "按阶段统计")
     private List<StageCountVO> customersByStage;
 

@@ -35,23 +35,11 @@ public class CustomerAiSearchQueryVO {
     @Schema(description = "客户来源")
     private String source;
 
-    @Schema(description = "报价金额下限")
+    @Schema(description = "预计成交金额下限")
     private BigDecimal quotationMin;
 
-    @Schema(description = "报价金额上限")
+    @Schema(description = "预计成交金额上限")
     private BigDecimal quotationMax;
-
-    @Schema(description = "合同金额下限")
-    private BigDecimal contractAmountMin;
-
-    @Schema(description = "合同金额上限")
-    private BigDecimal contractAmountMax;
-
-    @Schema(description = "收入金额下限")
-    private BigDecimal revenueMin;
-
-    @Schema(description = "收入金额上限")
-    private BigDecimal revenueMax;
 
     @Schema(description = "最后联系时间开始")
     private Date lastContactStart;

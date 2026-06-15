@@ -38,7 +38,7 @@ public class CustomerImportBO {
     @Schema(description = "网站")
     private String website;
 
-    @Schema(description = "报价金额")
+    @Schema(description = "预计成交金额")
     private BigDecimal quotation;
 
     @Schema(description = "备注")

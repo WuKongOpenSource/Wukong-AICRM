@@ -364,7 +364,7 @@
                   <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.website || '-' }}</p>
                 </div>
                 <div>
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">报价金额</p>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">预计成交金额</p>
                   <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2">{{ formatAmount(customer.quotation) }}</p>
                 </div>
                 <div>

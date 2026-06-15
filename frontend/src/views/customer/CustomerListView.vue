@@ -227,7 +227,7 @@
                 </template>
               </el-table-column>
 
-              <!-- <el-table-column label="报价金额" min-width="130" align="right">
+              <!-- <el-table-column label="预计成交金额" min-width="130" align="right">
                 <template #default="{ row }">
                   <span class="text-sm font-medium text-slate-900 whitespace-nowrap">{{ row.quotation ? formatMoney(row.quotation) : '-' }}</span>
                 </template>
@@ -595,14 +595,6 @@ function clearAiQueryField(query: CustomerAiSearchQuery, key: string) {
     case 'quotation':
       delete query.quotationMin
       delete query.quotationMax
-      break
-    case 'contractAmount':
-      delete query.contractAmountMin
-      delete query.contractAmountMax
-      break
-    case 'revenue':
-      delete query.revenueMin
-      delete query.revenueMax
       break
     case 'lastContact':
       delete query.lastContactStart

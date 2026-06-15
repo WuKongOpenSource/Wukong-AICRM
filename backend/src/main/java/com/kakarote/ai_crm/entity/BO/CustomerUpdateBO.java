@@ -44,14 +44,8 @@ public class CustomerUpdateBO {
     @Schema(description = "Logo")
     private String logo;
 
-    @Schema(description = "报价金额")
+    @Schema(description = "预计成交金额")
     private BigDecimal quotation;
-
-    @Schema(description = "合同金额")
-    private BigDecimal contractAmount;
-
-    @Schema(description = "收入金额")
-    private BigDecimal revenue;
 
     @Schema(description = "下次跟进时间")
     private Date nextFollowTime;

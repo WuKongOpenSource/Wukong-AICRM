@@ -145,10 +145,6 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             "source": "客户来源",
             "quotationMin": 0,
             "quotationMax": 0,
-            "contractAmountMin": 0,
-            "contractAmountMax": 0,
-            "revenueMin": 0,
-            "revenueMax": 0,
             "lastContactStart": "yyyy-MM-dd HH:mm:ss",
             "lastContactEnd": "yyyy-MM-dd HH:mm:ss",
             "includeNoLastContact": true,
@@ -158,7 +154,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             "createTimeEnd": "yyyy-MM-dd HH:mm:ss",
             "contactCountMin": 0,
             "contactCountMax": 0,
-            "sortBy": "createTime/quotation/contractAmount/revenue/lastContactTime/nextFollowTime/contactCount",
+            "sortBy": "createTime/quotation/lastContactTime/nextFollowTime/contactCount",
             "sortOrder": "asc/desc"
           },
           "explanation": "一句话说明解析依据",
@@ -383,8 +379,6 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         vo.setSource(toStr(row.get("source")));
         vo.setLogo(toStr(row.get("logo")));
         vo.setQuotation(toBigDecimal(row.get("quotation")));
-        vo.setContractAmount(toBigDecimal(row.get("contract_amount")));
-        vo.setRevenue(toBigDecimal(row.get("revenue")));
         vo.setLastContactTime(toDate(row.get("last_contact_time")));
         vo.setNextFollowTime(toDate(row.get("next_follow_time")));
         vo.setOwnerId(toLong(row.get("owner_id")));
@@ -591,8 +585,6 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         STAGE_LABEL_MAP.put("lost", "已流失");
         STAGE_LABEL_MAP.forEach((k, v) -> LABEL_STAGE_MAP.put(v, k));
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("includeNoLastContact", "包含未跟进客户");
-        SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("contractAmountMin", "合同金额");
-        SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("contractAmountMax", "合同金额");
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("lastContactStart", "最后跟进时间");
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("lastContactEnd", "最后跟进时间");
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("nextFollowStart", "下次跟进时间");
@@ -606,15 +598,11 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("parsedQuery", "筛选条件");
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("sortOrder", "排序方向");
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("sortBy", "排序规则");
-        SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("quotationMin", "报价");
-        SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("quotationMax", "报价");
-        SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("quotation", "报价");
+        SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("quotationMin", "预计成交金额");
+        SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("quotationMax", "预计成交金额");
+        SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("quotation", "预计成交金额");
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("createTime", "创建时间");
-        SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("revenueMin", "回款金额");
-        SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("revenueMax", "回款金额");
-        SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("revenue", "回款金额");
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("contactCount", "联系人数量");
-        SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("contractAmount", "合同金额");
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("industry", "行业");
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("keyword", "关键词");
         SEARCH_EXPLANATION_FIELD_LABEL_MAP.put("stages", "阶段");
@@ -657,7 +645,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         // 固定表头
         List<String> headers = new ArrayList<>(Arrays.asList(
                 "公司名称", "行业", "商机阶段", "客户级别", "来源", "地址", "网站",
-                "报价金额", "合同金额", "收入金额", "备注",
+                "预计成交金额", "备注",
                 "联系人姓名", "联系人职位", "联系人电话", "联系人邮箱", "联系人微信"
         ));
         // 追加自定义字段表头
@@ -667,8 +655,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         writer.writeHeadRow(headers);
 
         // 列索引常量
-        final int CUSTOMER_COL_END = 10;
-        final int CUSTOM_FIELD_COL_START = 16;
+        final int CUSTOMER_COL_END = 8;
+        final int CUSTOM_FIELD_COL_START = 14;
         final int CUSTOM_FIELD_COL_END = headers.size() - 1;
 
         // 5. 写数据行，记录多联系人客户的行范围
@@ -704,12 +692,12 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 int firstRow = range[0];
                 int lastRow = firstRow + range[1] - 1;
 
-                // 合并客户列 (0–10)
+                // 合并客户列 (0-8)
                 for (int col = 0; col <= CUSTOMER_COL_END; col++) {
                     exportSheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, col, col));
                     applyCenteredStyle(exportSheet, wb, firstRow, col);
                 }
-                // 合并自定义字段列 (16+)
+                // 合并自定义字段列 (14+)
                 for (int col = CUSTOM_FIELD_COL_START; col <= CUSTOM_FIELD_COL_END; col++) {
                     exportSheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, col, col));
                     applyCenteredStyle(exportSheet, wb, firstRow, col);
@@ -796,18 +784,6 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (exportBO.getQuotationMax() != null) {
             wrapper.le(Customer::getQuotation, exportBO.getQuotationMax());
         }
-        if (exportBO.getContractAmountMin() != null) {
-            wrapper.ge(Customer::getContractAmount, exportBO.getContractAmountMin());
-        }
-        if (exportBO.getContractAmountMax() != null) {
-            wrapper.le(Customer::getContractAmount, exportBO.getContractAmountMax());
-        }
-        if (exportBO.getRevenueMin() != null) {
-            wrapper.ge(Customer::getRevenue, exportBO.getRevenueMin());
-        }
-        if (exportBO.getRevenueMax() != null) {
-            wrapper.le(Customer::getRevenue, exportBO.getRevenueMax());
-        }
         if (exportBO.getLastContactStart() != null) {
             wrapper.ge(Customer::getLastContactTime, exportBO.getLastContactStart());
         }
@@ -856,8 +832,6 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
         switch (sortBy) {
             case "quotation" -> wrapper.orderBy(true, asc, Customer::getQuotation);
-            case "contractAmount" -> wrapper.orderBy(true, asc, Customer::getContractAmount);
-            case "revenue" -> wrapper.orderBy(true, asc, Customer::getRevenue);
             case "lastContactTime" -> wrapper.orderBy(true, asc, Customer::getLastContactTime);
             case "nextFollowTime" -> wrapper.orderBy(true, asc, Customer::getNextFollowTime);
             case "contactCount" -> wrapper.orderBy(true, asc, Customer::getContactCount);
@@ -883,8 +857,6 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         row.add(c.getAddress());
         row.add(c.getWebsite());
         row.add(c.getQuotation());
-        row.add(c.getContractAmount());
-        row.add(c.getRevenue());
         row.add(c.getRemark());
         // 联系人
         if (contact != null) {
@@ -932,7 +904,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         // -- 构建表头列表 --
         List<String> headers = new ArrayList<>(Arrays.asList(
                 "公司名称", "行业", "商机阶段", "客户级别", "来源", "地址", "网站",
-                "报价金额", "备注",
+                "预计成交金额", "备注",
                 "联系人姓名", "联系人职位", "联系人电话", "联系人邮箱", "联系人微信"
         ));
         for (CustomFieldVO cf : customFields) {
@@ -946,7 +918,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 + "1. 表头标\"*\"的红色字体为必填项\n"
                 + "2. 商机阶段可选值：线索、资格审查、方案报价、谈判中、已成交、已流失\n"
                 + "3. 客户级别可选值：A、B、C\n"
-                + "4. 报价金额：数字，支持小数\n"
+                + "4. 预计成交金额：数字，支持小数\n"
                 + "5. 同一公司多个联系人时，重复填写公司名称，每行一个联系人";
 
         sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, totalCols - 1));
@@ -1109,7 +1081,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             int colSource = headers.indexOf("来源");
             int colAddress = headers.indexOf("地址");
             int colWebsite = headers.indexOf("网站");
-            int colQuotation = headers.indexOf("报价金额");
+            int colQuotation = headers.indexOf("预计成交金额");
             int colRemark = headers.indexOf("备注");
             int colContactName = headers.indexOf("联系人姓名");
             int colContactPosition = headers.indexOf("联系人职位");
@@ -1168,13 +1140,13 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                     }
                 }
 
-                // 报价金额
+                // 预计成交金额
                 String quotationStr = getCellStr(rowData, colQuotation);
                 if (StrUtil.isNotEmpty(quotationStr)) {
                     try {
                         bo.setQuotation(new BigDecimal(quotationStr.replace(",", "")));
                     } catch (NumberFormatException e) {
-                        rowErrors.add("报价金额格式无效");
+                        rowErrors.add("预计成交金额格式无效");
                     }
                 }
 
@@ -1701,10 +1673,6 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         query.setSource(normalizeOptionalText(getJsonText(queryNode, "source")));
         query.setQuotationMin(parseJsonBigDecimal(queryNode.get("quotationMin")));
         query.setQuotationMax(parseJsonBigDecimal(queryNode.get("quotationMax")));
-        query.setContractAmountMin(parseJsonBigDecimal(queryNode.get("contractAmountMin")));
-        query.setContractAmountMax(parseJsonBigDecimal(queryNode.get("contractAmountMax")));
-        query.setRevenueMin(parseJsonBigDecimal(queryNode.get("revenueMin")));
-        query.setRevenueMax(parseJsonBigDecimal(queryNode.get("revenueMax")));
         query.setLastContactStart(parseJsonDate(queryNode.get("lastContactStart")));
         query.setLastContactEnd(parseJsonDate(queryNode.get("lastContactEnd")));
         query.setIncludeNoLastContact(parseJsonBoolean(queryNode.get("includeNoLastContact")));
@@ -1837,10 +1805,6 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             && StrUtil.isBlank(query.getSource())
             && query.getQuotationMin() == null
             && query.getQuotationMax() == null
-            && query.getContractAmountMin() == null
-            && query.getContractAmountMax() == null
-            && query.getRevenueMin() == null
-            && query.getRevenueMax() == null
             && query.getLastContactStart() == null
             && query.getLastContactEnd() == null
             && !Boolean.TRUE.equals(query.getIncludeNoLastContact())
@@ -1880,13 +1844,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             chips.add(new CustomerAiSearchDisplayChipVO("source", "来源: " + query.getSource()));
         }
         if (query.getQuotationMin() != null || query.getQuotationMax() != null) {
-            chips.add(new CustomerAiSearchDisplayChipVO("quotation", buildAmountRangeLabel("报价", query.getQuotationMin(), query.getQuotationMax())));
-        }
-        if (query.getContractAmountMin() != null || query.getContractAmountMax() != null) {
-            chips.add(new CustomerAiSearchDisplayChipVO("contractAmount", buildAmountRangeLabel("合同", query.getContractAmountMin(), query.getContractAmountMax())));
-        }
-        if (query.getRevenueMin() != null || query.getRevenueMax() != null) {
-            chips.add(new CustomerAiSearchDisplayChipVO("revenue", buildAmountRangeLabel("回款", query.getRevenueMin(), query.getRevenueMax())));
+            chips.add(new CustomerAiSearchDisplayChipVO("quotation", buildAmountRangeLabel("预计成交金额", query.getQuotationMin(), query.getQuotationMax())));
         }
         if (query.getLastContactStart() != null || query.getLastContactEnd() != null || Boolean.TRUE.equals(query.getIncludeNoLastContact())) {
             chips.add(new CustomerAiSearchDisplayChipVO("lastContact", buildDateRangeLabel("最后跟进", query.getLastContactStart(), query.getLastContactEnd(), Boolean.TRUE.equals(query.getIncludeNoLastContact()))));
@@ -1950,9 +1908,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
     private String buildSortLabel(String sortBy, String sortOrder) {
         String label = switch (sortBy) {
-            case "quotation" -> "报价";
-            case "contractAmount" -> "合同金额";
-            case "revenue" -> "回款";
+            case "quotation" -> "预计成交金额";
             case "lastContactTime" -> "最后跟进";
             case "nextFollowTime" -> "下次跟进";
             case "contactCount" -> "联系人数量";
@@ -2150,9 +2106,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
         return switch (normalized) {
             case "createTime", "create_time", "创建时间", "新增时间" -> "createTime";
-            case "quotation", "报价", "报价金额" -> "quotation";
-            case "contractAmount", "contract_amount", "合同金额" -> "contractAmount";
-            case "revenue", "回款", "回款金额" -> "revenue";
+            case "quotation", "报价", "报价金额", "预计成交金额" -> "quotation";
             case "lastContactTime", "last_contact_time", "最后联系", "最后跟进" -> "lastContactTime";
             case "nextFollowTime", "next_follow_time", "下次跟进" -> "nextFollowTime";
             case "contactCount", "contact_count", "联系人数", "联系人数量" -> "contactCount";

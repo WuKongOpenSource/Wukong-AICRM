@@ -174,11 +174,11 @@
                       />
                     </div>
                     <div class="space-y-1.5">
-                      <label class="text-xs font-bold text-slate-500 uppercase ml-1">报价金额</label>
+                      <label class="text-xs font-bold text-slate-500 uppercase ml-1">预计成交金额</label>
                       <el-input
                         v-model.number="formData.quotation"
                         type="number"
-                        placeholder="请输入报价金额"
+                        placeholder="请输入预计成交金额"
                         size="large"
                         class="w-full wk-crm-el-field-input"
                       />

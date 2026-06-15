@@ -56,7 +56,7 @@ public class CustomerTools {
             @ToolParam(description = "地址", required = false) String address,
             @ToolParam(description = "网站", required = false) String website,
             @ToolParam(description = "备注", required = false) String remark,
-            @ToolParam(description = "报价金额", required = false) String quotation) {
+            @ToolParam(description = "预计成交金额", required = false) String quotation) {
 
         log.info("【Tool调用】createCustomer: companyName={}, industry={}, level={}",
             companyName, industry, level);
@@ -190,7 +190,7 @@ public class CustomerTools {
         }
     }
 
-    @Tool(description = "修改客户信息。当用户要修改、编辑、更新已有客户的信息时调用。包括公司名称、行业、阶段、等级、地址、网站、金额等。")
+    @Tool(description = "修改客户信息。当用户要修改、编辑、更新已有客户的信息时调用。包括公司名称、行业、阶段、等级、地址、网站、预计成交金额等。")
     @AiToolPermission(value = "customer:edit", action = "编辑客户")
     public String updateCustomer(
             @ToolParam(description = "客户ID，数字类型，必填") String customerIdStr,
@@ -200,9 +200,7 @@ public class CustomerTools {
             @ToolParam(description = "客户级别：A（重要客户）、B（普通客户）、C（一般客户）", required = false) String level,
             @ToolParam(description = "地址", required = false) String address,
             @ToolParam(description = "网站", required = false) String website,
-            @ToolParam(description = "报价金额", required = false) String quotation,
-            @ToolParam(description = "合同金额", required = false) String contractAmount,
-            @ToolParam(description = "回款金额", required = false) String revenue,
+            @ToolParam(description = "预计成交金额", required = false) String quotation,
             @ToolParam(description = "下次跟进时间，格式：yyyy-MM-dd", required = false) String nextFollowTime,
             @ToolParam(description = "备注", required = false) String remark) {
 
@@ -261,21 +259,7 @@ public class CustomerTools {
                 try {
                     bo.setQuotation(new BigDecimal(quotation.trim()));
                 } catch (NumberFormatException e) {
-                    log.warn("报价金额格式无效: {}", quotation);
-                }
-            }
-            if (normalizeOptionalText(contractAmount) != null) {
-                try {
-                    bo.setContractAmount(new BigDecimal(contractAmount.trim()));
-                } catch (NumberFormatException e) {
-                    log.warn("合同金额格式无效: {}", contractAmount);
-                }
-            }
-            if (normalizeOptionalText(revenue) != null) {
-                try {
-                    bo.setRevenue(new BigDecimal(revenue.trim()));
-                } catch (NumberFormatException e) {
-                    log.warn("回款金额格式无效: {}", revenue);
+                    log.warn("预计成交金额格式无效: {}", quotation);
                 }
             }
 
@@ -301,7 +285,7 @@ public class CustomerTools {
                 result.append("\n- 等级: ").append(normalizedLevel);
             }
             if (normalizeOptionalText(quotation) != null) {
-                result.append("\n- 报价金额: ").append(quotation.trim());
+                result.append("\n- 预计成交金额: ").append(quotation.trim());
             }
             return result.toString();
         } catch (Exception e) {
@@ -414,7 +398,7 @@ public class CustomerTools {
             try {
                 bo.setQuotation(new BigDecimal(normalizedQuotation));
             } catch (NumberFormatException e) {
-                log.warn("报价金额格式无效: {}", quotation);
+                log.warn("预计成交金额格式无效: {}", quotation);
             }
         }
         return bo;

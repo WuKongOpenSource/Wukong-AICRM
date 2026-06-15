@@ -50,14 +50,8 @@ public class CustomerDetailVO {
     @Schema(description = "Logo URL")
     private String logoUrl;
 
-    @Schema(description = "报价金额")
+    @Schema(description = "预计成交金额")
     private BigDecimal quotation;
-
-    @Schema(description = "合同金额")
-    private BigDecimal contractAmount;
-
-    @Schema(description = "收入金额")
-    private BigDecimal revenue;
 
     @Schema(description = "最后联系时间")
     private Date lastContactTime;

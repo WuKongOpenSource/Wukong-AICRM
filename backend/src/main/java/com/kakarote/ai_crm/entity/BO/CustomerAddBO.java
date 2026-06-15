@@ -40,7 +40,7 @@ public class CustomerAddBO {
     @Schema(description = "Logo")
     private String logo;
 
-    @Schema(description = "报价金额")
+    @Schema(description = "预计成交金额")
     private BigDecimal quotation;
 
     @Schema(description = "备注")
