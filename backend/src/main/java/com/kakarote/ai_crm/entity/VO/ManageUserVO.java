@@ -66,4 +66,7 @@ public class ManageUserVO {
 
     @Schema(description = "角色名称列表")
     private List<String> roleNames;
+
+    @Schema(description = "User UI preferences")
+    private UserPreferenceVO preferences;
 }

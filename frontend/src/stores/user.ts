@@ -5,10 +5,11 @@ import {
   logout as apiLogout,
   getUserInfo as apiGetUserInfo,
   updateProfile as apiUpdateProfile,
+  updateUserPreferences as apiUpdateUserPreferences,
   getUserAuth as apiGetUserAuth
 } from '@/api/auth'
 import { setToken, removeToken, getToken } from '@/utils/request'
-import type { UserInfo, LoginParams, LoginResult } from '@/types/api'
+import type { UserInfo, LoginParams, LoginResult, UserPreferenceUpdateParams, UserPreferences } from '@/types/api'
 import { useEnterpriseStore } from './enterprise'
 
 export const useUserStore = defineStore('user', () => {
@@ -99,6 +100,17 @@ export const useUserStore = defineStore('user', () => {
     await fetchUserInfo()
   }
 
+  async function updatePreferences(data: UserPreferenceUpdateParams): Promise<UserPreferences> {
+    const nextPreferences = await apiUpdateUserPreferences(data)
+    if (userInfo.value) {
+      userInfo.value = {
+        ...userInfo.value,
+        preferences: nextPreferences
+      }
+    }
+    return nextPreferences
+  }
+
   return {
     token,
     userInfo,
@@ -116,6 +128,7 @@ export const useUserStore = defineStore('user', () => {
     setUserInfo,
     resetState,
     updateProfile,
+    updatePreferences,
     hasPermission
   }
 })

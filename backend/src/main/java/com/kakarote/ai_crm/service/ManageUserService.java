@@ -2,12 +2,14 @@ package com.kakarote.ai_crm.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.kakarote.ai_crm.common.BasePage;
+import com.kakarote.ai_crm.entity.BO.UserPreferenceUpdateBO;
 import com.kakarote.ai_crm.entity.BO.UserAddBO;
 import com.kakarote.ai_crm.entity.BO.UserQueryBO;
 import com.kakarote.ai_crm.entity.BO.UserStatusBO;
 import com.kakarote.ai_crm.entity.BO.UserUpdateBO;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.VO.ManageUserVO;
+import com.kakarote.ai_crm.entity.VO.UserPreferenceVO;
 
 
 /**
@@ -62,6 +64,8 @@ public interface ManageUserService extends IService<ManagerUser> {
      * @return
      */
     ManageUserVO queryLoginUser();
+
+    UserPreferenceVO updateCurrentUserPreferences(UserPreferenceUpdateBO preferenceUpdateBO);
 
     /**
      * 修改密码

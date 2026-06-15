@@ -6,6 +6,8 @@ import type {
   ExternalAuthTicketLoginParams,
   LoginParams,
   LoginResult,
+  UserPreferenceUpdateParams,
+  UserPreferences,
   UserInfo
 } from '@/types/api'
 
@@ -42,6 +44,10 @@ export function getLoginUserDetail(): Promise<UserInfo> {
  */
 export function updateProfile(data: { userId: string | number; realname?: string; mobile?: string; email?: string; post?: string; img?: string }): Promise<void> {
   return post('/managerUser/updateUser', data)
+}
+
+export function updateUserPreferences(data: UserPreferenceUpdateParams): Promise<UserPreferences> {
+  return post('/managerUser/preferences', data)
 }
 
 /**

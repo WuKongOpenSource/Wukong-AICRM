@@ -16,6 +16,7 @@ import com.kakarote.ai_crm.entity.VO.ManageUserVO;
 import com.kakarote.ai_crm.service.ManageUserService;
 import com.kakarote.ai_crm.service.OidcService;
 import com.kakarote.ai_crm.service.FileStorageService;
+import com.kakarote.ai_crm.service.support.UserPreferenceSupport;
 import com.kakarote.ai_crm.utils.UserUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -117,6 +118,7 @@ public class AuthController {
         }
         userVO.setMobile(loginUser.getUser().getMobile());
         userVO.setEmail(loginUser.getUser().getEmail());
+        userVO.setPreferences(UserPreferenceSupport.parsePreferences(loginUser.getUser().getUiPreferences()));
         result.put("userInfo", userVO);
 
         return Result.ok(result);

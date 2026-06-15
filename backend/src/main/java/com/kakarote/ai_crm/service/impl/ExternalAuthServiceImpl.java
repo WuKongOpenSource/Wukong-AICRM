@@ -23,6 +23,7 @@ import com.kakarote.ai_crm.service.ExternalAuthService;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.ManageUserService;
 import com.kakarote.ai_crm.service.OidcService;
+import com.kakarote.ai_crm.service.support.UserPreferenceSupport;
 import com.kakarote.ai_crm.utils.UserUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -362,6 +363,7 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
         userVO.setDeptId(user.getDeptId());
         userVO.setSex(user.getSex());
         userVO.setStatus(user.getStatus());
+        userVO.setPreferences(UserPreferenceSupport.parsePreferences(user.getUiPreferences()));
         return userVO;
     }
 

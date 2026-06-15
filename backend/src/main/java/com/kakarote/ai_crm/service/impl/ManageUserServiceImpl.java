@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
+import com.kakarote.ai_crm.entity.BO.UserPreferenceUpdateBO;
 import com.kakarote.ai_crm.entity.BO.UserAddBO;
 import com.kakarote.ai_crm.entity.BO.UserQueryBO;
 import com.kakarote.ai_crm.entity.BO.UserStatusBO;
@@ -16,9 +17,11 @@ import com.kakarote.ai_crm.entity.BO.UserUpdateBO;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.PO.ManagerUserRole;
 import com.kakarote.ai_crm.entity.VO.ManageUserVO;
+import com.kakarote.ai_crm.entity.VO.UserPreferenceVO;
 import com.kakarote.ai_crm.mapper.ManageUserMapper;
 import com.kakarote.ai_crm.service.IManagerUserRoleService;
 import com.kakarote.ai_crm.service.ManageUserService;
+import com.kakarote.ai_crm.service.support.UserPreferenceSupport;
 import com.kakarote.ai_crm.utils.UserUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -267,9 +270,25 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
             // 填充角色信息
             fillRoleInfo(Collections.singletonList(vo));
             fillImgUrl(Collections.singletonList(vo));
+            vo.setPreferences(UserPreferenceSupport.parsePreferences(userEntity.getUiPreferences()));
             return vo;
         }
         return null;
+    }
+
+    @Override
+    public UserPreferenceVO updateCurrentUserPreferences(UserPreferenceUpdateBO preferenceUpdateBO) {
+        ManagerUser userEntity = baseMapper.getUserId(UserUtil.getUserId());
+        if (ObjectUtil.isNull(userEntity)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_USER_DOES_NOT_EXIST);
+        }
+
+        UserPreferenceVO preferences = UserPreferenceSupport.toPreferenceVO(
+                preferenceUpdateBO == null ? null : preferenceUpdateBO.getSidebarModuleOrder()
+        );
+        userEntity.setUiPreferences(UserPreferenceSupport.serializePreferences(preferences));
+        updateById(userEntity);
+        return preferences;
     }
 
     /**

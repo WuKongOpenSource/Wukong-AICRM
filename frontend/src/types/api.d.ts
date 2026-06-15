@@ -71,4 +71,13 @@ export interface UserInfo {
   deptId?: number
   deptName?: string
   sex?: number
+  preferences?: UserPreferences
+}
+
+export interface UserPreferences {
+  sidebarModuleOrder: string[]
+}
+
+export interface UserPreferenceUpdateParams {
+  sidebarModuleOrder?: string[]
 }
