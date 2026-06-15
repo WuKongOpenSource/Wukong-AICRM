@@ -248,19 +248,19 @@
               <div
                 v-for="message in chatStore.messages"
                 :key="message.id"
-                class="max-w-3xl mx-auto message-enter"
+                class="wk-chat-message max-w-3xl mx-auto message-enter"
               >
                 <!-- AI Message -->
-                <div v-if="message.role !== 'user'" class="flex gap-4 md:gap-5">
+                <div v-if="message.role !== 'user'" class="group flex gap-4 pb-4 md:gap-5 md:pb-8">
                   <div class="size-9 rounded-xl bg-primary flex items-center justify-center text-white shrink-0 shadow-lg shadow-primary/20">
                     <WkIcon name="ai" class="text-lg" />
                   </div>
                   <div class="flex-1 space-y-3 min-w-0">
-                    <div class="bg-slate-50 text-slate-700 rounded-2xl rounded-tl-none p-4 inline-block max-w-full text-sm leading-relaxed border border-slate-100">
+                    <div class="max-w-full text-left text-[15px] leading-7 text-[#0d0d0d]">
                       <div
                         class="wk-markdown"
                         :class="{ 'streaming-cursor': message.isStreaming }"
-                        v-html="renderAssistantMessage(message.content || '...')"
+                        v-html="renderAssistantMessage(message.content || '...', Boolean(message.isStreaming))"
                       />
                     </div>
                     <!-- Attachments -->
@@ -281,23 +281,40 @@
                           <a
                             :href="att.accessUrl"
                             target="_blank"
-                            class="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors max-w-xs"
+                            class="flex max-w-xs items-center gap-3 rounded-2xl border border-[#e5e5e5] bg-white p-3 transition-colors hover:bg-[#f7f7f7]"
                           >
-                            <span class="material-symbols-outlined text-slate-400">description</span>
-                            <div class="flex-1 min-w-0">
-                              <div class="text-sm text-slate-700 truncate">{{ att.fileName }}</div>
-                              <div class="text-xs text-slate-400">{{ formatFileSize(att.fileSize) }}</div>
+                            <span class="material-symbols-outlined text-[#8f8f8f]">description</span>
+                            <div class="min-w-0 flex-1">
+                              <div class="truncate text-sm text-[#0d0d0d]">{{ att.fileName }}</div>
+                              <div class="text-xs text-[#8f8f8f]">{{ formatFileSize(att.fileSize) }}</div>
                             </div>
                           </a>
                         </template>
                       </div>
                     </div>
-                    <div class="text-xs text-slate-400 font-medium">{{ formatTime(message.timestamp) }}</div>
+                    <div class="wk-chat-message-actions wk-chat-message-actions--assistant flex h-8 items-center gap-2">
+                      <button
+                        v-if="!message.isStreaming"
+                        type="button"
+                        class="flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] transition-all hover:bg-[#f1f1f1] hover:text-[#0d0d0d]"
+                        aria-label="复制内容"
+                        title="复制内容"
+                        @click="copyMessageContent(message, 'assistant')"
+                      >
+                        <WkIcon name="copy" :box-size="18" class="shrink-0 leading-none" />
+                      </button>
+                      <span
+                        class="text-xs font-medium"
+                        :class="message.isStreaming ? 'text-primary/70' : 'text-slate-400'"
+                      >
+                        {{ formatTime(message.timestamp) }}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 <!-- User Message -->
-                <div v-else class="flex gap-4 md:gap-5 flex-row-reverse">
+                <div v-else class="group flex gap-4 md:gap-5 flex-row-reverse">
                   <div class="size-9 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200 flex items-center justify-center">
                     <img
                       v-if="showUserAvatarImage"
@@ -311,7 +328,7 @@
                     </span>
                   </div>
                   <div class="space-y-3 min-w-0" :class="isMobile ? 'max-w-[85%]' : 'max-w-[70%]'">
-                    <div class="bg-primary text-white rounded-2xl rounded-tr-none p-4 shadow-lg shadow-primary/10 text-sm leading-relaxed">
+                    <div class="rounded-[24px] bg-[#f4f4f4] px-4 py-2.5 text-[15px] leading-7 text-[#0d0d0d]">
                       <div class="whitespace-pre-wrap">{{ message.content || '...' }}</div>
                     </div>
                     <!-- User Attachments -->
@@ -331,18 +348,29 @@
                           <a
                             :href="att.accessUrl"
                             target="_blank"
-                            class="flex items-center gap-3 p-3 rounded-xl border border-white/20 hover:bg-white/10 transition-colors max-w-xs"
+                            class="flex max-w-xs items-center gap-3 rounded-2xl border border-[#e5e5e5] bg-white p-3 transition-colors hover:bg-[#f7f7f7]"
                           >
-                            <span class="material-symbols-outlined text-white/70">description</span>
-                            <div class="flex-1 min-w-0">
-                              <div class="text-sm text-white truncate">{{ att.fileName }}</div>
-                              <div class="text-xs text-white/60">{{ formatFileSize(att.fileSize) }}</div>
+                            <span class="material-symbols-outlined text-[#8f8f8f]">description</span>
+                            <div class="min-w-0 flex-1">
+                              <div class="truncate text-sm text-[#0d0d0d]">{{ att.fileName }}</div>
+                              <div class="text-xs text-[#8f8f8f]">{{ formatFileSize(att.fileSize) }}</div>
                             </div>
                           </a>
                         </template>
                       </div>
                     </div>
-                    <div class="text-xs text-slate-400 font-medium text-right">{{ formatTime(message.timestamp) }}</div>
+                    <div class="wk-chat-message-actions wk-chat-message-actions--user flex h-8 items-center justify-end gap-2">
+                      <span class="text-xs font-medium text-slate-400">{{ formatTime(message.timestamp) }}</span>
+                      <button
+                        type="button"
+                        class="pointer-events-none flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] opacity-0 transition-all hover:bg-[#f1f1f1] hover:text-[#0d0d0d] group-hover:pointer-events-auto group-hover:opacity-100"
+                        aria-label="复制内容"
+                        title="复制内容"
+                        @click="copyMessageContent(message, 'user')"
+                      >
+                        <WkIcon name="copy" :box-size="18" class="shrink-0 leading-none" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1205,8 +1233,49 @@ function sendQuickMessage(text: string) {
   handleSend()
 }
 
-function renderAssistantMessage(content: string): string {
-  return renderMarkdown(content)
+function renderAssistantMessage(content: string, isStreaming = false): string {
+  return renderMarkdown(content, { streaming: isStreaming })
+}
+
+function htmlToPlainText(html: string): string {
+  const div = document.createElement('div')
+  div.innerHTML = html
+  return (div.textContent || '').replace(/\u00a0/g, ' ').trim()
+}
+
+async function copyToClipboard(text: string) {
+  const value = text.trim()
+  if (!value) return
+
+  try {
+    await navigator.clipboard.writeText(value)
+    ElMessage.success('已复制')
+  } catch {
+    const textarea = document.createElement('textarea')
+    textarea.value = value
+    textarea.setAttribute('readonly', 'true')
+    textarea.style.position = 'fixed'
+    textarea.style.left = '-9999px'
+    document.body.appendChild(textarea)
+    textarea.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    if (ok) {
+      ElMessage.success('已复制')
+    } else {
+      ElMessage.warning('复制失败')
+    }
+  }
+}
+
+async function copyMessageContent(message: { content: string; isStreaming?: boolean }, kind: 'assistant' | 'user') {
+  if (kind === 'assistant') {
+    const html = renderAssistantMessage(message.content || '', Boolean(message.isStreaming))
+    await copyToClipboard(htmlToPlainText(html))
+    return
+  }
+
+  await copyToClipboard(message.content || '')
 }
 
 function handleUpload() {
@@ -1449,6 +1518,84 @@ function resolveChatAppIcon(code: string): string {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.wk-chat-message {
+  width: min(100%, 768px);
+  overflow-wrap: anywhere;
+}
+
+.wk-chat-message-actions--assistant,
+.wk-chat-message-actions--user {
+  position: relative;
+  z-index: 0;
+}
+
+.wk-chat-message :deep(.wk-markdown) {
+  color: var(--wk-text-primary, #0d0d0d);
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.wk-chat-message :deep(.wk-markdown > *:first-child) {
+  margin-top: 0;
+}
+
+.wk-chat-message :deep(.wk-markdown > *:last-child) {
+  margin-bottom: 0;
+}
+
+.wk-chat-message :deep(.wk-markdown p) {
+  margin: 0 0 0.85em;
+}
+
+.wk-chat-message :deep(.wk-markdown pre) {
+  margin: 1em 0;
+  overflow-x: auto;
+  border-radius: 12px;
+  background: #1f1e1c;
+  padding: 14px 16px;
+  color: #f7f7f7;
+}
+
+.wk-chat-message :deep(.wk-markdown code) {
+  border-radius: 6px;
+  background: var(--wk-bg-surface-muted, #f4f4f4);
+  padding: 0.15em 0.35em;
+  color: var(--wk-text-primary, #0d0d0d);
+  font-size: 0.92em;
+}
+
+.wk-chat-message :deep(.wk-markdown pre code) {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.wk-chat-message :deep(.wk-markdown blockquote) {
+  margin: 1em 0;
+  border-left: 3px solid var(--wk-border-strong, #d4d4d4);
+  padding-left: 1em;
+  color: var(--wk-text-secondary, #5f5f5f);
+}
+
+.wk-chat-message :deep(.wk-markdown table) {
+  width: 100%;
+  margin: 1em 0;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.wk-chat-message :deep(.wk-markdown th),
+.wk-chat-message :deep(.wk-markdown td) {
+  border: 1px solid var(--wk-border-subtle, #e5e5e5);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.wk-chat-message :deep(.wk-markdown th) {
+  background: var(--wk-bg-surface-subtle, #fafafa);
+  font-weight: 600;
 }
 
 /* Message animation */
