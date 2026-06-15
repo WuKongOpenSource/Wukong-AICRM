@@ -24,7 +24,7 @@ CREATE TABLE crm_customer (
     industry VARCHAR(100),
     stage VARCHAR(50) NOT NULL DEFAULT 'lead',
     owner_id BIGINT NOT NULL,
-    level CHAR(1) DEFAULT 'C',
+    level VARCHAR(10),
     source VARCHAR(100),
     address VARCHAR(500),
     website VARCHAR(255),
@@ -47,6 +47,7 @@ CREATE INDEX idx_customer_owner_id ON crm_customer (owner_id);
 CREATE INDEX idx_customer_stage ON crm_customer (stage);
 CREATE INDEX idx_customer_level ON crm_customer (level);
 CREATE INDEX idx_customer_create_time ON crm_customer (create_time);
+CREATE INDEX idx_customer_update_time ON crm_customer (update_time DESC, create_time DESC);
 
 CREATE TRIGGER trg_customer_update_time
     BEFORE UPDATE ON crm_customer
@@ -58,7 +59,7 @@ COMMENT ON COLUMN crm_customer.company_name IS '公司名称';
 COMMENT ON COLUMN crm_customer.industry IS '行业';
 COMMENT ON COLUMN crm_customer.stage IS '阶段: lead, qualified, proposal, negotiation, closed, lost';
 COMMENT ON COLUMN crm_customer.owner_id IS '负责人ID';
-COMMENT ON COLUMN crm_customer.level IS '客户等级: A, B, C';
+COMMENT ON COLUMN crm_customer.level IS 'Customer level';
 COMMENT ON COLUMN crm_customer.source IS '客户来源';
 COMMENT ON COLUMN crm_customer.status IS '状态: 0-禁用, 1-正常';
 
