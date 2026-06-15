@@ -71,4 +71,16 @@ public class TaskVO {
 
     @Schema(description = "参与人名称（逗号分隔）")
     private String participantNames;
+
+    @Schema(description = "高价值任务评分")
+    private Integer valuePriorityScore;
+
+    @Schema(description = "高价值任务分层: HIGH/MEDIUM/LOW")
+    private String valuePriorityTier;
+
+    @Schema(description = "高价值任务评分原因")
+    private String valuePriorityReason;
+
+    @Schema(description = "是否高价值任务")
+    private Boolean highValue;
 }

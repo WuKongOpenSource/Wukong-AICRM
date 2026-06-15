@@ -13,7 +13,7 @@
             <!-- Segmented filter -->
             <div class="hidden md:flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
               <button
-                @click="valueFilter = 'all'"
+                @click="handleValueFilter('all')"
                 :class="[
                   'px-4 py-1.5 text-xs font-bold rounded-lg transition-all',
                   valueFilter === 'all' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'
@@ -22,7 +22,7 @@
                 全部任务
               </button>
               <button
-                @click="valueFilter = 'high-impact'"
+                @click="handleValueFilter('high-impact')"
                 :class="[
                   'px-4 py-1.5 text-xs font-bold rounded-lg transition-all',
                   valueFilter === 'high-impact' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'
@@ -107,8 +107,8 @@
                     'size-2 rounded-full',
                     task.status === 'COMPLETED'
                       ? 'bg-slate-200'
-                      : task.priority === 'HIGH' ? 'bg-red-500'
-                      : task.priority === 'MEDIUM' ? 'bg-amber-500'
+                      : task.valuePriorityTier === 'HIGH' ? 'bg-red-500'
+                      : task.valuePriorityTier === 'MEDIUM' ? 'bg-amber-500'
                       : 'bg-slate-300'
                   ]"
                 ></div>
@@ -390,12 +390,7 @@ const statusTabs = computed(() => {
   ]
 })
 
-const displayedTasks = computed(() => {
-  if (valueFilter.value === 'high-impact') {
-    return taskStore.taskList.filter(t => t.priority === 'HIGH')
-  }
-  return taskStore.taskList
-})
+const displayedTasks = computed(() => taskStore.taskList)
 
 const totalPages = computed(() => Math.ceil(taskStore.totalCount / (taskStore.queryParams.limit || 10)))
 
@@ -476,6 +471,14 @@ function syncSelectedTaskFromRoute() {
   const taskId = firstQueryValue(route.query.taskId)
   if (!taskId) return
   selectedTask.value = taskStore.taskList.find(task => String(task.taskId) === taskId) || null
+}
+
+async function handleValueFilter(filter: 'all' | 'high-impact') {
+  valueFilter.value = filter
+  taskStore.queryParams.page = 1
+  taskStore.queryParams.sortMode = filter === 'high-impact' ? 'value' : 'default'
+  taskStore.queryParams.highValueOnly = filter === 'high-impact'
+  await taskStore.fetchTaskList(false)
 }
 
 function firstQueryValue(value: unknown): string {
@@ -619,6 +622,9 @@ async function handleAiParse() {
 
 // AI Score - deterministic based on priority + taskId
 function getAiScore(task: Task): number {
+  if (typeof task.valuePriorityScore === 'number') {
+    return task.valuePriorityScore
+  }
   const base = task.priority === 'HIGH' ? 90 : task.priority === 'MEDIUM' ? 60 : 30
   const offset = Number(task.taskId) % 10
   return Math.min(99, base + offset)
@@ -626,6 +632,7 @@ function getAiScore(task: Task): number {
 
 // AI Insight - use description or generate from priority
 function getAiInsight(task: Task): string {
+  if (task.valuePriorityReason) return task.valuePriorityReason
   if (task.description) return task.description
   if (task.priority === 'HIGH') return '此任务优先级较高，建议尽快处理以推进业务进展。'
   if (task.priority === 'MEDIUM') return '常规跟进任务，按计划执行即可。'
