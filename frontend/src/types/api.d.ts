@@ -76,7 +76,7 @@ export interface UserInfo {
 }
 
 export interface UserPreferences {
-  sidebarModuleOrder: string[]
+  sidebarModuleOrder?: string[]
 }
 
 export interface UserPreferenceUpdateParams {
