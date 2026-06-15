@@ -178,21 +178,6 @@
                 </template>
               </el-table-column>
 
-              <el-table-column label="客户级别" width="110" align="center">
-                <template #default="{ row }">
-                  <span
-                    v-if="row.level"
-                    class="inline-flex items-center justify-center h-6 min-w-[2.5rem] px-2 rounded-lg font-bold text-xs"
-                    :class="{
-                      'bg-emerald-50 text-emerald-600': row.level === 'A',
-                      'bg-blue-50 text-blue-600': row.level === 'B',
-                      'bg-slate-100 text-slate-500': row.level === 'C'
-                    }"
-                  >{{ row.level }}级</span>
-                  <span v-else class="text-slate-300">-</span>
-                </template>
-              </el-table-column>
-
               <el-table-column label="联系人" min-width="140">
                 <template #default="{ row }">
                   <div v-if="row.primaryContactName" class="text-sm text-slate-600 whitespace-nowrap">
@@ -206,6 +191,21 @@
               <el-table-column label="电话" min-width="140">
                 <template #default="{ row }">
                   <span class="text-sm text-slate-600 font-mono whitespace-nowrap">{{ row.primaryContactPhone || '-' }}</span>
+                </template>
+              </el-table-column>
+
+              <el-table-column label="客户级别" width="110" align="center">
+                <template #default="{ row }">
+                  <span
+                    v-if="row.level"
+                    class="inline-flex items-center justify-center h-6 min-w-[2.5rem] px-2 rounded-lg font-bold text-xs"
+                    :class="{
+                      'bg-emerald-50 text-emerald-600': row.level === 'A',
+                      'bg-blue-50 text-blue-600': row.level === 'B',
+                      'bg-slate-100 text-slate-500': row.level === 'C'
+                    }"
+                  >{{ row.level }}级</span>
+                  <span v-else class="text-slate-300">-</span>
                 </template>
               </el-table-column>
 
