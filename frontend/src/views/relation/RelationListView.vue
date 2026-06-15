@@ -184,9 +184,10 @@
               filterable
               remote
               reserve-keyword
-              placeholder="搜索客户"
+              :placeholder="customerSelectPlaceholder"
               :remote-method="searchCustomers"
               :loading="customerLoading"
+              :disabled="!canQueryCustomers || saving"
             >
               <el-option v-for="item in customerOptions" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
@@ -249,6 +250,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { addRelation, deleteRelation, getRelationDetail, queryRelationPageList, updateRelation } from '@/api/relation'
 import { queryCustomerList } from '@/api/customer'
 import { useResponsive } from '@/composables/useResponsive'
+import { useUserStore } from '@/stores/user'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import type { CustomerListVO } from '@/types/customer'
 import type { Relation, RelationForm } from '@/types/relation'
@@ -272,6 +274,7 @@ const sourceLabels: Record<string, string> = {
 }
 
 const { isMobile } = useResponsive()
+const userStore = useUserStore()
 const relations = ref<Relation[]>([])
 const loading = ref(false)
 const keyword = ref('')
@@ -300,6 +303,8 @@ const form = reactive<RelationForm>({
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / limit.value)))
+const canQueryCustomers = computed(() => userStore.hasPermission('customer:view'))
+const customerSelectPlaceholder = computed(() => canQueryCustomers.value ? '搜索客户' : '暂无客户权限')
 const detailRows = computed(() => {
   const relation = currentDetail.value
   if (!relation) return []
@@ -456,6 +461,10 @@ async function openDetail(relation: Relation) {
 }
 
 async function searchCustomers(query: string) {
+  if (!canQueryCustomers.value) {
+    customerOptions.value = []
+    return
+  }
   const keywordText = query.trim()
   if (!keywordText) {
     customerOptions.value = []
