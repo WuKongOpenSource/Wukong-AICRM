@@ -160,6 +160,10 @@ export function connectImapMailbox(data: MailImapConnectPayload): Promise<MailAc
   return post('/email/auth/connect', data)
 }
 
+export function testImapMailbox(data: MailImapConnectPayload): Promise<void> {
+  return post('/email/auth/test', data)
+}
+
 export function setDefaultMailbox(accountId: string): Promise<MailAccount> {
   return post(`/email/accounts/${accountId}/default`)
 }

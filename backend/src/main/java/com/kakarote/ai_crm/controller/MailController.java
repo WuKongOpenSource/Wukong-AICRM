@@ -58,6 +58,14 @@ public class MailController {
         return Result.ok(mailService.bindImapAccount(bindBO));
     }
 
+    @PostMapping("/auth/test")
+    @Operation(summary = "Test custom IMAP mailbox connection")
+    @RequirePermission("mail:manage")
+    public Result<Void> testMailboxConnection(@Valid @RequestBody MailImapBindBO bindBO) {
+        mailService.testImapConnection(bindBO);
+        return Result.ok();
+    }
+
     @PostMapping("/accounts/imap")
     @Operation(summary = "Bind IMAP mailbox")
     @RequirePermission("mail:manage")

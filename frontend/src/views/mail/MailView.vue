@@ -339,6 +339,7 @@
       </el-form>
       <template #footer>
         <el-button @click="connectDialogVisible = false">取消</el-button>
+        <el-button :loading="testingConnection" @click="testImapConnect">测试连接</el-button>
         <el-button type="primary" :loading="connecting" @click="connectImap">连接</el-button>
       </template>
     </el-dialog>
@@ -398,6 +399,7 @@ import {
   starMail,
   startMailOAuth,
   syncMailbox,
+  testImapMailbox,
   updateDraft,
   updateMailTemplate,
   type MailAuthStatus,
@@ -421,6 +423,7 @@ const templateCategoryFilter = ref('')
 const authLoading = ref(false)
 const loading = ref(false)
 const connecting = ref(false)
+const testingConnection = ref(false)
 const savingDraft = ref(false)
 const sending = ref(false)
 const savingTemplate = ref(false)
@@ -813,6 +816,20 @@ async function handleOAuth(provider: 'gmail' | 'outlook') {
   const result = await startMailOAuth(provider)
   window.open(result.authorizeUrl, '_blank', 'noopener,noreferrer,width=760,height=760')
   ElMessage.info('授权完成后请回到本页面刷新邮箱状态')
+}
+
+async function testImapConnect() {
+  if (!imapForm.emailAddress || !imapForm.imapHost || !imapForm.smtpHost || !imapForm.password) {
+    ElMessage.warning('请填写邮箱地址、IMAP/SMTP 主机和授权码')
+    return
+  }
+  testingConnection.value = true
+  try {
+    await testImapMailbox(imapForm)
+    ElMessage.success('连接测试成功')
+  } finally {
+    testingConnection.value = false
+  }
 }
 
 async function connectImap() {

@@ -26,6 +26,8 @@ public interface IMailService {
 
     MailAccountVO bindImapAccount(MailImapBindBO bindBO);
 
+    void testImapConnection(MailImapBindBO bindBO);
+
     MailOAuthStartVO startOAuth(String provider);
 
     MailAccountVO handleOAuthCallback(String provider, String code, String state);
