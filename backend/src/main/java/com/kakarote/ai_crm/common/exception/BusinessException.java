@@ -60,4 +60,9 @@ public class BusinessException extends RuntimeException implements ResultCode {
     public String getMsg() {
         return this.message;
     }
+
+    @Override
+    public String getMessage() {
+        return this.message;
+    }
 }
