@@ -36,6 +36,12 @@
         <if test="query.endDate != null">
             AND s.start_time &lt;= #{query.endDate}
         </if>
+        <if test="query.participantUserId != null">
+            AND (
+                s.create_user_id = #{query.participantUserId}
+                OR CONCAT(',', COALESCE(s.participant_user_ids, ''), ',') LIKE CONCAT('%,', #{query.participantUserId}, ',%')
+            )
+        </if>
         ORDER BY s.start_time DESC
     </select>
 

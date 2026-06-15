@@ -291,7 +291,7 @@ type MainNavItem = {
   icon: WkIconName
   label: string
   route: string
-  permission: string
+  permission?: string
 }
 
 type ConfigNavItem = {
@@ -304,6 +304,7 @@ type ConfigNavItem = {
 const allMainNavItems: MainNavItem[] = [
   { icon: 'ai', label: 'AI 助手', route: '/chat', permission: 'chat' },
   { icon: 'customer', label: '客户管理', route: '/customer', permission: 'customer' },
+  { icon: 'profile', label: '通讯录', route: '/addressBook' },
   { icon: 'task', label: '任务管理', route: '/task', permission: 'task' },
   { icon: 'meetingRecord', label: '日程安排', route: '/calendar', permission: 'schedule' },
   { icon: 'knowledge', label: '知识库', route: '/knowledge', permission: 'knowledge' },
@@ -315,7 +316,7 @@ const allConfigNavItems: ConfigNavItem[] = [
 
 // AI 助手（chat）默认所有人可见
 const mainNavItems = computed(() =>
-  allMainNavItems.filter(item => item.permission === 'chat' || userStore.hasPermission(item.permission))
+  allMainNavItems.filter(item => !item.permission || item.permission === 'chat' || userStore.hasPermission(item.permission))
 )
 
 const configNavItems = computed(() =>
@@ -327,6 +328,7 @@ const showConfigSection = computed(() => configNavItems.value.length > 0)
 const activeMenu = computed(() => {
   const path = route.path
   if (path.startsWith('/customer')) return '/customer'
+  if (path.startsWith('/addressBook')) return '/addressBook'
   if (path.startsWith('/settings')) return '/settings'
   return path
 })

@@ -44,6 +44,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '客户管理', icon: 'group', permission: 'customer' }
       },
       {
+        path: 'addressBook',
+        name: 'AddressBook',
+        component: () => import('@/views/addressBook/AddressBookListView.vue'),
+        meta: { title: '通讯录', icon: 'contacts' }
+      },
+      {
         path: 'customer/:id',
         name: 'CustomerDetail',
         component: () => import('@/views/customer/CustomerDetailView.vue'),

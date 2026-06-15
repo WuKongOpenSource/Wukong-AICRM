@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.AddressBookMapper">
+
+    <select id="queryPageList" resultType="com.kakarote.ai_crm.entity.VO.AddressBookEmployeeVO">
+        SELECT
+            u.user_id,
+            u.realname,
+            u.img,
+            u.dept_id,
+            d.dept_name,
+            u.post,
+            u.mobile,
+            u.email,
+            CASE
+                WHEN u.status = 1 THEN 'active'
+                WHEN u.status = 2 THEN 'resigned'
+                ELSE 'disabled'
+            END AS employee_status,
+            (
+                SELECT MAX(COALESCE(t.completed_time, t.due_date, t.update_time, t.create_time))
+                FROM crm_task t
+                WHERE t.assigned_to = u.user_id
+            ) AS recent_task_time
+        FROM manager_user u
+        LEFT JOIN manager_dept d ON u.dept_id = d.dept_id
+        WHERE 1 = 1
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (
+                u.realname LIKE CONCAT('%', #{query.keyword}, '%')
+                OR u.username LIKE CONCAT('%', #{query.keyword}, '%')
+                OR u.mobile LIKE CONCAT('%', #{query.keyword}, '%')
+                OR u.email LIKE CONCAT('%', #{query.keyword}, '%')
+                OR u.post LIKE CONCAT('%', #{query.keyword}, '%')
+                OR d.dept_name LIKE CONCAT('%', #{query.keyword}, '%')
+            )
+        </if>
+        <if test="query.deptIds != null and query.deptIds.size() > 0">
+            AND u.dept_id IN
+            <foreach collection="query.deptIds" item="deptId" open="(" separator="," close=")">
+                #{deptId}
+            </foreach>
+        </if>
+        <if test="query.employeeStatus != null and query.employeeStatus != ''">
+            <choose>
+                <when test="query.employeeStatus == 'active'">
+                    AND u.status = 1
+                </when>
+                <when test="query.employeeStatus == 'resigned'">
+                    AND u.status = 2
+                </when>
+                <otherwise>
+                    AND COALESCE(u.status, 0) NOT IN (1, 2)
+                </otherwise>
+            </choose>
+        </if>
+        ORDER BY
+            CASE COALESCE(u.status, 0)
+                WHEN 1 THEN 0
+                WHEN 0 THEN 1
+                WHEN 2 THEN 2
+                ELSE 3
+            END,
+            u.create_time DESC
+    </select>
+
+    <select id="getDetail" resultType="com.kakarote.ai_crm.entity.VO.AddressBookDetailVO">
+        SELECT
+            u.user_id,
+            u.realname,
+            u.img,
+            u.dept_id,
+            d.dept_name,
+            u.post,
+            u.mobile,
+            u.email,
+            CASE
+                WHEN u.status = 1 THEN 'active'
+                WHEN u.status = 2 THEN 'resigned'
+                ELSE 'disabled'
+            END AS employee_status,
+            u.parent_id,
+            p.realname AS parent_name,
+            (
+                SELECT MAX(COALESCE(t.completed_time, t.due_date, t.update_time, t.create_time))
+                FROM crm_task t
+                WHERE t.assigned_to = u.user_id
+            ) AS recent_task_time
+        FROM manager_user u
+        LEFT JOIN manager_dept d ON u.dept_id = d.dept_id
+        LEFT JOIN manager_user p ON u.parent_id = p.user_id
+        WHERE u.user_id = #{userId}
+        LIMIT 1
+    </select>
+</mapper>

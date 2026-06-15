@@ -26,4 +26,7 @@ public class ScheduleQueryBO extends PageEntity {
 
     @Schema(description = "结束日期（范围查询）")
     private Date endDate;
+
+    @Schema(description = "参与人ID")
+    private Long participantUserId;
 }
