@@ -1049,7 +1049,7 @@
                       :title="sendActionTitle"
                       @click="handleSendAction"
                     >
-                      <span v-if="chatStore.currentSessionIsStreaming || isUploading || isTranscribing" class="material-symbols-outlined text-xl animate-spin">progress_activity</span>
+                      <span v-if="chatStore.currentSessionIsStreaming || isUploading || isNativeVoiceRecorderStopping || isTranscribing" class="material-symbols-outlined text-xl animate-spin">progress_activity</span>
                       <span v-else-if="isRecording" class="wk-recording-indicator" aria-hidden="true">
                         <span class="material-symbols-outlined wk-recording-indicator__stop">stop</span>
                         <span class="wk-recording-indicator__bars">
@@ -1259,7 +1259,7 @@
                     :title="sendActionTitle"
                     @click="handleSendAction"
                   >
-                    <span v-if="chatStore.currentSessionIsStreaming || isUploading || isTranscribing" class="material-symbols-outlined animate-spin text-[20px] leading-none">progress_activity</span>
+                    <span v-if="chatStore.currentSessionIsStreaming || isUploading || isNativeVoiceRecorderStopping || isTranscribing" class="material-symbols-outlined animate-spin text-[20px] leading-none">progress_activity</span>
                     <span v-else-if="isRecording" class="wk-recording-indicator" aria-hidden="true">
                       <span class="material-symbols-outlined wk-recording-indicator__stop">stop</span>
                       <span class="wk-recording-indicator__bars">
@@ -1652,6 +1652,9 @@ import {
   captureMobileAudioFile,
   hasMobileAudioInputSupport,
   requestMobileAudioStream,
+  shouldUseNativeAndroidVoiceRecorder,
+  startNativeAndroidVoiceRecording,
+  stopNativeAndroidVoiceRecording as stopNativeAndroidVoiceRecordingFile,
   shouldPreferMobileAudioFileCapture,
   shouldUseMobileAudioFileCapture
 } from '@/utils/mobileAudioRecording'
@@ -1712,6 +1715,7 @@ const chatUploadSubmenuVisible = ref(false)
 const chatModelImageLoadFailed = ref<Record<string, boolean>>({})
 const isRecording = ref(false)
 const isTranscribing = ref(false)
+const isNativeVoiceRecorderStopping = ref(false)
 const composerAttachmentPreviewItems = computed<ComposerAttachmentPreviewItem[]>(() => {
   const items: ComposerAttachmentPreviewItem[] = []
 
@@ -1767,6 +1771,7 @@ let recordedMimeType = ''
 let skipNextTranscription = false
 let transcriptionToken = 0
 let speechInputBase = ''
+let nativeAndroidVoiceRecordingActive = false
 let applyingChatRouteQuery = false
 let composerAttachmentScrollResizeObserver: ResizeObserver | null = null
 let chatUploadMenuLeaveTimer: ReturnType<typeof setTimeout> | null = null
@@ -1918,15 +1923,16 @@ const selectedChatAppLabel = computed(() => {
 const selectedChatAppIcon = computed(() => resolveChatAppIcon(chatStore.selectedAppCode))
 const sendActionButtonClass = computed(() => {
   if (isRecording.value) return '!bg-red-500 hover:!bg-red-600'
-  if (isTranscribing.value || isUploading.value) return '!bg-slate-200 !text-slate-500 hover:!bg-slate-200'
+  if (isNativeVoiceRecorderStopping.value || isTranscribing.value || isUploading.value) return '!bg-slate-200 !text-slate-500 hover:!bg-slate-200'
   return ''
 })
 const sendActionDisabled = computed(() =>
-  chatStore.currentSessionIsStreaming || isUploading.value || isTranscribing.value
+  chatStore.currentSessionIsStreaming || isUploading.value || isTranscribing.value || isNativeVoiceRecorderStopping.value
 )
 const sendActionTitle = computed(() => {
   if (chatStore.currentSessionIsStreaming) return '正在回复中'
   if (isUploading.value) return '文件上传中'
+  if (isNativeVoiceRecorderStopping.value) return '语音处理中...'
   if (isTranscribing.value) return '语音识别中'
   if (isRecording.value) return '点击结束录音'
   if (!hasComposerSendPayload.value) return '使用语音输入'
@@ -2922,6 +2928,11 @@ function releaseMediaStream() {
 
 function abortVoiceRecording() {
   skipNextTranscription = true
+
+  if (nativeAndroidVoiceRecordingActive) {
+    void stopNativeAndroidChatVoiceRecording(true)
+  }
+
   if (mediaRecorder && mediaRecorder.state !== 'inactive') {
     mediaRecorder.stop()
   }
@@ -2930,6 +2941,31 @@ function abortVoiceRecording() {
   recordedChunks = []
   recordedMimeType = ''
   isRecording.value = false
+}
+
+async function stopNativeAndroidChatVoiceRecording(discard = false) {
+  if (!nativeAndroidVoiceRecordingActive || isNativeVoiceRecorderStopping.value) return
+
+  const shouldSkip = discard || skipNextTranscription
+  skipNextTranscription = false
+  isRecording.value = false
+  isNativeVoiceRecorderStopping.value = true
+
+  let file: File | null = null
+  try {
+    file = await stopNativeAndroidVoiceRecordingFile('chat-recording')
+  } catch (error) {
+    console.error('Stop native Android voice recording failed:', error)
+    if (!shouldSkip) {
+      ElMessage.warning('录音失败，请检查麦克风权限后重试')
+    }
+  } finally {
+    nativeAndroidVoiceRecordingActive = false
+    isNativeVoiceRecorderStopping.value = false
+  }
+
+  if (shouldSkip) return
+  await transcribeRecordedAudio(file)
 }
 
 async function ensureAudioTranscriptionSupported(): Promise<boolean> {
@@ -3026,7 +3062,29 @@ async function handleRecordedAudioStop() {
 }
 
 async function handleStartAudioRecording() {
-  if (isRecording.value || isTranscribing.value) return
+  if (isRecording.value || isTranscribing.value || isNativeVoiceRecorderStopping.value) return
+
+  if (shouldUseNativeAndroidVoiceRecorder()) {
+    if (!(await ensureAudioTranscriptionSupported())) return
+
+    try {
+      speechInputBase = inputText.value.trim()
+      skipNextTranscription = false
+      const started = await startNativeAndroidVoiceRecording()
+      if (!started) {
+        ElMessage.warning('无法启动录音，请检查浏览器和麦克风权限')
+        return
+      }
+      nativeAndroidVoiceRecordingActive = true
+      isRecording.value = true
+    } catch (error) {
+      console.error('Start native Android voice recording failed:', error)
+      nativeAndroidVoiceRecordingActive = false
+      ElMessage.warning('无法启动录音，请检查浏览器和麦克风权限')
+    }
+    return
+  }
+
   const useMobileAudioApi = isMobile.value
   const hasAudioInput = useMobileAudioApi
     ? hasMobileAudioInputSupport()
@@ -3087,6 +3145,11 @@ async function handleStartAudioRecording() {
 }
 
 function handleStopAudioRecording() {
+  if (nativeAndroidVoiceRecordingActive) {
+    void stopNativeAndroidChatVoiceRecording()
+    return
+  }
+
   if (!mediaRecorder) return
   skipNextTranscription = false
   if (mediaRecorder.state !== 'inactive') {

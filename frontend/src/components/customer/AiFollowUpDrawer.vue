@@ -45,15 +45,15 @@
           <div v-if="step === 1" class="space-y-6">
             <section class="md:block rounded-2xl border border-slate-200 bg-slate-50 p-5 text-center">
               <div class="mx-auto mb-4 flex size-20 items-center justify-center rounded-full"
-                :class="isRecording ? 'bg-red-100 text-red-500' : isTranscribing ? 'bg-amber-100 text-amber-500' : 'bg-primary/10 text-primary'"
+                :class="isRecording ? 'bg-red-100 text-red-500' : (isNativeVoiceRecorderStopping || isTranscribing) ? 'bg-amber-100 text-amber-500' : 'bg-primary/10 text-primary'"
               >
                 <span class="material-symbols-outlined text-4xl">
-                  {{ isRecording ? 'mic' : isTranscribing ? 'hourglass_top' : 'graphic_eq' }}
+                  {{ isRecording ? 'mic' : (isNativeVoiceRecorderStopping || isTranscribing) ? 'hourglass_top' : 'graphic_eq' }}
                 </span>
               </div>
 
               <p class="text-sm font-semibold text-slate-900">
-                {{ isRecording ? '正在语音录入，请直接说话' : '可直接说话，内容会自动转成文字' }}
+                {{ isRecording ? '正在语音录入，请直接说话' : isNativeVoiceRecorderStopping ? '正在处理录音' : '可直接说话，内容会自动转成文字' }}
               </p>
               <p class="mt-2 text-xs text-slate-500">
                 {{ isRecording ? formatDuration(recordingDuration) : '也可以手动输入或上传图片、文档附件' }}
@@ -62,8 +62,8 @@
               <button
                 type="button"
                 class="mt-4 inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-bold text-white transition"
-                :class="isRecording ? 'bg-red-500 hover:bg-red-600' : isTranscribing ? 'bg-amber-500' : 'bg-primary hover:bg-primary/90'"
-                :disabled="isTranscribing"
+                :class="isRecording ? 'bg-red-500 hover:bg-red-600' : (isNativeVoiceRecorderStopping || isTranscribing) ? 'bg-amber-500' : 'bg-primary hover:bg-primary/90'"
+                :disabled="isNativeVoiceRecorderStopping || isTranscribing"
                 @click="isRecording ? handleStopAudioRecording() : handleStartAudioRecording()"
               >
                 {{ isRecording ? '停止语音录入' : '开始语音录入' }}
@@ -370,6 +370,9 @@ import {
   captureMobileAudioFile,
   hasMobileAudioInputSupport,
   requestMobileAudioStream,
+  shouldUseNativeAndroidVoiceRecorder,
+  startNativeAndroidVoiceRecording,
+  stopNativeAndroidVoiceRecording,
   shouldPreferMobileAudioFileCapture,
   shouldUseMobileAudioFileCapture
 } from '@/utils/mobileAudioRecording'
@@ -420,6 +423,7 @@ const isTranscribing = ref(false)
 const isProcessing = ref(false)
 const saving = ref(false)
 const recordingDuration = ref(0)
+const isNativeVoiceRecorderStopping = ref(false)
 const parsedData = ref<AiFollowUpParseVO | null>(null)
 const attachments = ref<Attachment[]>([])
 const uploadedAttachments = ref<ChatAttachmentDTO[]>([])
@@ -440,6 +444,7 @@ let skipNextTranscription = false
 let transcriptionToken = 0
 let speechInputBase = ''
 let recordingTimer: ReturnType<typeof setInterval> | null = null
+let nativeAndroidVoiceRecordingActive = false
 
 watch(
   () => props.modelValue,
@@ -465,6 +470,7 @@ function resetDrawerState() {
   resetParsedForm()
   isRecording.value = false
   isTranscribing.value = false
+  isNativeVoiceRecorderStopping.value = false
   isProcessing.value = false
   saving.value = false
   recordingDuration.value = 0
@@ -503,6 +509,10 @@ function releaseMediaStream() {
 
 function abortRecording() {
   skipNextTranscription = true
+
+  if (nativeAndroidVoiceRecordingActive) {
+    void stopNativeAndroidFollowUpRecording(true)
+  }
 
   if (mediaRecorder && mediaRecorder.state !== 'inactive') {
     mediaRecorder.stop()
@@ -856,8 +866,62 @@ async function handleRecordedAudioStop() {
   await transcribeRecordedAudio(file)
 }
 
+async function stopNativeAndroidFollowUpRecording(discard = false) {
+  if (!nativeAndroidVoiceRecordingActive || isNativeVoiceRecorderStopping.value) return
+
+  const shouldSkip = discard || skipNextTranscription
+  skipNextTranscription = false
+  stopRecordingTimer()
+  isRecording.value = false
+  isNativeVoiceRecorderStopping.value = true
+
+  let file: File | null = null
+  try {
+    file = await stopNativeAndroidVoiceRecording('followup-recording')
+  } catch (err) {
+    console.error('Stop native Android voice recording failed:', err)
+    if (!shouldSkip) {
+      ElMessage.warning('录音失败，请检查麦克风权限后重试')
+    }
+  } finally {
+    nativeAndroidVoiceRecordingActive = false
+    isNativeVoiceRecorderStopping.value = false
+  }
+
+  if (shouldSkip) return
+  await transcribeRecordedAudio(file)
+}
+
 async function handleStartAudioRecording() {
   if (isRecording.value || isTranscribing.value) return
+
+  if (shouldUseNativeAndroidVoiceRecorder()) {
+    if (!(await ensureAudioTranscriptionSupported())) return
+
+    try {
+      speechInputBase = textInput.value.trim()
+      skipNextTranscription = false
+      const started = await startNativeAndroidVoiceRecording()
+      if (!started) {
+        ElMessage.warning('无法启动录音，请检查浏览器和麦克风权限')
+        return
+      }
+
+      nativeAndroidVoiceRecordingActive = true
+      isRecording.value = true
+      recordingDuration.value = 0
+      stopRecordingTimer()
+      recordingTimer = setInterval(() => {
+        recordingDuration.value += 1
+      }, 1000)
+    } catch (err) {
+      console.error('Start native Android voice recording failed:', err)
+      nativeAndroidVoiceRecordingActive = false
+      stopRecordingTimer()
+      ElMessage.warning('无法启动录音，请检查浏览器和麦克风权限')
+    }
+    return
+  }
 
   const useMobileAudioApi = isMobile.value
   const hasAudioInput = useMobileAudioApi
@@ -929,6 +993,11 @@ async function handleStartAudioRecording() {
 }
 
 function handleStopAudioRecording() {
+  if (nativeAndroidVoiceRecordingActive) {
+    void stopNativeAndroidFollowUpRecording()
+    return
+  }
+
   if (!mediaRecorder) {
     return
   }

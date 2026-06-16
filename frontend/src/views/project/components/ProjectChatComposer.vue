@@ -345,7 +345,7 @@
                 :aria-label="sendActionTitle"
                 @click="handleSendAction"
               >
-                <span v-if="isTranscribing" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
+                <span v-if="isNativeVoiceRecorderStopping || isTranscribing" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
                 <span v-else-if="isUploading" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
                 <span v-else-if="isRecording" class="wk-recording-indicator" aria-hidden="true">
                   <span class="material-symbols-outlined wk-recording-indicator__stop">stop</span>
@@ -402,7 +402,10 @@ import {
   canCaptureMobileAudioFile,
   captureMobileAudioFile,
   hasMobileAudioInputSupport,
-  requestMobileAudioStream
+  requestMobileAudioStream,
+  shouldUseNativeAndroidVoiceRecorder,
+  startNativeAndroidVoiceRecording,
+  stopNativeAndroidVoiceRecording
 } from '@/utils/mobileAudioRecording'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import dashscopeBrandUrl from '@/assets/model-provider-brands/dashscope.svg?url'
@@ -462,6 +465,7 @@ const chatKnowledgePickerVisible = ref(false)
 const isUploading = ref(false)
 const isRecording = ref(false)
 const isTranscribing = ref(false)
+const isNativeVoiceRecorderStopping = ref(false)
 const selectedFilePreviewUrls = new Map<File, string>()
 const MAX_FILE_COUNT = MAX_CHAT_ATTACHMENT_COUNT
 let uploadMenuLeaveTimer: ReturnType<typeof setTimeout> | null = null
@@ -472,6 +476,7 @@ let recordedMimeType = ''
 let skipNextTranscription = false
 let transcriptionToken = 0
 let speechInputBase = ''
+let nativeAndroidVoiceRecordingActive = false
 
 const appChoices = [
   { code: 'crm', label: 'CRM管理', icon: 'customer' },
@@ -541,14 +546,15 @@ const composerAttachmentPreviewItems = computed<ComposerAttachmentPreviewItem[]>
 
 const sendActionButtonClass = computed(() => {
   if (isRecording.value) return '!bg-red-500 text-white hover:!bg-red-600'
-  if (isTranscribing.value || isUploading.value) return '!bg-[#e5e5e5] !text-[#909090]'
+  if (isNativeVoiceRecorderStopping.value || isTranscribing.value || isUploading.value) return '!bg-[#e5e5e5] !text-[#909090]'
   return ''
 })
 
-const sendActionDisabled = computed(() => props.disabled || isTranscribing.value || isUploading.value)
+const sendActionDisabled = computed(() => props.disabled || isNativeVoiceRecorderStopping.value || isTranscribing.value || isUploading.value)
 
 const sendActionTitle = computed(() => {
   if (isUploading.value) return '文件上传中…'
+  if (isNativeVoiceRecorderStopping.value) return '语音处理中…'
   if (isTranscribing.value) return '语音识别中…'
   if (isRecording.value) return '点击结束录音'
   if (!hasComposerSendPayload.value) return '使用语音功能'
@@ -674,7 +680,7 @@ async function handleSend() {
 }
 
 function handleSendAction() {
-  if (props.disabled || isTranscribing.value || isUploading.value) return
+  if (props.disabled || isNativeVoiceRecorderStopping.value || isTranscribing.value || isUploading.value) return
   if (isRecording.value) {
     handleStopAudioRecording()
     return
@@ -940,6 +946,9 @@ function releaseMediaStream() {
 
 function abortVoiceRecording() {
   skipNextTranscription = true
+  if (nativeAndroidVoiceRecordingActive) {
+    void stopNativeAndroidProjectRecording(true)
+  }
   if (mediaRecorder && mediaRecorder.state !== 'inactive') {
     mediaRecorder.stop()
   }
@@ -1034,8 +1043,55 @@ async function handleRecordedAudioStop() {
   await transcribeRecordedAudio(file)
 }
 
+async function stopNativeAndroidProjectRecording(discard = false) {
+  if (!nativeAndroidVoiceRecordingActive || isNativeVoiceRecorderStopping.value) return
+
+  const shouldSkip = discard || skipNextTranscription
+  skipNextTranscription = false
+  isRecording.value = false
+  isNativeVoiceRecorderStopping.value = true
+
+  let file: File | null = null
+  try {
+    file = await stopNativeAndroidVoiceRecording('project-chat-recording')
+  } catch (err) {
+    console.error('Stop native Android voice recording failed:', err)
+    if (!shouldSkip) {
+      ElMessage.warning('录音失败，请检查麦克风权限后重试')
+    }
+  } finally {
+    nativeAndroidVoiceRecordingActive = false
+    isNativeVoiceRecorderStopping.value = false
+  }
+
+  if (shouldSkip) return
+  await transcribeRecordedAudio(file)
+}
+
 async function handleStartAudioRecording() {
   if (isRecording.value || isTranscribing.value) return
+
+  if (shouldUseNativeAndroidVoiceRecorder()) {
+    if (!(await ensureAudioTranscriptionSupported())) return
+
+    try {
+      speechInputBase = props.modelValue.trim()
+      skipNextTranscription = false
+      const started = await startNativeAndroidVoiceRecording()
+      if (!started) {
+        ElMessage.warning('无法启动录音，请检查浏览器和麦克风权限')
+        return
+      }
+      nativeAndroidVoiceRecordingActive = true
+      isRecording.value = true
+    } catch (err) {
+      console.error('Start native Android voice recording failed:', err)
+      nativeAndroidVoiceRecordingActive = false
+      ElMessage.warning('无法启动录音，请检查浏览器和麦克风权限')
+    }
+    return
+  }
+
   const useMobileAudioApi = isMobile.value
   const hasAudioInput = useMobileAudioApi
     ? hasMobileAudioInputSupport()
@@ -1092,6 +1148,11 @@ async function handleStartAudioRecording() {
 }
 
 function handleStopAudioRecording() {
+  if (nativeAndroidVoiceRecordingActive) {
+    void stopNativeAndroidProjectRecording()
+    return
+  }
+
   if (!mediaRecorder) return
   skipNextTranscription = false
   if (mediaRecorder.state !== 'inactive') {

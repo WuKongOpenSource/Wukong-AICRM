@@ -1676,6 +1676,15 @@
 
                     <button
                       type="button"
+                      class="flex w-full items-center gap-3 border-t border-[#ededed] py-3.5 text-left text-[#8a8a92] transition-colors active:text-[#0d0d0d]"
+                      @click="handleAccountCancellationRequest"
+                    >
+                      <span class="material-symbols-outlined inline-flex size-5 shrink-0 items-center justify-center text-[20px] leading-none">person_remove</span>
+                      <span class="min-w-0 flex-1 truncate text-[1rem] font-medium">注销账户</span>
+                    </button>
+
+                    <button
+                      type="button"
                       class="flex w-full items-center justify-between border-t border-[#ededed] py-3.5 text-[#8a8a92] transition-colors active:text-[#0d0d0d] disabled:cursor-wait disabled:opacity-70"
                       :disabled="checkingAppUpdate"
                       @click="handleManualUpdateCheck"
@@ -1757,6 +1766,14 @@
               >
                 <span class="material-symbols-outlined text-rose-400 transition-colors group-hover:text-rose-600">logout</span>
                 <span class="text-sm font-medium">退出登录</span>
+              </button>
+
+              <button
+                class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[#8a8a92] transition-colors hover:bg-slate-50 hover:text-[#0d0d0d]"
+                @click="handleAccountCancellationRequest"
+              >
+                <span class="material-symbols-outlined text-[#8a8a92] transition-colors group-hover:text-[#0d0d0d]">person_remove</span>
+                <span class="text-sm font-medium">注销账户</span>
               </button>
 
               <button
@@ -2042,6 +2059,7 @@
 </template>
 
 <script setup lang="ts">
+import { App } from '@capacitor/app'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -4803,6 +4821,45 @@ async function handleLogout() {
     void router.push('/login')
   } catch {
     // User cancelled
+  }
+}
+
+async function handleAccountCancellationRequest() {
+  try {
+    await ElMessageBox.confirm('注销后您的个人数据将会被永久删除，您真的要注销当前登录账号吗？', '注销账户', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      showClose: false,
+      type: 'warning',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      closeOnHashChange: false,
+    })
+  } catch {
+    return
+  }
+
+  await ElMessageBox.alert('您的账户正在申请注销，30天内请勿登录', '提示', {
+    confirmButtonText: '好的，我知道了',
+    showClose: false,
+    closeOnClickModal: false,
+    closeOnPressEscape: false,
+    closeOnHashChange: false,
+    type: 'warning',
+  })
+
+  showUserMenu.value = false
+  drawerVisible.value = false
+
+  try {
+    await userStore.logout()
+  } finally {
+    await router.replace('/login')
+    try {
+      await App.exitApp()
+    } catch (error) {
+      console.warn('Exit app after account cancellation failed:', error)
+    }
   }
 }
 

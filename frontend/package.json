@@ -24,6 +24,7 @@
     "@vue-office/excel": "^1.7.14",
     "@vue-office/pptx": "^1.0.1",
     "axios": "^1.7.7",
+    "capacitor-voice-recorder": "^7.0.6",
     "dompurify": "^3.3.3",
     "element-plus": "^2.8.1",
     "marked": "^17.0.5",

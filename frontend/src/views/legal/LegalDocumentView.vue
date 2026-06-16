@@ -2,8 +2,8 @@
   <main class="legal-page">
     <section class="legal-shell">
       <div class="legal-brand">
-        <img :src="logoImg" alt="悟空CRM" class="legal-brand__logo" />
-        <span class="legal-brand__name">悟空CRM</span>
+        <img :src="logoImg" alt="悟空AI CRM" class="legal-brand__logo" />
+        <span class="legal-brand__name">悟空AI CRM</span>
       </div>
 
       <article class="legal-document">

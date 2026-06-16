@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core'
+
 type LegacyGetUserMedia = (
   constraints: MediaStreamConstraints,
   onSuccess: (stream: MediaStream) => void,
@@ -11,13 +13,11 @@ type LegacyMediaNavigator = Navigator & {
   msGetUserMedia?: LegacyGetUserMedia
 }
 
-type CapacitorGlobal = {
-  getPlatform?: () => string
-  isNativePlatform?: () => boolean
-}
-
-type CapacitorWindow = Window & {
-  Capacitor?: CapacitorGlobal
+type NativeVoiceRecorderRecording = {
+  recordDataBase64?: string
+  msDuration: number
+  mimeType: string
+  path?: string
 }
 
 export interface MobileAudioFileCaptureOptions {
@@ -42,34 +42,34 @@ export function hasMobileAudioInputSupport(): boolean {
   return Boolean(navigator.mediaDevices?.getUserMedia || getLegacyGetUserMedia())
 }
 
-function getCapacitorGlobal(): CapacitorGlobal | undefined {
-  if (typeof window === 'undefined') return undefined
-  return (window as CapacitorWindow).Capacitor
-}
-
 export function getCapacitorPlatform(): string {
-  const capacitor = getCapacitorGlobal()
-  if (typeof capacitor?.getPlatform !== 'function') return ''
-  return capacitor.getPlatform()
+  return Capacitor.getPlatform()
 }
 
 export function isNativeCapacitorAndroid(): boolean {
-  const capacitor = getCapacitorGlobal()
-  if (!capacitor) return false
-
-  const isNativePlatform = typeof capacitor.isNativePlatform === 'function'
-    ? capacitor.isNativePlatform()
-    : getCapacitorPlatform() !== 'web'
-
-  return isNativePlatform && getCapacitorPlatform() === 'android'
+  return getCapacitorPlatform() === 'android'
 }
 
-export function shouldPreferMobileAudioFileCapture(): boolean {
+function isAndroidUserAgent(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /\bAndroid\b/i.test(navigator.userAgent || '')
+}
+
+function shouldBlockMobileAudioFileCapture(): boolean {
+  return isNativeCapacitorAndroid() || isAndroidUserAgent()
+}
+
+export function shouldUseNativeAndroidVoiceRecorder(): boolean {
   return isNativeCapacitorAndroid()
 }
 
+export function shouldPreferMobileAudioFileCapture(): boolean {
+  return false
+}
+
 export function shouldUseMobileAudioFileCapture(options: MobileAudioFileCaptureOptions): boolean {
-  return options.useMobileAudioApi
+  return !shouldBlockMobileAudioFileCapture()
+    && options.useMobileAudioApi
     && options.canCaptureAudioFile
     && (
       Boolean(options.preferFileCapture)
@@ -99,8 +99,86 @@ export function canCaptureMobileAudioFile(): boolean {
   return typeof document !== 'undefined' && typeof File !== 'undefined'
 }
 
+function resolveNativeVoiceRecordingExtension(mimeType: string): string {
+  if (mimeType.includes('aac')) return 'aac'
+  if (mimeType.includes('mp4')) return 'm4a'
+  if (mimeType.includes('mpeg')) return 'mp3'
+  if (mimeType.includes('wav')) return 'wav'
+  if (mimeType.includes('ogg')) return 'ogg'
+  return 'webm'
+}
+
+function normalizeBase64AudioData(value: string): string {
+  const [, dataUrlBase64] = value.split('base64,')
+  return (dataUrlBase64 || value).trim()
+}
+
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+  return bytes
+}
+
+export function buildNativeVoiceRecordingFile(
+  recording: NativeVoiceRecorderRecording,
+  fileBaseName = 'voice-recording'
+): File | null {
+  const base64 = recording.recordDataBase64
+  if (!base64) return null
+
+  const mimeType = recording.mimeType || 'audio/aac'
+  const bytes = base64ToUint8Array(normalizeBase64AudioData(base64))
+  if (bytes.length === 0) return null
+  const audioBuffer = new ArrayBuffer(bytes.byteLength)
+  new Uint8Array(audioBuffer).set(bytes)
+
+  return new File(
+    [audioBuffer],
+    `${fileBaseName}.${resolveNativeVoiceRecordingExtension(mimeType)}`,
+    { type: mimeType }
+  )
+}
+
+async function loadNativeVoiceRecorder() {
+  const { VoiceRecorder } = await import('capacitor-voice-recorder')
+  return VoiceRecorder
+}
+
+export async function startNativeAndroidVoiceRecording(): Promise<boolean> {
+  const voiceRecorder = await loadNativeVoiceRecorder()
+  const canRecord = await voiceRecorder.canDeviceVoiceRecord().catch(() => ({ value: false }))
+  if (!canRecord.value) return false
+
+  const hasPermission = await voiceRecorder.hasAudioRecordingPermission().catch(() => ({ value: false }))
+  const permission = hasPermission.value
+    ? hasPermission
+    : await voiceRecorder.requestAudioRecordingPermission().catch(() => ({ value: false }))
+
+  if (!permission.value) return false
+
+  const started = await voiceRecorder.startRecording()
+  return Boolean(started.value)
+}
+
+export async function stopNativeAndroidVoiceRecording(fileBaseName = 'voice-recording'): Promise<File | null> {
+  const voiceRecorder = await loadNativeVoiceRecorder()
+  const recording = await voiceRecorder.stopRecording()
+  return buildNativeVoiceRecordingFile(recording.value, fileBaseName)
+}
+
+export async function discardNativeAndroidVoiceRecording(): Promise<void> {
+  try {
+    await stopNativeAndroidVoiceRecording()
+  } catch {
+    // Best effort: closing a drawer or leaving the page should not surface stale stop errors.
+  }
+}
+
 export function captureMobileAudioFile(): Promise<File | null> {
-  if (!canCaptureMobileAudioFile()) {
+  if (shouldBlockMobileAudioFileCapture() || !canCaptureMobileAudioFile()) {
     return Promise.resolve(null)
   }
 
