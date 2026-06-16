@@ -25,19 +25,19 @@ public class ChatSendBO {
     @Schema(description = "附件列表")
     private List<AttachmentDTO> attachments;
 
-    @Schema(description = "鏄惁鍚敤 RAG 妫€绱㈣矾鐢憋紝榛樿 false")
+    @Schema(description = "是否启用 RAG 检索路由，默认 false")
     private Boolean ragEnabled;
 
-    @Schema(description = "Application code")
+    @Schema(description = "聊天应用编码: general/crm/knowledge/product")
     private String appCode;
 
-    @Schema(description = "Bound product ID")
+    @Schema(description = "产品对话绑定的产品ID")
     private Long productId;
 
-    @Schema(description = "Bound project ID")
+    @Schema(description = "项目对话绑定的项目ID")
     private Long projectId;
 
-    @Schema(description = "Bound project task ID")
+    @Schema(description = "任务对话绑定的项目任务ID")
     private Long projectTaskId;
 
     @Schema(description = "本次对话选择的 AI 服务商编码")
@@ -49,7 +49,7 @@ public class ChatSendBO {
     @Schema(description = "模型来源：custom/system，单机版仅使用 custom")
     private String modelSource;
 
-    @Schema(description = "Knowledge file IDs used to limit RAG answers")
+    @Schema(description = "知识库文件 ID 列表（限定 RAG 范围等），无需上传文件本体")
     private List<Long> knowledgeIds;
 
     @Data
