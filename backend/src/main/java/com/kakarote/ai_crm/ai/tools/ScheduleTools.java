@@ -2,7 +2,8 @@ package com.kakarote.ai_crm.ai.tools;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.kakarote.ai_crm.ai.tools.support.AiCustomerMatcher;
+import com.kakarote.ai_crm.ai.context.AiContextHolder;
+import com.kakarote.ai_crm.ai.tools.support.AiToolCustomerResolver;
 import com.kakarote.ai_crm.ai.tools.support.AiToolPermission;
 import com.kakarote.ai_crm.entity.BO.ScheduleAddBO;
 import com.kakarote.ai_crm.entity.PO.Contact;
@@ -29,16 +30,17 @@ public class ScheduleTools {
     private IScheduleService scheduleService;
 
     @Autowired
-    private AiCustomerMatcher aiCustomerMatcher;
+    private IContactService contactService;
 
     @Autowired
-    private IContactService contactService;
+    private AiToolCustomerResolver customerResolver;
 
     private final SimpleDateFormat dateTimeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 
-    @Tool(description = "创建日程安排。仅当用户提到具体时间点时调用。没有具体执行时间点、只有截止日期的应使用 createTask。直接传入客户名称和联系人姓名即可，无需先查询ID。")
+    @Tool(description = "创建日程安排。仅当用户提到具体时间点时调用。没有具体执行时间点、只有截止日期的应使用 createTask。客户解析优先级：显式customerIdStr > 显式客户名称 > 当前客户对话绑定客户。当前客户对话中，如果用户只说“这个客户/当前客户/他们”等，不要把代词作为customerName，留空即可让工具默认关联当前客户。如果传入客户名称但系统中不存在该客户，工具会中止创建并提示先创建客户。")
     @AiToolPermission(value = "schedule:create", action = "创建日程")
     public String createSchedule(
+            @ToolParam(description = "Optional CRM customer ID returned by createCustomer or confirmPendingCustomerCreation. For a newly created customer, pass this ID to avoid name rematching.", required = false) String customerIdStr,
             @ToolParam(description = "日程标题，必填") String title,
             @ToolParam(description = "开始时间，格式：yyyy-MM-dd HH:mm，必填") String startTime,
             @ToolParam(description = "结束时间，格式：yyyy-MM-dd HH:mm", required = false) String endTime,
@@ -52,15 +54,19 @@ public class ScheduleTools {
             title, startTime, endTime, type, customerName, contactName);
 
         try {
-            if (StrUtil.isBlank(startTime) || "null".equalsIgnoreCase(startTime)) {
+            if (!hasTextValue(startTime)) {
                 return "创建日程失败: 缺少开始时间参数";
             }
 
             ScheduleAddBO bo = new ScheduleAddBO();
             bo.setTitle(title);
-            bo.setType(StrUtil.isNotBlank(type) && !"null".equalsIgnoreCase(type) ? type : "meeting");
+            bo.setType(hasTextValue(type) ? type : "meeting");
             bo.setDescription(description);
             bo.setLocation(location);
+            Long currentEmployeeId = AiContextHolder.getCurrentEmployeeId();
+            if (currentEmployeeId != null) {
+                bo.setParticipantUserIds(List.of(currentEmployeeId));
+            }
 
             try {
                 bo.setStartTime(dateTimeFormat.parse(startTime));
@@ -68,7 +74,7 @@ public class ScheduleTools {
                 return "创建日程失败: 开始时间格式无效，请使用 yyyy-MM-dd HH:mm 格式";
             }
 
-            if (StrUtil.isNotBlank(endTime) && !"null".equalsIgnoreCase(endTime)) {
+            if (hasTextValue(endTime)) {
                 try {
                     bo.setEndTime(dateTimeFormat.parse(endTime));
                 } catch (Exception e) {
@@ -78,24 +84,26 @@ public class ScheduleTools {
 
             String matchedCompanyName = null;
             Long customerId = null;
-            if (StrUtil.isNotBlank(customerName) && !"null".equalsIgnoreCase(customerName)) {
-                AiCustomerMatcher.CustomerMatchResult customerMatch = aiCustomerMatcher.match(customerName);
-                if (customerMatch.isExistsNoAccess()) {
-                    return "客户已存在：「" + customerName + "」。";
+            Long currentRelationId = AiContextHolder.getCurrentRelationId();
+            boolean useRelationContext = currentRelationId != null
+                && !hasTextValue(customerIdStr)
+                && !hasTextValue(customerName);
+            if (useRelationContext) {
+                bo.setRelationId(currentRelationId);
+            } else {
+                AiToolCustomerResolver.CustomerResolveResult customerResolve = customerResolver.resolveForCreate(
+                    customerIdStr, customerName, "关联该客户创建日程", "创建日程失败", "创建日程");
+                if (customerResolve.errorMessage() != null) {
+                    return customerResolve.errorMessage();
                 }
-                if (customerMatch.isAmbiguous()) {
-                    return "创建日程失败: 客户名称「" + customerName + "」无法唯一匹配，可能是：" + customerMatch.formatCandidateNames() + "。请提供更完整的客户名称。";
-                }
-                if (customerMatch.isMatched()) {
-                    customerId = customerMatch.getCustomer().getCustomerId();
-                    matchedCompanyName = customerMatch.getCustomer().getCompanyName();
+                if (customerResolve.customer() != null) {
+                    customerId = customerResolve.customer().getCustomerId();
+                    matchedCompanyName = customerResolve.customer().getCompanyName();
                     bo.setCustomerId(customerId);
-                } else {
-                    log.info("未找到客户「{}」，将不关联客户", customerName);
                 }
             }
 
-            if (StrUtil.isNotBlank(contactName) && !"null".equalsIgnoreCase(contactName)) {
+            if (hasTextValue(contactName) && customerId != null) {
                 Long contactId = findContactIdByName(contactName, customerId);
                 if (contactId == null) {
                     log.info("未找到联系人「{}」，将不关联联系人", contactName);
@@ -109,13 +117,22 @@ public class ScheduleTools {
             result.append(String.format("日程「%s」创建成功！日程ID: %d。", title, scheduleId));
             result.append(String.format("\n- 类型: %s", getTypeName(bo.getType())));
             result.append(String.format("\n- 开始时间: %s", startTime));
-            if (StrUtil.isNotBlank(endTime) && !"null".equalsIgnoreCase(endTime)) {
+            if (hasTextValue(endTime)) {
                 result.append(String.format("\n- 结束时间: %s", endTime));
             }
             if (matchedCompanyName != null) {
                 result.append(String.format("\n- 公司名称: %s", matchedCompanyName));
             }
-            if (StrUtil.isNotBlank(location) && !"null".equalsIgnoreCase(location)) {
+            if (customerId != null) {
+                result.append("\n- customerId: ").append(customerId);
+            }
+            if (useRelationContext) {
+                result.append("\n- relationId: ").append(currentRelationId);
+            }
+            if (currentEmployeeId != null) {
+                result.append("\n- employeeId: ").append(currentEmployeeId);
+            }
+            if (hasTextValue(location)) {
                 result.append(String.format("\n- 地点: %s", location));
             }
 
@@ -161,6 +178,9 @@ public class ScheduleTools {
                 if (vo.getCustomerName() != null) {
                     sb.append(String.format("，客户: %s", vo.getCustomerName()));
                 }
+                if (vo.getRelationName() != null) {
+                    sb.append(String.format("，关系人: %s", vo.getRelationName()));
+                }
                 if (StrUtil.isNotBlank(vo.getLocation())) {
                     sb.append(String.format("，地点: %s", vo.getLocation()));
                 }
@@ -199,6 +219,10 @@ public class ScheduleTools {
         }
 
         return null;
+    }
+
+    private boolean hasTextValue(String value) {
+        return StrUtil.isNotBlank(value) && !"null".equalsIgnoreCase(StrUtil.trim(value));
     }
 
     private String getTypeName(String type) {
