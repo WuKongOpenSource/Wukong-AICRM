@@ -85,6 +85,7 @@ public class SecurityConfig {
                         .requestMatchers("/", "/index", "/static/**", "/assets/**").anonymous()
                         .requestMatchers("/index.html", "/doc.html", "/swagger-resources/**", "/webjars/**", "/v3/api-docs/**", "/instrument/callback").anonymous()
                         .requestMatchers("/api/enum/**").permitAll() // 枚举值接口允许访问
+                        .requestMatchers("/knowledge/preview-range/**").permitAll()
                         // OIDC 端点允许访问（用于 MinIO SSO）
                         .requestMatchers("/.well-known/openid-configuration", "/oauth2/authorize", "/oauth2/token", "/oauth2/userinfo", "/oauth2/jwks", "/oauth2/minio-sso").permitAll()
                         .anyRequest().authenticated() // 其他所有请求都需要认证

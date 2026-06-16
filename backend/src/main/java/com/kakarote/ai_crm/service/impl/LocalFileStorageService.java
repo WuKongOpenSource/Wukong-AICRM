@@ -13,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
 
 /**
@@ -98,6 +99,26 @@ public class LocalFileStorageService implements FileStorageService {
     }
 
     @Override
+    public InputStream getFileRangeStream(String path, long start, long length) {
+        try {
+            File baseDir = new File(uploadPath).getAbsoluteFile();
+            File targetFile = new File(baseDir, path);
+            if (!targetFile.exists()) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "File does not exist");
+            }
+            FileInputStream inputStream = new FileInputStream(targetFile);
+            inputStream.skipNBytes(start);
+            return new LimitedInputStream(inputStream, length);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to read local file range: path={}, start={}, length={}",
+                    path, start, length, e);
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "File download failed");
+        }
+    }
+
+    @Override
     public String getLocalPath(String path) {
         File baseDir = new File(uploadPath).getAbsoluteFile();
         File targetFile = new File(baseDir, path);
@@ -112,5 +133,46 @@ public class LocalFileStorageService implements FileStorageService {
     @Override
     public PresignedUploadInfo getPresignedUploadUrl(String path, String contentType, int expiry) {
         throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "本地存储不支持预签名上传，请启用MinIO存储");
+    }
+
+    private static final class LimitedInputStream extends InputStream {
+
+        private final InputStream delegate;
+        private long remaining;
+
+        private LimitedInputStream(InputStream delegate, long remaining) {
+            this.delegate = delegate;
+            this.remaining = Math.max(remaining, 0);
+        }
+
+        @Override
+        public int read() throws IOException {
+            if (remaining <= 0) {
+                return -1;
+            }
+            int value = delegate.read();
+            if (value != -1) {
+                remaining--;
+            }
+            return value;
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int length) throws IOException {
+            if (remaining <= 0) {
+                return -1;
+            }
+            int maxLength = (int) Math.min(length, remaining);
+            int count = delegate.read(buffer, offset, maxLength);
+            if (count > 0) {
+                remaining -= count;
+            }
+            return count;
+        }
+
+        @Override
+        public void close() throws IOException {
+            delegate.close();
+        }
     }
 }

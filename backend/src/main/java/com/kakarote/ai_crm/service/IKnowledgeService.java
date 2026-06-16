@@ -38,6 +38,8 @@ public interface IKnowledgeService extends IService<Knowledge> {
      */
     BasePage<KnowledgeVO> queryPageList(KnowledgeQueryBO queryBO);
 
+    void updateCustomer(Long knowledgeId, Long customerId);
+
     KnowledgeAiSearchVO aiSearch(KnowledgeAiSearchBO searchBO);
 
     Flux<String> streamTargetedScript(KnowledgeTargetedScriptBO scriptBO);

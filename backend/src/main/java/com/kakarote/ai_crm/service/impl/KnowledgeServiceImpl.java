@@ -322,6 +322,23 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateCustomer(Long knowledgeId, Long customerId) {
+        Knowledge knowledge = getById(knowledgeId);
+        if (ObjectUtil.isNull(knowledge)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Knowledge file does not exist");
+        }
+        if (customerId != null) {
+            Customer customer = customerMapper.selectById(customerId);
+            if (ObjectUtil.isNull(customer)) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Customer does not exist");
+            }
+        }
+        knowledge.setCustomerId(customerId);
+        updateById(knowledge);
+    }
+
+    @Override
     public KnowledgeAiSearchVO aiSearch(KnowledgeAiSearchBO searchBO) {
         long startedAt = System.currentTimeMillis();
         String keyword = searchBO == null ? null : StrUtil.trim(searchBO.getKeyword());

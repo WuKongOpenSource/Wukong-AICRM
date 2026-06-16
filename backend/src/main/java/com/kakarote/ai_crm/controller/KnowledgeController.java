@@ -13,10 +13,14 @@ import com.kakarote.ai_crm.entity.BO.KnowledgeTargetedScriptBO;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiSearchVO;
+import com.kakarote.ai_crm.entity.VO.KnowledgePreviewTokenVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
+import com.kakarote.ai_crm.service.KnowledgePreviewTokenService;
 import com.kakarote.ai_crm.service.WeKnoraClient;
+import com.kakarote.ai_crm.utils.DocToHtmlConverter;
+import com.kakarote.ai_crm.utils.UserUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,12 +30,16 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpRange;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -42,6 +50,8 @@ import reactor.core.publisher.Flux;
 import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/knowledge")
@@ -56,6 +66,9 @@ public class KnowledgeController {
 
     @Autowired
     private WeKnoraClient weKnoraClient;
+
+    @Autowired
+    private KnowledgePreviewTokenService previewTokenService;
 
     @PostMapping("/upload")
     @Operation(summary = "Upload knowledge file")
@@ -117,13 +130,103 @@ public class KnowledgeController {
         InputStream inputStream = fileStorageService.getFileStream(knowledge.getFilePath());
         Resource resource = new InputStreamResource(inputStream);
 
-        String encodedFilename = URLEncoder.encode(knowledge.getName(), StandardCharsets.UTF_8)
-                .replace("+", "%20");
+        MediaType mediaType = resolveMediaType(knowledge.getName(), knowledge.getMimeType());
+        String encodedFilename = encodeFilename(knowledge.getName());
+        ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
+                .contentType(mediaType)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encodedFilename);
+        if (knowledge.getFileSize() != null && knowledge.getFileSize() >= 0) {
+            builder.contentLength(knowledge.getFileSize());
+        }
 
-        return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encodedFilename)
+        return builder.body(resource);
+    }
+
+    @PostMapping("/updateCustomer")
+    @Operation(summary = "Update knowledge related customer")
+    @RequirePermission("knowledge:upload")
+    public Result<String> updateCustomer(
+            @Parameter(description = "Knowledge ID") @RequestParam Long knowledgeId,
+            @Parameter(description = "Customer ID") @RequestParam(required = false) Long customerId) {
+        knowledgeService.updateCustomer(knowledgeId, customerId);
+        return Result.ok();
+    }
+
+    @PostMapping("/{id}/preview-token")
+    @Operation(summary = "Create knowledge media preview token")
+    @RequirePermission("knowledge:view")
+    public Result<KnowledgePreviewTokenVO> createPreviewToken(@PathVariable("id") Long id) {
+        Knowledge knowledge = requireKnowledge(id);
+        if (!isPreviewableMedia(knowledge.getName(), knowledge.getMimeType())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "File type does not support media preview");
+        }
+        if (StrUtil.isBlank(knowledge.getFilePath())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "File path is empty");
+        }
+
+        KnowledgePreviewTokenService.PreviewToken token =
+                previewTokenService.createToken(id, UserUtil.getUserId());
+        KnowledgePreviewTokenVO vo = new KnowledgePreviewTokenVO();
+        vo.setUrl("/knowledge/preview-range/" + id + "?previewToken=" + token.token());
+        vo.setExpiresAt(token.expiresAt().toString());
+        return Result.ok(vo);
+    }
+
+    @GetMapping("/preview-range/{id}")
+    @Operation(summary = "Preview knowledge media with range requests")
+    public ResponseEntity<Resource> previewRange(
+            @PathVariable("id") Long id,
+            @RequestParam("previewToken") String previewToken,
+            @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
+        if (!previewTokenService.validateToken(previewToken, id)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        Knowledge knowledge = knowledgeService.getById(id);
+        if (knowledge == null || StrUtil.isBlank(knowledge.getFilePath())
+                || !isPreviewableMedia(knowledge.getName(), knowledge.getMimeType())) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        MediaType mediaType = resolveMediaType(knowledge.getName(), knowledge.getMimeType());
+        long fileSize = knowledge.getFileSize() == null ? -1 : knowledge.getFileSize();
+        if (fileSize <= 0 || StrUtil.isBlank(rangeHeader)) {
+            return buildFullMediaResponse(knowledge, mediaType, fileSize);
+        }
+
+        ResolvedRange range = resolveSingleRange(rangeHeader, fileSize);
+        if (range == null) {
+            return buildRangeNotSatisfiableResponse(fileSize);
+        }
+
+        InputStream inputStream = fileStorageService.getFileRangeStream(
+                knowledge.getFilePath(), range.start(), range.length());
+        Resource resource = new InputStreamResource(inputStream);
+        HttpHeaders headers = buildMediaHeaders(knowledge, mediaType);
+        headers.set("Content-Range", "bytes " + range.start() + "-" + range.end() + "/" + fileSize);
+        headers.setContentLength(range.length());
+
+        return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
+                .headers(headers)
                 .body(resource);
+    }
+
+    @GetMapping("/preview-html/{id}")
+    @Operation(summary = "Preview knowledge document as HTML")
+    @RequirePermission("knowledge:view")
+    public Result<String> previewHtml(@PathVariable("id") Long id) {
+        Knowledge knowledge = requireKnowledge(id);
+        if (StrUtil.isBlank(knowledge.getFilePath())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "File path is empty");
+        }
+
+        try (InputStream inputStream = fileStorageService.getFileStream(knowledge.getFilePath())) {
+            return Result.ok(DocToHtmlConverter.convertToHtml(inputStream));
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Document conversion failed");
+        }
     }
 
     @GetMapping("/preview/{id}")
@@ -152,9 +255,7 @@ public class KnowledgeController {
         headers.setContentType(preview.getContentType() != null ? preview.getContentType() : MediaType.APPLICATION_OCTET_STREAM);
         headers.setContentLength(preview.getBody().length);
 
-        String encodedFilename = URLEncoder.encode(knowledge.getName(), StandardCharsets.UTF_8)
-                .replace("+", "%20");
-        headers.set(HttpHeaders.CONTENT_DISPOSITION, "inline; filename*=UTF-8''" + encodedFilename);
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "inline; filename*=UTF-8''" + encodeFilename(knowledge.getName()));
 
         return ResponseEntity.ok()
                 .headers(headers)
@@ -195,5 +296,89 @@ public class KnowledgeController {
         return knowledgeService.askDocumentQuestion(id, askBO)
                 .filter(chunk -> chunk != null && !chunk.isEmpty())
                 .map(chunk -> ServerSentEvent.<String>builder().data(chunk).build());
+    }
+
+    private Knowledge requireKnowledge(Long id) {
+        Knowledge knowledge = knowledgeService.getById(id);
+        if (knowledge == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Knowledge file does not exist");
+        }
+        return knowledge;
+    }
+
+    private ResponseEntity<Resource> buildFullMediaResponse(Knowledge knowledge, MediaType mediaType, long fileSize) {
+        InputStream inputStream = fileStorageService.getFileStream(knowledge.getFilePath());
+        Resource resource = new InputStreamResource(inputStream);
+        ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
+                .headers(buildMediaHeaders(knowledge, mediaType));
+        if (fileSize >= 0) {
+            builder.contentLength(fileSize);
+        }
+        return builder.body(resource);
+    }
+
+    private HttpHeaders buildMediaHeaders(Knowledge knowledge, MediaType mediaType) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(mediaType);
+        headers.set("Accept-Ranges", "bytes");
+        headers.set(HttpHeaders.CONTENT_DISPOSITION,
+                "inline; filename*=UTF-8''" + encodeFilename(knowledge.getName()));
+        return headers;
+    }
+
+    private ResponseEntity<Resource> buildRangeNotSatisfiableResponse(long fileSize) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Accept-Ranges", "bytes");
+        headers.set("Content-Range", "bytes */" + fileSize);
+        return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                .headers(headers)
+                .build();
+    }
+
+    private ResolvedRange resolveSingleRange(String rangeHeader, long fileSize) {
+        try {
+            List<HttpRange> ranges = HttpRange.parseRanges(rangeHeader);
+            if (ranges.isEmpty()) {
+                return null;
+            }
+            HttpRange range = ranges.get(0);
+            long start = range.getRangeStart(fileSize);
+            long end = Math.min(range.getRangeEnd(fileSize), fileSize - 1);
+            if (start < 0 || end < start || start >= fileSize) {
+                return null;
+            }
+            return new ResolvedRange(start, end, end - start + 1);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private MediaType resolveMediaType(String fileName, String mimeType) {
+        if (StrUtil.isNotBlank(mimeType)) {
+            try {
+                return MediaType.parseMediaType(mimeType);
+            } catch (Exception ignored) {
+                // Fallback to filename-based detection.
+            }
+        }
+        return MediaTypeFactory.getMediaType(fileName)
+                .orElse(MediaType.APPLICATION_OCTET_STREAM);
+    }
+
+    private boolean isPreviewableMedia(String fileName, String mimeType) {
+        String normalizedMime = StrUtil.blankToDefault(mimeType, "").toLowerCase(Locale.ROOT);
+        if (normalizedMime.startsWith("audio/") || normalizedMime.startsWith("video/")) {
+            return true;
+        }
+        String lowerName = StrUtil.blankToDefault(fileName, "").toLowerCase(Locale.ROOT);
+        return lowerName.matches(".*\\.(mp3|wav|m4a|aac|ogg|oga|opus|flac|weba|mp4|webm|mov|m4v|avi|mkv|ogv|3gp)$");
+    }
+
+    private String encodeFilename(String fileName) {
+        return URLEncoder.encode(StrUtil.blankToDefault(fileName, "file"), StandardCharsets.UTF_8)
+                .replace("+", "%20");
+    }
+
+    private record ResolvedRange(long start, long end, long length) {
     }
 }
