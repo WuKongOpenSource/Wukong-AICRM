@@ -500,12 +500,12 @@
                   <div v-if="false" class="size-9 rounded-xl bg-primary flex items-center justify-center text-white shrink-0 shadow-lg shadow-primary/20">
                     <WkIcon name="ai" class="text-lg" />
                   </div>
-                  <div class="flex-1 space-y-3 min-w-0">
+                  <div class="min-w-0 flex-1 space-y-3">
                     <div class="max-w-full text-left text-[16px] leading-7 text-[#0d0d0d]">
                       <div
                         class="wk-markdown"
                         :class="{ 'wk-thinking-shimmer': message.isThinking && message.content.length === 0 }"
-                        v-html="renderAssistantMessage(message.content, Boolean(message.isStreaming), Boolean(message.isThinking))"
+                        v-html="renderAssistantMessage(message.content, message.isStreaming, message.isThinking)"
                       />
                       <div v-if="message.isThinking && message.content.length > 0" class="wk-thinking-shimmer mt-1 text-sm">
                         <p>思考中</p>
@@ -525,9 +525,8 @@
                         <div class="mt-1 text-xs text-[#8f8f8f]">{{ att.fileName }}</div>
                       </div>
                     </div>
-                    <div class="wk-chat-message-actions wk-chat-message-actions--assistant flex h-8 items-center gap-2">
+                    <div v-if="!message.isStreaming" class="wk-chat-message-actions wk-chat-message-actions--assistant flex h-8 items-center">
                       <button
-                        v-if="!message.isStreaming"
                         type="button"
                         class="flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] transition-all hover:bg-[#f1f1f1] hover:text-[#0d0d0d]"
                         aria-label="复制内容"
@@ -536,12 +535,6 @@
                       >
                         <WkIcon name="copy" :box-size="18" class="shrink-0 leading-none" />
                       </button>
-                      <span
-                        class="text-xs font-medium"
-                        :class="message.isStreaming ? 'text-primary/70' : 'text-slate-400'"
-                      >
-                        {{ getAssistantMessageStatusLabel(Boolean(message.isStreaming)) }} · {{ formatTime(message.timestamp) }}
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -577,8 +570,7 @@
                         />
                       </div>
                     </div>
-                    <div class="wk-chat-message-actions wk-chat-message-actions--user flex h-8 w-full basis-full items-center justify-end gap-2">
-                      <span class="text-xs font-medium text-slate-400">{{ formatTime(message.timestamp) }}</span>
+                    <div class="wk-chat-message-actions wk-chat-message-actions--user z-10 flex h-8 w-full basis-full items-center justify-end">
                       <button
                         type="button"
                         class="pointer-events-none flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] opacity-0 transition-all hover:bg-[#f1f1f1] hover:text-[#0d0d0d] group-hover:pointer-events-auto group-hover:opacity-100"
@@ -1589,7 +1581,6 @@ import RelationChatInfoPanel from './components/RelationChatInfoPanel.vue'
 import { renderMarkdown } from '@/utils/markdown'
 import {
   getAssistantMessagePlaceholder,
-  getAssistantMessageStatusLabel,
   normalizeAssistantMessageContent
 } from '@/utils/chatMessage'
 import { appEvents, APP_EVENT } from '@/utils/events'
