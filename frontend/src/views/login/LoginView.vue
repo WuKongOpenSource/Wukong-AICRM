@@ -45,7 +45,7 @@
                 <el-icon class="text-white" :size="24"><CircleCheck /></el-icon>
               </div>
               <div>
-                <h4 class="text-sm font-bold">数据安全保障</h4>
+                <h4 class="text-sm font-bold">企业级安全保障</h4>
                 <p class="text-xs text-slate-500">多重加密，守护您的核心客户资产</p>
               </div>
             </div>
