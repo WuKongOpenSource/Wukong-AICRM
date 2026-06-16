@@ -78,8 +78,14 @@ export interface Knowledge {
   type: KnowledgeType
   customerId?: string
   customerName?: string
+  employeeId?: string
+  employeeName?: string
+  relationId?: string
+  relationName?: string
   filePath?: string
-  fileSize?: number
+  /** 文件大小，单位：字节 (B)，来自知识库列表/详情等接口 */
+  fileSize?: number | string
+  /** 后端可选返回的已格式化大小（若存在可优先展示） */
   fileSizeFormatted?: string
   mimeType?: string
   summary?: string
@@ -108,6 +114,8 @@ export interface KnowledgeQueryBO {
   type?: KnowledgeType
   fileType?: KnowledgeFileType
   customerId?: string
+  employeeId?: string
+  relationId?: string
   page?: number
   limit?: number
 }

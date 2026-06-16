@@ -1190,6 +1190,7 @@ import ProductChatInfoPanel from './components/ProductChatInfoPanel.vue'
 import RelationChatInfoPanel from './components/RelationChatInfoPanel.vue'
 import { renderMarkdown } from '@/utils/markdown'
 import { appEvents, APP_EVENT } from '@/utils/events'
+import { resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import { shouldRefocusChatComposerAfterSend } from '@/utils/chatComposerFocus'
 import { registerNativeKeyboardInsetListeners } from '@/utils/capacitorKeyboard'
@@ -2803,7 +2804,8 @@ function getKnowledgeCardSubtitle(item: Knowledge): string {
   const kind = getFriendlyFileKind(item.name, item.mimeType)
   const formattedSize = item.fileSizeFormatted?.trim()
   if (formattedSize) return `${kind} · ${formattedSize}`
-  if (item.fileSize && item.fileSize > 0) return `${kind} · ${formatFileSize(item.fileSize)}`
+  const fileSize = resolveKnowledgeFileSizeBytes(item.fileSize)
+  if (fileSize > 0) return `${kind} · ${formatFileSize(fileSize)}`
   return kind
 }
 
