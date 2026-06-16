@@ -182,7 +182,22 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
                 .eq(ExternalAuthIdentity::getUserId, userId)
                 .eq(ExternalAuthIdentity::getStatus, 1)
                 .list();
-        return identities.stream().map(this::toBindingVO).toList();
+        List<ExternalAuthBindingVO> result = new ArrayList<>();
+        for (String provider : SUPPORTED_PROVIDERS) {
+            ExternalAuthIdentity identity = identities.stream()
+                    .filter(item -> provider.equals(item.getProvider()))
+                    .findFirst()
+                    .orElse(null);
+            ExternalAuthBindingVO vo = identity == null ? new ExternalAuthBindingVO() : toBindingVO(identity);
+            ExternalAuthProperties.ProviderConfig config = externalAuthProperties.getProvider(provider);
+            vo.setProvider(provider);
+            vo.setName(providerName(provider));
+            vo.setProviderName(providerName(provider));
+            vo.setBound(identity != null);
+            vo.setEnabled(config != null && config.isUsable());
+            result.add(vo);
+        }
+        return result;
     }
 
     @Override
@@ -372,6 +387,8 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
         ExternalAuthBindingVO vo = new ExternalAuthBindingVO();
         vo.setProvider(identity.getProvider());
         vo.setName(providerName(identity.getProvider()));
+        vo.setProviderName(providerName(identity.getProvider()));
+        vo.setBound(true);
         vo.setSubject(identity.getSubject());
         vo.setEmail(identity.getEmail());
         vo.setDisplayName(identity.getDisplayName());

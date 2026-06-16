@@ -105,7 +105,9 @@ const copy = {
   bindFailed: '\u5916\u90e8\u8d26\u53f7\u7ed1\u5b9a\u5931\u8d25'
 }
 
-const bindingMap = computed(() => new Map(bindings.value.map((binding) => [binding.provider, binding])))
+const bindingMap = computed(() =>
+  new Map(bindings.value.filter(binding => binding.bound).map((binding) => [binding.provider, binding]))
+)
 
 onMounted(async () => {
   await handleExternalBindQuery()

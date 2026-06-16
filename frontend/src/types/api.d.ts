@@ -50,7 +50,10 @@ export interface ExternalAuthTicketLoginParams {
 export interface ExternalAuthBinding {
   provider: ExternalAuthProviderCode
   name: string
-  subject: string
+  providerName: string
+  bound: boolean
+  enabled: boolean
+  subject?: string
   email?: string
   displayName?: string
   avatarUrl?: string

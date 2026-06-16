@@ -11,6 +11,12 @@ public class ExternalAuthBindingVO {
 
     private String name;
 
+    private String providerName;
+
+    private Boolean bound;
+
+    private Boolean enabled;
+
     private String subject;
 
     private String email;

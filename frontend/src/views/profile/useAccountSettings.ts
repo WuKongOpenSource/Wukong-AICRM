@@ -4,7 +4,6 @@ import { useUserStore } from '@/stores/user'
 import {
   changePassword,
   getExternalAuthBindings,
-  getExternalAuthProviders,
   getExternalBindAuthorizeUrl,
   getLoginUserDetail,
   unbindExternalAuth,
@@ -14,12 +13,6 @@ import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import type { ExternalAuthBinding, ExternalAuthProviderCode } from '@/types/api'
 
-type AccountExternalBinding = ExternalAuthBinding & {
-  providerName: string
-  bound: boolean
-  enabled: boolean
-}
-
 export function useAccountSettings() {
   const userStore = useUserStore()
 
@@ -28,7 +21,7 @@ export function useAccountSettings() {
   const avatarInputRef = ref<HTMLInputElement | null>(null)
   const avatarPreviewUrl = ref('')
   const submittingPassword = ref(false)
-  const externalBindings = ref<AccountExternalBinding[]>([])
+  const externalBindings = ref<ExternalAuthBinding[]>([])
   const externalBindingsLoading = ref(false)
   const externalBindingProvider = ref<ExternalAuthProviderCode | ''>('')
 
@@ -70,34 +63,7 @@ export function useAccountSettings() {
   async function loadExternalBindings() {
     externalBindingsLoading.value = true
     try {
-      const [providers, bindings] = await Promise.all([
-        getExternalAuthProviders(),
-        getExternalAuthBindings()
-      ])
-      const bindingMap = new Map(bindings.map((binding) => [binding.provider, binding]))
-      externalBindings.value = providers
-        .filter((provider) =>
-          provider.provider === 'google'
-          || provider.provider === 'wechat'
-          || provider.provider === 'outlook'
-        )
-        .map((provider) => {
-          const binding = bindingMap.get(provider.provider)
-          const providerName = externalProviderName(provider.provider)
-          return {
-            provider: provider.provider,
-            name: binding?.name || providerName,
-            providerName,
-            subject: binding?.subject || '',
-            email: binding?.email,
-            displayName: binding?.displayName,
-            avatarUrl: binding?.avatarUrl,
-            bindTime: binding?.bindTime,
-            lastLoginTime: binding?.lastLoginTime,
-            bound: Boolean(binding),
-            enabled: provider.enabled
-          }
-        })
+      externalBindings.value = await getExternalAuthBindings()
     } catch (error) {
       console.error('Load external auth bindings failed:', error)
       externalBindings.value = []
