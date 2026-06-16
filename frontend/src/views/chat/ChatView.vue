@@ -1351,7 +1351,6 @@
       type="button"
       class="group/sb-toggle absolute right-3 top-3 z-30 flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef]"
       aria-label="展开对象侧栏"
-      title="展开对象侧栏"
       @click="customerPanelVisible = true"
     >
       <WkIcon name="fold" :size="18" class="shrink-0" />
@@ -1359,7 +1358,7 @@
         class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/sb-toggle:opacity-100"
         role="tooltip"
       >
-        展开对象侧栏
+        显示对象侧栏
       </span>
     </button>
 
