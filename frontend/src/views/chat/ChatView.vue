@@ -612,7 +612,7 @@
 
           <!-- Input Area -->
           <div
-            class="shrink-0 p-4 md:p-8 bg-gradient-to-t from-white via-white to-transparent"
+            class="wk-chat-composer-wrap relative z-[80] shrink-0 p-4 md:z-[120] md:p-8 bg-gradient-to-t from-white via-white to-transparent"
             :style="chatComposerWrapStyle"
           >
             <div class="max-w-4xl mx-auto space-y-4" :style="chatComposerShellStyle">
@@ -3871,6 +3871,7 @@ function resolveChatAppIcon(code: string): string {
 <style scoped>
 .line-clamp-1 {
   display: -webkit-box;
+  line-clamp: 1;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -3878,9 +3879,18 @@ function resolveChatAppIcon(code: string): string {
 
 .line-clamp-2 {
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.wk-chat-messages {
+  --wk-chat-messages-scrollbar-offset: 0px;
+  --wk-chat-composer-clearance: 1rem;
+
+  overflow-x: hidden;
+  overflow-anchor: none;
 }
 
 .wk-chat-shell {
@@ -4076,6 +4086,38 @@ function resolveChatAppIcon(code: string): string {
   height: calc(64px + max(8px, var(--safe-area-inset-top)) + var(--wk-mobile-viewport-top-offset, 0px));
   pointer-events: none;
   background: var(--wk-bg-surface, #fff);
+}
+
+.wk-scroll-to-bottom-button {
+  width: 44px;
+  height: 44px;
+  border-color: #d4d4d8;
+  box-shadow:
+    0 12px 34px rgb(15 23 42 / 0.11),
+    0 0 18px 8px rgb(203 213 225 / 0.12);
+}
+
+.wk-chat-composer-wrap {
+  background: linear-gradient(to top, var(--wk-bg-page) 72%, rgb(var(--wk-bg-page-rgb) / 0));
+  transition: transform 180ms cubic-bezier(0.2, 0, 0, 1);
+  will-change: transform;
+}
+
+@media (max-width: 768px) {
+  .wk-chat-messages {
+    --wk-chat-composer-clearance: calc(116px + var(--safe-area-inset-bottom));
+  }
+
+  .wk-chat-messages--scrollable {
+    padding-bottom: var(--wk-chat-composer-clearance) !important;
+    scroll-padding-bottom: var(--wk-chat-composer-clearance);
+  }
+
+  .wk-chat-composer-wrap {
+    padding-right: max(0.5rem, var(--safe-area-inset-right));
+    padding-bottom: calc(0.5rem + var(--safe-area-inset-bottom));
+    padding-left: max(0.5rem, var(--safe-area-inset-left));
+  }
 }
 
 .wk-mobile-chat-floating-bar {
