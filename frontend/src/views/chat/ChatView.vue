@@ -3376,6 +3376,7 @@ function resolveChatAppIcon(code: string): string {
   border-radius: 28px 28px 0 0;
   background: var(--wk-bg-surface, #fff);
   box-shadow: 0 -18px 55px rgb(15 23 42 / 0.18);
+  transition: height 220ms cubic-bezier(0.22, 1, 0.36, 1), transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .wk-mobile-object-detail__header {
@@ -3383,6 +3384,8 @@ function resolveChatAppIcon(code: string): string {
   border-bottom: 1px solid var(--wk-border-subtle, #ececec);
   background: color-mix(in srgb, var(--wk-bg-surface, #fff) 96%, transparent);
   padding: 12px 16px 14px;
+  touch-action: none;
+  user-select: none;
 }
 
 .wk-mobile-object-detail__handle {
@@ -3403,12 +3406,19 @@ function resolveChatAppIcon(code: string): string {
 }
 
 .wk-mobile-object-detail__title {
+  display: -webkit-box;
   min-width: 0;
   flex: 1;
+  max-height: 44px;
+  overflow: hidden;
   color: var(--wk-text-primary, #0d0d0d);
   font-size: 17px;
   font-weight: 700;
   line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .wk-mobile-object-detail__close {
@@ -3454,7 +3464,7 @@ function resolveChatAppIcon(code: string): string {
 
 .wk-mobile-object-detail-enter-active .wk-mobile-object-detail__sheet,
 .wk-mobile-object-detail-leave-active .wk-mobile-object-detail__sheet {
-  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), height 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .wk-mobile-object-detail-enter-from .wk-mobile-object-detail__sheet,
