@@ -83,7 +83,7 @@
               :props="{ label: 'categoryName', children: 'children' }"
               :expand-on-click-node="false"
               class="product-category-tree"
-              @node-click="(node: ProductCategoryVO) => selectCategory(String(node.categoryId))"
+              @node-click="node => selectCategory(String(node.categoryId))"
             >
               <template #default="{ data }">
                 <div
