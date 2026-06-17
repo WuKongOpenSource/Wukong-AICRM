@@ -112,22 +112,22 @@ public class LocalFileStorageService implements FileStorageService {
     @Override
     public InputStream getFileRangeStream(String path, long offset, long length) {
         if (offset < 0 || length < 0) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "invalid file range");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "文件范围无效");
         }
         try {
             File targetFile = resolveTargetFile(path);
             if (!targetFile.exists()) {
-                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "file not found");
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "文件不存在");
             }
             RandomAccessFile randomAccessFile = new RandomAccessFile(targetFile, "r");
             randomAccessFile.seek(offset);
             return new BoundedRandomAccessFileInputStream(randomAccessFile, length);
         } catch (FileNotFoundException e) {
             log.error("file not found: path={}", path);
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "file not found");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "文件不存在");
         } catch (IOException e) {
             log.error("read local file range failed: path={}, offset={}, length={}", path, offset, length, e);
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "file read failed");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "文件读取失败");
         }
     }
 
@@ -143,12 +143,12 @@ public class LocalFileStorageService implements FileStorageService {
             File targetFile = new File(baseDir, path).getCanonicalFile();
             if (!targetFile.toPath().startsWith(baseDir.toPath())) {
                 log.warn("blocked local file path outside upload dir: path={}", path);
-                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "invalid file path");
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "文件路径无效");
             }
             return targetFile;
         } catch (IOException e) {
             log.error("resolve local file path failed: path={}", path, e);
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "file path resolve failed");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "文件路径解析失败");
         }
     }
 

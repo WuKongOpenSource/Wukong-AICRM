@@ -777,7 +777,7 @@ async function loadDocument(id: string) {
     if (kind === 'audio' || kind === 'video') {
       const previewToken = await getKnowledgePreviewToken(id)
       if (!previewToken.url) {
-        throw new Error('Missing knowledge media preview URL')
+        throw new Error('缺少知识媒体预览地址')
       }
       mediaPreviewUrl.value = previewToken.url
       mediaPreviewObjectUrl.value = false

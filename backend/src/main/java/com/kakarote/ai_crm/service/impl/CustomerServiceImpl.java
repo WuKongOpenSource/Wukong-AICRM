@@ -314,7 +314,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     public CustomerDetailVO updateCustomerField(CustomerFieldUpdateBO fieldUpdateBO) {
         Customer customer = getById(fieldUpdateBO.getCustomerId());
         if (ObjectUtil.isNull(customer)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Customer does not exist");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在");
         }
 
         String fieldName = StrUtil.trim(fieldUpdateBO.getFieldName());
@@ -340,7 +340,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             case "nextFollowTime" -> customer.setNextFollowTime(toDateValue(value));
             case "remark" -> customer.setRemark(toStr(value));
             case "ownerId" -> customer.setOwnerId(toLong(value));
-            default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Unsupported customer field: " + fieldName);
+            default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "不支持的客户字段: " + fieldName);
         }
         customer.setUpdateTime(new Date());
         Long updateUserId = getCurrentUserIdOrNull();
@@ -1701,12 +1701,12 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     @Override
     public CustomerLogoUploadVO uploadCustomerLogo(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Logo image is required");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "请上传客户 Logo 图片");
         }
 
         String extension = resolveCustomerLogoExtension(file);
         if (extension == null) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Only png, jpg, jpeg, webp and gif images are supported");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "仅支持 png、jpg、jpeg、webp 和 gif 图片");
         }
 
         String datePath = DateUtil.format(new Date(), "yyyy/MM/dd");
@@ -1855,7 +1855,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     public CustomerAiReportVO generateAiReport(Long customerId) {
         Customer customer = getById(customerId);
         if (customer == null || Objects.equals(customer.getStatus(), 0)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Customer does not exist");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在");
         }
 
         CustomerAiReportVO report = new CustomerAiReportVO();

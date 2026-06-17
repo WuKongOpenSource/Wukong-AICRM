@@ -154,12 +154,12 @@ export async function streamKnowledgeTargetedScript(
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      throw new Error(`请求失败，HTTP 状态码：${response.status}`)
     }
 
     reader = response.body?.getReader() ?? null
     if (!reader) {
-      throw new Error('Response body is not readable')
+      throw new Error('响应内容不可读取')
     }
 
     const decoder = new TextDecoder()
@@ -227,12 +227,12 @@ export async function askKnowledgeQuestion(
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      throw new Error(`请求失败，HTTP 状态码：${response.status}`)
     }
 
     reader = response.body?.getReader() ?? null
     if (!reader) {
-      throw new Error('Response body is not readable')
+      throw new Error('响应内容不可读取')
     }
 
     const decoder = new TextDecoder()

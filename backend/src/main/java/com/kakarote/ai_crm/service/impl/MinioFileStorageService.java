@@ -191,7 +191,7 @@ public class MinioFileStorageService implements FileStorageService {
     @Override
     public InputStream getFileRangeStream(String path, long offset, long length) {
         if (offset < 0 || length < 0) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "invalid file range");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "文件范围无效");
         }
         ensureBucketExists();
         try {
@@ -206,7 +206,7 @@ public class MinioFileStorageService implements FileStorageService {
         } catch (Exception e) {
             log.error("get MinIO file range stream failed: path={}, offset={}, length={}, error={}",
                     path, offset, length, e.getMessage(), e);
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "file range read failed");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "文件范围读取失败");
         }
     }
 

@@ -454,6 +454,12 @@ watch(
   }
 )
 
+watch(enabledExternalProviders, async () => {
+  if (loginStep.value === 'credentials') {
+    await syncStageHeight(false)
+  }
+})
+
 function readLastLoginUsername(): string {
   if (typeof window === 'undefined') return ''
   try {

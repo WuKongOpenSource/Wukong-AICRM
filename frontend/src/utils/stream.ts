@@ -23,12 +23,12 @@ export async function fetchSSE(
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      throw new Error(`请求失败，HTTP 状态码：${response.status}`)
     }
 
     const reader = response.body?.getReader()
     if (!reader) {
-      throw new Error('Response body is not readable')
+      throw new Error('响应内容不可读取')
     }
 
     const decoder = new TextDecoder()
@@ -102,12 +102,12 @@ export class SSEClient {
       })
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        throw new Error(`请求失败，HTTP 状态码：${response.status}`)
       }
 
       const reader = response.body?.getReader()
       if (!reader) {
-        throw new Error('Response body is not readable')
+        throw new Error('响应内容不可读取')
       }
 
       const decoder = new TextDecoder()

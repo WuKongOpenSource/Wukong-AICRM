@@ -147,7 +147,7 @@ public class OidcController {
         // 验证 grant_type
         if (!"authorization_code".equals(grantType)) {
             log.warn("OIDC Token 失败: 不支持的 grant_type={}", grantType);
-            return errorResponse("unsupported_grant_type", "Only authorization_code is supported");
+            return errorResponse("unsupported_grant_type", "仅支持 authorization_code 授权方式");
         }
 
         // 支持 HTTP Basic Auth 方式传递 client credentials
@@ -171,27 +171,27 @@ public class OidcController {
         // 验证 client_id
         if (!oidcConfig.getClientId().equals(resolvedClientId)) {
             log.warn("OIDC Token 失败: 无效的 client_id");
-            return errorResponse("invalid_client", "Invalid client_id");
+            return errorResponse("invalid_client", "client_id 无效");
         }
 
         // 验证 client_secret
         if (!oidcConfig.getClientSecret().equals(resolvedClientSecret)) {
             log.warn("OIDC Token 失败: 无效的 client_secret");
-            return errorResponse("invalid_client", "Invalid client_secret");
+            return errorResponse("invalid_client", "client_secret 无效");
         }
 
         // 验证并消费授权码
         Long userId = oidcService.exchangeCode(code, redirectUri);
         if (userId == null) {
             log.warn("OIDC Token 失败: 无效或已过期的授权码");
-            return errorResponse("invalid_grant", "Invalid or expired authorization code");
+            return errorResponse("invalid_grant", "授权码无效或已过期");
         }
 
         // 获取用户信息
         ManagerUser user = manageUserService.getById(userId);
         if (user == null) {
             log.warn("OIDC Token 失败: 用户不存在 userId={}", userId);
-            return errorResponse("invalid_grant", "User not found");
+            return errorResponse("invalid_grant", "用户不存在");
         }
 
         LoginUser loginUser = new LoginUser();
@@ -220,13 +220,13 @@ public class OidcController {
     @Operation(summary = "OIDC UserInfo 端点")
     public ResponseEntity<?> userinfo(@RequestHeader(value = "Authorization", required = false) String authorization) {
         if (StrUtil.isEmpty(authorization)) {
-            return errorResponse("invalid_token", "Missing Authorization header");
+            return errorResponse("invalid_token", "缺少 Authorization 请求头");
         }
 
         Map<String, Object> userInfo = oidcService.getUserInfoByAccessToken(authorization);
         if (userInfo == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "invalid_token", "error_description", "Invalid or expired access token"));
+                    .body(Map.of("error", "invalid_token", "error_description", "访问令牌无效或已过期"));
         }
 
         return ResponseEntity.ok(userInfo);

@@ -34,7 +34,7 @@ public final class QrCodeUtil {
             String base64 = Base64.getEncoder().encodeToString(output.toByteArray());
             return "data:image/png;base64," + base64;
         } catch (WriterException | IOException e) {
-            throw new IllegalStateException("Failed to generate QR code", e);
+            throw new IllegalStateException("二维码生成失败", e);
         }
     }
 }

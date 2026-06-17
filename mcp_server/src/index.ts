@@ -220,11 +220,11 @@ async function request(method: HttpMethod, path: string, body?: unknown, query?:
   const parsed = parseJson(text);
 
   if (!response.ok) {
-    throw new Error(`AI_CRM backend returned HTTP ${response.status}: ${formatErrorBody(parsed, text)}`);
+    throw new Error(`AI_CRM 后端返回 HTTP ${response.status}: ${formatErrorBody(parsed, text)}`);
   }
 
   if (isBackendError(parsed)) {
-    throw new Error(`AI_CRM backend returned code ${parsed.code}: ${parsed.msg ?? "unknown error"}`);
+    throw new Error(`AI_CRM 后端返回业务码 ${parsed.code}: ${parsed.msg ?? "未知错误"}`);
   }
 
   return parsed;

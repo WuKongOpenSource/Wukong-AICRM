@@ -274,7 +274,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         if (customerId != null) {
             Customer customer = customerMapper.selectById(customerId);
             if (ObjectUtil.isNull(customer)) {
-                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Customer does not exist");
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在或无权限访问");
             }
         }
         Knowledge knowledge = new Knowledge();
@@ -399,12 +399,12 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     public void updateCustomer(Long knowledgeId, Long customerId) {
         Knowledge knowledge = getById(knowledgeId);
         if (ObjectUtil.isNull(knowledge)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Knowledge file does not exist");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "知识库文件不存在");
         }
         if (customerId != null) {
             Customer customer = customerMapper.selectById(customerId);
             if (ObjectUtil.isNull(customer)) {
-                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Customer does not exist");
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在或无权限访问");
             }
         }
         knowledge.setCustomerId(customerId);
@@ -416,7 +416,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         long startedAt = System.currentTimeMillis();
         String keyword = searchBO == null ? null : StrUtil.trim(searchBO.getKeyword());
         if (StrUtil.isBlank(keyword)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Search keyword is required");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "搜索关键词不能为空");
         }
 
         String type = searchBO == null ? null : StrUtil.trimToNull(searchBO.getType());
@@ -448,7 +448,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     public Flux<String> streamTargetedScript(KnowledgeTargetedScriptBO scriptBO) {
         if (scriptBO == null || scriptBO.getCustomerId() == null
                 || scriptBO.getKnowledgeIds() == null || scriptBO.getKnowledgeIds().isEmpty()) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Generation parameters are incomplete");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "生成参数不完整");
         }
 
         List<Long> requestedIds = scriptBO.getKnowledgeIds().stream()
@@ -457,7 +457,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
                 .limit(MAX_TARGETED_SCRIPT_DOC_COUNT)
                 .toList();
         if (requestedIds.isEmpty()) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Please select at least one reference document");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "请至少选择一份参考文档");
         }
 
         List<Knowledge> fetchedKnowledges = lambdaQuery()
@@ -477,7 +477,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
             }
         }
         if (knowledges.size() != requestedIds.size()) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Some reference documents do not exist");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "部分参考文档不存在");
         }
 
         CustomerDetailVO customerDetail = customerService.getCustomerDetail(scriptBO.getCustomerId());

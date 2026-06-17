@@ -73,7 +73,7 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
             return CCJSqlParserUtil.parseCondExpression(sqlSegment);
         } catch (JSQLParserException e) {
             log.error("Failed to parse data permission SQL segment: {}", sqlSegment, e);
-            throw new IllegalStateException("Failed to parse data permission SQL segment", e);
+            throw new IllegalStateException("数据权限 SQL 片段解析失败", e);
         }
     }
 

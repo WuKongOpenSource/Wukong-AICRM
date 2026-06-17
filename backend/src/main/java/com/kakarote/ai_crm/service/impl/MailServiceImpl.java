@@ -389,7 +389,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     public MailAccountVO setDefaultAccount(Long accountId) {
         MailAccount account = loadUserAccount(accountId);
         if (!Boolean.TRUE.equals(account.getEnabled())) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Mailbox is disconnected");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "邮箱账号已断开连接");
         }
         baseMapper.selectList(new LambdaQueryWrapper<MailAccount>()
                         .eq(MailAccount::getUserId, account.getUserId()))
@@ -643,7 +643,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     @Override
     public List<MailMessageVO> queryCustomerTimeline(Long customerId, int limit) {
         if (customerId == null || customerMapper.selectById(customerId) == null) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Customer does not exist or is not accessible");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在或无权限访问");
         }
         int actualLimit = Math.max(1, Math.min(limit <= 0 ? 20 : limit, 100));
         return mailMessageMapper.selectCustomerTimeline(UserUtil.getUserId(), customerId, actualLimit);
@@ -667,7 +667,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     public MailAttachmentVO downloadAttachment(Long attachmentId) {
         MailAttachment attachment = mailAttachmentMapper.selectById(attachmentId);
         if (attachment == null) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Attachment does not exist");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "附件不存在");
         }
         MailMessage message = loadUserMessage(attachment.getMessageId());
         if (StrUtil.isNotBlank(attachment.getFilePath())) {
@@ -675,7 +675,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         }
         if (StrUtil.isBlank(message.getRawFilePath())) {
             attachment.setDownloadStatus("external_required");
-            attachment.setDownloadError("Attachment source was not retained by the current sync policy. Re-sync with attachment auto/full mode or use the source mailbox.");
+            attachment.setDownloadError("当前同步策略未保留附件源文件，请使用附件自动/完整模式重新同步，或从源邮箱获取。");
             mailAttachmentMapper.updateById(attachment);
             return toAttachmentVO(attachment);
         }
@@ -688,7 +688,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                     .orElse(null);
             if (matched == null || matched.bytes() == null || matched.bytes().length == 0) {
                 attachment.setDownloadStatus("failed");
-                attachment.setDownloadError("Attachment was not found in retained raw mail.");
+                attachment.setDownloadError("保留的原始邮件中未找到该附件。");
                 mailAttachmentMapper.updateById(attachment);
                 return toAttachmentVO(attachment);
             }
@@ -716,7 +716,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     public MailDraftVO createDraft(MailDraftCreateBO draftBO) {
         MailAccount account = draftBO.getAccountId() != null ? loadUserAccount(draftBO.getAccountId()) : findDefaultAccount();
         if (draftBO.getCustomerId() != null && customerMapper.selectById(draftBO.getCustomerId()) == null) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Customer does not exist or is not accessible");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在或无权限访问");
         }
         if (draftBO.getSourceMessageId() != null) {
             loadUserMessage(draftBO.getSourceMessageId());
@@ -809,11 +809,11 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
             MailDraftVO created = createDraft(sendBO.getDraft());
             draft = loadUserDraft(created.getDraftId());
         } else {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Draft is required");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "草稿不能为空");
         }
         MailAccount account = draft.getAccountId() != null ? loadUserAccount(draft.getAccountId()) : findDefaultAccount();
         if (account == null || !Boolean.TRUE.equals(account.getEnabled())) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "No connected mailbox account");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "没有已连接的邮箱账号");
         }
         try {
             byte[] rawBytes = buildDraftRawBytes(account, draft);
@@ -835,7 +835,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
             draft.setRiskStatus("send_failed");
             draft.setRiskReasons(StrUtil.maxLength(e.getMessage(), 1000));
             mailDraftMapper.updateById(draft);
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Send mail failed: " + e.getMessage());
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "邮件发送失败: " + e.getMessage());
         }
     }
 
@@ -999,7 +999,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
             case PROVIDER_GMAIL -> sendGmail(account, rawBytes, credentials);
             case PROVIDER_OUTLOOK -> sendGraph(account, draft, credentials);
             case PROVIDER_IMAP -> sendSmtp(account, rawBytes, credentials);
-            default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Unsupported mailbox provider");
+            default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "不支持的邮箱服务商");
         };
     }
 
@@ -1036,7 +1036,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     private String sendSmtp(MailAccount account, byte[] rawBytes, Map<String, Object> credentials) throws Exception {
         String password = asString(credentials.get("password"));
         if (StrUtil.isBlank(password)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Mailbox credential has expired, please reconnect.");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "邮箱授权已过期，请重新连接");
         }
         String smtpHost = resolveSmtpHost(account);
         int smtpPort = resolveSmtpPort(account.getSmtpPort());
@@ -1105,7 +1105,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         }
         InternetAddress[] parsed = InternetAddress.parse(addresses, false);
         if (parsed.length == 0) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Recipient address cannot be empty");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "收件人地址不能为空");
         }
         return parsed;
     }
@@ -1139,7 +1139,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
             String responseBody = response.getBody();
             return StrUtil.isBlank(responseBody) ? objectMapper.createObjectNode() : objectMapper.readTree(responseBody);
         } catch (HttpClientErrorException e) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Send mail provider API failed: " + e.getStatusCode());
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "邮件服务商 API 调用失败: " + e.getStatusCode());
         }
     }
 
@@ -1150,7 +1150,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         try {
             restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(body, headers), Void.class);
         } catch (HttpClientErrorException e) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Send mail provider API failed: " + e.getStatusCode());
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "邮件服务商 API 调用失败: " + e.getStatusCode());
         }
     }
 
@@ -1671,7 +1671,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         if (imapHost != null && imapHost.toLowerCase(Locale.ROOT).startsWith("imap.")) {
             return "smtp." + imapHost.substring(5);
         }
-        throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "SMTP server is required for IMAP mailbox sending");
+        throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "使用 IMAP 邮箱发送邮件时必须配置 SMTP 服务器");
     }
 
     private MatchResult matchContactAndCustomer(String fromAddress) {
@@ -1736,7 +1736,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                 .eq(MailDraft::getUserId, UserUtil.getUserId())
                 .ne(MailDraft::getStatus, "deleted"));
         if (draft == null) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Draft does not exist or is not accessible");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "草稿不存在或无权限访问");
         }
         return draft;
     }
@@ -1746,7 +1746,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                 .eq(MailTemplate::getTemplateId, templateId)
                 .eq(MailTemplate::getUserId, UserUtil.getUserId()));
         if (template == null) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Template does not exist or is not accessible");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "模板不存在或无权限访问");
         }
         return template;
     }

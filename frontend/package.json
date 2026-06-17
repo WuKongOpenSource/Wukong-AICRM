@@ -10,6 +10,7 @@
     "test:android-legacy-build": "node verification/androidLegacyBuildConfig.test.mjs",
     "test:android-webview-runtime": "node verification/androidWebViewRuntimeCompat.test.mjs",
     "test:privacy-consent": "node verification/nativePrivacyConsentCore.test.mjs",
+    "test:login-external-auth": "node verification/loginExternalAuthHeight.test.mjs",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix"
   },
   "dependencies": {

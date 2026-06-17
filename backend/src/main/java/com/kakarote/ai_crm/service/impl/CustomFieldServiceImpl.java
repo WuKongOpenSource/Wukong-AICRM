@@ -381,12 +381,12 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         CustomFieldVO field = getEnabledFieldsByEntity(entityType).stream()
                 .filter(item -> fieldName.equals(item.getFieldName()))
                 .findFirst()
-                .orElseThrow(() -> new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Custom field not found"));
+                .orElseThrow(() -> new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "自定义字段不存在"));
 
         String tableName = dynamicSchemaService.getTableName(entityType);
         String idColumn = dynamicSchemaService.getIdColumnName(entityType);
         if (StrUtil.isBlank(field.getColumnName()) || !dynamicSchemaService.columnExists(tableName, field.getColumnName())) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Custom field column not found");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "自定义字段列不存在");
         }
 
         Object jdbcValue = "".equals(value) ? null : convertValueForJdbc(field.getFieldType(), value, fieldName);

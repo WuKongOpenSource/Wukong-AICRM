@@ -5,10 +5,10 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
-@Schema(name = "SessionPinBO", description = "Session pin parameters")
+@Schema(name = "SessionPinBO", description = "会话置顶参数")
 public class SessionPinBO {
 
-    @NotNull(message = "Pinned status is required")
-    @Schema(description = "Whether the session is pinned", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "置顶状态不能为空")
+    @Schema(description = "是否置顶会话", requiredMode = Schema.RequiredMode.REQUIRED)
     private Boolean pinned;
 }

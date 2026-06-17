@@ -76,7 +76,7 @@ function getBrowserPlugin(): BrowserPlugin {
   if (!browserPlugin) {
     browserPlugin = registerNativePlugin<BrowserPlugin>('Browser')
     if (!browserPlugin) {
-      throw new Error('Capacitor Browser plugin is unavailable')
+      throw new Error('Capacitor Browser 插件不可用')
     }
   }
   return browserPlugin
@@ -240,7 +240,7 @@ export async function checkForUpdates(options: CheckForUpdatesOptions = {}): Pro
     const response = await fetcher(manifestUrl, { cache: 'no-store' })
 
     if (!response.ok) {
-      throw new Error(`Version check request failed: ${response.status}`)
+      throw new Error(`版本检查请求失败：${response.status}`)
     }
 
     const platform = getNativePlatform()

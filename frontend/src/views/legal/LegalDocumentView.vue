@@ -73,7 +73,7 @@ async function loadDocument(): Promise<void> {
   try {
     const response = await fetch(documentUrl.value, { cache: 'no-store' })
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
+      throw new Error(`请求失败，HTTP 状态码：${response.status}`)
     }
 
     documentContent.value = await response.text()

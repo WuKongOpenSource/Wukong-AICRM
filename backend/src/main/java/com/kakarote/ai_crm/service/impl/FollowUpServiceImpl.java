@@ -124,7 +124,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             followUpAddBO.setCustomerId(relation.getCustomerId());
         }
         if (followUpAddBO.getCustomerId() == null) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Customer or relation is required");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户或关系人不能为空");
         }
 
         Customer customer = customerMapper.selectById(followUpAddBO.getCustomerId());
@@ -156,7 +156,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     public void updateFollowUp(FollowUpUpdateBO followUpUpdateBO) {
         FollowUp followUp = getById(followUpUpdateBO.getFollowUpId());
         if (ObjectUtil.isNull(followUp)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Follow-up record does not exist");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "跟进记录不存在");
         }
         validateRelation(followUpUpdateBO.getRelationId());
 
@@ -222,7 +222,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     public FollowUpAttachmentVO getAttachment(Long attachmentId) {
         FollowUpAttachment attachment = followUpAttachmentMapper.selectById(attachmentId);
         if (attachment == null) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Attachment does not exist");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "附件不存在");
         }
         return toAttachmentVO(attachment);
     }
@@ -243,7 +243,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     public FollowUpAttachmentVO analyzeAttachment(Long attachmentId) {
         FollowUpAttachment attachment = followUpAttachmentMapper.selectById(attachmentId);
         if (attachment == null) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Attachment does not exist");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "附件不存在");
         }
 
         attachment.setAnalysisStatus("processing");
@@ -299,12 +299,12 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         }
         Relation relation = relationMapper.selectById(relationId);
         if (relation == null || Objects.equals(relation.getStatus(), 0)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Relation does not exist");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "关系人不存在");
         }
         Long currentUserId = UserUtil.getUserIdOrNull();
         if (currentUserId != null && relation.getCreateUserId() != null
             && !Objects.equals(currentUserId, relation.getCreateUserId())) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Relation does not exist");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "关系人不存在");
         }
         return relation;
     }
@@ -379,12 +379,12 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             content = extractDocumentText(attachment.getFilePath(), mimeType, fileName);
         } else {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
-                "Current attachment type is not supported for AI analysis");
+                "当前附件类型不支持 AI 分析");
         }
 
         if (StrUtil.isBlank(content)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
-                "No readable content could be extracted from this attachment");
+                "无法从该附件中提取可读内容");
         }
         return analyzeTextLikeAttachment(fileName, content);
     }
@@ -393,7 +393,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         AiModelCapabilities capabilities = chatClientProvider.getCurrentCapabilities();
         if (capabilities == null || !capabilities.isSupportsVision()) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
-                "The current model does not support image analysis");
+                "当前模型不支持图片分析");
         }
 
         String prompt = """
@@ -414,18 +414,18 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
                 .user(user -> user.text(prompt).media(media))
                 .call()
                 .content();
-            return StrUtil.blankToDefault(response, "Unable to generate an effective image analysis.").trim();
+            return StrUtil.blankToDefault(response, "未能生成有效的图片分析。").trim();
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Image analysis failed");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "图片分析失败，请稍后重试");
         }
     }
 
     private String analyzeAudioAttachment(FollowUpAttachment attachment) {
         try (InputStream inputStream = fileStorageService.getFileStream(attachment.getFilePath())) {
             if (inputStream == null) {
-                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Attachment audio could not be loaded");
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "附件音频加载失败");
             }
             byte[] bytes = inputStream.readAllBytes();
             String transcript = aiAudioTranscriptionService.transcribe(
@@ -444,7 +444,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Audio analysis failed");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "音频分析失败，请稍后重试");
         }
     }
 
@@ -469,12 +469,12 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
                 .user(prompt)
                 .call()
                 .content();
-            return StrUtil.blankToDefault(response, "Attachment content was read, but no useful analysis was generated.")
+            return StrUtil.blankToDefault(response, "附件内容已读取，但未生成有效分析。")
                 .trim();
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Attachment analysis failed");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "附件分析失败，请稍后重试");
         }
     }
 

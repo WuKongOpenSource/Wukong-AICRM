@@ -166,7 +166,7 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
         String userIdText = redisTemplate.opsForValue().get(ticketKey);
         redisTemplate.delete(ticketKey);
         if (StrUtil.isBlank(userIdText)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NOT_LOGIN, "External login ticket is expired");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NOT_LOGIN, "第三方登录凭证已过期");
         }
         ManagerUser user = loadEnabledUser(Long.parseLong(userIdText));
         return createLoginResult(user, response);
@@ -279,7 +279,7 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
         loadEnabledUser(userId);
         ExternalAuthIdentity subjectIdentity = findIdentityBySubject(provider, profile.getSubject());
         if (subjectIdentity != null && !Objects.equals(subjectIdentity.getUserId(), userId)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "External account is already bound");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "第三方账号已绑定");
         }
 
         ExternalAuthIdentity userIdentity = findIdentityByUser(provider, userId);
@@ -403,7 +403,7 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
             case "google" -> fetchGoogleProfile(config, code, redirectUri);
             case "outlook" -> fetchOutlookProfile(config, code, redirectUri);
             case "wechat" -> fetchWechatProfile(config, code);
-            default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Unsupported external auth provider");
+            default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "不支持的第三方登录方式");
         };
     }
 
@@ -426,7 +426,7 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
         JSONObject tokenJson = parseJsonResponse(tokenResponse);
         String accessToken = tokenJson.getString("access_token");
         if (StrUtil.isBlank(accessToken)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Google token response is missing access_token");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Google 授权返回缺少 access_token");
         }
 
         HttpHeaders userHeaders = new HttpHeaders();
@@ -440,7 +440,7 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
         JSONObject userJson = parseJsonResponse(userResponse);
         String subject = userJson.getString("sub");
         if (StrUtil.isBlank(subject)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Google profile is missing sub");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Google 用户信息缺少 sub");
         }
         ExternalProfile profile = new ExternalProfile();
         profile.setSubject(subject);
@@ -471,7 +471,7 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
         ));
         String accessToken = tokenJson.getString("access_token");
         if (StrUtil.isBlank(accessToken)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Outlook token response is missing access_token");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Outlook 授权返回缺少 access_token");
         }
 
         HttpHeaders userHeaders = new HttpHeaders();
@@ -492,7 +492,7 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
         );
         String subject = firstNotBlank(userJson.getString("sub"), idClaims.getString("sub"), idClaims.getString("oid"));
         if (StrUtil.isBlank(subject)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Outlook profile is missing subject");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Outlook 用户信息缺少 subject");
         }
 
         JSONObject rawProfile = new JSONObject();
@@ -524,7 +524,7 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
         String accessToken = tokenJson.getString("access_token");
         String openId = tokenJson.getString("openid");
         if (StrUtil.isBlank(accessToken) || StrUtil.isBlank(openId)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "WeChat token response is invalid");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "微信授权令牌响应无效");
         }
 
         String profileUrl = UriComponentsBuilder.fromHttpUrl("https://api.weixin.qq.com/sns/userinfo")
@@ -537,7 +537,7 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
         JSONObject userJson = parseJsonResponse(restTemplate.exchange(profileUrl, HttpMethod.GET, HttpEntity.EMPTY, String.class));
         String subject = StrUtil.blankToDefault(userJson.getString("unionid"), userJson.getString("openid"));
         if (StrUtil.isBlank(subject)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "WeChat profile is missing subject");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "微信用户信息缺少唯一标识");
         }
         ExternalProfile profile = new ExternalProfile();
         profile.setSubject(subject);
@@ -551,13 +551,13 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
 
     private JSONObject parseJsonResponse(ResponseEntity<String> response) {
         if (!response.getStatusCode().is2xxSuccessful() || StrUtil.isBlank(response.getBody())) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "External auth provider request failed");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "第三方登录服务请求失败");
         }
         JSONObject json = JSON.parseObject(response.getBody());
         if (json.containsKey("error") || json.containsKey("errcode")) {
             Integer errcode = json.getInteger("errcode");
             if (errcode == null || errcode != 0) {
-                throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "External auth provider returned an error");
+                throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "第三方登录服务返回错误");
             }
         }
         return json;
@@ -604,7 +604,7 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
     private ExternalAuthProperties.ProviderConfig requireUsableProvider(String provider) {
         ExternalAuthProperties.ProviderConfig config = externalAuthProperties.getProvider(provider);
         if (config == null || !config.isUsable()) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "External auth provider is not configured");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "第三方登录方式未配置");
         }
         return config;
     }
@@ -612,7 +612,7 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
     private String normalizeProvider(String provider) {
         String normalized = StrUtil.emptyToDefault(provider, "").toLowerCase(Locale.ROOT);
         if (!SUPPORTED_PROVIDERS.contains(normalized)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Unsupported external auth provider");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "不支持的第三方登录方式");
         }
         return normalized;
     }

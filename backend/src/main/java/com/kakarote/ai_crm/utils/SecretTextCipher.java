@@ -43,7 +43,7 @@ public class SecretTextCipher {
             buffer.put(encrypted);
             return Base64.getEncoder().encodeToString(buffer.array());
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to encrypt mail credential", e);
+            throw new IllegalStateException("邮箱凭据加密失败", e);
         }
     }
 
@@ -62,7 +62,7 @@ public class SecretTextCipher {
             cipher.init(Cipher.DECRYPT_MODE, keySpec(), new GCMParameterSpec(TAG_LENGTH_BITS, nonce));
             return new String(cipher.doFinal(encrypted), StandardCharsets.UTF_8);
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to decrypt mail credential", e);
+            throw new IllegalStateException("邮箱凭据解密失败", e);
         }
     }
 
@@ -77,7 +77,7 @@ public class SecretTextCipher {
         try {
             return MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to initialize mail credential key", e);
+            throw new IllegalStateException("邮箱凭据密钥初始化失败", e);
         }
     }
 }
