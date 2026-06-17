@@ -9,6 +9,7 @@ import com.kakarote.ai_crm.entity.VO.WeKnoraChunk;
 import com.kakarote.ai_crm.entity.VO.WeKnoraKnowledge;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -54,6 +55,7 @@ public class WeKnoraClient {
     private final ObjectMapper objectMapper;
     private final ConcurrentHashMap<String, String> conversationSessionCache = new ConcurrentHashMap<>();
 
+    @Autowired
     public WeKnoraClient(WeKnoraConfig config) {
         this(config, new RestTemplate(), new ObjectMapper());
     }

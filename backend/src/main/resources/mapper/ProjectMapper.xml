@@ -41,7 +41,7 @@
             SELECT
                 project_id,
                 COUNT(*) AS task_count,
-                COUNT(*) FILTER (WHERE status <> 'COMPLETED') AS incomplete_task_count
+                COUNT(*) FILTER (WHERE status &lt;&gt; 'COMPLETED') AS incomplete_task_count
             FROM crm_project_task
             GROUP BY project_id
         ) task_stats ON p.project_id = task_stats.project_id
@@ -71,7 +71,7 @@
             SELECT
                 project_id,
                 COUNT(*) AS task_count,
-                COUNT(*) FILTER (WHERE status <> 'COMPLETED') AS incomplete_task_count
+                COUNT(*) FILTER (WHERE status &lt;&gt; 'COMPLETED') AS incomplete_task_count
             FROM crm_project_task
             GROUP BY project_id
         ) task_stats ON p.project_id = task_stats.project_id

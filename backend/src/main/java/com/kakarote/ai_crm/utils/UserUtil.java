@@ -55,10 +55,18 @@ public class UserUtil {
      */
     public static Long getUserIdOrNull() {
         try {
-            return getLoginUser().getUser().getUserId();
-        } catch (Exception e) {
-            return null;
+            Authentication auth = getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof LoginUser loginUser) {
+                return loginUser.getUser().getUserId();
+            }
+        } catch (Exception ignored) {
         }
+
+        Long aiContextUserId = AiContextHolder.getCurrentUserId();
+        if (aiContextUserId != null) {
+            return aiContextUserId;
+        }
+        return null;
     }
 
     /**

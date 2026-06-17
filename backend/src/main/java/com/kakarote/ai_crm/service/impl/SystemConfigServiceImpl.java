@@ -24,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,6 +66,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
     private StringRedisTemplate redisTemplate;
 
     @Autowired
+    @Lazy
     private DynamicChatClientProvider chatClientProvider;
 
     @Autowired
