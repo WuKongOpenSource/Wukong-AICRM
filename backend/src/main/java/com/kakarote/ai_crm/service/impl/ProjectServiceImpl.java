@@ -85,27 +85,45 @@ public class ProjectServiceImpl implements IProjectService {
     private static final String ROLE_EXTERNAL = "EXTERNAL";
     private static final String MEMBER_STATUS_ACTIVE = "ACTIVE";
     private static final int MAX_AI_CONTEXT_TEXT_LENGTH = 8_000;
+    private static final String PERMISSION_VIEW_PROJECT = "VIEW_PROJECT";
+    private static final String PERMISSION_EDIT_PROJECT = "EDIT_PROJECT";
+    private static final String PERMISSION_DELETE_PROJECT = "DELETE_PROJECT";
+    private static final String PERMISSION_ARCHIVE_PROJECT = "ARCHIVE_PROJECT";
+    private static final String PERMISSION_ADD_MEMBER = "ADD_MEMBER";
+    private static final String PERMISSION_REMOVE_MEMBER = "REMOVE_MEMBER";
+    private static final String PERMISSION_MODIFY_MEMBER_PERMISSION = "MODIFY_MEMBER_PERMISSION";
+    private static final String PERMISSION_CREATE_TASK = "CREATE_TASK";
+    private static final String PERMISSION_EDIT_TASK = "EDIT_TASK";
+    private static final String PERMISSION_DELETE_TASK = "DELETE_TASK";
+    private static final String PERMISSION_MOVE_TASK = "MOVE_TASK";
+    private static final String PERMISSION_ADD_LANE = "ADD_LANE";
+    private static final String PERMISSION_EDIT_LANE = "EDIT_LANE";
+    private static final String PERMISSION_DELETE_LANE = "DELETE_LANE";
+    private static final String PERMISSION_USE_AI_CHAT = "USE_AI_CHAT";
+    private static final String PERMISSION_UPLOAD_ATTACHMENT = "UPLOAD_ATTACHMENT";
+    private static final String PERMISSION_DELETE_ATTACHMENT = "DELETE_ATTACHMENT";
+    private static final String PERMISSION_CREATE_SCHEDULE = "CREATE_SCHEDULE";
     private static final List<String> PROJECT_ROLES = List.of(ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER, ROLE_READONLY, ROLE_EXTERNAL);
     private static final List<String> ALL_PERMISSIONS = List.of(
-            "VIEW_PROJECT",
-            "EDIT_PROJECT",
-            "DELETE_PROJECT",
-            "ARCHIVE_PROJECT",
-            "ADD_MEMBER",
-            "REMOVE_MEMBER",
-            "MODIFY_MEMBER_PERMISSION",
-            "CREATE_TASK",
-            "EDIT_TASK",
-            "DELETE_TASK",
-            "MOVE_TASK",
-            "ADD_LANE",
-            "EDIT_LANE",
-            "DELETE_LANE",
-            "USE_AI_CHAT",
+            PERMISSION_VIEW_PROJECT,
+            PERMISSION_EDIT_PROJECT,
+            PERMISSION_DELETE_PROJECT,
+            PERMISSION_ARCHIVE_PROJECT,
+            PERMISSION_ADD_MEMBER,
+            PERMISSION_REMOVE_MEMBER,
+            PERMISSION_MODIFY_MEMBER_PERMISSION,
+            PERMISSION_CREATE_TASK,
+            PERMISSION_EDIT_TASK,
+            PERMISSION_DELETE_TASK,
+            PERMISSION_MOVE_TASK,
+            PERMISSION_ADD_LANE,
+            PERMISSION_EDIT_LANE,
+            PERMISSION_DELETE_LANE,
+            PERMISSION_USE_AI_CHAT,
             "AI_CREATE_TASK",
-            "UPLOAD_ATTACHMENT",
-            "DELETE_ATTACHMENT",
-            "CREATE_SCHEDULE",
+            PERMISSION_UPLOAD_ATTACHMENT,
+            PERMISSION_DELETE_ATTACHMENT,
+            PERMISSION_CREATE_SCHEDULE,
             "VIEW_STATISTICS"
     );
     private static final Map<String, List<String>> DEFAULT_ROLE_PERMISSIONS = createDefaultRolePermissions();
@@ -240,6 +258,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO updateProject(ProjectBO.Update updateBO) {
         Project project = getProjectEntity(updateBO.getProjectId());
+        ensureProjectPermission(project, PERMISSION_EDIT_PROJECT);
         if (updateBO.getName() != null) {
             project.setName(requireName(updateBO.getName()));
         }
@@ -275,6 +294,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO archiveProject(Long projectId) {
         Project project = getProjectEntity(projectId);
+        ensureProjectPermission(project, PERMISSION_ARCHIVE_PROJECT);
         project.setStatus(STATUS_ARCHIVED);
         project.setUpdateUserId(UserUtil.getUserId());
         projectMapper.updateById(project);
@@ -285,6 +305,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO restoreProject(Long projectId) {
         Project project = getProjectEntity(projectId);
+        ensureProjectPermission(project, PERMISSION_ARCHIVE_PROJECT);
         project.setStatus(STATUS_NOT_STARTED);
         project.setUpdateUserId(UserUtil.getUserId());
         projectMapper.updateById(project);
@@ -294,7 +315,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO addProjectAttachment(Long projectId, ProjectBO.ProjectAttachmentSave attachmentBO) {
-        getProjectEntity(projectId);
+        ensureProjectPermission(getProjectEntity(projectId), PERMISSION_UPLOAD_ATTACHMENT);
         if (attachmentBO == null || StrUtil.isAllBlank(attachmentBO.getName(), attachmentBO.getFileUrl())) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Attachment is required");
         }
@@ -311,6 +332,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO deleteProjectAttachment(Long projectId, Long attachmentId) {
+        ensureProjectPermission(projectId, PERMISSION_DELETE_ATTACHMENT);
         ProjectAttachment attachment = projectAttachmentMapper.selectById(attachmentId);
         if (attachment == null || !Objects.equals(attachment.getProjectId(), projectId)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Project attachment does not exist");
@@ -322,7 +344,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO addProjectSchedule(Long projectId, ProjectBO.ProjectScheduleSave scheduleBO) {
-        getProjectEntity(projectId);
+        ensureProjectPermission(getProjectEntity(projectId), PERMISSION_CREATE_SCHEDULE);
         if (scheduleBO == null) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Schedule is required");
         }
@@ -339,6 +361,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO deleteProjectSchedule(Long projectId, Long scheduleId) {
+        ensureProjectPermission(projectId, PERMISSION_CREATE_SCHEDULE);
         ProjectSchedule schedule = projectScheduleMapper.selectById(scheduleId);
         if (schedule == null || !Objects.equals(schedule.getProjectId(), projectId)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Project schedule does not exist");
@@ -350,7 +373,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteProject(Long projectId) {
-        getProjectEntity(projectId);
+        ensureProjectPermission(getProjectEntity(projectId), PERMISSION_DELETE_PROJECT);
         projectAttachmentMapper.delete(Wrappers.<ProjectAttachment>lambdaQuery()
                 .eq(ProjectAttachment::getProjectId, projectId));
         projectScheduleMapper.delete(Wrappers.<ProjectSchedule>lambdaQuery()
@@ -365,7 +388,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO addLane(Long projectId, ProjectBO.LaneSave laneBO) {
-        getProjectEntity(projectId);
+        ensureProjectPermission(getProjectEntity(projectId), PERMISSION_ADD_LANE);
         Long currentUserId = UserUtil.getUserId();
         int sortOrder = nextLaneSortOrder(projectId);
         insertLane(projectId, null, laneBO.getName(), sortOrder, false, currentUserId);
@@ -375,7 +398,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO updateLane(Long projectId, ProjectBO.LaneSave laneBO) {
-        getProjectEntity(projectId);
+        ensureProjectPermission(getProjectEntity(projectId), PERMISSION_EDIT_LANE);
         ProjectLane lane = getProjectLane(projectId, laneBO.getLaneId());
         lane.setName(requireName(laneBO.getName()));
         lane.setUpdateUserId(UserUtil.getUserId());
@@ -386,7 +409,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO deleteLane(Long projectId, Long laneId) {
-        getProjectEntity(projectId);
+        ensureProjectPermission(getProjectEntity(projectId), PERMISSION_DELETE_LANE);
         ProjectLane lane = getProjectLane(projectId, laneId);
         if (Boolean.TRUE.equals(lane.getSystemFlag())) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "System lane cannot be deleted");
@@ -404,7 +427,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO addTask(Long projectId, ProjectBO.TaskSave taskBO) {
-        getProjectEntity(projectId);
+        ensureProjectPermission(getProjectEntity(projectId), PERMISSION_CREATE_TASK);
         ProjectLane lane = taskBO.getLaneId() == null ? firstLane(projectId) : getProjectLane(projectId, taskBO.getLaneId());
         ProjectTask task = new ProjectTask();
         copyTaskFields(task, taskBO);
@@ -424,7 +447,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO updateTask(Long projectId, ProjectBO.TaskSave taskBO) {
-        getProjectEntity(projectId);
+        ensureProjectPermission(getProjectEntity(projectId), PERMISSION_EDIT_TASK);
         ProjectTask task = getProjectTask(projectId, taskBO.getTaskId());
         copyTaskFields(task, taskBO);
         if (taskBO.getLaneId() != null) {
@@ -442,6 +465,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO addTaskAttachment(Long projectId, Long taskId, ProjectBO.TaskAttachmentSave attachmentBO) {
+        ensureProjectPermission(projectId, PERMISSION_UPLOAD_ATTACHMENT);
         getProjectTask(projectId, taskId);
         saveTaskAttachment(projectId, taskId, attachmentBO);
         return getProject(projectId);
@@ -450,6 +474,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO deleteTaskAttachment(Long projectId, Long taskId, Long attachmentId) {
+        ensureProjectPermission(projectId, PERMISSION_DELETE_ATTACHMENT);
         ProjectTaskAttachment attachment = getProjectTaskAttachment(projectId, taskId, attachmentId);
         projectTaskAttachmentMapper.deleteById(attachment.getAttachmentId());
         return getProject(projectId);
@@ -463,6 +488,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO deleteTask(Long projectId, Long taskId) {
+        ensureProjectPermission(projectId, PERMISSION_DELETE_TASK);
         getProjectTask(projectId, taskId);
         projectTaskAttachmentMapper.delete(Wrappers.<ProjectTaskAttachment>lambdaQuery()
                 .eq(ProjectTaskAttachment::getProjectId, projectId)
@@ -474,6 +500,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO moveTask(Long projectId, ProjectBO.TaskMove moveBO) {
+        ensureProjectPermission(projectId, PERMISSION_MOVE_TASK);
         ProjectTask task = getProjectTask(projectId, moveBO.getTaskId());
         task.setLaneId(getProjectLane(projectId, moveBO.getLaneId()).getLaneId());
         if (isCompletedLane(task.getLaneId())) {
@@ -500,7 +527,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO addMember(Long projectId, ProjectBO.MemberSave memberBO) {
-        getProjectEntity(projectId);
+        ensureProjectPermission(getProjectEntity(projectId), PERMISSION_ADD_MEMBER);
         ManagerUser user = resolveUser(memberBO.getUserId());
         String memberName = StrUtil.blankToDefault(normalizeOptional(memberBO.getMemberName()),
                 StrUtil.blankToDefault(user.getRealname(), user.getUsername()));
@@ -517,7 +544,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO updateMemberRole(Long projectId, ProjectBO.MemberRole roleBO) {
-        getProjectEntity(projectId);
+        ensureProjectPermission(getProjectEntity(projectId), PERMISSION_MODIFY_MEMBER_PERMISSION);
         ProjectVO.ProjectMemberVO before = findMember(projectId, roleBO.getUserId());
         String role = normalizeRole(roleBO.getRole());
         jdbcTemplate.update("""
@@ -534,7 +561,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO updateMemberPermissions(Long projectId, ProjectBO.MemberPermissions permissionsBO) {
-        getProjectEntity(projectId);
+        ensureProjectPermission(getProjectEntity(projectId), PERMISSION_MODIFY_MEMBER_PERMISSION);
         ProjectVO.ProjectMemberVO before = findMember(projectId, permissionsBO.getUserId());
         List<String> permissions = normalizePermissions(permissionsBO.getPermissions());
         jdbcTemplate.update("""
@@ -551,7 +578,8 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO updateMemberStatus(Long projectId, ProjectBO.MemberStatus statusBO) {
-        getProjectEntity(projectId);
+        String permission = "REMOVED".equalsIgnoreCase(statusBO.getStatus()) ? PERMISSION_REMOVE_MEMBER : PERMISSION_MODIFY_MEMBER_PERMISSION;
+        ensureProjectPermission(getProjectEntity(projectId), permission);
         ProjectVO.ProjectMemberVO before = findMember(projectId, statusBO.getUserId());
         String status = normalizeMemberStatus(statusBO.getStatus());
         jdbcTemplate.update("""
@@ -568,7 +596,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO handleProjectAiCommand(Long projectId, ProjectBO.AiCommand commandBO) {
-        getProjectEntity(projectId);
+        ensureProjectPermission(getProjectEntity(projectId), PERMISSION_USE_AI_CHAT);
         String content = requireName(commandBO.getContent());
         appendProjectChat(projectId, "user", content);
         if (hasAiReferenceMaterials(commandBO)) {
@@ -636,6 +664,7 @@ public class ProjectServiceImpl implements IProjectService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProjectVO handleTaskAiCommand(Long projectId, Long taskId, ProjectBO.AiCommand commandBO) {
+        ensureProjectPermission(projectId, PERMISSION_USE_AI_CHAT);
         ProjectTask task = getProjectTask(projectId, taskId);
         String content = requireName(commandBO.getContent());
         appendTaskChat(projectId, taskId, "user", content);
@@ -1454,8 +1483,33 @@ public class ProjectServiceImpl implements IProjectService {
             vo.setBeforeSummary(rs.getString("before_summary"));
             vo.setAfterSummary(rs.getString("after_summary"));
             vo.setCreateTime(rs.getTimestamp("create_time"));
-            return vo;
+                return vo;
         }, projectId);
+    }
+
+    private void ensureProjectPermission(Long projectId, String permission) {
+        ensureProjectPermission(getProjectEntity(projectId), permission);
+    }
+
+    private void ensureProjectPermission(Project project, String permission) {
+        if (!hasProjectPermission(project, permission)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_AUTH, "当前账号没有该项目操作权限");
+        }
+    }
+
+    private boolean hasProjectPermission(Project project, String permission) {
+        if (project == null) {
+            return false;
+        }
+        Long currentUserId = UserUtil.getUserId();
+        if (Objects.equals(currentUserId, UserUtil.getSuperUserId())
+                || Objects.equals(project.getOwnerId(), currentUserId)) {
+            return true;
+        }
+        ProjectVO.ProjectMemberVO member = findActiveMember(project.getProjectId(), currentUserId);
+        return member != null
+                && member.getPermissions() != null
+                && member.getPermissions().contains(permission);
     }
 
     private void fillProjectAccess(ProjectVO project) {

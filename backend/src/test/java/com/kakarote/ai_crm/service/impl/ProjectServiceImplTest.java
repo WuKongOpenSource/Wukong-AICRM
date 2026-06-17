@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kakarote.ai_crm.ai.AiMode;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
 import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
+import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.entity.BO.ProjectBO;
@@ -41,8 +42,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -145,6 +148,30 @@ class ProjectServiceImplTest {
     }
 
     @Test
+    void addLaneRequiresProjectPermission() {
+        Project project = new Project();
+        project.setProjectId(2001L);
+        project.setOwnerId(2002L);
+        when(projectMapper.selectById(2001L)).thenReturn(project);
+
+        ProjectVO.ProjectMemberVO member = new ProjectVO.ProjectMemberVO();
+        member.setUserId(1001L);
+        member.setRole("READONLY");
+        member.setStatus("ACTIVE");
+        member.setPermissions(List.of("VIEW_PROJECT"));
+        when(jdbcTemplate.query(any(String.class), any(org.springframework.jdbc.core.RowMapper.class), eq(2001L)))
+                .thenReturn(List.of(member));
+
+        ProjectBO.LaneSave laneBO = new ProjectBO.LaneSave();
+        laneBO.setName("Review");
+
+        assertThatThrownBy(() -> projectService.addLane(2001L, laneBO))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("权限");
+        verify(projectLaneMapper, never()).insert(any(ProjectLane.class));
+    }
+
+    @Test
     void createProjectDefaultsOwnerStatusAndSystemLanes() {
         when(manageUserMapper.getUserId(1001L)).thenReturn(activeUser(1001L));
 
@@ -179,6 +206,7 @@ class ProjectServiceImplTest {
         Project project = new Project();
         project.setProjectId(2001L);
         project.setName("Implementation");
+        project.setOwnerId(1001L);
         project.setCustomerId(5001L);
         ProjectTask task = new ProjectTask();
         task.setTaskId(3001L);
@@ -222,7 +250,10 @@ class ProjectServiceImplTest {
 
     @Test
     void addProjectAttachmentStoresMetadataAndReturnsProjectDetail() {
-        when(projectMapper.selectById(2001L)).thenReturn(new Project());
+        Project project = new Project();
+        project.setProjectId(2001L);
+        project.setOwnerId(1001L);
+        when(projectMapper.selectById(2001L)).thenReturn(project);
         when(projectMapper.getProjectById(2001L)).thenReturn(projectDetail(2001L));
         when(projectLaneMapper.selectList(any())).thenReturn(List.of());
         when(projectTaskMapper.selectProjectTasks(2001L, null)).thenReturn(List.of());
@@ -250,6 +281,7 @@ class ProjectServiceImplTest {
         Project project = new Project();
         project.setProjectId(2001L);
         project.setName("Implementation");
+        project.setOwnerId(1001L);
         ProjectTask task = new ProjectTask();
         task.setTaskId(3001L);
         task.setProjectId(2001L);
@@ -300,6 +332,7 @@ class ProjectServiceImplTest {
         project.setProjectId(projectId);
         project.setName("Implementation");
         project.setStatus("NOT_STARTED");
+        project.setOwnerId(1001L);
         return project;
     }
 
