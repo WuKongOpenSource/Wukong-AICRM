@@ -144,6 +144,16 @@ public interface ICustomerService extends IService<Customer> {
     void refreshCustomerActivity(Long customerId);
 
     /**
+     * Rebuild searchable customer text for all customers.
+     */
+    int refreshAllCustomerSearchText();
+
+    /**
+     * Rebuild searchable customer text for one customer.
+     */
+    void refreshCustomerSearchText(Long customerId);
+
+    /**
      * 使用 AI 解析搜索。
      */
     CustomerAiSearchParseVO aiParseSearch(CustomerAiSearchParseBO parseBO);

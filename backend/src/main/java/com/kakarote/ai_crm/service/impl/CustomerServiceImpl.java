@@ -106,7 +106,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final String CUSTOMER_TABLE_NAME = "crm_customer";
+    private static final String CUSTOMER_SEARCH_TEXT_COLUMN = "search_text";
     private static final Set<String> CUSTOMER_LOGO_EXTENSIONS = Set.of(".png", ".jpg", ".jpeg", ".webp", ".gif");
+    private static final Set<String> SEARCHABLE_CUSTOM_FIELD_TYPES = Set.of("text", "textarea", "select", "multiselect");
     private static final Set<String> BLANK_EMPTY_FIELD_TYPES = Set.of("text", "textarea", "select");
     private static final String FIELD_SOURCE_SYSTEM = "system";
     private static final String FIELD_SOURCE_CUSTOM = "custom";
@@ -861,6 +863,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
         customer.setStage(stage);
         updateById(customer);
+        refreshCustomerActivity(customerId);
     }
 
     @Override
@@ -1728,10 +1731,68 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 .set(Customer::getAiAnalysisRequestedAt, analysisRequestedAt)
                 .set(Customer::getUpdateTime, analysisRequestedAt);
         baseMapper.update(null, updateWrapper);
+        refreshCustomerSearchText(customerId);
         globalSearchIndexService.refreshCustomerIndex(customerId);
         globalSearchIndexService.refreshCustomerRelatedIndexes(customerId);
         taskService.refreshValuePriorityByCustomerId(customerId);
         scheduleCustomerAiAnalysis(customerId, analysisRequestedAt);
+    }
+
+    @Override
+    public int refreshAllCustomerSearchText() {
+        if (!dynamicSchemaService.columnExists(CUSTOMER_TABLE_NAME, CUSTOMER_SEARCH_TEXT_COLUMN)) {
+            log.info("skip refresh customer search text because {}.{} does not exist",
+                    CUSTOMER_TABLE_NAME, CUSTOMER_SEARCH_TEXT_COLUMN);
+            return 0;
+        }
+
+        List<Customer> customers = lambdaQuery().list();
+        if (customers.isEmpty()) {
+            return 0;
+        }
+
+        List<CustomFieldVO> searchableFields = getSearchableCustomerTextFields();
+        List<Long> customerIds = customers.stream()
+                .map(Customer::getCustomerId)
+                .filter(Objects::nonNull)
+                .toList();
+        Map<Long, Map<String, Object>> customFieldMap = searchableFields.isEmpty()
+                ? Collections.emptyMap()
+                : customFieldService.getBatchCustomFieldValues("customer", customerIds);
+
+        List<Customer> updates = new ArrayList<>(customers.size());
+        for (Customer customer : customers) {
+            Map<String, Object> customFields = customFieldMap.getOrDefault(customer.getCustomerId(), Collections.emptyMap());
+            Customer update = new Customer();
+            update.setCustomerId(customer.getCustomerId());
+            update.setSearchText(buildCustomerSearchText(customer, searchableFields, customFields));
+            updates.add(update);
+        }
+        updateBatchById(updates);
+        return updates.size();
+    }
+
+    @Override
+    public void refreshCustomerSearchText(Long customerId) {
+        if (customerId == null || !dynamicSchemaService.columnExists(CUSTOMER_TABLE_NAME, CUSTOMER_SEARCH_TEXT_COLUMN)) {
+            return;
+        }
+
+        Customer customer = baseMapper.selectByIdIgnoreDataPermission(customerId);
+        if (customer == null) {
+            return;
+        }
+
+        List<CustomFieldVO> searchableFields = getSearchableCustomerTextFields();
+        Map<String, Object> customFields = searchableFields.isEmpty()
+                ? Collections.emptyMap()
+                : customFieldService.getCustomFieldValues("customer", customerId);
+        String searchText = buildCustomerSearchText(customer, searchableFields, customFields);
+
+        lambdaUpdate()
+                .eq(Customer::getCustomerId, customerId)
+                .set(Customer::getSearchText, searchText)
+                .update();
     }
 
     @Override
@@ -1852,6 +1913,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             update.set(Customer::getUpdateUserId, updateUserId);
         }
         update.update();
+        refreshCustomerSearchText(customerId);
+        globalSearchIndexService.refreshCustomerIndex(customerId);
+        taskService.refreshValuePriorityByCustomerId(customerId);
     }
 
     /**
@@ -1874,6 +1938,201 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             update.set(Customer::getUpdateUserId, updateUserId);
         }
         update.update();
+        refreshCustomerSearchText(customerId);
+        globalSearchIndexService.refreshCustomerIndex(customerId);
+    }
+
+    private List<CustomFieldVO> getSearchableCustomerTextFields() {
+        return customFieldService.getEnabledFieldsByEntity("customer").stream()
+                .filter(field -> !FIELD_SOURCE_SYSTEM.equalsIgnoreCase(field.getFieldSource()))
+                .filter(field -> Boolean.TRUE.equals(field.getIsSearchable()))
+                .filter(field -> SEARCHABLE_CUSTOM_FIELD_TYPES.contains(field.getFieldType()))
+                .toList();
+    }
+
+    private String buildCustomerSearchText(Customer customer,
+                                           List<CustomFieldVO> searchableFields,
+                                           Map<String, Object> customFields) {
+        LinkedHashSet<String> fragments = new LinkedHashSet<>();
+
+        if (customer != null) {
+            appendSearchText(fragments, customer.getCompanyName());
+            appendSearchText(fragments, customer.getIndustry());
+            appendSearchText(fragments, customer.getStage());
+            appendSearchText(fragments, getStageLabel(customer.getStage()));
+            appendSearchText(fragments, customer.getLevel());
+            appendSearchText(fragments, getLevelDisplayLabel(customer.getLevel()));
+            appendSearchText(fragments, customer.getSource());
+            appendSearchText(fragments, customer.getAddress());
+            appendSearchText(fragments, customer.getWebsite());
+            appendSearchText(fragments, customer.getPrimaryContactName());
+            appendSearchText(fragments, customer.getPrimaryContactPhone());
+            appendSearchText(fragments, customer.getPrimaryContactPosition());
+            appendSearchText(fragments, customer.getTagNames());
+            appendSearchText(fragments, customer.getRemark());
+            appendSearchText(fragments, customer.getAiStatusDetection());
+            appendSearchText(fragments, customer.getAiInsight());
+        }
+
+        if (searchableFields != null && !searchableFields.isEmpty() && customFields != null && !customFields.isEmpty()) {
+            for (CustomFieldVO field : searchableFields) {
+                Object rawValue = resolveSearchFieldRawValue(field, customFields);
+                for (String value : resolveCustomFieldSearchValues(field, rawValue)) {
+                    appendSearchText(fragments, value);
+                }
+            }
+        }
+
+        return String.join(" ", fragments);
+    }
+
+    private Object resolveSearchFieldRawValue(CustomFieldVO field, Map<String, Object> customFields) {
+        if (field == null || customFields == null || customFields.isEmpty()) {
+            return null;
+        }
+
+        String columnName = StrUtil.trim(field.getColumnName());
+        if (StrUtil.isNotBlank(columnName) && customFields.containsKey(columnName)) {
+            return customFields.get(columnName);
+        }
+
+        String fieldName = StrUtil.trim(field.getFieldName());
+        if (StrUtil.isNotBlank(fieldName) && customFields.containsKey(fieldName)) {
+            return customFields.get(fieldName);
+        }
+
+        return null;
+    }
+
+    private List<String> resolveCustomFieldSearchValues(CustomFieldVO field, Object rawValue) {
+        if (field == null || rawValue == null) {
+            return Collections.emptyList();
+        }
+
+        return switch (StrUtil.blankToDefault(field.getFieldType(), "")) {
+            case "select" -> buildSelectSearchValues(field, rawValue);
+            case "multiselect" -> buildMultiselectSearchValues(field, rawValue);
+            default -> Collections.singletonList(String.valueOf(rawValue));
+        };
+    }
+
+    private List<String> buildSelectSearchValues(CustomFieldVO field, Object rawValue) {
+        String raw = StrUtil.trim(String.valueOf(rawValue));
+        if (StrUtil.isBlank(raw)) {
+            return Collections.emptyList();
+        }
+
+        List<String> values = new ArrayList<>();
+        values.add(raw);
+        String label = resolveFieldOptionLabel(field, raw);
+        if (StrUtil.isNotBlank(label) && !StrUtil.equals(label, raw)) {
+            values.add(label);
+        }
+        return values;
+    }
+
+    private List<String> buildMultiselectSearchValues(CustomFieldVO field, Object rawValue) {
+        List<String> values = new ArrayList<>();
+        for (String item : parseMultiValueSafe(rawValue)) {
+            if (StrUtil.isBlank(item)) {
+                continue;
+            }
+            values.add(item);
+            String label = resolveFieldOptionLabel(field, item);
+            if (StrUtil.isNotBlank(label) && !StrUtil.equals(label, item)) {
+                values.add(label);
+            }
+        }
+        return values;
+    }
+
+    private List<String> parseMultiValueSafe(Object rawValue) {
+        if (rawValue == null) {
+            return Collections.emptyList();
+        }
+        if (rawValue instanceof Collection<?> collection) {
+            return collection.stream()
+                    .filter(Objects::nonNull)
+                    .map(String::valueOf)
+                    .map(String::trim)
+                    .filter(StrUtil::isNotBlank)
+                    .toList();
+        }
+
+        String text = String.valueOf(rawValue).trim();
+        if (StrUtil.isBlank(text)) {
+            return Collections.emptyList();
+        }
+        if (text.startsWith("[") && text.endsWith("]")) {
+            try {
+                JsonNode root = objectMapper.readTree(text);
+                if (root.isArray()) {
+                    List<String> values = new ArrayList<>();
+                    for (JsonNode node : root) {
+                        String value = node.isTextual() ? node.asText() : node.toString();
+                        if (StrUtil.isNotBlank(value)) {
+                            values.add(value.trim());
+                        }
+                    }
+                    return values;
+                }
+            } catch (Exception ignored) {
+                // Fall back to delimiter parsing.
+            }
+        }
+        return Arrays.stream(text.split("[,，;；]"))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .toList();
+    }
+
+    private String resolveFieldOptionLabel(CustomFieldVO field, String rawValue) {
+        if (field == null || field.getOptions() == null || field.getOptions().isEmpty() || StrUtil.isBlank(rawValue)) {
+            return rawValue;
+        }
+
+        return field.getOptions().stream()
+                .filter(option -> StrUtil.equals(option.getValue(), rawValue))
+                .map(FieldOption::getLabel)
+                .filter(StrUtil::isNotBlank)
+                .findFirst()
+                .orElse(rawValue);
+    }
+
+    private String getLevelDisplayLabel(String level) {
+        if (StrUtil.isBlank(level)) {
+            return null;
+        }
+        return switch (level.trim().toUpperCase(Locale.ROOT)) {
+            case "A" -> "A级客户";
+            case "B" -> "B级客户";
+            case "C" -> "C级客户";
+            default -> level;
+        };
+    }
+
+    private void appendSearchText(Set<String> fragments, String value) {
+        String normalized = normalizeSearchTextFragment(value);
+        if (StrUtil.isNotBlank(normalized)) {
+            fragments.add(normalized);
+        }
+    }
+
+    private String normalizeSearchTextFragment(String value) {
+        if (StrUtil.isBlank(value)) {
+            return null;
+        }
+
+        String normalized = value
+                .replace('\r', ' ')
+                .replace('\n', ' ')
+                .replace('\t', ' ')
+                .replace('，', ' ')
+                .replace(',', ' ')
+                .replace('；', ' ')
+                .replace(';', ' ');
+        normalized = normalized.replaceAll("\\s+", " ").trim().toLowerCase(Locale.ROOT);
+        return StrUtil.isBlank(normalized) ? null : normalized;
     }
 
     // ==================== AI 智能录入 ====================

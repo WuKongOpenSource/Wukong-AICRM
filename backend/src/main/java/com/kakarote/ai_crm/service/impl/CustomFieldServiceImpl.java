@@ -20,6 +20,7 @@ import com.kakarote.ai_crm.entity.PO.CustomFieldPool;
 import com.kakarote.ai_crm.service.ICustomFieldPoolService;
 import com.kakarote.ai_crm.service.ICustomFieldService;
 import com.kakarote.ai_crm.service.ICustomFieldSortService;
+import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.IDynamicSchemaService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,11 +50,16 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
     @Autowired
     private ICustomFieldSortService customFieldSortService;
 
+    @Lazy
+    @Autowired
+    private ICustomerService customerService;
+
     /**
      * 单个实体最大自定义字段数
      */
     private static final int MAX_FIELDS_PER_ENTITY = 50;
     private static final long OPTIONS_CACHE_TTL_MS = 60_000L;
+    private static final Set<String> CUSTOMER_SEARCHABLE_TEXT_FIELD_TYPES = Set.of("text", "textarea", "select", "multiselect");
     private static final String FIELD_SOURCE_SYSTEM = "system";
     private static final String FIELD_SOURCE_CUSTOM = "custom";
     private static final Set<String> HIDDEN_RELATION_SYSTEM_FIELDS = Set.of("avatar", "company");
@@ -139,6 +145,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         field.setStatus(1);
         save(field);
         evictOptionsCache();
+        refreshCustomerSearchTextIfNeeded(field);
 
         return field.getFieldId();
     }
@@ -150,6 +157,9 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         if (ObjectUtil.isNull(field)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "字段不存在");
         }
+
+        boolean wasSearchable = isCustomerSearchTextField(field);
+        boolean optionsChanged = false;
 
         // 只更新允许修改的字段
         if (StrUtil.isNotEmpty(bo.getFieldLabel())) {
@@ -178,6 +188,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
                 validateSystemFieldOptions(field, bo.getOptions());
             }
             field.setOptions(JSON.toJSONString(bo.getOptions()));
+            optionsChanged = true;
         }
         if (bo.getValidation() != null && !isSystemField(field)) {
             field.setValidationRules(JSON.toJSONString(bo.getValidation()));
@@ -188,6 +199,9 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
 
         updateById(field);
         evictOptionsCache();
+        if (wasSearchable || isCustomerSearchTextField(field) || optionsChanged) {
+            refreshCustomerSearchTextIfNeeded(field, wasSearchable);
+        }
     }
 
     @Override
@@ -199,6 +213,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         }
         field.setStatus(0);
         updateById(field);
+        refreshCustomerSearchTextIfNeeded(field, true);
     }
 
     @Override
@@ -210,6 +225,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         }
         field.setStatus(1);
         updateById(field);
+        refreshCustomerSearchTextIfNeeded(field);
     }
 
     @Override
@@ -229,6 +245,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
 
         // 清理该字段的所有用户排序记录
         customFieldSortService.removeByFieldId(fieldId);
+        refreshCustomerSearchTextIfNeeded(field, true);
     }
 
     @Override
@@ -736,6 +753,29 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         } catch (NumberFormatException ignored) {
             return 0;
         }
+    }
+
+    private void refreshCustomerSearchTextIfNeeded(CustomField field) {
+        refreshCustomerSearchTextIfNeeded(field, false);
+    }
+
+    private void refreshCustomerSearchTextIfNeeded(CustomField field, boolean force) {
+        if ((force && isCustomerSearchTextCandidate(field)) || isCustomerSearchTextField(field)) {
+            customerService.refreshAllCustomerSearchText();
+        }
+    }
+
+    private boolean isCustomerSearchTextField(CustomField field) {
+        return isCustomerSearchTextCandidate(field)
+                && field.getIsSearchable() != null
+                && field.getIsSearchable() == 1;
+    }
+
+    private boolean isCustomerSearchTextCandidate(CustomField field) {
+        return field != null
+                && isCustomField(field)
+                && "customer".equals(field.getEntityType())
+                && CUSTOMER_SEARCHABLE_TEXT_FIELD_TYPES.contains(field.getFieldType());
     }
 
     private void evictOptionsCache() {
