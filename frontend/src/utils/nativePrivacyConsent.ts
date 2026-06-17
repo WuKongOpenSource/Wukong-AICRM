@@ -73,7 +73,10 @@ function renderNativePrivacyConsentDialog(
       <style>
         .wk-native-privacy-consent {
           position: fixed;
-          inset: 0;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          left: 0;
           z-index: 2147483647;
           display: flex;
           align-items: center;
@@ -86,8 +89,9 @@ function renderNativePrivacyConsentDialog(
         }
 
         .wk-native-privacy-consent__dialog {
-          width: min(100%, 420px);
-          max-height: min(86vh, 560px);
+          width: 100%;
+          max-width: 420px;
+          max-height: 86vh;
           overflow-y: auto;
           box-sizing: border-box;
           border-radius: 8px;
@@ -219,7 +223,10 @@ function renderNativePrivacyConsentDialog(
       </section>
     `
 
-    host.replaceChildren(root)
+    while (host.firstChild) {
+      host.removeChild(host.firstChild)
+    }
+    host.appendChild(root)
 
     const dialog = root.querySelector<HTMLElement>('.wk-native-privacy-consent__dialog')
     const acceptButton = root.querySelector<HTMLButtonElement>('[data-action="accept"]')

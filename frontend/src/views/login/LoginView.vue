@@ -1,5 +1,8 @@
 <template>
-  <div class="auth-page relative bg-slate-50">
+  <div
+    class="auth-page relative bg-slate-50"
+    :class="{ 'auth-page--keyboard-open': loginKeyboardInset > 0 }"
+  >
     <div class="pointer-events-none absolute inset-0 overflow-hidden">
       <div class="absolute -left-24 -top-24 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
       <div class="absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-indigo-500/5 blur-3xl" />
@@ -318,6 +321,7 @@ import {
 import logoImg from '@/assets/images/logo.png'
 import SliderCaptchaDialog from '@/components/auth/SliderCaptchaDialog.vue'
 import { useUserStore } from '@/stores/user'
+import { registerNativeKeyboardInsetListeners } from '@/utils/capacitorKeyboard'
 import { openLegalDocumentWithInAppBrowser } from '@/utils/inAppBrowser'
 import type { ExternalAuthProvider, ExternalAuthProviderCode } from '@/types/api'
 
@@ -336,6 +340,8 @@ const loginLayerRef = ref<HTMLElement>()
 const externalProviders = ref<ExternalAuthProvider[]>([])
 const externalLoadingProvider = ref<ExternalAuthProviderCode | ''>('')
 const externalLoginTicketProcessing = ref(false)
+const loginKeyboardInset = ref(0)
+let removeLoginKeyboardInsetListeners: (() => void) | null = null
 
 const LAST_LOGIN_USERNAME_STORAGE_KEY = 'wk_ai_crm:last_login_username:v1'
 const LOGIN_FORM_DRAFT_STORAGE_KEY = 'wk_ai_crm:login_form_draft:v1'
@@ -420,10 +426,20 @@ onMounted(async () => {
     await loadExternalProviders()
   }
   await syncStageHeight(false)
+  removeLoginKeyboardInsetListeners = registerNativeKeyboardInsetListeners({
+    onShow: (keyboardHeight) => {
+      loginKeyboardInset.value = Math.max(0, Math.round(keyboardHeight))
+    },
+    onHide: () => {
+      loginKeyboardInset.value = 0
+    }
+  })
   window.addEventListener('resize', snapStageHeightForResize)
 })
 
 onBeforeUnmount(() => {
+  removeLoginKeyboardInsetListeners?.()
+  removeLoginKeyboardInsetListeners = null
   window.removeEventListener('resize', snapStageHeightForResize)
 })
 
@@ -1023,7 +1039,10 @@ async function completeLoginRedirect(redirectValue: unknown) {
 .desktop-agreement-consent__check input,
 .mobile-agreement-consent__check input {
   position: absolute;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   margin: 0;
   cursor: pointer;
   opacity: 0;
@@ -1203,7 +1222,10 @@ async function completeLoginRedirect(redirectValue: unknown) {
 
 .agreement-modal {
   position: fixed;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: 3000;
   display: flex;
   align-items: center;
@@ -1213,7 +1235,10 @@ async function completeLoginRedirect(redirectValue: unknown) {
 
 .agreement-modal__backdrop {
   position: absolute;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   background: rgba(15, 23, 42, 0.48);
   backdrop-filter: blur(2px);
 }
@@ -1324,6 +1349,129 @@ async function completeLoginRedirect(redirectValue: unknown) {
   opacity: 0.72;
 }
 
+:global(html.dark .auth-page) {
+  background: var(--wk-bg-page);
+  color: var(--wk-text-primary);
+}
+
+:global(html.dark .auth-card) {
+  border-color: var(--wk-border-subtle);
+  background: var(--wk-bg-surface);
+  box-shadow: 0 28px 80px rgb(var(--wk-shadow-color) / 0.45);
+}
+
+:global(html.dark .auth-form-panel) {
+  background: var(--wk-bg-surface);
+}
+
+:global(html.dark .auth-form-panel::before) {
+  background: linear-gradient(180deg, rgb(var(--wk-bg-page-rgb) / 0.08) 0%, rgb(var(--wk-bg-page-rgb) / 0) 100%);
+}
+
+:global(html.dark .auth-form-panel::after) {
+  background: linear-gradient(0deg, rgb(var(--wk-bg-page-rgb) / 0.08) 0%, rgb(var(--wk-bg-page-rgb) / 0) 100%);
+}
+
+:global(html.dark .label-upper),
+:global(html.dark .external-auth-divider),
+:global(html.dark .agreement-modal__hint) {
+  color: var(--wk-text-muted);
+}
+
+:global(html.dark .external-auth-btn),
+:global(html.dark .agreement-modal__title) {
+  color: var(--wk-text-primary);
+}
+
+:global(html.dark .external-auth-btn__fallback),
+:global(html.dark .agreement-modal__icon) {
+  background: rgb(var(--wk-primary-rgb) / 0.14);
+  color: var(--wk-primary);
+  box-shadow: none;
+}
+
+:global(html.dark .agreement-modal__copy) {
+  color: var(--wk-text-secondary);
+}
+
+:global(html.dark .auth-send-code-btn),
+:global(html.dark .external-auth-btn),
+:global(html.dark .agreement-modal__button--ghost) {
+  border-color: var(--wk-border-subtle);
+  background: var(--wk-bg-surface-subtle);
+  color: var(--wk-text-secondary);
+}
+
+:global(html.dark .auth-send-code-btn:hover:not(:disabled)),
+:global(html.dark .external-auth-btn:hover:not(:disabled)),
+:global(html.dark .agreement-modal__button--ghost:hover) {
+  border-color: var(--wk-border-muted);
+  background: var(--wk-bg-surface-hover);
+  color: var(--wk-primary);
+  box-shadow: none;
+}
+
+:global(html.dark .external-auth-divider::before),
+:global(html.dark .external-auth-divider::after) {
+  background: var(--wk-border-subtle);
+}
+
+:global(html.dark .mobile-agreement-consent) {
+  border: 1px solid var(--wk-border-subtle);
+  border-radius: 1rem;
+  background: rgb(var(--wk-bg-page-rgb) / 0.88);
+  padding: 0.75rem 0.85rem;
+  box-shadow: 0 16px 38px rgb(var(--wk-shadow-color) / 0.28);
+  backdrop-filter: blur(16px);
+}
+
+:global(html.dark .mobile-agreement-consent__box) {
+  border-color: var(--wk-border-muted);
+  background: var(--wk-bg-surface);
+  color: var(--wk-primary);
+}
+
+:global(html.dark .mobile-agreement-consent__check input:checked + .mobile-agreement-consent__box) {
+  border-color: var(--wk-primary);
+  background: rgb(var(--wk-primary-rgb) / 0.16);
+}
+
+:global(html.dark .mobile-agreement-consent__text) {
+  color: var(--wk-text-muted);
+}
+
+:global(html.dark .mobile-agreement-consent__text a),
+:global(html.dark .agreement-modal__copy a) {
+  color: var(--wk-primary);
+}
+
+:global(html.dark .agreement-modal__backdrop) {
+  background: rgba(0, 0, 0, 0.68);
+}
+
+:global(html.dark .agreement-modal__panel) {
+  border-color: var(--wk-border-subtle);
+  background: var(--wk-bg-surface);
+  color: var(--wk-text-primary);
+  box-shadow: 0 28px 80px rgb(var(--wk-shadow-color) / 0.58);
+}
+
+:global(html.dark .agreement-modal__eyebrow) {
+  color: var(--wk-text-muted);
+}
+
+:global(html.dark .agreement-modal__button--primary) {
+  border-color: var(--wk-primary);
+  background: var(--wk-primary);
+  color: #07111f;
+  box-shadow: 0 14px 28px rgb(var(--wk-primary-rgb) / 0.2);
+}
+
+:global(html.dark .agreement-modal__button--primary:hover:not(:disabled)) {
+  border-color: var(--el-color-primary-dark-2);
+  background: var(--el-color-primary-dark-2);
+}
+
 @media (min-width: 1024px) {
   .auth-card {
     min-height: 620px;
@@ -1382,7 +1530,8 @@ async function completeLoginRedirect(redirectValue: unknown) {
     left: 50%;
     bottom: calc(1.5rem + env(safe-area-inset-bottom));
     display: flex;
-    width: min(calc(100% - 2rem), 480px);
+    width: calc(100% - 2rem);
+    max-width: 480px;
     align-items: flex-start;
     gap: 0.55rem;
     margin-top: 0;
@@ -1416,6 +1565,14 @@ async function completeLoginRedirect(redirectValue: unknown) {
 
   .agreement-modal__actions {
     gap: 0.75rem;
+  }
+
+  .auth-page--keyboard-open .auth-form-content--with-fixed-consent {
+    padding-bottom: 1.5rem;
+  }
+
+  .auth-page--keyboard-open .mobile-agreement-consent {
+    display: none;
   }
 }
 </style>

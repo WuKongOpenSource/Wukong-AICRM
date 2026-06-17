@@ -11,7 +11,7 @@ import '@fontsource/inter/800.css'
 import '@fontsource/inter/900.css'
 import '@fontsource-variable/noto-sans-sc'
 import 'material-symbols/outlined.css'
-import { isNativeMobileRuntime } from '@/utils/nativeMobileRuntime'
+import { isLegacyAndroidWebView, isNativeMobileRuntime } from '@/utils/nativeMobileRuntime'
 import { ensureNativePrivacyConsent } from '@/utils/nativePrivacyConsent'
 import './styles/iconfont.css'
 import './styles/main.css'
@@ -65,6 +65,9 @@ async function bootstrap(): Promise<void> {
 
   if (nativeMobileRuntime) {
     document.documentElement.classList.add('wk-native-mobile')
+    if (isLegacyAndroidWebView()) {
+      document.documentElement.classList.add('wk-android-legacy-webview')
+    }
     void import('@/utils/capacitorSafeArea').catch((error) => {
       console.warn('Failed to load native safe area plugin:', error)
     })

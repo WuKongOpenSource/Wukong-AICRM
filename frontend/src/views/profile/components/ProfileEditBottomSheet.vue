@@ -10,7 +10,7 @@
         <Transition name="profile-edit-sheet-panel">
           <section
             v-if="modelValue"
-            class="relative flex max-h-[min(86dvh,760px)] w-full max-w-[480px] flex-col overflow-hidden rounded-t-[34px] border border-white/80 bg-white/95 shadow-[0_-18px_60px_rgba(15,23,42,0.18)] backdrop-blur-2xl"
+            class="relative flex max-h-[min(86dvh,760px)] w-full max-w-[480px] flex-col overflow-hidden rounded-t-[34px] border border-white/80 bg-white/95 shadow-[0_-18px_60px_rgba(15,23,42,0.18)] backdrop-blur-2xl dark:border-slate-700 dark:bg-slate-900/95 dark:shadow-[0_-18px_60px_rgba(0,0,0,0.45)]"
             role="dialog"
             aria-modal="true"
             aria-labelledby="profile-edit-title"
@@ -32,7 +32,7 @@
                   </div>
                   <button
                     type="button"
-                    class="absolute bottom-1 right-1 flex size-10 items-center justify-center rounded-full border-[3px] border-white bg-white text-[#5f6368] shadow-[0_6px_18px_rgba(15,23,42,0.18)] transition-colors active:bg-slate-100"
+                    class="absolute bottom-1 right-1 flex size-10 items-center justify-center rounded-full border-[3px] border-white bg-white text-[#5f6368] shadow-[0_6px_18px_rgba(15,23,42,0.18)] transition-colors active:bg-slate-100 dark:border-slate-900 dark:bg-slate-800 dark:text-slate-200 dark:shadow-none dark:active:bg-slate-700"
                     aria-label="更换头像"
                     :disabled="avatarUploading"
                     @click="avatarInputRef?.click()"
@@ -50,7 +50,7 @@
                     <h3 class="text-[14px] font-semibold text-[#0d0d0d]">基本信息</h3>
                     <button
                       type="button"
-                      class="rounded-full px-3 py-1.5 text-[14px] font-medium text-[#5f6368] transition-colors active:bg-slate-100 disabled:opacity-50"
+                      class="rounded-full px-3 py-1.5 text-[14px] font-medium text-[#5f6368] transition-colors active:bg-slate-100 disabled:opacity-50 dark:text-slate-300 dark:active:bg-slate-800"
                       :disabled="savingProfile || avatarUploading"
                       @click="resetProfileForm"
                     >
@@ -60,74 +60,74 @@
 
                   <div class="space-y-4">
                     <div class="space-y-2.5">
-                      <label class="block px-1 text-[14px] font-medium text-[#5f6368]" for="profile-realname">姓名</label>
+                      <label class="block px-1 text-[14px] font-medium text-[#5f6368] dark:text-slate-400" for="profile-realname">姓名</label>
                       <input
                         id="profile-realname"
                         v-model="profileForm.realname"
                         type="text"
-                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/80 px-5 text-[14px] font-semibold text-[#0d0d0d] outline-none transition-colors placeholder:text-slate-300 focus:border-[#9a9a9f]"
+                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/80 px-5 text-[14px] font-semibold text-[#0d0d0d] outline-none transition-colors placeholder:text-slate-300 focus:border-[#9a9a9f] dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-500"
                       />
                     </div>
 
                     <div class="space-y-2.5">
-                      <label class="block px-1 text-[14px] font-medium text-[#5f6368]" for="profile-username">用户名</label>
+                      <label class="block px-1 text-[14px] font-medium text-[#5f6368] dark:text-slate-400" for="profile-username">用户名</label>
                       <input
                         id="profile-username"
                         :value="usernameValue"
                         type="text"
                         disabled
-                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/70 px-5 text-[14px] font-medium text-[#0d0d0d] outline-none"
+                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/70 px-5 text-[14px] font-medium text-[#0d0d0d] outline-none dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
                       />
                     </div>
 
                     <div class="space-y-2.5">
-                      <label class="block px-1 text-[14px] font-medium text-[#5f6368]" for="profile-department">部门</label>
+                      <label class="block px-1 text-[14px] font-medium text-[#5f6368] dark:text-slate-400" for="profile-department">部门</label>
                       <input
                         id="profile-department"
                         v-model="profileForm.department"
                         type="text"
                         disabled
-                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/70 px-5 text-[14px] font-medium text-[#5f6368] outline-none"
+                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/70 px-5 text-[14px] font-medium text-[#5f6368] outline-none dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400"
                       />
                     </div>
 
                     <div class="space-y-2.5">
-                      <label class="block px-1 text-[14px] font-medium text-[#5f6368]" for="profile-position">职位</label>
+                      <label class="block px-1 text-[14px] font-medium text-[#5f6368] dark:text-slate-400" for="profile-position">职位</label>
                       <input
                         id="profile-position"
                         v-model="profileForm.position"
                         type="text"
-                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/80 px-5 text-[14px] font-medium text-[#0d0d0d] outline-none transition-colors placeholder:text-slate-300 focus:border-[#9a9a9f]"
+                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/80 px-5 text-[14px] font-medium text-[#0d0d0d] outline-none transition-colors placeholder:text-slate-300 focus:border-[#9a9a9f] dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-500"
                       />
                     </div>
 
                     <div class="space-y-2.5">
-                      <label class="block px-1 text-[14px] font-medium text-[#5f6368]" for="profile-email">电子邮箱</label>
+                      <label class="block px-1 text-[14px] font-medium text-[#5f6368] dark:text-slate-400" for="profile-email">电子邮箱</label>
                       <input
                         id="profile-email"
                         v-model="profileForm.email"
                         type="email"
-                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/80 px-5 text-[14px] font-medium text-[#0d0d0d] outline-none transition-colors placeholder:text-slate-300 focus:border-[#9a9a9f]"
+                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/80 px-5 text-[14px] font-medium text-[#0d0d0d] outline-none transition-colors placeholder:text-slate-300 focus:border-[#9a9a9f] dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-500"
                       />
                     </div>
 
                     <div class="space-y-2.5">
-                      <label class="block px-1 text-[14px] font-medium text-[#5f6368]" for="profile-phone">手机号码</label>
+                      <label class="block px-1 text-[14px] font-medium text-[#5f6368] dark:text-slate-400" for="profile-phone">手机号码</label>
                       <input
                         id="profile-phone"
                         v-model="profileForm.phone"
                         type="text"
-                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/80 px-5 text-[14px] font-medium text-[#0d0d0d] outline-none transition-colors placeholder:text-slate-300 focus:border-[#9a9a9f]"
+                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/80 px-5 text-[14px] font-medium text-[#0d0d0d] outline-none transition-colors placeholder:text-slate-300 focus:border-[#9a9a9f] dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-500"
                       />
                     </div>
                   </div>
 
-                  <p class="mx-auto max-w-[340px] text-center text-[14px] leading-6 text-[#6b6b6b]">
+                  <p class="mx-auto max-w-[340px] text-center text-[14px] leading-6 text-[#6b6b6b] dark:text-slate-400">
                     个人资料有助于他人识别你的身份。你的姓名和用户名将用于系统内展示。
                   </p>
                 </section>
 
-                <div class="h-px bg-[#ececf0]" />
+                <div class="h-px bg-[#ececf0] dark:bg-slate-800" />
 
                 <section class="space-y-5">
                   <div class="flex items-center justify-between gap-4">
@@ -144,47 +144,47 @@
 
                   <div class="space-y-4">
                     <div class="space-y-2.5">
-                      <label class="block px-1 text-[14px] font-medium text-[#5f6368]" for="profile-old-password">当前密码</label>
+                      <label class="block px-1 text-[14px] font-medium text-[#5f6368] dark:text-slate-400" for="profile-old-password">当前密码</label>
                       <input
                         id="profile-old-password"
                         v-model="passwordForm.oldPassword"
                         type="password"
                         placeholder="请输入当前密码"
-                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/80 px-5 text-[14px] font-medium text-[#0d0d0d] outline-none transition-colors placeholder:text-slate-300 focus:border-[#9a9a9f]"
+                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/80 px-5 text-[14px] font-medium text-[#0d0d0d] outline-none transition-colors placeholder:text-slate-300 focus:border-[#9a9a9f] dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-500"
                       />
                     </div>
 
                     <div class="space-y-2.5">
-                      <label class="block px-1 text-[14px] font-medium text-[#5f6368]" for="profile-new-password">新密码</label>
+                      <label class="block px-1 text-[14px] font-medium text-[#5f6368] dark:text-slate-400" for="profile-new-password">新密码</label>
                       <input
                         id="profile-new-password"
                         v-model="passwordForm.newPassword"
                         type="password"
                         placeholder="请输入新密码"
-                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/80 px-5 text-[14px] font-medium text-[#0d0d0d] outline-none transition-colors placeholder:text-slate-300 focus:border-[#9a9a9f]"
+                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/80 px-5 text-[14px] font-medium text-[#0d0d0d] outline-none transition-colors placeholder:text-slate-300 focus:border-[#9a9a9f] dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-500"
                       />
                     </div>
 
                     <div class="space-y-2.5">
-                      <label class="block px-1 text-[14px] font-medium text-[#5f6368]" for="profile-confirm-password">确认新密码</label>
+                      <label class="block px-1 text-[14px] font-medium text-[#5f6368] dark:text-slate-400" for="profile-confirm-password">确认新密码</label>
                       <input
                         id="profile-confirm-password"
                         v-model="passwordForm.confirmPassword"
                         type="password"
                         placeholder="请再次输入新密码"
-                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/80 px-5 text-[14px] font-medium text-[#0d0d0d] outline-none transition-colors placeholder:text-slate-300 focus:border-[#9a9a9f]"
+                        class="h-12 w-full rounded-full border border-[#d9d9de] bg-white/80 px-5 text-[14px] font-medium text-[#0d0d0d] outline-none transition-colors placeholder:text-slate-300 focus:border-[#9a9a9f] dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-500"
                       />
                     </div>
                   </div>
 
-                  <p class="rounded-[18px] bg-[#f5f5f7] px-4 py-3 text-[14px] leading-5 text-[#6b6b6b]">
+                  <p class="rounded-[18px] bg-[#f5f5f7] px-4 py-3 text-[14px] leading-5 text-[#6b6b6b] dark:bg-slate-800 dark:text-slate-400">
                     密码修改成功后将立即生效。为安全起见，建议使用至少 6 位并包含字母与数字的组合。
                   </p>
                 </section>
               </form>
             </div>
 
-            <div class="shrink-0 border-t border-[#ececf0] bg-white/90 px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4">
+            <div class="shrink-0 border-t border-[#ececf0] bg-white/90 px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 dark:border-slate-800 dark:bg-slate-900/90">
               <div class="flex flex-col items-center gap-3">
                 <button
                   type="button"
@@ -196,7 +196,7 @@
                 </button>
                 <button
                   type="button"
-                  class="h-9 px-6 text-[14px] font-medium text-[#0d0d0d] transition-opacity active:opacity-60"
+                  class="h-9 px-6 text-[14px] font-medium text-[#0d0d0d] transition-opacity active:opacity-60 dark:text-slate-200"
                   @click="handleClose"
                 >
                   取消

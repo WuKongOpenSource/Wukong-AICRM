@@ -13,7 +13,11 @@
           title="打开菜单"
           @click="emit('menu')"
         >
-          <span class="material-symbols-outlined text-[22px] leading-none">menu</span>
+          <span class="wk-mobile-menu-glyph" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
         </button>
         <div class="flex min-w-0 flex-1 items-center gap-2">
           <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
@@ -49,7 +53,11 @@
           :title="detailLabel"
           @click="emit('detail')"
         >
-          <span class="material-symbols-outlined text-[24px] leading-none">more_horiz</span>
+          <span class="wk-mobile-more-glyph" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
         </button>
       </div>
     </div>

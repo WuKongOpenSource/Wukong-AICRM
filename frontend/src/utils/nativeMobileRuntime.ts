@@ -51,6 +51,44 @@ export function isNativeMobileRuntime(): boolean {
   return isNativePlatform()
 }
 
+function readUserAgent(userAgent?: string): string {
+  if (typeof userAgent === 'string') return userAgent
+  if (typeof navigator === 'undefined') return ''
+  return navigator.userAgent || ''
+}
+
+export function resolveAndroidMajorVersion(userAgent?: string): number | null {
+  const match = readUserAgent(userAgent).match(/\bAndroid\s+(\d+)/i)
+  if (!match) return null
+
+  const version = Number.parseInt(match[1], 10)
+  return Number.isFinite(version) ? version : null
+}
+
+export function resolveAndroidChromeMajorVersion(userAgent?: string): number | null {
+  const ua = readUserAgent(userAgent)
+  if (!/\bAndroid\b/i.test(ua)) return null
+
+  const match = ua.match(/\b(?:Chrome|Chromium)\/(\d+)/i)
+  if (!match) return null
+
+  const version = Number.parseInt(match[1], 10)
+  return Number.isFinite(version) ? version : null
+}
+
+export function isLegacyAndroidWebView(userAgent?: string): boolean {
+  const ua = readUserAgent(userAgent)
+  if (!/\bAndroid\b/i.test(ua)) return false
+
+  const chromeMajor = resolveAndroidChromeMajorVersion(ua)
+  if (chromeMajor != null) {
+    return chromeMajor < 84
+  }
+
+  const androidMajor = resolveAndroidMajorVersion(ua)
+  return androidMajor != null && androidMajor <= 8
+}
+
 export function isNativeTabletViewport(
   viewportWidth: number,
   viewportHeight: number,

@@ -1382,12 +1382,14 @@ onMounted(async () => {
   queueTableHeightUpdate()
   window.addEventListener('resize', queueTableHeightUpdate, { passive: true })
 
-  layoutObserver = new ResizeObserver(() => {
-    queueTableHeightUpdate()
-  })
+  if (typeof ResizeObserver !== 'undefined') {
+    layoutObserver = new ResizeObserver(() => {
+      queueTableHeightUpdate()
+    })
+  }
 
-  if (pageRootRef.value) layoutObserver.observe(pageRootRef.value)
-  if (tableCardRef.value) layoutObserver.observe(tableCardRef.value)
+  if (pageRootRef.value) layoutObserver?.observe(pageRootRef.value)
+  if (tableCardRef.value) layoutObserver?.observe(tableCardRef.value)
   customerStore.queryParams.page = getCustomerListPageFromRouteQuery()
 
   await Promise.all([

@@ -182,13 +182,15 @@ onMounted(() => {
     scrollContainer.addEventListener('scroll', queueExpandedPanelMeasure, { passive: true })
   }
 
-  layoutObserver = new ResizeObserver(() => {
-    queueExpandedPanelMeasure()
-  })
+  if (typeof ResizeObserver !== 'undefined') {
+    layoutObserver = new ResizeObserver(() => {
+      queueExpandedPanelMeasure()
+    })
+  }
 
-  if (sidebarEl) layoutObserver.observe(sidebarEl)
-  if (mainEl instanceof HTMLElement) layoutObserver.observe(mainEl)
-  if (pageRootEl instanceof HTMLElement) layoutObserver.observe(pageRootEl)
+  if (sidebarEl) layoutObserver?.observe(sidebarEl)
+  if (mainEl instanceof HTMLElement) layoutObserver?.observe(mainEl)
+  if (pageRootEl instanceof HTMLElement) layoutObserver?.observe(pageRootEl)
 })
 
 onBeforeUnmount(() => {

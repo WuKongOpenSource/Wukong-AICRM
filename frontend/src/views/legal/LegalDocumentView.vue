@@ -292,6 +292,67 @@ watch(
   text-decoration: underline;
 }
 
+:global(html.dark .legal-page){
+  background: var(--wk-bg-page);
+  color: var(--wk-text-primary);
+}
+
+:global(html.dark .legal-brand__logo){
+  background: var(--wk-bg-surface);
+  box-shadow: 0 12px 24px rgb(var(--wk-shadow-color) / 0.32);
+}
+
+:global(html.dark .legal-document){
+  background: var(--wk-bg-surface);
+  box-shadow: 0 20px 48px rgb(var(--wk-shadow-color) / 0.3);
+}
+
+:global(html.dark .legal-document__eyebrow),
+:global(html.dark .legal-document__fallback a),
+:global(html.dark .legal-page__back){
+  color: var(--wk-primary);
+}
+
+:global(html.dark .legal-document__intro),
+:global(html.dark .legal-document__fallback){
+  color: var(--wk-text-secondary);
+}
+
+:global(html.dark .legal-document__content){
+  background: var(--wk-bg-surface);
+  scrollbar-color: var(--wk-border-strong) var(--wk-bg-surface);
+}
+
+:global(html.dark .legal-document__content::-webkit-scrollbar-track){
+  background: var(--wk-bg-surface);
+}
+
+:global(html.dark .legal-document__content::-webkit-scrollbar-thumb){
+  border-color: var(--wk-bg-surface);
+  background: var(--wk-border-strong);
+}
+
+:global(html.dark .legal-document__content::-webkit-scrollbar-thumb:hover){
+  background: var(--wk-text-muted);
+}
+
+:global(html.dark .legal-document__text){
+  color: var(--wk-text-primary);
+}
+
+:global(html.dark .legal-document__state){
+  color: var(--wk-text-muted);
+}
+
+:global(html.dark .legal-document__state--error button){
+  background: var(--wk-primary);
+  color: #07111f;
+}
+
+:global(html.dark .legal-document__state--error button:hover){
+  background: var(--el-color-primary-dark-2);
+}
+
 @media (max-width: 640px) {
   .legal-shell {
     padding: 1.5rem 1.25rem 2rem;

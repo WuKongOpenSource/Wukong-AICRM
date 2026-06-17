@@ -118,5 +118,20 @@ assert.doesNotMatch(
   /不会读取\s*Android ID|设备标识|MAC 地址|剪贴板/,
   'native privacy dialog should not show the personal-information-reading copy'
 )
+assert.doesNotMatch(
+  consentSource,
+  /\.replaceChildren\(/,
+  'native privacy dialog must not depend on Element.replaceChildren because Android 8 WebView may not support it'
+)
+assert.doesNotMatch(
+  consentSource,
+  /inset:\s*0/,
+  'native privacy dialog must not depend on the CSS inset shorthand in Android 8 WebView'
+)
+assert.doesNotMatch(
+  consentSource,
+  /\bmin\(/,
+  'native privacy dialog must not depend on CSS min() in Android 8 WebView'
+)
 
 console.log('native privacy consent core tests passed')

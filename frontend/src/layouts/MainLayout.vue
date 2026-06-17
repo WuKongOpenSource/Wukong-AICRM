@@ -146,7 +146,7 @@
               ]"
             >
               <span
-                v-if="item.materialIcon"
+                v-if="item.materialIcon && !useLegacyAndroidIconFallback"
                 class="material-symbols-outlined inline-flex size-5 shrink-0 items-center justify-center text-[20px] leading-none"
               >
                 {{ item.materialIcon }}
@@ -1178,7 +1178,7 @@
                   @click="handleMobilePrimaryNavClick(item)"
                 >
                   <span
-                    v-if="item.materialIcon"
+                    v-if="item.materialIcon && !useLegacyAndroidIconFallback"
                     class="material-symbols-outlined inline-flex size-6 shrink-0 items-center justify-center text-[20px] leading-none"
                   >
                     {{ item.materialIcon }}
@@ -1615,13 +1615,13 @@
           <Transition name="profile-drawer">
             <div
               v-if="isMobile && drawerVisible && showUserMenu"
-              class="absolute bottom-0 left-0 right-0 z-20 flex h-[80%] w-full flex-col overflow-hidden rounded-t-[34px] border-t border-white/70 bg-[#f4f4f7] text-[14px] shadow-[0_-18px_50px_rgba(15,23,42,0.18)]"
+              class="absolute bottom-0 left-0 right-0 z-20 flex h-[80%] w-full flex-col overflow-hidden rounded-t-[34px] border-t border-white/70 bg-[#f4f4f7] text-[14px] shadow-[0_-18px_50px_rgba(15,23,42,0.18)] dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
             >
               <div class="relative flex h-14 shrink-0 items-center justify-center px-4 pt-2">
-                <h2 class="text-[16px] font-bold text-[#0d0d0d]">设置</h2>
+                <h2 class="text-[16px] font-bold text-[#0d0d0d] dark:text-slate-100">设置</h2>
                 <button
                   type="button"
-                  class="absolute right-4 top-3.5 flex size-9 items-center justify-center rounded-full bg-white text-[#0d0d0d] shadow-[0_8px_22px_rgba(15,23,42,0.08)] transition-colors active:bg-slate-50"
+                  class="absolute right-4 top-3.5 flex size-9 items-center justify-center rounded-full bg-white text-[#0d0d0d] shadow-[0_8px_22px_rgba(15,23,42,0.08)] transition-colors active:bg-slate-50 dark:bg-slate-800 dark:text-slate-100 dark:shadow-none dark:active:bg-slate-700"
                   aria-label="关闭个人账户"
                   @click="showUserMenu = false"
                 >
@@ -1638,12 +1638,12 @@
                   <h3 class="mt-3 max-w-full truncate text-[20px] font-bold leading-tight text-[#0d0d0d]">
                     {{ userDisplayName }}
                   </h3>
-                  <p class="mt-1 max-w-full truncate text-[14px] text-[#6b6b6b]">
+                  <p class="mt-1 max-w-full truncate text-[14px] text-[#6b6b6b] dark:text-slate-400">
                     {{ userAccountName }}
                   </p>
                   <button
                     type="button"
-                    class="mt-4 rounded-full border border-[#d7d7dc] bg-transparent px-5 py-2 text-[14px] font-medium text-[#0d0d0d] transition-colors active:bg-white"
+                    class="mt-4 rounded-full border border-[#d7d7dc] bg-transparent px-5 py-2 text-[14px] font-medium text-[#0d0d0d] transition-colors active:bg-white dark:border-slate-700 dark:text-slate-100 dark:active:bg-slate-800"
                     @click="handleOpenAccountSettings"
                   >
                     编辑个人资料
@@ -1651,23 +1651,23 @@
                 </section>
 
                 <section class="space-y-2.5">
-                  <p class="px-2 text-[14px] font-semibold text-[#8a8a92]">账户</p>
-                  <div class="overflow-hidden rounded-[22px] bg-white px-4">
+                  <p class="px-2 text-[14px] font-semibold text-[#8a8a92] dark:text-slate-500">账户</p>
+                  <div class="overflow-hidden rounded-[22px] bg-white px-4 dark:bg-slate-900">
                     <button
                       v-for="item in configNavItems"
                       :key="item.route"
                       type="button"
-                      class="flex w-full items-center gap-3 border-b border-[#ededed] py-3.5 text-left text-[#0d0d0d] last:border-b-0"
+                      class="flex w-full items-center gap-3 border-b border-[#ededed] py-3.5 text-left text-[#0d0d0d] last:border-b-0 dark:border-slate-800 dark:text-slate-100"
                       @click="mobileProfileNavigate(item.route, item.query)"
                     >
                       <WkIcon :name="item.icon" :box-size="20" class="shrink-0" />
                       <span class="min-w-0 flex-1 truncate text-[1rem] font-medium">{{ item.label }}</span>
-                      <span class="material-symbols-outlined shrink-0 text-[20px] leading-none text-[#c7c7cc]">chevron_right</span>
+                      <span class="material-symbols-outlined shrink-0 text-[20px] leading-none text-[#c7c7cc] dark:text-slate-600">chevron_right</span>
                     </button>
 
                     <button
                       type="button"
-                      class="flex w-full items-center gap-3 py-3.5 text-left text-rose-600"
+                      class="flex w-full items-center gap-3 py-3.5 text-left text-rose-600 dark:text-rose-400"
                       @click="handleLogout"
                     >
                       <span class="material-symbols-outlined inline-flex size-5 shrink-0 items-center justify-center text-[20px] leading-none">logout</span>
@@ -1676,7 +1676,7 @@
 
                     <button
                       type="button"
-                      class="flex w-full items-center gap-3 border-t border-[#ededed] py-3.5 text-left text-[#8a8a92] transition-colors active:text-[#0d0d0d]"
+                      class="flex w-full items-center gap-3 border-t border-[#ededed] py-3.5 text-left text-[#8a8a92] transition-colors active:text-[#0d0d0d] dark:border-slate-800 dark:text-slate-500 dark:active:text-slate-100"
                       @click="handleAccountCancellationRequest"
                     >
                       <span class="material-symbols-outlined inline-flex size-5 shrink-0 items-center justify-center text-[20px] leading-none">person_remove</span>
@@ -1685,7 +1685,7 @@
 
                     <button
                       type="button"
-                      class="flex w-full items-center justify-between border-t border-[#ededed] py-3.5 text-[#8a8a92] transition-colors active:text-[#0d0d0d] disabled:cursor-wait disabled:opacity-70"
+                      class="flex w-full items-center justify-between border-t border-[#ededed] py-3.5 text-[#8a8a92] transition-colors active:text-[#0d0d0d] disabled:cursor-wait disabled:opacity-70 dark:border-slate-800 dark:text-slate-500 dark:active:text-slate-100"
                       :disabled="checkingAppUpdate"
                       @click="handleManualUpdateCheck"
                     >
@@ -1710,7 +1710,7 @@
       <Transition name="profile-drawer">
         <div
           v-if="isMobile && !drawerVisible && showUserMenu"
-          class="fixed bottom-0 left-0 right-0 z-[111] overflow-hidden rounded-t-2xl border-t border-slate-200 bg-white shadow-[0_-8px_30px_rgb(0,0,0,0.12)]"
+          class="fixed bottom-0 left-0 right-0 z-[111] overflow-hidden rounded-t-2xl border-t border-slate-200 bg-white shadow-[0_-8px_30px_rgb(0,0,0,0.12)] dark:border-slate-700 dark:bg-slate-900"
         >
           <div class="p-4 pb-[calc(1rem+var(--safe-area-inset-bottom))]">
             <div class="space-y-1">
@@ -1737,7 +1737,7 @@
               <div class="mx-3 my-1 h-px bg-slate-100" />
 
               <button
-                class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-slate-700 transition-colors hover:bg-slate-50"
+                class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                 @click="handleOpenAccountSettings"
               >
                 <WkIcon name="set" :size="24" class="text-slate-400 transition-colors group-hover:text-primary" />
@@ -1748,7 +1748,7 @@
                 v-for="item in configNavItems"
                 :key="item.route"
                 class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
-                :class="isActive(item.route, item.query) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
+                :class="isActive(item.route, item.query) ? 'bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'"
                 @click="navigateTo(item.route, item.query)"
               >
                 <WkIcon
@@ -1761,7 +1761,7 @@
               </button>
 
               <button
-                class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-rose-600 transition-colors hover:bg-rose-50"
+                class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
                 @click="handleLogout"
               >
                 <span class="material-symbols-outlined text-rose-400 transition-colors group-hover:text-rose-600">logout</span>
@@ -1769,16 +1769,16 @@
               </button>
 
               <button
-                class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[#8a8a92] transition-colors hover:bg-slate-50 hover:text-[#0d0d0d]"
+                class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[#8a8a92] transition-colors hover:bg-slate-50 hover:text-[#0d0d0d] dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                 @click="handleAccountCancellationRequest"
               >
-                <span class="material-symbols-outlined text-[#8a8a92] transition-colors group-hover:text-[#0d0d0d]">person_remove</span>
+                <span class="material-symbols-outlined text-[#8a8a92] transition-colors group-hover:text-[#0d0d0d] dark:text-slate-500 dark:group-hover:text-slate-100">person_remove</span>
                 <span class="text-sm font-medium">注销账户</span>
               </button>
 
               <button
                 type="button"
-                class="mx-3 flex items-center justify-between rounded-xl px-3 py-2 text-xs text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:cursor-wait disabled:opacity-70"
+                class="mx-3 flex items-center justify-between rounded-xl px-3 py-2 text-xs text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:cursor-wait disabled:opacity-70 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
                 :disabled="checkingAppUpdate"
                 @click="handleManualUpdateCheck"
               >
@@ -2088,7 +2088,7 @@ import { useEnumStore } from '@/stores/enums'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import { shouldCloseMobileDrawerFromSwipe, type SwipePoint } from '@/utils/mobileDrawerSwipe'
-import { isNativeMobileRuntime, isNativeTabletRuntime } from '@/utils/nativeMobileRuntime'
+import { isLegacyAndroidWebView, isNativeMobileRuntime, isNativeTabletRuntime } from '@/utils/nativeMobileRuntime'
 import {
   DEFAULT_SIDEBAR_MODULE_ORDER,
   normalizeSidebarModuleOrder,
@@ -2122,6 +2122,16 @@ const { isOpen: chatDrawerOpen } = useChatDrawer()
 const { isDark, toggleTheme } = useTheme()
 const themeIcon = computed(() => (isDark.value ? 'light_mode' : 'dark_mode'))
 const themeButtonLabel = computed(() => (isDark.value ? '浅色模式' : '深色模式'))
+const useLegacyAndroidIconFallback = isLegacyAndroidWebView()
+
+function scheduleMicrotask(callback: () => void): void {
+  if (typeof window !== 'undefined' && typeof window.queueMicrotask === 'function') {
+    window.queueMicrotask(callback)
+    return
+  }
+
+  setTimeout(callback, 0)
+}
 
 /**
  * 主内容列（顶栏 + router-view 所在 flex 列）在侧栏展开时的宽度小于该值且仍为 PC 时，自动收起左侧一级导航；
@@ -2413,7 +2423,7 @@ function runLayoutNarrowProgrammatic(fn: () => void) {
   try {
     fn()
   } finally {
-    queueMicrotask(() => {
+    scheduleMicrotask(() => {
       layoutNarrowProgrammatic.value = false
     })
   }
@@ -3519,7 +3529,7 @@ watch(primarySidebarCollapsed, collapsed => {
     primarySidebarTransitionTimer = null
     primarySidebarContentCollapsed.value = collapsed
     primarySidebarTransitioning.value = false
-    queueMicrotask(() => updatePrimaryNavScrollbar())
+    scheduleMicrotask(() => updatePrimaryNavScrollbar())
   }, PRIMARY_SIDEBAR_TRANSITION_MS)
 })
 
@@ -3610,7 +3620,7 @@ onMounted(() => {
     if (primaryNavRef.value) primaryNavResizeObserver.observe(primaryNavRef.value)
   }
   // Initial measure
-  queueMicrotask(() => updatePrimaryNavScrollbar())
+  scheduleMicrotask(() => updatePrimaryNavScrollbar())
 })
 
 watch(
@@ -3623,7 +3633,7 @@ watch(
     mainContentColumnResizeObserver.disconnect()
     if (el) {
       mainContentColumnResizeObserver.observe(el)
-      queueMicrotask(() => updateMainContentColumnWidth())
+      scheduleMicrotask(() => updateMainContentColumnWidth())
     } else {
       mainContentColumnWidth.value = 0
       mainContentColumnMeasured.value = false
@@ -3709,8 +3719,8 @@ watch(
     sidebarDraftModuleOrder.value.join('|'),
   ],
   () => {
-    queueMicrotask(() => updatePrimaryNavScrollbar())
-    queueMicrotask(() => maybeLoadMoreSidebarObjects())
+    scheduleMicrotask(() => updatePrimaryNavScrollbar())
+    scheduleMicrotask(() => maybeLoadMoreSidebarObjects())
   },
   { flush: 'post' }
 )
@@ -3962,7 +3972,7 @@ async function fetchSidebarCustomers(options: { reset?: boolean; preserveScroll?
     if (preservedScrollTop != null) {
       await restorePrimaryNavScrollTop(preservedScrollTop)
     }
-    queueMicrotask(() => {
+    scheduleMicrotask(() => {
       updatePrimaryNavScrollbar()
       maybeLoadMoreSidebarCustomers()
     })
@@ -4015,7 +4025,7 @@ async function fetchSidebarProducts(options: { reset?: boolean; preserveScroll?:
     if (preservedScrollTop != null) {
       await restorePrimaryNavScrollTop(preservedScrollTop)
     }
-    queueMicrotask(() => {
+    scheduleMicrotask(() => {
       updatePrimaryNavScrollbar()
       maybeLoadMoreSidebarObjects()
     })
@@ -4068,7 +4078,7 @@ async function fetchSidebarEmployees(options: { reset?: boolean; preserveScroll?
     if (preservedScrollTop != null) {
       await restorePrimaryNavScrollTop(preservedScrollTop)
     }
-    queueMicrotask(() => {
+    scheduleMicrotask(() => {
       updatePrimaryNavScrollbar()
       maybeLoadMoreSidebarObjects()
     })
@@ -4121,7 +4131,7 @@ async function fetchSidebarRelations(options: { reset?: boolean; preserveScroll?
     if (preservedScrollTop != null) {
       await restorePrimaryNavScrollTop(preservedScrollTop)
     }
-    queueMicrotask(() => {
+    scheduleMicrotask(() => {
       updatePrimaryNavScrollbar()
       maybeLoadMoreSidebarObjects()
     })

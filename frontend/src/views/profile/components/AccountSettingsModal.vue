@@ -7,31 +7,31 @@
         <Transition name="account-settings-panel">
           <div
             v-if="modelValue"
-            class="relative w-full bg-white shadow-2xl overflow-hidden flex flex-col"
+            class="relative w-full bg-white shadow-2xl overflow-hidden flex flex-col dark:bg-slate-900"
             :class="isMobile ? 'max-w-full max-h-full h-full rounded-none' : 'max-w-2xl max-h-[90vh] rounded-2xl'"
           >
-            <div class="bg-white border-b border-slate-200 px-6 md:px-8 py-5 flex items-center justify-between shrink-0">
+            <div class="bg-white border-b border-slate-200 px-6 md:px-8 py-5 flex items-center justify-between shrink-0 dark:border-slate-800 dark:bg-slate-900">
               <div class="flex items-center gap-4">
                 <div class="size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
                   <WkIcon name="set" :size="24" />
                 </div>
                 <div>
-                  <h2 class="text-xl font-bold text-slate-900">账号设置</h2>
-                  <p class="text-xs text-slate-500">管理您的个人信息与账户安全</p>
+                  <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">账号设置</h2>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">管理您的个人信息与账户安全</p>
                 </div>
               </div>
               <button
-                class="size-10 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
+                class="size-10 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all dark:hover:bg-slate-800 dark:hover:text-slate-200"
                 @click="handleClose"
               >
                 <span class="material-symbols-outlined">close</span>
               </button>
             </div>
 
-            <div class="flex-1 overflow-y-auto p-6 md:p-8 space-y-10">
+            <div class="flex-1 overflow-y-auto p-6 md:p-8 space-y-10 dark:bg-slate-900">
               <div class="space-y-6">
                 <div class="flex items-center justify-between gap-4">
-                  <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2 uppercase tracking-wider">
+                  <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2 uppercase tracking-wider dark:text-slate-100">
                     <span class="w-1.5 h-4 bg-primary rounded-full"></span>
                     基本信息
                   </h3>
@@ -47,7 +47,7 @@
                 <div class="flex flex-col md:flex-row gap-8 items-start">
                   <div class="flex flex-col items-center gap-3 py-2 shrink-0">
                     <div class="relative group">
-                      <div class="size-28 rounded-full bg-slate-100 border-4 border-white shadow-md overflow-hidden flex items-center justify-center">
+                      <div class="size-28 rounded-full bg-slate-100 border-4 border-white shadow-md overflow-hidden flex items-center justify-center dark:border-slate-900 dark:bg-slate-800">
                         <img
                           v-if="avatarPreviewUrl || profileForm.imgUrl"
                           :src="avatarPreviewUrl || profileForm.imgUrl"
@@ -77,7 +77,7 @@
                       <input
                         v-model="profileForm.realname"
                         type="text"
-                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 outline-none transition-all"
+                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 outline-none transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                       />
                     </div>
                     <div class="space-y-1.5">
@@ -86,7 +86,7 @@
                         v-model="profileForm.department"
                         type="text"
                         disabled
-                        class="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm text-slate-500 outline-none transition-all cursor-not-allowed"
+                        class="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm text-slate-500 outline-none transition-all cursor-not-allowed dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-400"
                       />
                     </div>
                     <div class="space-y-1.5">
@@ -94,7 +94,7 @@
                       <input
                         v-model="profileForm.position"
                         type="text"
-                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 outline-none transition-all"
+                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 outline-none transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                       />
                     </div>
                     <div class="space-y-1.5">
@@ -102,7 +102,7 @@
                       <input
                         v-model="profileForm.email"
                         type="email"
-                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 outline-none transition-all"
+                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 outline-none transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                       />
                     </div>
                     <div class="space-y-1.5 sm:col-span-2">
@@ -110,7 +110,7 @@
                       <input
                         v-model="profileForm.phone"
                         type="text"
-                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 outline-none transition-all"
+                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 outline-none transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                       />
                     </div>
                   </div>
@@ -118,7 +118,7 @@
 
                 <div class="flex justify-end gap-3">
                   <button
-                    class="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                    class="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors dark:text-slate-300 dark:hover:bg-slate-800"
                     type="button"
                     @click="resetProfileForm"
                   >
@@ -127,11 +127,11 @@
                 </div>
               </div>
 
-              <div class="h-px bg-slate-100 w-full" />
+              <div class="h-px bg-slate-100 w-full dark:bg-slate-800" />
 
               <div class="space-y-6">
                 <div class="flex items-center justify-between gap-4">
-                  <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2 uppercase tracking-wider">
+                  <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2 uppercase tracking-wider dark:text-slate-100">
                     <span class="w-1.5 h-4 bg-rose-500 rounded-full"></span>
                     安全设置
                   </h3>
@@ -151,7 +151,7 @@
                       v-model="passwordForm.oldPassword"
                       type="password"
                       placeholder="请输入当前密码"
-                      class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 outline-none transition-all"
+                      class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 outline-none transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
                     />
                   </div>
                   <div class="space-y-1.5">
@@ -160,7 +160,7 @@
                       v-model="passwordForm.newPassword"
                       type="password"
                       placeholder="请输入新密码"
-                      class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 outline-none transition-all"
+                      class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 outline-none transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
                     />
                   </div>
                   <div class="space-y-1.5">
@@ -169,20 +169,20 @@
                       v-model="passwordForm.confirmPassword"
                       type="password"
                       placeholder="请再次输入新密码"
-                      class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 outline-none transition-all"
+                      class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 outline-none transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
                     />
                   </div>
                 </div>
 
-                <div class="rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 text-xs text-slate-500">
+                <div class="rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-400">
                   密码修改成功后将立即生效。为安全起见，建议使用至少 6 位并包含字母与数字的组合。
                 </div>
               </div>
             </div>
 
-            <div class="bg-slate-50 border-t border-slate-200 px-6 md:px-8 py-5 flex items-center justify-end shrink-0">
+            <div class="bg-slate-50 border-t border-slate-200 px-6 md:px-8 py-5 flex items-center justify-end shrink-0 dark:border-slate-800 dark:bg-slate-950">
               <button
-                class="px-6 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-200 transition-colors"
+                class="px-6 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-200 transition-colors dark:text-slate-300 dark:hover:bg-slate-800"
                 type="button"
                 @click="handleClose"
               >

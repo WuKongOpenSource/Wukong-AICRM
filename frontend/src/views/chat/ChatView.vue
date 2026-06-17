@@ -22,7 +22,11 @@
           title="打开菜单"
           @click="openMobileMainMenu"
         >
-          <span class="material-symbols-outlined text-[22px] leading-none">menu</span>
+          <span class="wk-mobile-menu-glyph" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
         </button>
         <div v-if="showMobileChatFloatingActions" class="pointer-events-auto flex items-center justify-end gap-3">
           <div class="wk-mobile-chat-actions" :class="{ 'wk-mobile-chat-actions--single': mobileChatFloatingActionCount === 1 }">
@@ -2057,9 +2061,11 @@ const isMobileKeyboardVisible = computed(() =>
   isChatKeyboardFloatingEnabled.value && effectiveMobileKeyboardInset.value > 0
 )
 const chatComposerWrapStyle = computed(() =>
-  isMobileKeyboardVisible.value
-    ? { transform: `translate3d(0, -${effectiveMobileKeyboardInset.value}px, 0)` }
-    : undefined
+  ({
+    '--wk-mobile-keyboard-inset': isMobileKeyboardVisible.value
+      ? `${effectiveMobileKeyboardInset.value}px`
+      : '0px'
+  })
 )
 const chatComposerShellStyle = computed(() =>
   isMobile.value ? undefined : { minWidth: `${CHAT_COMPOSER_MIN_WIDTH_PX}px` }
@@ -4321,9 +4327,12 @@ function resolveChatAppIcon(code: string): string {
 }
 
 .wk-chat-composer-wrap {
+  --wk-mobile-keyboard-inset: 0px;
+
+  bottom: var(--wk-mobile-keyboard-inset);
   background: linear-gradient(to top, var(--wk-bg-page) 72%, rgb(var(--wk-bg-page-rgb) / 0));
-  transition: transform 180ms cubic-bezier(0.2, 0, 0, 1);
-  will-change: transform;
+  transition: bottom 180ms cubic-bezier(0.2, 0, 0, 1);
+  will-change: bottom;
 }
 
 @media (max-width: 768px) {
