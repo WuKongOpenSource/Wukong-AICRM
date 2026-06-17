@@ -194,6 +194,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     private static final Pattern DAYS_WITHOUT_CONTACT_PATTERN = Pattern.compile("(\\d{1,3})\\s*天(?:未跟进|未联系|未互动)");
     private static final Pattern RECENT_NEW_CUSTOMERS_PATTERN = Pattern.compile("(?:最近|近)(\\d{1,3})\\s*天新增");
     private static final Pattern LEVEL_PATTERN = Pattern.compile("([ABC])\\s*(?:类|级)?客户", Pattern.CASE_INSENSITIVE);
+    private static final Pattern WEBSITE_URL_PATTERN = Pattern.compile("(?i)\\b(?:https?://|www\\.)[^\\s，。；;、)）\\]】>]+");
     private static final List<String> COMMON_INDUSTRIES = List.of(
         "制造业", "互联网", "金融", "教育", "医疗", "零售", "物流", "房地产", "SaaS", "政府", "能源"
     );
@@ -1957,10 +1958,10 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             }
 
             log.info("AI 客户录入解析原始响应: {}", response);
-            return parseCustomerAiResponse(response);
+            return parseCustomerAiResponse(response, parseBO.getContent());
         } catch (Exception e) {
             log.error("AI 客户录入解析失败", e);
-            return buildFallbackCustomerResult();
+            return buildFallbackCustomerResult(parseBO.getContent());
         }
     }
 
@@ -1993,7 +1994,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
     }
 
-    private CustomerAiParseVO parseCustomerAiResponse(String response) {
+    private CustomerAiParseVO parseCustomerAiResponse(String response, String sourceContent) {
         try {
             // Strip markdown code block markers if present
             String json = response.trim();
@@ -2009,6 +2010,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             vo.setLevel(getJsonText(root, "level"));
             vo.setStage(getJsonText(root, "stage"));
             vo.setSource(getJsonText(root, "source"));
+            vo.setWebsite(resolveAiParsedWebsite(getJsonText(root, "website"), sourceContent));
             vo.setRemark(getJsonText(root, "remark"));
             vo.setContactName(getJsonText(root, "contactName"));
             vo.setContactPhone(getJsonText(root, "contactPhone"));
@@ -2027,7 +2029,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             return vo;
         } catch (Exception e) {
             log.warn("AI 客户录入响应 JSON 解析失败: {}", e.getMessage());
-            return buildFallbackCustomerResult();
+            return buildFallbackCustomerResult(sourceContent);
         }
     }
 
@@ -2548,7 +2550,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (StrUtil.isBlank(stage)) {
             return "未知";
         }
-        return STAGE_LABEL_MAP.getOrDefault(stage, stage);
+        String label = customFieldService.resolveOptionLabel("customer", "stage", stage);
+        return StrUtil.isNotBlank(label) ? label : STAGE_LABEL_MAP.getOrDefault(stage, stage);
     }
 
     private String buildAmountRangeLabel(String prefix, BigDecimal min, BigDecimal max) {
@@ -2580,6 +2583,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
     private String buildSortLabel(String sortBy, String sortOrder) {
         String label = switch (sortBy) {
+            case "updateTime" -> "更新时间";
             case "quotation" -> "预计成交金额";
             case "lastContactTime" -> "最后跟进";
             case "nextFollowTime" -> "下次跟进";
@@ -2798,6 +2802,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             return null;
         }
         return switch (normalized) {
+            case "updateTime", "update_time", "更新时间", "最新更新", "最近更新", "最近活动" -> "updateTime";
             case "createTime", "create_time", "创建时间", "新增时间" -> "createTime";
             case "quotation", "报价", "报价金额", "预计成交金额" -> "quotation";
             case "lastContactTime", "last_contact_time", "最后联系", "最后跟进" -> "lastContactTime";
@@ -2844,11 +2849,48 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         return result;
     }
 
-    private CustomerAiParseVO buildFallbackCustomerResult() {
+    private CustomerAiParseVO buildFallbackCustomerResult(String sourceContent) {
         CustomerAiParseVO vo = new CustomerAiParseVO();
+        vo.setWebsite(extractWebsiteFromContent(sourceContent));
         vo.setTags(List.of());
         vo.setKeyPoints(List.of());
         return vo;
+    }
+
+    private String resolveAiParsedWebsite(String parsedWebsite, String sourceContent) {
+        String normalizedWebsite = normalizeWebsiteForAiParse(parsedWebsite);
+        if (StrUtil.isNotBlank(normalizedWebsite)) {
+            return normalizedWebsite;
+        }
+        return extractWebsiteFromContent(sourceContent);
+    }
+
+    private String extractWebsiteFromContent(String content) {
+        if (StrUtil.isBlank(content)) {
+            return null;
+        }
+        Matcher matcher = WEBSITE_URL_PATTERN.matcher(content);
+        if (!matcher.find()) {
+            return null;
+        }
+        return normalizeWebsiteForAiParse(matcher.group());
+    }
+
+    private String normalizeWebsiteForAiParse(String website) {
+        String normalized = StrUtil.trim(website);
+        if (StrUtil.isBlank(normalized)) {
+            return null;
+        }
+        while (!normalized.isEmpty() && ".,;:，。；、)）]】>》".indexOf(normalized.charAt(normalized.length() - 1)) >= 0) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        if (StrUtil.isBlank(normalized)) {
+            return null;
+        }
+        if (normalized.toLowerCase(Locale.ROOT).startsWith("www.")) {
+            normalized = "https://" + normalized;
+        }
+        return customerLogoService.normalizeWebsite(normalized);
     }
 
     private void populateCustomerLogoQuietly(Long customerId) {

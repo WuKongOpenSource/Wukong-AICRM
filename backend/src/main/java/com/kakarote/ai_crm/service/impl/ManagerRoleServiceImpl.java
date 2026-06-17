@@ -47,6 +47,9 @@ import java.util.stream.Collectors;
 @Service
 public class ManagerRoleServiceImpl extends ServiceImpl<ManagerRoleMapper, ManagerRole> implements IManagerRoleService {
 
+    private static final String PRODUCT_MODULE_REALM = "product";
+    private static final String PRODUCT_PERMISSION_PREFIX = "product:";
+
     @Autowired
     private IManagerUserRoleService userRoleService;
 
@@ -154,22 +157,30 @@ public class ManagerRoleServiceImpl extends ServiceImpl<ManagerRoleMapper, Manag
      */
     @Override
     public JSONObject auth(Long userId) {
-        String cacheKey = Const.USER_AUTH_CACHE_KET + UserUtil.getUserId();
-        if (redis.exists(cacheKey)) {
-            return redis.get(cacheKey);
+        String cacheKey = Const.USER_AUTH_CACHE_KET + userId;
+        JSONObject cachedAuth = redis.get(cacheKey);
+        if (cachedAuth != null && !isProductAuthCacheStale(cachedAuth, userId)) {
+            return cachedAuth;
         }
-        List<ManagerMenu> managerMenus = menuService.queryMenuList(userId);
+        if (cachedAuth != null) {
+            redis.del(cacheKey);
+        }
+        List<ManagerMenu> managerMenus = new ArrayList<>(menuService.queryMenuList(userId));
         // 收集用户有权限的菜单的 parentId，只添加对应的父模块
         Set<Long> parentIds = managerMenus.stream()
                 .map(ManagerMenu::getParentId)
                 .collect(Collectors.toSet());
-        List<ManagerMenu> allMenus = menuService.list();
+        List<ManagerMenu> allMenus = new ArrayList<>(menuService.list());
+        Map<Long, ManagerMenu> authorizedMenus = new LinkedHashMap<>();
+        for (ManagerMenu menu : managerMenus) {
+            authorizedMenus.putIfAbsent(menu.getMenuId(), menu);
+        }
         for (ManagerMenu menu : allMenus) {
             if (Objects.equals(0L, menu.getParentId()) && parentIds.contains(menu.getMenuId())) {
-                managerMenus.add(menu);
+                authorizedMenus.putIfAbsent(menu.getMenuId(), menu);
             }
         }
-        JSONObject jsonObject = createMenu(new HashSet<>(managerMenus), 0L);
+        JSONObject jsonObject = createMenu(new HashSet<>(authorizedMenus.values()), 0L);
         redis.setex(cacheKey, 300, jsonObject);
         return jsonObject;
     }
@@ -296,9 +307,16 @@ public class ManagerRoleServiceImpl extends ServiceImpl<ManagerRoleMapper, Manag
                         "schedule",
                         "knowledge",
                         "relation",
-                        "addressBook"
+                        "addressBook",
+                        PRODUCT_MODULE_REALM
                 );
-                ap.setHasScopeOption(dataScopeModules.contains(module.getRealm()) && !realm.endsWith(":create"));
+                Set<String> actionRealmsWithoutDataScope = Set.of(
+                        "product:category_manage",
+                        "product:settings"
+                );
+                ap.setHasScopeOption(dataScopeModules.contains(module.getRealm())
+                        && !realm.endsWith(":create")
+                        && !actionRealmsWithoutDataScope.contains(realm));
                 ManagerRoleMenu rm = roleMenuMap.get(action.getMenuId());
                 if (rm != null) {
                     ap.setEnabled(true);
@@ -313,6 +331,16 @@ public class ManagerRoleServiceImpl extends ServiceImpl<ManagerRoleMapper, Manag
             result.add(vo);
         }
         return result;
+    }
+
+    private boolean isProductAuthCacheStale(JSONObject cachedAuth, Long userId) {
+        if (cachedAuth == null || cachedAuth.containsKey(PRODUCT_MODULE_REALM)) {
+            return false;
+        }
+        return menuService.queryMenuList(userId).stream()
+                .map(ManagerMenu::getRealm)
+                .filter(Objects::nonNull)
+                .anyMatch(realm -> PRODUCT_MODULE_REALM.equals(realm) || realm.startsWith(PRODUCT_PERMISSION_PREFIX));
     }
 
     @Override

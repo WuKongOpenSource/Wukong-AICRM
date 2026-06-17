@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -13,16 +14,21 @@ import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
+import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpAddBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpAiParseBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpQueryBO;
+import com.kakarote.ai_crm.entity.BO.FollowUpSuggestedTaskBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpUpdateBO;
+import com.kakarote.ai_crm.entity.BO.TaskAddBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.FollowUp;
 import com.kakarote.ai_crm.entity.PO.FollowUpAttachment;
 import com.kakarote.ai_crm.entity.PO.Relation;
+import com.kakarote.ai_crm.entity.PO.Task;
 import com.kakarote.ai_crm.entity.VO.FollowUpAiParseVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpAttachmentVO;
+import com.kakarote.ai_crm.entity.VO.FollowUpLinkedTaskVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.FollowUpAttachmentMapper;
@@ -30,7 +36,9 @@ import com.kakarote.ai_crm.mapper.FollowUpMapper;
 import com.kakarote.ai_crm.mapper.RelationMapper;
 import com.kakarote.ai_crm.service.AiAudioTranscriptionService;
 import com.kakarote.ai_crm.service.FileStorageService;
+import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.IFollowUpService;
+import com.kakarote.ai_crm.service.ITaskService;
 import com.kakarote.ai_crm.utils.AiMediaUtil;
 import com.kakarote.ai_crm.utils.DocumentTextExtractor;
 import com.kakarote.ai_crm.utils.UserUtil;
@@ -56,6 +64,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -73,6 +83,12 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
         DateTimeFormatter.ISO_LOCAL_DATE_TIME
+    );
+    private static final Pattern CHINESE_RELATIVE_TIME_PATTERN = Pattern.compile(
+        "(明天|后天|明早|明晚|今天)\\s*(凌晨|早上|早晨|上午|中午|下午|傍晚|晚上|今晚)?\\s*(\\d{1,2})(?:\\s*[:点时]\\s*(\\d{1,2}))?(半)?\\s*(?:分)?"
+    );
+    private static final Pattern ENGLISH_RELATIVE_TIME_PATTERN = Pattern.compile(
+        "(?i)\\b(today|tomorrow|day after tomorrow)\\b(?:\\s+at)?(?:\\s+(morning|afternoon|evening))?\\s*(\\d{1,2})(?::(\\d{1,2}))?\\s*(am|pm)?"
     );
 
     private static final String AI_PARSE_PROMPT_TEMPLATE = """
@@ -108,6 +124,12 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     private FileStorageService fileStorageService;
 
     @Autowired
+    private ITaskService taskService;
+
+    @Autowired
+    private ICustomerService customerService;
+
+    @Autowired
     private AiAudioTranscriptionService aiAudioTranscriptionService;
 
     @Lazy
@@ -139,14 +161,11 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         if (followUp.getAiGenerated() == null) {
             followUp.setAiGenerated(0);
         }
+        followUp.setSummary(normalizeStoredSummary(followUp.getSummary()));
         save(followUp);
         saveAttachments(followUp.getFollowUpId(), followUpAddBO.getAttachments());
-
-        customer.setLastContactTime(new Date());
-        if (followUpAddBO.getNextFollowTime() != null) {
-            customer.setNextFollowTime(followUpAddBO.getNextFollowTime());
-        }
-        customerMapper.updateById(customer);
+        createSuggestedTasks(followUp, followUpAddBO.getSuggestedTasks());
+        syncCustomerFollowUpSummary(followUp.getCustomerId());
 
         return followUp.getFollowUpId();
     }
@@ -169,24 +188,19 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         followUp.setAiGenerated(followUpUpdateBO.getAiGenerated());
         followUp.setFollowTime(followUpUpdateBO.getFollowTime());
         followUp.setNextFollowTime(followUpUpdateBO.getNextFollowTime());
+        followUp.setSummary(normalizeStoredSummary(followUp.getSummary()));
         updateById(followUp);
-
-        if (followUp.getCustomerId() != null) {
-            Customer customer = customerMapper.selectById(followUp.getCustomerId());
-            if (customer != null) {
-                customer.setLastContactTime(followUp.getFollowTime());
-                customer.setNextFollowTime(followUp.getNextFollowTime());
-                customerMapper.updateById(customer);
-            }
-        }
+        syncCustomerFollowUpSummary(followUp.getCustomerId());
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteFollowUp(Long followUpId) {
         FollowUp followUp = getById(followUpId);
         if (ObjectUtil.isNull(followUp)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "跟进记录不存在");
         }
+        Long customerId = followUp.getCustomerId();
         List<FollowUpAttachment> attachments = followUpAttachmentMapper.selectList(
             Wrappers.<FollowUpAttachment>lambdaQuery().eq(FollowUpAttachment::getFollowUpId, followUpId)
         );
@@ -197,6 +211,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             followUpAttachmentMapper.deleteBatchIds(attachments.stream().map(FollowUpAttachment::getAttachmentId).toList());
         }
         removeById(followUpId);
+        syncCustomerFollowUpSummary(customerId);
     }
 
     @Override
@@ -309,12 +324,12 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         return relation;
     }
 
-    private void saveAttachments(Long followUpId, List<com.kakarote.ai_crm.entity.BO.ChatSendBO.AttachmentDTO> attachments) {
+    private void saveAttachments(Long followUpId, List<ChatSendBO.AttachmentDTO> attachments) {
         if (followUpId == null || CollUtil.isEmpty(attachments)) {
             return;
         }
         int sort = 0;
-        for (com.kakarote.ai_crm.entity.BO.ChatSendBO.AttachmentDTO dto : attachments) {
+        for (ChatSendBO.AttachmentDTO dto : attachments) {
             if (dto == null || StrUtil.isBlank(dto.getFilePath())) {
                 continue;
             }
@@ -327,6 +342,31 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             attachment.setSort(sort++);
             attachment.setAnalysisStatus("idle");
             followUpAttachmentMapper.insert(attachment);
+        }
+    }
+
+    private void createSuggestedTasks(FollowUp followUp, List<FollowUpSuggestedTaskBO> suggestedTasks) {
+        if (followUp == null || (followUp.getCustomerId() == null && followUp.getRelationId() == null) || CollUtil.isEmpty(suggestedTasks)) {
+            return;
+        }
+
+        for (FollowUpSuggestedTaskBO suggestedTask : suggestedTasks) {
+            if (suggestedTask == null || StrUtil.isBlank(suggestedTask.getTitle())) {
+                continue;
+            }
+
+            TaskAddBO taskAddBO = new TaskAddBO();
+            taskAddBO.setTitle(suggestedTask.getTitle().trim());
+            taskAddBO.setDescription(StrUtil.blankToDefault(StrUtil.trim(suggestedTask.getDescription()), followUp.getSummary()));
+            taskAddBO.setDueDate(suggestedTask.getDueDate() != null ? suggestedTask.getDueDate() : followUp.getNextFollowTime());
+            taskAddBO.setPriority("medium");
+            taskAddBO.setTaskType(StrUtil.blankToDefault(suggestedTask.getTaskType(), "跟进"));
+            taskAddBO.setCustomerId(followUp.getCustomerId());
+            taskAddBO.setRelationId(followUp.getRelationId());
+            taskAddBO.setGeneratedByAi(1);
+            taskAddBO.setAiContext("Generated from follow-up " + followUp.getFollowUpId());
+            taskAddBO.setSourceFollowUpId(followUp.getFollowUpId());
+            taskService.addTask(taskAddBO);
         }
     }
 
@@ -353,13 +393,40 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
                 LinkedHashMap::new,
                 Collectors.toList()
             ));
+        Map<Long, List<FollowUpLinkedTaskVO>> taskMap = taskService.lambdaQuery()
+            .in(Task::getSourceFollowUpId, followUpIds)
+            .orderByAsc(Task::getDueDate)
+            .orderByDesc(Task::getCreateTime)
+            .list()
+            .stream()
+            .map(this::toLinkedTaskVO)
+            .collect(Collectors.groupingBy(
+                FollowUpLinkedTaskVO::getFollowUpId,
+                LinkedHashMap::new,
+                Collectors.toList()
+            ));
         for (FollowUpVO followUp : followUps) {
+            followUp.setSummary(normalizeStoredSummary(followUp.getSummary()));
             followUp.setAttachments(attachmentMap.getOrDefault(followUp.getFollowUpId(), List.of()));
+            followUp.setTasks(taskMap.getOrDefault(followUp.getFollowUpId(), List.of()));
         }
     }
 
     private FollowUpAttachmentVO toAttachmentVO(FollowUpAttachment attachment) {
         return BeanUtil.copyProperties(attachment, FollowUpAttachmentVO.class);
+    }
+
+    private FollowUpLinkedTaskVO toLinkedTaskVO(Task task) {
+        FollowUpLinkedTaskVO vo = new FollowUpLinkedTaskVO();
+        vo.setFollowUpId(task.getSourceFollowUpId());
+        vo.setTaskId(task.getTaskId());
+        vo.setTitle(task.getTitle());
+        vo.setDescription(task.getDescription());
+        vo.setDueDate(task.getDueDate());
+        vo.setStatus(task.getStatus());
+        vo.setTaskType(task.getTaskType());
+        vo.setGeneratedByAi(task.getGeneratedByAi());
+        return vo;
     }
 
     private String buildAttachmentAnalysis(FollowUpAttachment attachment) {
@@ -586,6 +653,80 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         }
     }
 
+    private void syncCustomerFollowUpSummary(Long customerId) {
+        if (customerId == null) {
+            return;
+        }
+
+        FollowUp latestFollowUp = lambdaQuery()
+            .eq(FollowUp::getCustomerId, customerId)
+            .orderByDesc(FollowUp::getFollowTime)
+            .orderByDesc(FollowUp::getCreateTime)
+            .orderByDesc(FollowUp::getFollowUpId)
+            .last("LIMIT 1")
+            .one();
+
+        LambdaUpdateWrapper<Customer> updateWrapper = new LambdaUpdateWrapper<Customer>()
+            .eq(Customer::getCustomerId, customerId)
+            .set(Customer::getLastContactTime, latestFollowUp != null ? latestFollowUp.getFollowTime() : null)
+            .set(Customer::getNextFollowTime, latestFollowUp != null ? latestFollowUp.getNextFollowTime() : null);
+        customerMapper.update(null, updateWrapper);
+        customerService.refreshCustomerActivity(customerId);
+    }
+
+    private String normalizeStoredSummary(String summary) {
+        if (StrUtil.isBlank(summary)) {
+            return null;
+        }
+        return compactSummary(summary);
+    }
+
+    private String normalizeGeneratedSummary(String summary, String originalContent) {
+        String compacted = compactSummary(summary);
+        if (StrUtil.isNotBlank(compacted)) {
+            return compacted;
+        }
+        return compactSummary(originalContent);
+    }
+
+    private String compactSummary(String text) {
+        String normalized = normalizeSingleLineText(text);
+        if (StrUtil.isBlank(normalized)) {
+            return "";
+        }
+
+        String sentence = firstSegment(normalized, "[。！？!?；;\\r\\n]+");
+        String clause = firstSegment(sentence, "[，,:：]+");
+        String candidate = StrUtil.isNotBlank(clause) ? clause : sentence;
+        candidate = candidate.replaceFirst("^[\\s\\-•·*#\\d.、）)]+", "");
+        candidate = candidate.replaceFirst("[\\s,，.。!！?？;；:：]+$", "");
+        candidate = normalizeSingleLineText(candidate);
+        if (StrUtil.isBlank(candidate)) {
+            candidate = normalized;
+        }
+
+        if (candidate.length() <= 22) {
+            return candidate;
+        }
+        return candidate.substring(0, 22) + "...";
+    }
+
+    private String normalizeSingleLineText(String text) {
+        return StrUtil.blankToDefault(text, "")
+            .replace("\\n", " ")
+            .replace("\\r", " ")
+            .replaceAll("\\s+", " ")
+            .trim();
+    }
+
+    private String firstSegment(String text, String regex) {
+        if (StrUtil.isBlank(text)) {
+            return "";
+        }
+        String[] parts = text.split(regex, 2);
+        return parts.length == 0 ? "" : StrUtil.trim(parts[0]);
+    }
+
     private FollowUpAiParseVO parseAiResponse(String response, String originalContent, String now) {
         try {
             String json = response.trim();
@@ -596,8 +737,8 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
 
             JsonNode root = objectMapper.readTree(json);
             FollowUpAiParseVO vo = new FollowUpAiParseVO();
-            vo.setSummary(getTextOrDefault(root, "summary",
-                originalContent.length() > 100 ? originalContent.substring(0, 100) + "..." : originalContent));
+            vo.setSummary(normalizeGeneratedSummary(getTextOrDefault(root, "summary", ""), originalContent));
+            vo.setSceneType(getTextOrDefault(root, "sceneType", ""));
             vo.setType(getTextOrDefault(root, "type", "other"));
             vo.setFollowTime(normalizeRequiredDateTime(getTextOrDefault(root, "followTime", now), now));
             vo.setNextFollowTime(normalizeOptionalDateTime(getTextOrDefault(root, "nextFollowTime", ""), now));
@@ -614,7 +755,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             }
             vo.setTodos(todos);
 
-            return vo;
+            return normalizeParsedTimes(vo, originalContent, now);
         } catch (Exception e) {
             log.warn("AI 响应 JSON 解析失败: {}", e.getMessage());
             return buildFallbackResult(originalContent, now);
@@ -631,13 +772,188 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
 
     private FollowUpAiParseVO buildFallbackResult(String content, String now) {
         FollowUpAiParseVO vo = new FollowUpAiParseVO();
-        vo.setSummary(content.length() > 100 ? content.substring(0, 100) + "..." : content);
+        vo.setSummary(normalizeGeneratedSummary("", content));
+        vo.setSceneType("");
         vo.setType("other");
         vo.setFollowTime(now);
         vo.setNextFollowTime("");
         vo.setKeyPoints(List.of());
         vo.setTodos(List.of());
         return vo;
+    }
+
+    private FollowUpAiParseVO normalizeParsedTimes(FollowUpAiParseVO vo, String originalContent, String now) {
+        LocalDateTime nowTime = parseDateTime(now, LocalTime.now());
+        if (nowTime == null) {
+            return vo;
+        }
+
+        LocalDateTime followTime = parseDateTime(vo.getFollowTime(), nowTime.toLocalTime());
+        LocalDateTime nextFollowTime = parseDateTime(vo.getNextFollowTime(), nowTime.toLocalTime());
+        LocalDateTime inferredNextFollowTime = inferNextFollowTimeFromContent(originalContent, nowTime);
+
+        if (followTime != null && followTime.isAfter(nowTime.plusMinutes(5))) {
+            LocalDateTime normalizedNextFollowTime = chooseFutureNextFollowTime(
+                inferredNextFollowTime,
+                nextFollowTime,
+                followTime,
+                nowTime
+            );
+            if (normalizedNextFollowTime != null) {
+                vo.setNextFollowTime(AI_TIME_FORMATTER.format(normalizedNextFollowTime));
+                nextFollowTime = normalizedNextFollowTime;
+            }
+            vo.setFollowTime(now);
+            followTime = nowTime;
+        }
+
+        if (inferredNextFollowTime != null
+            && inferredNextFollowTime.isAfter(nowTime.plusMinutes(5))
+            && (nextFollowTime == null || !nextFollowTime.isAfter(nowTime.plusMinutes(5)))) {
+            vo.setNextFollowTime(AI_TIME_FORMATTER.format(inferredNextFollowTime));
+        }
+
+        return vo;
+    }
+
+    private LocalDateTime chooseFutureNextFollowTime(LocalDateTime inferredNextFollowTime,
+                                                     LocalDateTime parsedNextFollowTime,
+                                                     LocalDateTime parsedFollowTime,
+                                                     LocalDateTime nowTime) {
+        LocalDateTime[] candidates = {inferredNextFollowTime, parsedNextFollowTime, parsedFollowTime};
+        for (LocalDateTime candidate : candidates) {
+            if (candidate != null && candidate.isAfter(nowTime.plusMinutes(5))) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private LocalDateTime inferNextFollowTimeFromContent(String content, LocalDateTime nowTime) {
+        if (StrUtil.isBlank(content)) {
+            return null;
+        }
+        LocalDateTime chinese = parseChineseRelativeTime(content, nowTime);
+        if (chinese != null) {
+            return chinese;
+        }
+        return parseEnglishRelativeTime(content, nowTime);
+    }
+
+    private LocalDateTime parseChineseRelativeTime(String content, LocalDateTime nowTime) {
+        Matcher matcher = CHINESE_RELATIVE_TIME_PATTERN.matcher(content);
+        while (matcher.find()) {
+            String dayToken = matcher.group(1);
+            String periodToken = StrUtil.blankToDefault(matcher.group(2), deriveChinesePeriodToken(dayToken));
+            Integer hour = parseHourToken(matcher.group(3));
+            Integer minute = parseMinuteToken(matcher.group(4), matcher.group(5));
+            Integer normalizedHour = normalizeHour(hour, periodToken);
+            if (normalizedHour == null || minute == null) {
+                continue;
+            }
+
+            LocalDateTime candidate = LocalDateTime.of(
+                nowTime.toLocalDate().plusDays(resolveChineseDayOffset(dayToken)),
+                LocalTime.of(normalizedHour, minute)
+            );
+            if (candidate.isAfter(nowTime)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private LocalDateTime parseEnglishRelativeTime(String content, LocalDateTime nowTime) {
+        Matcher matcher = ENGLISH_RELATIVE_TIME_PATTERN.matcher(content);
+        while (matcher.find()) {
+            String dayToken = matcher.group(1);
+            String periodToken = matcher.group(5) != null ? matcher.group(5) : matcher.group(2);
+            Integer hour = parseHourToken(matcher.group(3));
+            Integer minute = parseMinuteToken(matcher.group(4), null);
+            Integer normalizedHour = normalizeHour(hour, periodToken);
+            if (normalizedHour == null || minute == null) {
+                continue;
+            }
+
+            LocalDateTime candidate = LocalDateTime.of(
+                nowTime.toLocalDate().plusDays(resolveEnglishDayOffset(dayToken)),
+                LocalTime.of(normalizedHour, minute)
+            );
+            if (candidate.isAfter(nowTime)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private long resolveChineseDayOffset(String dayToken) {
+        return switch (dayToken) {
+            case "后天" -> 2L;
+            case "明天", "明早", "明晚" -> 1L;
+            default -> 0L;
+        };
+    }
+
+    private long resolveEnglishDayOffset(String dayToken) {
+        if ("day after tomorrow".equalsIgnoreCase(dayToken)) {
+            return 2L;
+        }
+        if ("tomorrow".equalsIgnoreCase(dayToken)) {
+            return 1L;
+        }
+        return 0L;
+    }
+
+    private String deriveChinesePeriodToken(String dayToken) {
+        if ("明早".equals(dayToken)) {
+            return "早上";
+        }
+        if ("明晚".equals(dayToken)) {
+            return "晚上";
+        }
+        return "";
+    }
+
+    private Integer parseHourToken(String token) {
+        try {
+            return StrUtil.isBlank(token) ? null : Integer.parseInt(token);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Integer parseMinuteToken(String minuteToken, String halfToken) {
+        if (StrUtil.isNotBlank(halfToken)) {
+            return 30;
+        }
+        if (StrUtil.isBlank(minuteToken)) {
+            return 0;
+        }
+        try {
+            int minute = Integer.parseInt(minuteToken);
+            return minute >= 0 && minute <= 59 ? minute : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Integer normalizeHour(Integer hour, String periodToken) {
+        if (hour == null || hour < 0 || hour > 23) {
+            return null;
+        }
+        String period = StrUtil.blankToDefault(periodToken, "").toLowerCase(Locale.ROOT);
+        if (period.contains("pm") || period.contains("下午") || period.contains("晚上")
+            || period.contains("傍晚") || period.contains("今晚") || period.contains("evening")) {
+            return hour < 12 ? hour + 12 : hour;
+        }
+        if (period.contains("am") || period.contains("凌晨") || period.contains("早上")
+            || period.contains("早晨") || period.contains("上午") || period.contains("morning")) {
+            return hour == 12 ? 0 : hour;
+        }
+        if (period.contains("中午")) {
+            return hour < 11 ? hour + 12 : hour;
+        }
+        return hour;
     }
 
     private String normalizeRequiredDateTime(String value, String fallback) {

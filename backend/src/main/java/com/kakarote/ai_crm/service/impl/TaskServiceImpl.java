@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,11 +17,20 @@ import com.kakarote.ai_crm.entity.BO.TaskAiParseBO;
 import com.kakarote.ai_crm.entity.BO.TaskQueryBO;
 import com.kakarote.ai_crm.entity.BO.TaskUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
+import com.kakarote.ai_crm.entity.PO.Project;
+import com.kakarote.ai_crm.entity.PO.ProjectLane;
+import com.kakarote.ai_crm.entity.PO.Relation;
 import com.kakarote.ai_crm.entity.PO.Task;
 import com.kakarote.ai_crm.entity.VO.TaskAiParseVO;
 import com.kakarote.ai_crm.entity.VO.TaskVO;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
+import com.kakarote.ai_crm.mapper.ProjectLaneMapper;
+import com.kakarote.ai_crm.mapper.ProjectMapper;
+import com.kakarote.ai_crm.mapper.RelationMapper;
 import com.kakarote.ai_crm.mapper.TaskMapper;
+import com.kakarote.ai_crm.service.ICustomFieldService;
+import com.kakarote.ai_crm.service.ICustomerService;
+import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import com.kakarote.ai_crm.service.ITaskService;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -58,10 +68,31 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
     @Autowired
     private CustomerMapper customerMapper;
 
+    @Autowired
+    private RelationMapper relationMapper;
+
+    @Autowired
+    private ProjectMapper projectMapper;
+
+    @Autowired
+    private ProjectLaneMapper projectLaneMapper;
+
+    @Autowired
+    private IGlobalSearchIndexService globalSearchIndexService;
+
+    @Autowired
+    @Lazy
+    private ICustomerService customerService;
+
+    @Autowired
+    @Lazy
+    private ICustomFieldService customFieldService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final int HIGH_VALUE_THRESHOLD = 72;
     private static final int MEDIUM_VALUE_THRESHOLD = 58;
+    private static final int HIGH_VALUE_FALLBACK_LIMIT = 5;
 
     private static final String AI_TASK_PARSE_PROMPT = """
         你是一个专业的 CRM 助手。请分析以下自然语言任务描述，提取结构化信息并以 JSON 格式返回。
@@ -86,6 +117,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
 
     @Override
     public Long addTask(TaskAddBO taskAddBO) {
+        validateOwnedRelation(taskAddBO.getRelationId());
         Task task = BeanUtil.copyProperties(taskAddBO, Task.class);
         if (StrUtil.isEmpty(task.getStatus())) {
             task.setStatus("pending");
@@ -99,8 +131,12 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         if (task.getGeneratedByAi() == null) {
             task.setGeneratedByAi(0);
         }
+        normalizeProjectBinding(task);
         save(task);
         refreshValuePriority(task.getTaskId());
+        globalSearchIndexService.refreshTaskIndex(task.getTaskId());
+        refreshCustomerActivity(task.getCustomerId());
+        touchProject(task.getProjectId());
         return task.getTaskId();
     }
 
@@ -110,9 +146,16 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         if (ObjectUtil.isNull(task)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "任务不存在");
         }
+        validateOwnedRelation(taskUpdateBO.getRelationId());
+        Long previousCustomerId = task.getCustomerId();
+        Long previousProjectId = task.getProjectId();
         BeanUtil.copyProperties(taskUpdateBO, task, "taskId", "createUserId", "createTime");
+        normalizeProjectBinding(task);
         updateById(task);
         refreshValuePriority(task.getTaskId());
+        globalSearchIndexService.refreshTaskIndex(task.getTaskId());
+        refreshCustomerActivities(previousCustomerId, task.getCustomerId());
+        touchProjects(previousProjectId, task.getProjectId());
     }
 
     @Override
@@ -121,7 +164,12 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         if (ObjectUtil.isNull(task)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "任务不存在");
         }
+        Long customerId = task.getCustomerId();
+        Long projectId = task.getProjectId();
         removeById(taskId);
+        globalSearchIndexService.deleteByEntity("task", taskId);
+        refreshCustomerActivity(customerId);
+        touchProject(projectId);
     }
 
     @Override
@@ -143,12 +191,120 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         if (ObjectUtil.isNull(task)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "任务不存在");
         }
-        task.setStatus(status);
-        if ("completed".equals(status)) {
+        task.setStatus(normalizeTaskStatus(status));
+        if ("completed".equals(task.getStatus())) {
             task.setCompletedTime(new Date());
         }
         updateById(task);
         refreshValuePriority(taskId);
+        globalSearchIndexService.refreshTaskIndex(taskId);
+        refreshCustomerActivity(task.getCustomerId());
+        touchProject(task.getProjectId());
+    }
+
+    private void normalizeProjectBinding(Task task) {
+        task.setStatus(normalizeTaskStatus(task.getStatus()));
+        if (task.getProjectId() == null) {
+            task.setLaneId(null);
+            return;
+        }
+
+        ensureProjectExists(task.getProjectId());
+        ProjectLane lane = task.getLaneId() == null
+                ? defaultProjectLane(task.getProjectId())
+                : findProjectLane(task.getProjectId(), task.getLaneId());
+        task.setLaneId(lane.getLaneId());
+        task.setStatus(laneToTaskStatus(lane));
+    }
+
+    private String normalizeTaskStatus(String status) {
+        return StrUtil.blankToDefault(status, "pending").trim().toLowerCase();
+    }
+
+    private void ensureProjectExists(Long projectId) {
+        if (projectMapper.selectById(projectId) == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_DATA_DOES_NOT_EXIST, "项目不存在或无权访问");
+        }
+    }
+
+    private ProjectLane defaultProjectLane(Long projectId) {
+        List<ProjectLane> lanes = loadProjectLanes(projectId);
+        return lanes.stream()
+                .filter(lane -> "not-started".equals(lane.getCode()))
+                .findFirst()
+                .orElseGet(() -> lanes.stream().findFirst()
+                        .orElseThrow(() -> new BusinessException(SystemCodeEnum.SYSTEM_DATA_DOES_NOT_EXIST, "项目泳道不存在")));
+    }
+
+    private ProjectLane findProjectLane(Long projectId, Long laneId) {
+        return loadProjectLanes(projectId).stream()
+                .filter(lane -> Objects.equals(lane.getLaneId(), laneId))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(SystemCodeEnum.SYSTEM_DATA_DOES_NOT_EXIST, "项目泳道不存在"));
+    }
+
+    private List<ProjectLane> loadProjectLanes(Long projectId) {
+        return projectLaneMapper.selectList(Wrappers.<ProjectLane>lambdaQuery()
+                .eq(ProjectLane::getProjectId, projectId)
+                .orderByAsc(ProjectLane::getSortOrder)
+                .orderByAsc(ProjectLane::getCreateTime));
+    }
+
+    private String laneToTaskStatus(ProjectLane lane) {
+        if ("in-progress".equals(lane.getCode())) {
+            return "in_progress";
+        }
+        if ("completed".equals(lane.getCode())) {
+            return "completed";
+        }
+        if ("not-started".equals(lane.getCode())) {
+            return "pending";
+        }
+        return StrUtil.blankToDefault(lane.getName(), "pending");
+    }
+
+    private void validateOwnedRelation(Long relationId) {
+        if (relationId == null) {
+            return;
+        }
+        Relation relation = relationMapper.selectById(relationId);
+        if (relation == null || Integer.valueOf(0).equals(relation.getStatus())
+                || !UserUtil.getUserId().equals(relation.getCreateUserId())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "关系人不存在或无权限访问");
+        }
+    }
+
+    private void refreshCustomerActivity(Long customerId) {
+        if (customerId != null) {
+            customerService.refreshCustomerActivity(customerId);
+        }
+    }
+
+    private void refreshCustomerActivities(Long previousCustomerId, Long currentCustomerId) {
+        refreshCustomerActivity(previousCustomerId);
+        if (!Objects.equals(previousCustomerId, currentCustomerId)) {
+            refreshCustomerActivity(currentCustomerId);
+        }
+    }
+
+    private void touchProject(Long projectId) {
+        if (projectId == null) {
+            return;
+        }
+        Project project = projectMapper.selectById(projectId);
+        if (project == null) {
+            return;
+        }
+        project.setUpdateUserId(UserUtil.getUserId());
+        project.setUpdateTime(new Date());
+        projectMapper.updateById(project);
+    }
+
+    private void touchProjects(Long previousProjectId, Long currentProjectId) {
+        touchProject(previousProjectId);
+        if (!Objects.equals(previousProjectId, currentProjectId)) {
+            touchProject(currentProjectId);
+        }
     }
 
     @Override
@@ -175,10 +331,19 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         fillTaskNames(tasks);
         hydrateValuePriority(tasks, true);
 
-        List<TaskVO> rankedTasks = tasks.stream()
-                .filter(task -> !Boolean.TRUE.equals(queryBO.getHighValueOnly()) || Boolean.TRUE.equals(task.getHighValue()))
+        List<TaskVO> sortedTasks = tasks.stream()
                 .sorted(buildValuePriorityComparator())
                 .collect(Collectors.toList());
+
+        List<TaskVO> rankedTasks = sortedTasks.stream()
+                .filter(task -> !Boolean.TRUE.equals(queryBO.getHighValueOnly()) || Boolean.TRUE.equals(task.getHighValue()))
+                .collect(Collectors.toList());
+
+        if (Boolean.TRUE.equals(queryBO.getHighValueOnly()) && rankedTasks.isEmpty()) {
+            rankedTasks = sortedTasks.stream()
+                    .limit(resolveHighValueFallbackLimit(queryBO))
+                    .collect(Collectors.toList());
+        }
 
         BasePage<TaskVO> page = paginateTasks(rankedTasks, queryBO);
         attachStatusCounts(page, queryBO);
@@ -209,31 +374,57 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
     }
 
     private void attachStatusCounts(BasePage<TaskVO> page, TaskQueryBO queryBO) {
-        page.setExtraData(Map.of("statusCounts", buildStatusCounts(queryBO)));
+        Map<String, Object> extraData = new LinkedHashMap<>();
+        extraData.put("statusCounts", buildStatusCounts(queryBO));
+        page.setExtraData(extraData);
     }
 
     private Map<String, Long> buildStatusCounts(TaskQueryBO queryBO) {
-        TaskQueryBO countQuery = new TaskQueryBO();
-        BeanUtil.copyProperties(queryBO, countQuery);
-        countQuery.setTaskId(null);
-        countQuery.setStatus(null);
-
-        List<TaskVO> tasks = baseMapper.queryList(countQuery);
-        fillTaskNames(tasks);
-        hydrateValuePriority(tasks, false);
-        if (Boolean.TRUE.equals(queryBO.getHighValueOnly())) {
-            tasks = tasks.stream()
-                    .filter(task -> Boolean.TRUE.equals(task.getHighValue()))
-                    .toList();
+        TaskQueryBO summaryQuery = BeanUtil.copyProperties(queryBO, TaskQueryBO.class);
+        summaryQuery.setStatus(null);
+        if ("overdue".equalsIgnoreCase(summaryQuery.getFilter())) {
+            summaryQuery.setFilter("all");
         }
 
-        Date now = new Date();
+        List<TaskVO> tasks = baseMapper.queryList(summaryQuery);
+        fillTaskNames(tasks);
+        if (tasks == null || tasks.isEmpty()) {
+            return buildStatusCountMap(Collections.emptyList());
+        }
+
+        if (useValuePriorityMode(summaryQuery)) {
+            hydrateValuePriority(tasks, true);
+            List<TaskVO> sortedTasks = tasks.stream()
+                    .sorted(buildValuePriorityComparator())
+                    .collect(Collectors.toList());
+
+            if (Boolean.TRUE.equals(summaryQuery.getHighValueOnly())) {
+                List<TaskVO> highValueTasks = sortedTasks.stream()
+                        .filter(task -> Boolean.TRUE.equals(task.getHighValue()))
+                        .collect(Collectors.toList());
+
+                if (!highValueTasks.isEmpty()) {
+                    return buildStatusCountMap(highValueTasks);
+                }
+
+                return buildStatusCountMap(sortedTasks.stream()
+                        .limit(resolveHighValueFallbackLimit(summaryQuery))
+                        .collect(Collectors.toList()));
+            }
+
+            return buildStatusCountMap(sortedTasks);
+        }
+
+        return buildStatusCountMap(tasks);
+    }
+
+    private Map<String, Long> buildStatusCountMap(List<TaskVO> tasks) {
         Map<String, Long> counts = new LinkedHashMap<>();
         counts.put("all", (long) tasks.size());
         counts.put("PENDING", countStatus(tasks, "PENDING"));
         counts.put("IN_PROGRESS", countStatus(tasks, "IN_PROGRESS"));
         counts.put("COMPLETED", countStatus(tasks, "COMPLETED"));
-        counts.put("OVERDUE", tasks.stream().filter(task -> isOverdue(task, now)).count());
+        counts.put("OVERDUE", tasks.stream().filter(this::isOverdueTask).count());
         return counts;
     }
 
@@ -243,10 +434,17 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
                 .count();
     }
 
-    private boolean isOverdue(TaskVO task, Date now) {
+    private boolean isOverdueTask(TaskVO task) {
         return task.getDueDate() != null
-                && task.getDueDate().before(now)
+                && task.getDueDate().before(new Date())
                 && !"COMPLETED".equalsIgnoreCase(StrUtil.blankToDefault(task.getStatus(), ""));
+    }
+
+    private int resolveHighValueFallbackLimit(TaskQueryBO queryBO) {
+        return (int) Math.min(
+                Math.max(1, ObjectUtil.defaultIfNull(queryBO.getLimit(), HIGH_VALUE_FALLBACK_LIMIT)),
+                HIGH_VALUE_FALLBACK_LIMIT
+        );
     }
 
     @Override
@@ -375,10 +573,15 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
             score += 8;
         }
 
-        score += scoreAmount(customer.getQuotation(), 10, 16, 24);
+        score += scoreAmount(customer.getQuotation(), 8, 12, 16);
 
         if (customer.getContactCount() != null) {
             score += Math.min(10, Math.max(0, customer.getContactCount()) * 2);
+        }
+
+        Integer snapshotScore = extractSnapshotScore(customer);
+        if (snapshotScore != null) {
+            score = Math.round(score * 0.75f + snapshotScore * 0.25f);
         }
 
         return clamp(score, 10, 98);
@@ -398,6 +601,15 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
             case "lost" -> 5;
             default -> 30;
         };
+
+        switch (normalizeAiStatus(customer.getAiStatusDetection())) {
+            case "HIGH_INTENT" -> score += 12;
+            case "ACTIVE" -> score += 6;
+            case "DORMANT" -> score -= 18;
+            case "FOLLOW_UP" -> score += 1;
+            default -> {
+            }
+        }
 
         long daysSinceLastContact = daysSince(customer.getLastContactTime());
         if (daysSinceLastContact >= 0) {
@@ -478,6 +690,9 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
             if ("lost".equalsIgnoreCase(customer.getStage())) {
                 penalty += 20;
             }
+            if ("DORMANT".equals(normalizeAiStatus(customer.getAiStatusDetection()))) {
+                penalty += 8;
+            }
             if (customer.getNextFollowTime() == null) {
                 penalty += 4;
             }
@@ -498,9 +713,15 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
                                             int actionFit) {
         List<String> reasons = new ArrayList<>();
         String stage = customer == null ? "" : StrUtil.blankToDefault(customer.getStage(), "");
+        String aiStatus = customer == null ? "" : normalizeAiStatus(customer.getAiStatusDetection());
 
         if (StrUtil.isNotBlank(stage)) {
             reasons.add("客户处于" + getStageLabel(stage) + "阶段");
+        }
+        if ("HIGH_INTENT".equals(aiStatus)) {
+            reasons.add("AI 判断为高意向");
+        } else if ("ACTIVE".equals(aiStatus)) {
+            reasons.add("客户近期仍保持活跃");
         }
         if (urgency >= 85) {
             reasons.add("当前处理窗口已经非常接近");
@@ -508,7 +729,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
             reasons.add("任务时效性较强");
         }
         if (hasCommercialSignal(customer) && customerValue >= 70) {
-            reasons.add("已有明确预计成交金额信号");
+            reasons.add("已有明确商业金额信号");
         }
         if (actionFit >= 75) {
             reasons.add("当前任务与客户阶段高度匹配");
@@ -570,6 +791,21 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         );
     }
 
+    private Integer extractSnapshotScore(Customer customer) {
+        if (customer == null || StrUtil.isBlank(customer.getAiParseSnapshot())) {
+            return null;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(customer.getAiParseSnapshot());
+            if (root.has("score") && !root.get("score").isNull()) {
+                return root.get("score").asInt();
+            }
+        } catch (Exception e) {
+            log.debug("Failed to parse customer ai snapshot score: customerId={}", customer.getCustomerId(), e);
+        }
+        return null;
+    }
+
     private int scoreAmount(BigDecimal amount, int lowScore, int mediumScore, int highScore) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             return 0;
@@ -597,10 +833,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         if (hours <= 72) {
             return 6;
         }
-        if (hours <= 24 * 7L) {
-            return 3;
-        }
-        return 0;
+        return 3;
     }
 
     private int scoreDeadline(Date deadline,
@@ -676,16 +909,41 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         return false;
     }
 
+    private String normalizeAiStatus(String aiStatus) {
+        String normalized = StrUtil.blankToDefault(aiStatus, "").replace(" ", "");
+        if (normalized.contains("高意向")) {
+            return "HIGH_INTENT";
+        }
+        if (normalized.contains("活跃")) {
+            return "ACTIVE";
+        }
+        if (normalized.contains("休眠")) {
+            return "DORMANT";
+        }
+        if (normalized.contains("需跟进") || normalized.contains("待跟进")) {
+            return "FOLLOW_UP";
+        }
+        return normalized;
+    }
+
     private String getStageLabel(String stage) {
-        return switch (stage.toLowerCase()) {
+        if (StrUtil.isBlank(stage)) {
+            return "推进中";
+        }
+        String label = switch (stage.toLowerCase()) {
             case "lead" -> "线索初期";
             case "qualified" -> "需求确认";
             case "proposal" -> "方案评估";
             case "negotiation" -> "商务谈判";
             case "closed" -> "成交";
             case "lost" -> "流失";
-            default -> "推进中";
+            default -> null;
         };
+        if (label != null) {
+            return label;
+        }
+        String resolved = customFieldService.resolveOptionLabel("customer", "stage", stage);
+        return StrUtil.isNotBlank(resolved) ? resolved : "推进中";
     }
 
     private int clamp(int value, int min, int max) {
@@ -731,6 +989,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         }
         task.setPriorityName(getPriorityName(task.getPriority()));
         task.setStatusName(getStatusName(task.getStatus()));
+        task.setOverdue(isOverdueTask(task));
     }
 
     /**

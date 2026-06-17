@@ -9,6 +9,9 @@ import java.util.Date;
 @Schema(name = "FollowUpLinkedTaskVO", description = "Task linked to a follow-up")
 public class FollowUpLinkedTaskVO {
 
+    @Schema(description = "Source follow-up ID")
+    private Long followUpId;
+
     @Schema(description = "Task ID")
     private Long taskId;
 
