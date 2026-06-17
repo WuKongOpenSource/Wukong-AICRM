@@ -137,12 +137,15 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
      */
     @Override
     public BasePage<ManageUserVO> queryPageList(UserQueryBO userQueryBO) {
+        if (StrUtil.isNotBlank(userQueryBO.getEmployeeStatus())) {
+            userQueryBO.setEmployeeStatus(EmployeeStatusEnum.normalize(userQueryBO.getEmployeeStatus()));
+        }
         // 如果指定了部门ID，收集该部门及所有下级部门ID
         if (userQueryBO.getDeptId() != null) {
             List<ManagerDept> allDepts = deptMapper.selectList(null);
-            List<Long> deptIds = new ArrayList<>();
-            collectChildDeptIds(allDepts, userQueryBO.getDeptId(), deptIds);
-            userQueryBO.setDeptIds(deptIds);
+            Set<Long> deptIds = new LinkedHashSet<>();
+            collectChildDeptIds(allDepts, userQueryBO.getDeptId(), deptIds, Const.AUTH_DATA_RECURSION_NUM);
+            userQueryBO.setDeptIds(new ArrayList<>(deptIds));
         }
         BasePage<ManageUserVO> page = baseMapper.queryPageList(userQueryBO.parse(), userQueryBO);
         fillRoleInfo(page.getRecords());
@@ -155,10 +158,19 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
      * 递归收集指定部门及其所有下级部门ID
      */
     private void collectChildDeptIds(List<ManagerDept> allDepts, Long parentId, List<Long> result) {
-        result.add(parentId);
+        Set<Long> deptIds = new LinkedHashSet<>(result);
+        collectChildDeptIds(allDepts, parentId, deptIds, Const.AUTH_DATA_RECURSION_NUM);
+        result.clear();
+        result.addAll(deptIds);
+    }
+
+    private void collectChildDeptIds(List<ManagerDept> allDepts, Long parentId, Set<Long> result, int depth) {
+        if (parentId == null || depth < 0 || !result.add(parentId)) {
+            return;
+        }
         for (ManagerDept dept : allDepts) {
             if (parentId.equals(dept.getParentId())) {
-                collectChildDeptIds(allDepts, dept.getDeptId(), result);
+                collectChildDeptIds(allDepts, dept.getDeptId(), result, depth - 1);
             }
         }
     }
