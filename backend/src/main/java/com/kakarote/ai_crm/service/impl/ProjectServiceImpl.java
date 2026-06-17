@@ -690,6 +690,18 @@ public class ProjectServiceImpl implements IProjectService {
             task.setUpdateUserId(UserUtil.getUserId());
             projectTaskMapper.updateById(task);
             reply = "已将任务优先级更新为「" + priority + "」。";
+        } else if (containsAny(content, "移动", "移到", "挪到", "转到", "拖到")) {
+            ensureProjectPermission(projectId, PERMISSION_MOVE_TASK);
+            ProjectLane lane = findLaneByKeyword(projectId, content);
+            if (lane != null) {
+                task.setLaneId(lane.getLaneId());
+                if (isCompletedLane(lane.getLaneId())) {
+                    task.setStatus(TASK_STATUS_COMPLETED);
+                }
+                task.setUpdateUserId(UserUtil.getUserId());
+                projectTaskMapper.updateById(task);
+                reply = "已将任务「" + task.getTitle() + "」移动到「" + lane.getName() + "」。";
+            }
         } else if (containsAny(content, "日程", "安排", "提醒")) {
             Date scheduleTime = parseRelativeDateTime(content);
             String title = extractScheduleTitle(content, task.getTitle());
@@ -1173,6 +1185,41 @@ public class ProjectServiceImpl implements IProjectService {
             return "LOW";
         }
         return PRIORITY_MEDIUM;
+    }
+
+    private ProjectLane findLaneByKeyword(Long projectId, String content) {
+        if (StrUtil.isBlank(content)) {
+            return null;
+        }
+        List<ProjectLane> lanes = projectLaneMapper.selectList(Wrappers.<ProjectLane>lambdaQuery()
+                .eq(ProjectLane::getProjectId, projectId)
+                .orderByAsc(ProjectLane::getSortOrder)
+                .orderByAsc(ProjectLane::getCreateTime));
+        for (ProjectLane lane : lanes) {
+            if (lane == null) {
+                continue;
+            }
+            if (StrUtil.isNotBlank(lane.getName()) && content.contains(lane.getName())) {
+                return lane;
+            }
+            if (StrUtil.isNotBlank(lane.getCode())
+                    && content.toLowerCase(Locale.ROOT).contains(lane.getCode().toLowerCase(Locale.ROOT))) {
+                return lane;
+            }
+            if (containsAny(content, "完成", "完结", "结束")
+                    && ("completed".equals(lane.getCode()) || "已完成".equals(lane.getName()))) {
+                return lane;
+            }
+            if (containsAny(content, "进行", "处理中")
+                    && ("in_progress".equals(lane.getCode()) || "进行中".equals(lane.getName()))) {
+                return lane;
+            }
+            if (containsAny(content, "开始", "待办", "未开始")
+                    && ("todo".equals(lane.getCode()) || "not_started".equals(lane.getCode()) || "未开始".equals(lane.getName()))) {
+                return lane;
+            }
+        }
+        return null;
     }
 
     private String extractScheduleTitle(String content, String fallback) {

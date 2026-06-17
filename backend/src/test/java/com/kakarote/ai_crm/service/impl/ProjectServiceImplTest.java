@@ -318,6 +318,46 @@ class ProjectServiceImplTest {
         verify(chatClientProvider).getRuntimeConfigSnapshot(null, null);
     }
 
+    @Test
+    void taskAiCommandMovesTaskToMatchedLane() {
+        Project project = new Project();
+        project.setProjectId(2001L);
+        project.setName("Implementation");
+        project.setOwnerId(1001L);
+
+        ProjectTask task = new ProjectTask();
+        task.setTaskId(3001L);
+        task.setProjectId(2001L);
+        task.setLaneId(10L);
+        task.setTitle("Prepare proposal");
+        task.setPriority("MEDIUM");
+        task.setStatus("TODO");
+
+        ProjectLane todoLane = lane(10L, "todo", "未开始", 10);
+        ProjectLane completedLane = lane(30L, "completed", "已完成", 30);
+
+        when(projectMapper.selectById(2001L)).thenReturn(project);
+        when(projectTaskMapper.selectById(3001L)).thenReturn(task);
+        when(projectLaneMapper.selectList(any())).thenReturn(List.of(todoLane, completedLane));
+        when(projectLaneMapper.selectById(30L)).thenReturn(completedLane);
+        when(projectMapper.getProjectById(2001L)).thenReturn(projectDetail(2001L));
+        when(projectTaskMapper.selectProjectTasks(2001L, null)).thenReturn(List.of(taskVO(3001L)));
+        when(projectTaskAttachmentMapper.selectList(any())).thenReturn(List.of());
+        when(projectAttachmentMapper.selectList(any())).thenReturn(List.of());
+        when(projectScheduleMapper.selectList(any())).thenReturn(List.of());
+
+        ProjectBO.AiCommand command = new ProjectBO.AiCommand();
+        command.setContent("把这个任务移动到完成");
+
+        ProjectVO result = projectService.handleTaskAiCommand(2001L, 3001L, command);
+
+        assertThat(result.getProjectId()).isEqualTo(2001L);
+        ArgumentCaptor<ProjectTask> taskCaptor = ArgumentCaptor.forClass(ProjectTask.class);
+        verify(projectTaskMapper).updateById(taskCaptor.capture());
+        assertThat(taskCaptor.getValue().getLaneId()).isEqualTo(30L);
+        assertThat(taskCaptor.getValue().getStatus()).isEqualTo("COMPLETED");
+    }
+
     private ManagerUser activeUser(Long userId) {
         ManagerUser user = new ManagerUser();
         user.setUserId(userId);
@@ -342,6 +382,16 @@ class ProjectServiceImplTest {
         task.setProjectId(2001L);
         task.setTitle("Prepare proposal");
         return task;
+    }
+
+    private ProjectLane lane(Long laneId, String code, String name, int sortOrder) {
+        ProjectLane lane = new ProjectLane();
+        lane.setLaneId(laneId);
+        lane.setProjectId(2001L);
+        lane.setCode(code);
+        lane.setName(name);
+        lane.setSortOrder(sortOrder);
+        return lane;
     }
 
     private void setCurrentUser(Long userId) {
