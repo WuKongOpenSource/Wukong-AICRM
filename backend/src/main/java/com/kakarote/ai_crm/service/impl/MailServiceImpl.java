@@ -55,6 +55,7 @@ import com.kakarote.ai_crm.utils.UserUtil;
 import jakarta.annotation.PostConstruct;
 import jakarta.mail.FetchProfile;
 import jakarta.mail.Folder;
+import jakarta.mail.MessagingException;
 import jakarta.mail.Message;
 import jakarta.mail.Session;
 import jakarta.mail.Store;
@@ -65,6 +66,7 @@ import jakarta.mail.internet.MimeMessage;
 import jakarta.mail.search.ReceivedDateTerm;
 import jakarta.mail.search.SearchTerm;
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.angus.mail.imap.IMAPStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpEntity;
@@ -138,6 +140,11 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     private static final List<String> DEFAULT_IMAP_FOLDERS = List.of("INBOX", "Sent");
     private static final List<String> DEFAULT_GMAIL_FOLDERS = List.of("INBOX", "SENT");
     private static final List<String> DEFAULT_GRAPH_FOLDERS = List.of("inbox", "sentitems");
+    private static final Map<String, String> IMAP_CLIENT_ID = Map.of(
+            "name", "AICRM",
+            "version", "1.0.0",
+            "vendor", "Kakarote"
+    );
     private static final Pattern ISO_DATE_PATTERN = Pattern.compile("(20\\d{2})[-/.](\\d{1,2})[-/.](\\d{1,2})");
     private static final Pattern CN_DATE_PATTERN = Pattern.compile("(\\d{1,2})月(\\d{1,2})日");
     private static final List<String> ACTION_HINTS = List.of(
@@ -297,7 +304,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                     .build(true)
                     .toUriString();
         } else {
-            authorizeUrl = UriComponentsBuilder.fromUriString("https://login.microsoftonline.com/common/oauth2/v2.0/authorize")
+            authorizeUrl = UriComponentsBuilder.fromUriString(outlookOAuthUrl(oauthProvider, "authorize"))
                     .queryParam("client_id", oauthProvider.getClientId())
                     .queryParam("redirect_uri", oauthProvider.getRedirectUri())
                     .queryParam("response_type", "code")
@@ -465,7 +472,10 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                 .last("LIMIT 20"));
         for (MailAccount account : accounts) {
             try {
-                syncAccountWithLock(account);
+                MailSyncLog syncLog = startSyncLog(account, "scheduled");
+                markAccountSyncRunning(account);
+                syncTaskExecutor.submit("mail-scheduled-sync-" + account.getAccountId(),
+                        () -> syncAccountWithLock(account, syncLog));
             } catch (Exception e) {
                 log.warn("自动同步邮箱失败: accountId={}, error={}", account.getAccountId(), e.getMessage());
             }
@@ -577,6 +587,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         Session session = Session.getInstance(props);
         try (Store store = session.getStore("imap")) {
             store.connect(account.getImapHost(), resolveImapPort(account.getImapPort()), account.getUsername(), password);
+            sendImapClientId(store);
             Folder folder = store.getFolder(folderName);
             if (folder == null || !folder.exists() || !(folder instanceof UIDFolder uidFolder)) {
                 return null;
@@ -1332,6 +1343,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         Session session = Session.getInstance(props);
         try (Store store = session.getStore("imap")) {
             store.connect(account.getImapHost(), account.getImapPort(), account.getUsername(), password);
+            sendImapClientId(store);
             for (String folderName : folders) {
                 Folder folder = store.getFolder(folderName);
                 if (folder == null || !folder.exists()) {
@@ -1593,7 +1605,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     private OAuthToken postToken(String provider, MultiValueMap<String, String> form) {
         String tokenUrl = PROVIDER_GMAIL.equals(provider)
                 ? "https://oauth2.googleapis.com/token"
-                : "https://login.microsoftonline.com/common/oauth2/v2.0/token";
+                : outlookOAuthUrl(oauthProvider(provider), "token");
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
         ResponseEntity<Map> response = restTemplate.postForEntity(tokenUrl, new HttpEntity<>(form, headers), Map.class);
@@ -1607,6 +1619,11 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                 asString(body.get("refresh_token")),
                 Instant.now().plusSeconds(Math.max(60, expiresIn)).toEpochMilli()
         );
+    }
+
+    private String outlookOAuthUrl(MailIntegrationProperties.OAuthProvider oauthProvider, String action) {
+        String tenant = StrUtil.blankToDefault(oauthProvider.getTenant(), "common");
+        return "https://login.microsoftonline.com/" + tenant + "/oauth2/v2.0/" + action;
     }
 
     private OAuthProfile fetchOAuthProfile(String provider, String accessToken) throws Exception {
@@ -1653,8 +1670,37 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         Session session = Session.getInstance(props);
         try (Store store = session.getStore("imap")) {
             store.connect(host, port, username, password);
+            sendImapClientId(store);
+            validateReadableInbox(store);
         } catch (Exception e) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "IMAP 连接失败，请检查服务器、账号和授权码");
+        }
+    }
+
+    private void sendImapClientId(Store store) {
+        if (store instanceof IMAPStore imapStore) {
+            sendImapClientId(imapStore);
+        }
+    }
+
+    private void sendImapClientId(IMAPStore store) {
+        try {
+            store.id(IMAP_CLIENT_ID);
+        } catch (MessagingException e) {
+            log.debug("IMAP ID command ignored: {}", e.getMessage());
+        }
+    }
+
+    private void validateReadableInbox(Store store) throws MessagingException {
+        Folder inbox = store.getFolder("INBOX");
+        if (inbox == null || !inbox.exists()) {
+            throw new MessagingException("未找到 INBOX 文件夹");
+        }
+        inbox.open(Folder.READ_ONLY);
+        try {
+            // Opening the folder is enough to prove the account can read via IMAP.
+        } finally {
+            inbox.close(false);
         }
     }
 
@@ -1953,6 +1999,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         syncLog.setFailedCount(0);
         syncLog.setStartedAt(new Date());
         syncLogMapper.insert(syncLog);
+        logSyncStage(syncLog, account, "sync.start", "Sync log created, syncType=" + syncType);
         return syncLog;
     }
 
@@ -1984,6 +2031,23 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         syncLog.setFinishedAt(new Date());
         syncLog.setErrorMessage(StrUtil.maxLength(result.getErrorMessage(), 1000));
         syncLogMapper.updateById(syncLog);
+        log.info("mail sync finished: logId={}, accountId={}, status={}, fetched={}, saved={}, skipped={}, failed={}, error={}",
+                syncLog.getLogId(), syncLog.getAccountId(), result.getStatus(), result.getFetchedCount(),
+                result.getSavedCount(), result.getSkippedCount(), result.getFailedCount(),
+                StrUtil.maxLength(result.getErrorMessage(), 500));
+    }
+
+    private void logSyncStage(MailSyncLog syncLog, MailAccount account, String stage, String detail) {
+        Date startedAt = syncLog == null ? null : syncLog.getStartedAt();
+        Long elapsedMs = startedAt == null ? null : Math.max(0L, System.currentTimeMillis() - startedAt.getTime());
+        log.debug("mail sync stage: logId={}, accountId={}, email={}, provider={}, stage={}, elapsedMs={}, detail={}",
+                syncLog == null ? null : syncLog.getLogId(),
+                account == null ? null : account.getAccountId(),
+                account == null ? null : account.getEmailAddress(),
+                account == null ? null : account.getProvider(),
+                stage,
+                elapsedMs,
+                StrUtil.maxLength(StrUtil.blankToDefault(detail, ""), 500));
     }
 
     private MailExtraction extractMail(SyncedMail mail, boolean extractActions) {

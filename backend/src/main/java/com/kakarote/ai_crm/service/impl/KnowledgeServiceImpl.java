@@ -1089,6 +1089,22 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
                 || lower.endsWith(".pptx");
     }
 
+    private boolean isImageFile(String mimeType, String fileName) {
+        String normalizedMime = normalizeMimeType(mimeType);
+        if (StrUtil.isNotBlank(normalizedMime) && normalizedMime.startsWith("image/")) {
+            return true;
+        }
+        String lower = StrUtil.blankToDefault(fileName, "").toLowerCase(Locale.ROOT);
+        return lower.endsWith(".png")
+                || lower.endsWith(".jpg")
+                || lower.endsWith(".jpeg")
+                || lower.endsWith(".gif")
+                || lower.endsWith(".webp")
+                || lower.endsWith(".bmp")
+                || lower.endsWith(".svg")
+                || lower.endsWith(".avif");
+    }
+
     private boolean isAudioFile(String mimeType, String fileName) {
         String normalizedMime = normalizeMimeType(mimeType);
         if (StrUtil.isNotBlank(normalizedMime) && normalizedMime.startsWith("audio/")) {
@@ -1294,6 +1310,22 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         - relatedEntities 从文档中提取提到的客户名称、公司名称或商机/项目名称
         """;
 
+    private static final String IMAGE_AI_ANALYZE_PROMPT_TEMPLATE = """
+        你是一个专业的 CRM 助手。请分析随消息附带的图片，并以 JSON 格式返回。
+
+        图片名称: %s
+        图片类型: %s
+        已有摘要: %s
+
+        请重点识别图片中的文字、表格、产品、合同/票据/现场信息、客户名称、项目名称、时间、金额、风险点或后续动作。
+        请严格按以下 JSON 格式返回，不要包含任何其他文字、代码块标记或解释：
+        {
+          "coreHighlights": "图片核心内容的精炼总结，2-3句话，突出关键信息和价值点",
+          "talkingPoints": ["基于图片内容的销售话术建议", "话术建议2", "话术建议3"],
+          "relatedEntities": [{"name": "相关的客户或商机名称", "type": "customer 或 opportunity"}]
+        }
+        """;
+
     private static final String DOC_QA_SYSTEM_PROMPT_TEMPLATE = """
         你是一个专业的文档问答助手。请基于以下文档内容回答用户的问题。
 
@@ -1320,6 +1352,9 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         }
 
         try {
+            if (isImageFile(knowledge.getMimeType(), knowledge.getName())) {
+                return analyzeImageKnowledge(knowledge);
+            }
             if (isAudioFile(knowledge.getMimeType(), knowledge.getName())) {
                 return analyzeAudioKnowledge(knowledge);
             }
@@ -1348,6 +1383,33 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         log.info("AI 文档分析原始响应: {}", response);
         KnowledgeAiAnalyzeVO result = parseAnalyzeResponse(response, knowledge);
         persistAnalyzeResult(knowledge, result);
+        return result;
+    }
+
+    private KnowledgeAiAnalyzeVO analyzeImageKnowledge(Knowledge knowledge) {
+        ensureVisionSupported("图片");
+        String prompt = String.format(IMAGE_AI_ANALYZE_PROMPT_TEMPLATE,
+                knowledge.getName(),
+                StrUtil.blankToDefault(knowledge.getMimeType(), "image"),
+                StrUtil.blankToDefault(knowledge.getSummary(), "无"));
+        Media media;
+        try {
+            media = AiMediaUtil.buildMedia(
+                    fileStorageService,
+                    knowledge.getFilePath(),
+                    MimeType.valueOf(StrUtil.blankToDefault(normalizeMimeType(knowledge.getMimeType()), "image/jpeg"))
+            );
+        } catch (IOException e) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "图片文件读取失败，请确认文件仍可访问");
+        }
+        String response = chatClientProvider.getChatClient()
+                .prompt()
+                .user(userSpec -> userSpec.text(prompt).media(media))
+                .call()
+                .content();
+        KnowledgeAiAnalyzeVO result = parseAnalyzeResponse(response, knowledge);
+        persistAnalyzeResult(knowledge, result);
+        persistKnowledgeContentText(knowledge, "图片内容摘要：\n" + buildAnalyzeResultContent(result));
         return result;
     }
 

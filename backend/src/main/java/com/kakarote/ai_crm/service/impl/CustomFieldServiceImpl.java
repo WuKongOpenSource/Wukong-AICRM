@@ -54,6 +54,8 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
      */
     private static final int MAX_FIELDS_PER_ENTITY = 50;
     private static final long OPTIONS_CACHE_TTL_MS = 60_000L;
+    private static final String FIELD_SOURCE_SYSTEM = "system";
+    private static final String FIELD_SOURCE_CUSTOM = "custom";
 
     private final Map<String, OptionsCacheEntry> optionsCache = new ConcurrentHashMap<>();
 
@@ -81,6 +83,13 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
                     option("customer_contact", "客户联系人"),
                     option("other", "其他")
             ),
+            optionKey("relation", "relationType"), List.of(
+                    option("decision_maker", "决策人"),
+                    option("influencer", "影响人"),
+                    option("partner", "合作伙伴"),
+                    option("customer_contact", "客户联系人"),
+                    option("other", "其他")
+            ),
             optionKey("relation", "source"), List.of(
                     option("manual", "手动创建"),
                     option("customer_contact", "客户联系人"),
@@ -98,7 +107,8 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
 
         // 2. 检查字段数量限制
         long count = count(new LambdaQueryWrapper<CustomField>()
-                .eq(CustomField::getEntityType, bo.getEntityType()));
+                .eq(CustomField::getEntityType, bo.getEntityType())
+                .and(this::appendCustomFieldSourceCondition));
         if (count >= MAX_FIELDS_PER_ENTITY) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "自定义字段数量已达上限(" + MAX_FIELDS_PER_ENTITY + "个)");
         }
@@ -113,7 +123,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         field.setFieldName(columnName);
         field.setFieldLabel(bo.getFieldLabel());
         field.setFieldType(bo.getFieldType());
-        field.setFieldSource("custom");
+        field.setFieldSource(FIELD_SOURCE_CUSTOM);
         field.setColumnName(columnName);
         field.setColumnType(poolEntry.getColumnType());
         field.setDefaultValue(bo.getDefaultValue());
@@ -124,7 +134,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         field.setIsUnique(Boolean.TRUE.equals(bo.getIsUnique()) ? 1 : 0);
         field.setOptions(bo.getOptions() != null ? JSON.toJSONString(bo.getOptions()) : null);
         field.setValidationRules(bo.getValidation() != null ? JSON.toJSONString(bo.getValidation()) : null);
-        field.setSortOrder(bo.getSortOrder() != null ? bo.getSortOrder() : 0);
+        field.setSortOrder(bo.getSortOrder() != null ? bo.getSortOrder() : getNextSortOrder(bo.getEntityType()));
         field.setStatus(1);
         save(field);
         evictOptionsCache();
@@ -163,9 +173,12 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
             field.setIsUnique(bo.getIsUnique() ? 1 : 0);
         }
         if (bo.getOptions() != null) {
+            if (isSystemField(field)) {
+                validateSystemFieldOptions(field, bo.getOptions());
+            }
             field.setOptions(JSON.toJSONString(bo.getOptions()));
         }
-        if (bo.getValidation() != null) {
+        if (bo.getValidation() != null && !isSystemField(field)) {
             field.setValidationRules(JSON.toJSONString(bo.getValidation()));
         }
         if (bo.getSortOrder() != null) {
@@ -207,6 +220,9 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         }
 
         // 仅删除元数据，物理列保留在字段池中供未来复用
+        if (isSystemField(field)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "系统字段不支持删除");
+        }
         removeById(fieldId);
         evictOptionsCache();
 
@@ -447,14 +463,21 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
             return cached.options();
         }
 
-        CustomField field = getOne(new LambdaQueryWrapper<CustomField>()
+        List<String> fieldNames = optionFieldNames(entityType, fieldName);
+        List<CustomField> fields = list(new LambdaQueryWrapper<CustomField>()
                 .eq(CustomField::getEntityType, entityType)
-                .eq(CustomField::getFieldName, fieldName)
-                .eq(CustomField::getStatus, 1)
-                .last("LIMIT 1"), false);
+                .in(CustomField::getFieldName, fieldNames)
+                .eq(CustomField::getStatus, 1));
+        CustomField field = fields.stream()
+                .filter(item -> StrUtil.equals(item.getFieldName(), fieldName) && StrUtil.isNotBlank(item.getOptions()))
+                .findFirst()
+                .orElseGet(() -> fields.stream()
+                        .filter(item -> StrUtil.isNotBlank(item.getOptions()))
+                        .findFirst()
+                        .orElse(null));
         List<FieldOption> options = field != null && StrUtil.isNotBlank(field.getOptions())
                 ? JSON.parseArray(field.getOptions(), FieldOption.class)
-                : builtinOptions(entityType, fieldName);
+                : builtinOptions(entityType, builtinFieldName(entityType, fieldName));
         if (options == null) {
             options = Collections.emptyList();
         }
@@ -602,8 +625,91 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         }
     }
 
+    private int getNextSortOrder(String entityType) {
+        CustomField lastField = getOne(new LambdaQueryWrapper<CustomField>()
+                .eq(CustomField::getEntityType, entityType)
+                .orderByDesc(CustomField::getSortOrder)
+                .orderByDesc(CustomField::getCreateTime)
+                .last("LIMIT 1"), false);
+        if (lastField == null || lastField.getSortOrder() == null) {
+            return 1;
+        }
+        return lastField.getSortOrder() + 1;
+    }
+
+    private void appendCustomFieldSourceCondition(LambdaQueryWrapper<CustomField> wrapper) {
+        wrapper.isNull(CustomField::getFieldSource)
+                .or()
+                .eq(CustomField::getFieldSource, FIELD_SOURCE_CUSTOM);
+    }
+
+    private boolean isSystemField(CustomField field) {
+        return field != null && FIELD_SOURCE_SYSTEM.equalsIgnoreCase(field.getFieldSource());
+    }
+
+    private List<String> optionFieldNames(String entityType, String fieldName) {
+        if ("relation".equals(entityType)) {
+            if ("relationType".equals(fieldName)) {
+                return List.of("relationType", "relation_type");
+            }
+            if ("relation_type".equals(fieldName)) {
+                return List.of("relation_type", "relationType");
+            }
+        }
+        return List.of(fieldName);
+    }
+
+    private String builtinFieldName(String entityType, String fieldName) {
+        if ("relation".equals(entityType) && "relation_type".equals(fieldName)) {
+            return "relationType";
+        }
+        return fieldName;
+    }
+
     private List<FieldOption> builtinOptions(String entityType, String fieldName) {
         return BUILTIN_FIELD_OPTIONS.getOrDefault(optionKey(entityType, fieldName), Collections.emptyList());
+    }
+
+    private void validateSystemFieldOptions(CustomField field, List<FieldOption> options) {
+        Set<String> submittedValues = new LinkedHashSet<>();
+        int maxLen = parseColumnLength(field.getColumnType());
+        for (FieldOption option : options) {
+            if (option == null || StrUtil.isBlank(option.getValue())) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "选项值不能为空");
+            }
+            if (!submittedValues.add(option.getValue())) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "选项值重复: " + option.getValue());
+            }
+            if (maxLen > 0 && option.getValue().length() > maxLen) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                        "选项值「" + option.getValue() + "」长度超过该字段限制(" + maxLen + ")");
+            }
+        }
+        for (FieldOption builtin : builtinOptions(field.getEntityType(), builtinFieldName(field.getEntityType(), field.getFieldName()))) {
+            if (!submittedValues.contains(builtin.getValue())) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                        "系统内置选项不可删除或修改取值: " + builtin.getValue());
+            }
+        }
+    }
+
+    private int parseColumnLength(String columnType) {
+        if (StrUtil.isBlank(columnType)) {
+            return 0;
+        }
+        int start = columnType.indexOf('(');
+        if (start < 0) {
+            return 0;
+        }
+        int end = columnType.indexOf(')', start + 1);
+        if (end <= start + 1) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(columnType.substring(start + 1, end).trim());
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 
     private void evictOptionsCache() {

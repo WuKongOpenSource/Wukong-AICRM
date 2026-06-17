@@ -79,6 +79,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     private static final DateTimeFormatter DATE_ONLY_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final int MAX_EXTRACTED_TEXT_LENGTH = 3000;
     private static final int MAX_ATTACHMENT_ANALYSIS_LENGTH = 4000;
+    private static final int MAX_PARSE_ATTACHMENT_CONTEXT_LENGTH = 1600;
     private static final List<DateTimeFormatter> DATE_TIME_FORMATTERS = List.of(
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
@@ -98,11 +99,13 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
 
         跟进内容:
         %s
+        %s
 
         不要臆造沟通渠道：如果内容只表达报价、完成报价或完成事项，没有明确电话、会议、邮件、拜访等渠道词，type 必须使用 other。
         请严格按照以下 JSON 格式返回，不要包含任何其他文字、代码块标记或解释：
         {
           "summary": "简明扼要的摘要，1-2句话",
+          "sceneType": "跟进场景标签，如报价沟通/需求确认/售后问题；无法判断则为空字符串",
           "type": "跟进类型，只能是以下之一: call, meeting, email, visit, other",
           "followTime": "跟进发生的时间，格式 yyyy-MM-dd HH:mm:ss（如未提及则用当前时间）",
           "nextFollowTime": "建议的下次跟进时间，格式 yyyy-MM-dd HH:mm:ss（根据内容合理推断，通常3-7天后）",
@@ -290,21 +293,29 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     @Override
     public FollowUpAiParseVO aiParseFollowUp(FollowUpAiParseBO parseBO) {
         String customerName = StrUtil.blankToDefault(parseBO.getCustomerName(), "未知客户");
+        String content = StrUtil.blankToDefault(parseBO.getContent(), "");
         String now = LocalDateTime.now().format(AI_TIME_FORMATTER);
-        String prompt = String.format(AI_PARSE_PROMPT_TEMPLATE, customerName, now, parseBO.getContent());
+        List<ChatSendBO.AttachmentDTO> attachments = parseBO.getAttachments();
+        boolean hasAttachments = CollUtil.isNotEmpty(attachments);
+        AiModelCapabilities capabilities = hasAttachments ? chatClientProvider.getCurrentCapabilities() : null;
+        String attachmentContext = hasAttachments ? buildAttachmentContext(attachments, capabilities) : "";
+        String attachmentBlock = StrUtil.isNotBlank(attachmentContext)
+            ? "\n\n附件上下文:\n" + attachmentContext
+            : "";
+        String prompt = String.format(AI_PARSE_PROMPT_TEMPLATE, customerName, now, content, attachmentBlock);
 
         try {
-            String response = chatClientProvider.getChatClient()
-                .prompt()
-                .user(prompt)
-                .call()
-                .content();
+            List<Media> mediaList = hasAttachments ? buildMediaList(attachments, capabilities) : List.of();
+            var requestSpec = chatClientProvider.getChatClient().prompt();
+            String response = CollUtil.isNotEmpty(mediaList)
+                ? requestSpec.user(user -> user.text(prompt).media(mediaList.toArray(new Media[0]))).call().content()
+                : requestSpec.user(prompt).call().content();
 
             log.info("AI 跟进解析原始响应: {}", response);
-            return parseAiResponse(response, parseBO.getContent(), now);
+            return parseAiResponse(response, content, now);
         } catch (Exception e) {
             log.error("AI 跟进解析失败，返回默认值", e);
-            return buildFallbackResult(parseBO.getContent(), now);
+            return buildFallbackResult(content, now);
         }
     }
 
@@ -543,6 +554,76 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         } catch (Exception ex) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "附件分析失败，请稍后重试");
         }
+    }
+
+    private String buildAttachmentContext(List<ChatSendBO.AttachmentDTO> attachments, AiModelCapabilities capabilities) {
+        if (CollUtil.isEmpty(attachments)) {
+            return "";
+        }
+
+        StringBuilder context = new StringBuilder();
+        context.append("[Uploaded attachments]\n");
+        for (ChatSendBO.AttachmentDTO attachment : attachments) {
+            if (attachment == null) {
+                continue;
+            }
+            String mimeType = attachment.getMimeType();
+            String fileName = StrUtil.blankToDefault(attachment.getFileName(), "unnamed");
+            if (StrUtil.blankToDefault(mimeType, "").startsWith("image/")) {
+                if (capabilities != null && capabilities.isSupportsVision()) {
+                    context.append(String.format("- Image: %s (available as visual input)\n", fileName));
+                } else {
+                    context.append(String.format("- Image: %s (current model does not support visual analysis)\n", fileName));
+                }
+            } else if (isTextFile(mimeType, fileName)) {
+                String textContent = extractFileText(attachment.getFilePath());
+                appendAttachmentTextContext(context, "Text file", fileName, textContent);
+            } else if (isDocumentFile(mimeType, fileName)) {
+                String textContent = extractDocumentText(attachment.getFilePath(), mimeType, fileName);
+                appendAttachmentTextContext(context, "Document", fileName, textContent);
+            } else if (isAudioFile(mimeType, fileName)) {
+                context.append(String.format("- Audio file: %s\n", fileName));
+            } else {
+                context.append(String.format("- File: %s (type: %s)\n", fileName, StrUtil.blankToDefault(mimeType, "unknown")));
+            }
+            if (context.length() >= MAX_PARSE_ATTACHMENT_CONTEXT_LENGTH) {
+                return limitText(context.toString(), MAX_PARSE_ATTACHMENT_CONTEXT_LENGTH);
+            }
+        }
+        return limitText(context.toString(), MAX_PARSE_ATTACHMENT_CONTEXT_LENGTH);
+    }
+
+    private void appendAttachmentTextContext(StringBuilder context, String label, String fileName, String textContent) {
+        if (StrUtil.isNotBlank(textContent)) {
+            context.append(String.format("- %s: %s\n```\n%s\n```\n",
+                label, fileName, limitText(textContent, MAX_PARSE_ATTACHMENT_CONTEXT_LENGTH)));
+        } else {
+            context.append(String.format("- %s: %s (content could not be read)\n", label, fileName));
+        }
+    }
+
+    private List<Media> buildMediaList(List<ChatSendBO.AttachmentDTO> attachments, AiModelCapabilities capabilities) {
+        if (CollUtil.isEmpty(attachments) || capabilities == null || !capabilities.isSupportsVision()) {
+            return List.of();
+        }
+
+        List<Media> mediaList = new ArrayList<>();
+        for (ChatSendBO.AttachmentDTO attachment : attachments) {
+            if (attachment == null || !StrUtil.blankToDefault(attachment.getMimeType(), "").startsWith("image/")) {
+                continue;
+            }
+            try {
+                Media media = AiMediaUtil.buildMedia(
+                    fileStorageService,
+                    attachment.getFilePath(),
+                    MimeType.valueOf(StrUtil.blankToDefault(attachment.getMimeType(), "image/jpeg"))
+                );
+                mediaList.add(media);
+            } catch (Exception e) {
+                log.warn("Failed to build image media for follow-up parse: {}", attachment.getFileName(), e);
+            }
+        }
+        return mediaList;
     }
 
     private boolean isTextFile(String mimeType, String fileName) {
