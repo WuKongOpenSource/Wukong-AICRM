@@ -58,6 +58,7 @@ import org.springframework.util.MimeType;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 
 import java.io.InputStream;
 import java.net.URI;
@@ -65,6 +66,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.TextStyle;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -540,6 +542,8 @@ public class ChatServiceImpl implements IChatService {
         AtomicReference<Integer> totalTokensRef = new AtomicReference<>(0);
         AtomicReference<String> modelNameRef = new AtomicReference<>(null);
         AtomicReference<AiToolExecutionRecorder.ToolExecution> toolFailureRef = new AtomicReference<>(null);
+        AtomicBoolean streamFinalized = new AtomicBoolean(false);
+        AtomicBoolean streamFailed = new AtomicBoolean(false);
 
         String unavailableTip = resolveAiUnavailableTip(runtimeConfig);
         if (unavailableTip != null) {
@@ -555,6 +559,32 @@ public class ChatServiceImpl implements IChatService {
 
         final String finalSystemPrompt = enhancedSystemPrompt;
         final String finalContent = enhancedContent;
+        Runnable finalizeSuccessfulStream = () -> {
+            if (!streamFinalized.compareAndSet(false, true)) {
+                return;
+            }
+            String responseText = toolFailureRef.get() == null
+                ? fullResponse.toString()
+                : buildToolFailureReply(toolFailureRef.get());
+            if (StrUtil.isBlank(responseText)) {
+                return;
+            }
+            TokenUsageSnapshot usage = resolveTokenUsage(
+                promptTokensRef.get(),
+                completionTokensRef.get(),
+                totalTokensRef.get(),
+                finalSystemPrompt,
+                history,
+                finalContent,
+                responseText
+            );
+            log.debug("AI 对话完成，响应长度: {}, tokens: prompt={}, completion={}, total={}",
+                responseText.length(), usage.promptTokens(), usage.completionTokens(), usage.totalTokens());
+            saveMessage(sessionId, "assistant", responseText,
+                usage.promptTokens(), usage.completionTokens(),
+                usage.totalTokens(), modelNameRef.get());
+            updateSessionTime(sessionId);
+        };
         ChatClient.ChatClientRequestSpec requestSpec = chatClient.prompt()
             .system(finalSystemPrompt)
             .messages(history);
@@ -610,28 +640,9 @@ public class ChatServiceImpl implements IChatService {
                 AiToolExecutionRecorder.ToolExecution failure = toolFailureRef.get();
                 return failure == null ? Mono.empty() : Mono.just(buildToolFailureReply(failure));
             }))
-            .doOnComplete(() -> {
-                String responseText = toolFailureRef.get() == null
-                    ? fullResponse.toString()
-                    : buildToolFailureReply(toolFailureRef.get());
-                TokenUsageSnapshot usage = resolveTokenUsage(
-                    promptTokensRef.get(),
-                    completionTokensRef.get(),
-                    totalTokensRef.get(),
-                    finalSystemPrompt,
-                    history,
-                    finalContent,
-                    responseText
-                );
-                log.debug("AI 对话完成，响应长度: {}, tokens: prompt={}, completion={}, total={}",
-                    responseText.length(), usage.promptTokens(), usage.completionTokens(), usage.totalTokens());
-                saveMessage(sessionId, "assistant", responseText,
-                    usage.promptTokens(), usage.completionTokens(),
-                    usage.totalTokens(), modelNameRef.get());
-                updateSessionTime(sessionId);
-                AiContextHolder.clear();
-            })
+            .doOnComplete(finalizeSuccessfulStream)
             .onErrorResume(error -> {
+                streamFailed.set(true);
                 logAiChatError(error);
                 String errorMsg = resolveToolFailureReply(sessionId, resolveAiChatErrorMessage(error, runtimeConfig));
                 saveMessage(sessionId, "assistant", errorMsg);
@@ -640,6 +651,9 @@ public class ChatServiceImpl implements IChatService {
                 return Flux.just(errorMsg);
             })
             .doFinally(signalType -> {
+                if (signalType == SignalType.CANCEL && !streamFailed.get() && fullResponse.length() > 0) {
+                    finalizeSuccessfulStream.run();
+                }
                 aiToolExecutionRecorder.finish(sessionId);
                 AiContextHolder.clear();
             });
