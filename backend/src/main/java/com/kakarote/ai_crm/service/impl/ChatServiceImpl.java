@@ -508,6 +508,10 @@ public class ChatServiceImpl implements IChatService {
         if (StrUtil.isNotBlank(knowledgeToolPrompt)) {
             enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + knowledgeToolPrompt;
         }
+        String boundContext = buildBoundObjectContext(session);
+        if (StrUtil.isNotBlank(boundContext)) {
+            enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + boundContext;
+        }
 
         String enhancedContent = content;
         if (StrUtil.isNotBlank(attachmentContext)) {
@@ -679,6 +683,10 @@ public class ChatServiceImpl implements IChatService {
         if (StrUtil.isNotBlank(knowledgeToolPrompt)) {
             enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + knowledgeToolPrompt;
         }
+        String boundContext = buildBoundObjectContext(session);
+        if (StrUtil.isNotBlank(boundContext)) {
+            enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + boundContext;
+        }
 
         String enhancedContent = content;
         if (StrUtil.isNotBlank(attachmentContext)) {
@@ -798,6 +806,161 @@ public class ChatServiceImpl implements IChatService {
         }
 
         return context.toString();
+    }
+
+    private String buildBoundObjectContext(ChatSession session) {
+        if (session == null) {
+            return "";
+        }
+        List<String> contexts = new ArrayList<>();
+        String customerContext = buildBoundCustomerContext(session.getCustomerId());
+        if (StrUtil.isNotBlank(customerContext)) {
+            contexts.add(customerContext);
+        }
+        String employeeContext = buildBoundEmployeeContext(session.getEmployeeId());
+        if (StrUtil.isNotBlank(employeeContext)) {
+            contexts.add(employeeContext);
+        }
+        String relationContext = buildBoundRelationContext(session.getRelationId());
+        if (StrUtil.isNotBlank(relationContext)) {
+            contexts.add(relationContext);
+        }
+        String productContext = buildBoundProductContext(session.getProductId());
+        if (StrUtil.isNotBlank(productContext)) {
+            contexts.add(productContext);
+        }
+        String projectContext = buildBoundProjectContext(session.getProjectId(), session.getProjectTaskId());
+        if (StrUtil.isNotBlank(projectContext)) {
+            contexts.add(projectContext);
+        }
+        return String.join("\n\n", contexts);
+    }
+
+    private String buildBoundCustomerContext(Long customerId) {
+        if (customerId == null) {
+            return "";
+        }
+        Customer customer = customerMapper.selectById(customerId);
+        if (customer == null) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder("[当前绑定客户]\n")
+                .append("- customerId: ").append(customer.getCustomerId()).append("\n")
+                .append("- 客户名称: ").append(StrUtil.blankToDefault(customer.getCompanyName(), "未命名客户")).append("\n");
+        appendContextLine(builder, "行业", customer.getIndustry());
+        appendContextLine(builder, "阶段", customer.getStage());
+        appendContextLine(builder, "等级", customer.getLevel());
+        appendContextLine(builder, "来源", customer.getSource());
+        appendContextLine(builder, "负责人ID", customer.getOwnerId());
+        appendContextLine(builder, "主联系人", customer.getPrimaryContactName());
+        appendContextLine(builder, "主联系人电话", customer.getPrimaryContactPhone());
+        appendContextLine(builder, "AI洞察", customer.getAiInsight());
+        return builder.toString();
+    }
+
+    private String buildBoundEmployeeContext(Long employeeId) {
+        if (employeeId == null) {
+            return "";
+        }
+        ManagerUser employee = manageUserMapper.selectById(employeeId);
+        if (employee == null) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder("[当前绑定员工]\n")
+                .append("- employeeId: ").append(employee.getUserId()).append("\n")
+                .append("- 姓名: ").append(StrUtil.blankToDefault(employee.getRealname(), employee.getUsername())).append("\n");
+        appendContextLine(builder, "账号", employee.getUsername());
+        appendContextLine(builder, "手机号", employee.getMobile());
+        appendContextLine(builder, "邮箱", employee.getEmail());
+        appendContextLine(builder, "岗位", employee.getPost());
+        appendContextLine(builder, "员工状态", employee.getEmployeeStatus());
+        return builder.toString();
+    }
+
+    private String buildBoundRelationContext(Long relationId) {
+        if (relationId == null) {
+            return "";
+        }
+        Relation relation = relationMapper.selectById(relationId);
+        if (relation == null) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder("[当前绑定关系人]\n")
+                .append("- relationId: ").append(relation.getRelationId()).append("\n")
+                .append("- 姓名: ").append(StrUtil.blankToDefault(relation.getName(), "未命名关系人")).append("\n");
+        appendContextLine(builder, "类型", relation.getRelationType());
+        appendContextLine(builder, "公司", relation.getCompany());
+        appendContextLine(builder, "电话", relation.getPhone());
+        appendContextLine(builder, "微信", relation.getWechat());
+        appendContextLine(builder, "邮箱", relation.getEmail());
+        appendContextLine(builder, "备注", relation.getRemark());
+        return builder.toString();
+    }
+
+    private String buildBoundProductContext(Long productId) {
+        if (productId == null) {
+            return "";
+        }
+        Product product = productMapper.selectById(productId);
+        if (product == null) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder("[当前绑定产品]\n")
+                .append("- productId: ").append(product.getProductId()).append("\n")
+                .append("- 产品名称: ").append(StrUtil.blankToDefault(product.getProductName(), "未命名产品")).append("\n");
+        appendContextLine(builder, "产品编码", product.getProductCode());
+        appendContextLine(builder, "产品类型", product.getProductType());
+        appendContextLine(builder, "单位", product.getUnit());
+        appendContextLine(builder, "状态", product.getStatus());
+        appendContextLine(builder, "标准价", product.getStandardPrice());
+        appendContextLine(builder, "描述", product.getDescription());
+        return builder.toString();
+    }
+
+    private String buildBoundProjectContext(Long projectId, Long projectTaskId) {
+        if (projectId == null && projectTaskId == null) {
+            return "";
+        }
+        Project project = projectId == null ? null : projectMapper.selectById(projectId);
+        ProjectTask task = projectTaskId == null ? null : projectTaskMapper.selectById(projectTaskId);
+        if (project == null && task != null) {
+            project = projectMapper.selectById(task.getProjectId());
+        }
+        if (project == null) {
+            return "";
+        }
+
+        StringBuilder builder = new StringBuilder("[当前绑定项目]\n")
+                .append("- projectId: ").append(project.getProjectId()).append("\n")
+                .append("- 项目名称: ").append(StrUtil.blankToDefault(project.getName(), "未命名项目")).append("\n");
+        appendContextLine(builder, "项目状态", project.getStatus());
+        appendContextLine(builder, "负责人ID", project.getOwnerId());
+        appendContextLine(builder, "关联客户", project.getCustomerName());
+        appendContextLine(builder, "项目描述", project.getDescription());
+        appendContextLine(builder, "开始时间", project.getStartDate());
+        appendContextLine(builder, "截止时间", project.getDueDate());
+
+        if (task != null) {
+            builder.append("\n[当前绑定项目任务]\n")
+                    .append("- taskId: ").append(task.getTaskId()).append("\n")
+                    .append("- 任务标题: ").append(StrUtil.blankToDefault(task.getTitle(), "未命名任务")).append("\n");
+            appendContextLine(builder, "任务状态", task.getStatus());
+            appendContextLine(builder, "优先级", task.getPriority());
+            appendContextLine(builder, "负责人", task.getOwnerName());
+            appendContextLine(builder, "关联客户", StrUtil.blankToDefault(task.getCustomerName(), project.getCustomerName()));
+            appendContextLine(builder, "截止时间", task.getDueDate());
+            appendContextLine(builder, "任务描述", task.getDescription());
+        }
+
+        return builder.toString();
+    }
+
+    private void appendContextLine(StringBuilder builder, String label, Object value) {
+        String text = value == null ? "" : String.valueOf(value);
+        if (StrUtil.isBlank(text)) {
+            return;
+        }
+        builder.append("- ").append(label).append(": ").append(text).append("\n");
     }
 
     /**
