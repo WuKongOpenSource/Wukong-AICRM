@@ -42,9 +42,9 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
     private static final String DASHSCOPE_TRANSCRIPTION_MODEL = "qwen3-asr-flash";
     private static final long DASHSCOPE_MAX_AUDIO_SECONDS = 300L;
     private static final String OPENAI_TRANSCRIPTION_PROMPT =
-        "Please transcribe the audio accurately as Simplified Chinese text. Return only the transcript.";
+        "请将音频内容准确转写为简体中文文本，只返回转写结果。";
     private static final String UNSUPPORTED_PROVIDER_MESSAGE =
-        "The current model does not support audio transcription. Please configure OpenAI or DashScope.";
+        "当前模型不支持语音识别，请配置支持的模型（目前支持 OpenAI、阿里云百炼）。";
     private static final String DASHSCOPE_DURATION_UNSUPPORTED_MESSAGE =
         "仅支持 5 分钟以内音频的AI分析";
 
@@ -58,13 +58,16 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
     @Value("${media-analysis.audio.probe-timeout-seconds:10}")
     private long audioProbeTimeoutSeconds;
 
+    @Value("${system-ai.openai.proxy-base-url:http://52.198.150.151}")
+    private String openAiProxyBaseUrl;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final WebClient webClient = WebClient.builder().build();
 
     @Override
     public String transcribe(MultipartFile audioFile) {
         if (audioFile == null || audioFile.isEmpty()) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Please upload an audio file first");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "请先上传音频文件");
         }
         try {
             return transcribe(
@@ -73,20 +76,20 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
                 audioFile.getContentType()
             );
         } catch (IOException ex) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Audio transcription failed");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "音频转写失败");
         }
     }
 
     @Override
     public String transcribe(byte[] audioBytes, String filename, String contentType) {
         if (audioBytes == null || audioBytes.length == 0) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Please upload an audio file first");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "请先上传音频文件");
         }
 
         DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig =
             chatClientProvider.getCurrentRuntimeConfigSnapshot();
         if (runtimeConfig == null || StrUtil.isBlank(runtimeConfig.apiKey())) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Please configure an AI API key first");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "请先配置 AI API Key");
         }
 
         AiModelCapabilities capabilities = runtimeConfig.capabilities();
@@ -102,14 +105,14 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
                 default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, UNSUPPORTED_PROVIDER_MESSAGE);
             };
             if (StrUtil.isBlank(transcript)) {
-                throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Audio transcription result is empty");
+                throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "音频转写结果为空");
             }
             return transcript.trim();
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
             log.error("AI audio transcription failed: provider={}", providerCode, ex);
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Audio transcription failed");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "音频转写失败");
         }
     }
 
@@ -119,7 +122,8 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
                                         String contentType) {
         String endpoint = DynamicChatClientProvider.resolveActualRequestBaseUrl(
             runtimeConfig.providerCode(),
-            runtimeConfig.apiUrl()
+            runtimeConfig.apiUrl(),
+            openAiProxyBaseUrl
         ) + "/v1/audio/transcriptions";
 
         MultipartBodyBuilder bodyBuilder = new MultipartBodyBuilder();
@@ -148,7 +152,8 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
 
         String endpoint = DynamicChatClientProvider.resolveActualRequestBaseUrl(
             runtimeConfig.providerCode(),
-            runtimeConfig.apiUrl()
+            runtimeConfig.apiUrl(),
+            openAiProxyBaseUrl
         ) + "/v1/chat/completions";
 
         String mimeType = resolveMediaType(contentType).toString();
@@ -183,7 +188,7 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
     private void ensureDashscopeAudioWithinDuration(byte[] audioBytes, String filename) {
         OptionalDouble durationSeconds = probeAudioDurationSeconds(audioBytes, filename);
         if (durationSeconds.isPresent() && durationSeconds.getAsDouble() > DASHSCOPE_MAX_AUDIO_SECONDS) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, DASHSCOPE_DURATION_UNSUPPORTED_MESSAGE);
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "仅支持 5 分钟以内音频的 AI 分析");
         }
     }
 
@@ -322,7 +327,7 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
         } catch (Exception ex) {
             log.warn("Failed to parse DashScope transcription response: {}", ex.getMessage());
         }
-        throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Audio transcription result is empty");
+        throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "音频转写结果为空");
     }
 
     private BusinessException toBusinessException(String responseBody) {
@@ -331,7 +336,7 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
 
     private String extractErrorMessage(String responseBody) {
         if (StrUtil.isBlank(responseBody)) {
-            return "Audio transcription failed";
+            return "音频转写失败";
         }
         try {
             JsonNode root = objectMapper.readTree(responseBody);
@@ -356,6 +361,6 @@ public class AiAudioTranscriptionServiceImpl implements AiAudioTranscriptionServ
         } catch (Exception ex) {
             log.warn("Failed to parse provider error response: {}", ex.getMessage());
         }
-        return "Audio transcription failed";
+        return "音频转写失败";
     }
 }

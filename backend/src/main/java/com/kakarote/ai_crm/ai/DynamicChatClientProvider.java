@@ -61,7 +61,7 @@ public class DynamicChatClientProvider {
     private static final String AI_EXTRA_HEADERS_KEY = "ai_extra_headers";
     private static final String AI_PROVIDER_CONFIGS_KEY = "ai_provider_configs";
     private static final String OPENAI_PUBLIC_BASE_URL = "https://api.openai.com";
-    private static final String OPENAI_PROXY_BASE_URL = "http://52.198.150.151";
+    private static final String DEFAULT_OPENAI_PROXY_BASE_URL = "http://52.198.150.151";
     private static final double MOONSHOT_K2_NON_THINKING_TEMPERATURE = 0.6D;
 
     private volatile ChatClient currentChatClient;
@@ -124,6 +124,9 @@ public class DynamicChatClientProvider {
 
     @Value("${spring.ai.openai.chat.options.max-tokens:2048}")
     private Integer defaultMaxTokens;
+
+    @Value("${system-ai.openai.proxy-base-url:" + DEFAULT_OPENAI_PROXY_BASE_URL + "}")
+    private String openAiProxyBaseUrl;
 
     public ChatClient getChatClient() {
         ChatClient client = currentChatClient;
@@ -511,7 +514,7 @@ public class DynamicChatClientProvider {
     private OpenAiApi buildOpenAiApi(String providerCode, String baseUrl, String apiKey, String extraHeadersJson) {
         String normalizedBaseUrl = normalizeCompatibleBaseUrl(baseUrl);
         AiProviderDescriptor descriptor = AiProviderRegistry.resolve(providerCode, normalizedBaseUrl);
-        String actualRequestBaseUrl = resolveActualRequestBaseUrl(descriptor.getCode(), normalizedBaseUrl);
+        String actualRequestBaseUrl = resolveActualRequestBaseUrl(descriptor.getCode(), normalizedBaseUrl, openAiProxyBaseUrl);
         OpenAiApi.Builder builder = OpenAiApi.builder()
                 .baseUrl(actualRequestBaseUrl)
                 .apiKey(apiKey);
@@ -531,9 +534,13 @@ public class DynamicChatClientProvider {
     }
 
     public static String resolveActualRequestBaseUrl(String providerCode, String baseUrl) {
+        return resolveActualRequestBaseUrl(providerCode, baseUrl, DEFAULT_OPENAI_PROXY_BASE_URL);
+    }
+
+    public static String resolveActualRequestBaseUrl(String providerCode, String baseUrl, String openAiProxyBaseUrl) {
         String normalizedBaseUrl = normalizeCompatibleBaseUrl(baseUrl);
         if ("openai".equalsIgnoreCase(providerCode) && OPENAI_PUBLIC_BASE_URL.equalsIgnoreCase(normalizedBaseUrl)) {
-            return OPENAI_PROXY_BASE_URL;
+            return StrUtil.blankToDefault(openAiProxyBaseUrl, DEFAULT_OPENAI_PROXY_BASE_URL);
         }
         return normalizedBaseUrl;
     }

@@ -37,6 +37,12 @@ public class CustomerListVO {
     @Schema(description = "客户来源")
     private String source;
 
+    @Schema(description = "客户地址")
+    private String address;
+
+    @Schema(description = "公司网站")
+    private String website;
+
     @Schema(description = "Logo")
     private String logo;
 
@@ -51,6 +57,15 @@ public class CustomerListVO {
 
     @Schema(description = "下次跟进时间")
     private Date nextFollowTime;
+
+    @Schema(description = "备注")
+    private String remark;
+
+    @Schema(description = "AI状态探测")
+    private String aiStatusDetection;
+
+    @Schema(description = "AI洞察")
+    private String aiInsight;
 
     @Schema(description = "负责人ID")
     private Long ownerId;
@@ -82,6 +97,9 @@ public class CustomerListVO {
 
     @Schema(description = "创建时间")
     private Date createTime;
+
+    @Schema(description = "更新时间")
+    private Date updateTime;
 
     @Schema(description = "自定义字段值")
     private Map<String, Object> customFields;

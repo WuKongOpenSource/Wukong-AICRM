@@ -62,6 +62,21 @@ public class CustomerDetailVO {
     @Schema(description = "备注")
     private String remark;
 
+    @Schema(description = "AI状态探测")
+    private String aiStatusDetection;
+
+    @Schema(description = "AI洞察")
+    private String aiInsight;
+
+    @Schema(description = "新增时保存的 AI 分析快照(JSON)")
+    private String aiParseSnapshot;
+
+    @Schema(description = "AI analysis task status")
+    private String aiAnalysisStatus;
+
+    @Schema(description = "AI analysis request timestamp")
+    private Date aiAnalysisRequestedAt;
+
     @Schema(description = "负责人ID")
     private Long ownerId;
 

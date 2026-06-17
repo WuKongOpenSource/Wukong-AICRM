@@ -115,6 +115,16 @@
     <!-- 可复用的 ORDER BY 片段 -->
     <sql id="customerQueryOrderBy">
         <choose>
+            <when test="query.sortBy == 'updateTime'">
+                ORDER BY c.update_time
+                <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
+                NULLS LAST, c.create_time DESC
+            </when>
+            <when test="query.sortBy == 'createTime'">
+                ORDER BY c.create_time
+                <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
+                , c.customer_id DESC
+            </when>
             <when test="query.sortBy == 'quotation'">
                 ORDER BY c.quotation
                 <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
@@ -136,7 +146,7 @@
                 NULLS LAST, c.create_time DESC
             </when>
             <otherwise>
-                ORDER BY c.create_time DESC
+                ORDER BY c.update_time DESC NULLS LAST, c.create_time DESC
             </otherwise>
         </choose>
     </sql>
@@ -149,13 +159,19 @@
             c.stage,
             c.level,
             c.source,
+            c.address,
+            c.website,
             c.logo,
             c.quotation,
             c.last_contact_time,
             c.next_follow_time,
+            c.remark,
+            c.ai_status_detection,
+            c.ai_insight,
             c.owner_id,
             u.realname AS owner_name,
             c.create_time,
+            c.update_time,
             c.primary_contact_name,
             c.primary_contact_phone,
             c.primary_contact_position,
@@ -176,13 +192,19 @@
             c.stage,
             c.level,
             c.source,
+            c.address,
+            c.website,
             c.logo,
             c.quotation,
             c.last_contact_time,
             c.next_follow_time,
+            c.remark,
+            c.ai_status_detection,
+            c.ai_insight,
             c.owner_id,
             u.realname AS owner_name,
             c.create_time,
+            c.update_time,
             c.primary_contact_name,
             c.primary_contact_phone,
             c.primary_contact_position,
@@ -215,6 +237,11 @@
             c.last_contact_time,
             c.next_follow_time,
             c.remark,
+            c.ai_status_detection,
+            c.ai_insight,
+            c.ai_parse_snapshot,
+            c.ai_analysis_status,
+            c.ai_analysis_requested_at,
             c.owner_id,
             u.realname AS owner_name,
             c.create_user_id,

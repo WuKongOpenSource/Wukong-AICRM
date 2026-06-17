@@ -77,8 +77,10 @@ public class KnowledgeController {
             @Parameter(description = "File") @RequestParam("file") MultipartFile file,
             @Parameter(description = "Type") @RequestParam(required = false) String type,
             @Parameter(description = "Customer ID") @RequestParam(required = false) Long customerId,
+            @Parameter(description = "Employee ID") @RequestParam(required = false) Long employeeId,
+            @Parameter(description = "Relation ID") @RequestParam(required = false) Long relationId,
             @Parameter(description = "Summary") @RequestParam(required = false) String summary) {
-        Long knowledgeId = knowledgeService.uploadFile(file, type, customerId, summary);
+        Long knowledgeId = knowledgeService.uploadFile(file, type, customerId, employeeId, relationId, summary);
         return Result.ok(knowledgeId);
     }
 
