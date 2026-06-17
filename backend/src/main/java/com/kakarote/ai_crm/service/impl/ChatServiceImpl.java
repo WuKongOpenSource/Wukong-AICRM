@@ -111,6 +111,12 @@ public class ChatServiceImpl implements IChatService {
     private IChatAttachmentService chatAttachmentService;
 
     @Autowired
+    private IKnowledgeService knowledgeService;
+
+    @Autowired
+    private PermissionService permissionService;
+
+    @Autowired
     private FileStorageService fileStorageService;
 
     @Autowired
@@ -493,6 +499,7 @@ public class ChatServiceImpl implements IChatService {
 
         if (CollUtil.isNotEmpty(attachments)) {
             chatAttachmentService.saveBatchAttachments(messageId, attachments);
+            archiveChatAttachments(session, messageId, attachments);
         }
 
         boolean ragEnabled = resolveRagEnabled(sendBO, application);
@@ -680,6 +687,7 @@ public class ChatServiceImpl implements IChatService {
 
         if (CollUtil.isNotEmpty(attachments)) {
             chatAttachmentService.saveBatchAttachments(messageId, attachments);
+            archiveChatAttachments(session, messageId, attachments);
         }
 
         boolean ragEnabled = resolveRagEnabled(sendBO, application);
@@ -1584,6 +1592,66 @@ public class ChatServiceImpl implements IChatService {
                 3. 如果已经拿到相关片段，但用户仍然需要结论性总结、条款归纳、反馈汇总，再调用 askKnowledgeQuestion。
                 4. 若 searchKnowledgeContent 没有找到结果，再尝试 askKnowledgeQuestion；仍未命中时再告知用户换关键词。
                 """;
+    }
+
+    private void archiveChatAttachments(ChatSession session, Long messageId, List<ChatSendBO.AttachmentDTO> attachments) {
+        if (session == null || CollUtil.isEmpty(attachments)
+                || (session.getCustomerId() == null && session.getEmployeeId() == null && session.getRelationId() == null)) {
+            return;
+        }
+        boolean canArchive;
+        try {
+            canArchive = permissionService.hasPermission("knowledge:upload");
+        } catch (Exception exception) {
+            log.info("检查知识库上传权限失败，跳过会话附件归档: sessionId={}, messageId={}, customerId={}, employeeId={}, relationId={}, error={}",
+                    session.getSessionId(), messageId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId(), exception.getMessage());
+            return;
+        }
+        if (!canArchive) {
+            log.info("用户无知识库上传权限，跳过会话附件归档: sessionId={}, messageId={}, customerId={}, employeeId={}, relationId={}",
+                    session.getSessionId(), messageId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId());
+            return;
+        }
+
+        for (ChatSendBO.AttachmentDTO attachment : attachments) {
+            if (attachment == null || StrUtil.isBlank(attachment.getFilePath())) {
+                continue;
+            }
+            try {
+                if (session.getEmployeeId() != null) {
+                    knowledgeService.archiveExistingEmployeeFile(
+                            attachment.getFileName(),
+                            attachment.getFilePath(),
+                            attachment.getFileSize(),
+                            attachment.getMimeType(),
+                            session.getEmployeeId(),
+                            null
+                    );
+                } else if (session.getRelationId() != null) {
+                    knowledgeService.archiveExistingRelationFile(
+                            attachment.getFileName(),
+                            attachment.getFilePath(),
+                            attachment.getFileSize(),
+                            attachment.getMimeType(),
+                            session.getRelationId(),
+                            null
+                    );
+                } else {
+                    knowledgeService.archiveExistingFile(
+                            attachment.getFileName(),
+                            attachment.getFilePath(),
+                            attachment.getFileSize(),
+                            attachment.getMimeType(),
+                            session.getCustomerId(),
+                            null
+                    );
+                }
+            } catch (Exception exception) {
+                log.warn("会话附件归档失败: sessionId={}, messageId={}, customerId={}, employeeId={}, relationId={}, fileName={}, error={}",
+                        session.getSessionId(), messageId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId(),
+                        attachment.getFileName(), exception.getMessage(), exception);
+            }
+        }
     }
 
     private String abbreviateForLog(String text) {
