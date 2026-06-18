@@ -65,7 +65,15 @@ public class SecurityConfig {
                                 "/auth/external/*/callback",
                                 "/auth/external/login-ticket"
                         ).permitAll()
-                        .requestMatchers("/", "/index", "/static/**", "/assets/**").anonymous()
+                        .requestMatchers(
+                                "/",
+                                "/index",
+                                "/static/**",
+                                "/assets/**",
+                                "/favicon.ico",
+                                "/logo.png",
+                                "/*.txt"
+                        ).anonymous()
                         .requestMatchers(
                                 "/index.html",
                                 "/doc.html",
