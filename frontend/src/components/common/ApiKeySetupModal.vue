@@ -40,7 +40,7 @@
                 </span>
               </div>
               <p class="mt-3 text-xs leading-5 text-slate-500">
-                当前仅支持完善手机号获取更多额度；购买额度能力后续开放。
+                可完善手机号领取更多额度，也可以购买额度继续使用。
               </p>
             </div>
 
@@ -59,7 +59,7 @@
                 :disabled="loading"
                 @click="handleManageQuota"
               >
-                完善手机号获取额度
+                管理/购买额度
               </button>
             </div>
           </div>
@@ -100,7 +100,7 @@ const wukongPreset = computed(() => props.providerOptions.find((item) => item.va
 const providerLabel = computed(() => wukongPreset.value?.label || '悟空云 AI')
 const providerStatus = computed(() => {
   if (wukongPreset.value?.apiKeyConfigured || props.initialConfig?.apiKey) {
-    return '悟空云 AI 已开通，可完善手机号获取更多额度。'
+    return '悟空云 AI 已开通，可管理或购买更多额度。'
   }
   return '首次登录会自动注册无手机号账户，无需手动配置。'
 })

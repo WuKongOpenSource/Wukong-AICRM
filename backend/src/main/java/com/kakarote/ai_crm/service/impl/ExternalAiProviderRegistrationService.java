@@ -9,6 +9,7 @@ import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.ExternalAiCaptchaProxyBO;
 import com.kakarote.ai_crm.entity.BO.ExternalAiCompleteMobileBO;
+import com.kakarote.ai_crm.entity.BO.ExternalAiPurchaseCreateBO;
 import com.kakarote.ai_crm.entity.BO.ExternalAiRegisterAndSaveBO;
 import com.kakarote.ai_crm.entity.BO.ExternalAiSmsCodeBO;
 import com.kakarote.ai_crm.entity.VO.AiConfigVO;
@@ -133,6 +134,34 @@ public class ExternalAiProviderRegistrationService {
         return vo;
     }
 
+    public Object getExternalApiPurchaseOptions() {
+        SavedExternalAiConfig savedConfig = resolveSavedWukongConfigOrRegister();
+        return getRemoteWithBearer(savedConfig.apiUrl(), "/purchase/options", savedConfig.apiKey());
+    }
+
+    public Object createExternalApiPurchaseOrder(ExternalAiPurchaseCreateBO request) {
+        SavedExternalAiConfig savedConfig = resolveSavedWukongConfigOrRegister();
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("planId", StrUtil.trim(request.getPlanId()));
+        payload.put("paymentChannel", StrUtil.trim(request.getPaymentChannel()));
+        return postRemoteWithBearer(savedConfig.apiUrl(), "/purchase/orders", payload, savedConfig.apiKey());
+    }
+
+    public Object getExternalApiPurchaseOrder(String orderNo) {
+        SavedExternalAiConfig savedConfig = resolveSavedWukongConfigOrRegister();
+        return getRemoteWithBearer(savedConfig.apiUrl(), "/purchase/orders/" + StrUtil.trim(orderNo), savedConfig.apiKey());
+    }
+
+    public Object listExternalApiPurchaseOrders(Integer limit) {
+        SavedExternalAiConfig savedConfig = resolveSavedWukongConfigOrRegister();
+        return getRemoteWithBearer(savedConfig.apiUrl(), "/purchase/orders?limit=" + safeLimit(limit, 10), savedConfig.apiKey());
+    }
+
+    public Object getExternalApiUsage(Integer limit) {
+        SavedExternalAiConfig savedConfig = resolveSavedWukongConfigOrRegister();
+        return getRemoteWithBearer(savedConfig.apiUrl(), "/usage?limit=" + safeLimit(limit, 20), savedConfig.apiKey());
+    }
+
     public static String normalizeExternalApiRoot(String apiUrl) {
         String normalized = StrUtil.trim(apiUrl);
         if (StrUtil.isBlank(normalized)) {
@@ -244,6 +273,19 @@ public class ExternalAiProviderRegistrationService {
                         && Boolean.TRUE.equals(provider.getApiKeyConfigured()));
     }
 
+    private SavedExternalAiConfig resolveSavedWukongConfigOrRegister() {
+        SavedExternalAiConfig savedConfig = resolveSavedWukongConfig();
+        if (savedConfig != null) {
+            return savedConfig;
+        }
+        ensureWukongExternalProvider();
+        savedConfig = resolveSavedWukongConfig();
+        if (savedConfig == null || StrUtil.isBlank(savedConfig.apiKey())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Wukong external AI is not configured");
+        }
+        return savedConfig;
+    }
+
     private SavedExternalAiConfig resolveSavedWukongConfig() {
         Map<String, String> configs = systemConfigService.getConfigsByType(AI_CONFIG_TYPE);
         SavedExternalAiConfig storedConfig = resolveStoredWukongConfig(configs);
@@ -314,6 +356,28 @@ public class ExternalAiProviderRegistrationService {
         }
     }
 
+    private Object getRemoteWithBearer(String apiUrl, String path, String apiKey) {
+        String url = normalizeExternalApiRoot(apiUrl) + path;
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(apiKey);
+        try {
+            ResponseEntity<Map> response = restOperations.exchange(
+                    url,
+                    HttpMethod.GET,
+                    new HttpEntity<>(headers),
+                    Map.class
+            );
+            return unwrapRemoteResponse(response.getBody());
+        } catch (HttpStatusCodeException e) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, extractRemoteError(e));
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Failed to call external AI purchase or usage API: {}", e.getMessage());
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "External AI service is temporarily unavailable");
+        }
+    }
+
     private Object postRemoteWithBearer(String apiUrl, String path, Object payload, String apiKey) {
         String url = normalizeExternalApiRoot(apiUrl) + path;
         HttpHeaders headers = new HttpHeaders();
@@ -334,6 +398,11 @@ public class ExternalAiProviderRegistrationService {
             log.warn("调用外部 AI 手机号完善接口失败: {}", e.getMessage());
             throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "外部 AI 服务暂时不可用，请稍后重试");
         }
+    }
+
+    private int safeLimit(Integer limit, int defaultValue) {
+        int value = limit == null ? defaultValue : limit;
+        return Math.max(1, Math.min(value, 100));
     }
 
     private Object unwrapRemoteResponse(Map<?, ?> body) {

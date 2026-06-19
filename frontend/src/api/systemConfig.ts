@@ -10,6 +10,10 @@ import type {
   ExternalAiCaptchaProxyParams,
   ExternalAiRegisterAndSaveParams,
   ExternalAiRegisterAndSaveResult,
+  ExternalAiPurchaseCreateParams,
+  ExternalAiPurchaseOptions,
+  ExternalAiPurchaseOrder,
+  ExternalAiUsage,
   ExternalAiSmsCodeParams,
   MinioConsoleConfig
 } from '@/types/systemConfig'
@@ -60,6 +64,28 @@ export function externalAiCompleteMobile(
   data: ExternalAiCompleteMobileParams
 ): Promise<ExternalAiRegisterAndSaveResult> {
   return post('/systemConfig/ai/external-api/complete-mobile', data)
+}
+
+export function getExternalAiPurchaseOptions(): Promise<ExternalAiPurchaseOptions> {
+  return get('/systemConfig/ai/external-api/purchase/options')
+}
+
+export function createExternalAiPurchaseOrder(
+  data: ExternalAiPurchaseCreateParams
+): Promise<ExternalAiPurchaseOrder> {
+  return post('/systemConfig/ai/external-api/purchase/orders', data)
+}
+
+export function getExternalAiPurchaseOrder(orderNo: string): Promise<ExternalAiPurchaseOrder> {
+  return get(`/systemConfig/ai/external-api/purchase/orders/${orderNo}`)
+}
+
+export function listExternalAiPurchaseOrders(limit = 10): Promise<ExternalAiPurchaseOrder[]> {
+  return get('/systemConfig/ai/external-api/purchase/orders', { params: { limit } })
+}
+
+export function getExternalAiUsage(limit = 20): Promise<ExternalAiUsage> {
+  return get('/systemConfig/ai/external-api/usage', { params: { limit } })
 }
 
 export function getConfigsByType(type: string): Promise<Record<string, string>> {

@@ -106,13 +106,31 @@
               <div class="min-w-0">
                 <p class="truncate text-base font-semibold text-slate-950">悟空云 AI 额度</p>
                 <p class="mt-1 text-sm leading-5 text-slate-500">
-                  绑定手机号后发放更多额度，购买额度能力后续开放。
+                  绑定手机号可领取更多额度，也可以直接购买额度。
                 </p>
               </div>
             </div>
             <div class="flex shrink-0 flex-wrap gap-2">
               <el-tag type="primary" effect="plain">系统托管</el-tag>
               <el-tag type="success" effect="plain">无需 API Key</el-tag>
+              <el-button size="small" type="primary" plain :loading="externalAiUsageLoading" @click="openExternalAiPurchaseDialog">
+                购买额度
+              </el-button>
+            </div>
+          </div>
+
+          <div class="grid gap-3 border-b border-slate-100 bg-white px-5 py-4 sm:grid-cols-3">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+              <p class="text-xs font-medium text-slate-500">可用额度</p>
+              <p class="mt-2 text-lg font-semibold tabular-nums text-slate-950">{{ formatCreditValue(externalAiUsage?.creditRemaining ?? 0) }}</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-4 py-3">
+              <p class="text-xs font-medium text-slate-500">购买剩余</p>
+              <p class="mt-2 text-lg font-semibold tabular-nums text-slate-950">{{ formatCreditValue(externalAiUsage?.purchasedCreditRemaining ?? 0) }}</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-4 py-3">
+              <p class="text-xs font-medium text-slate-500">已使用</p>
+              <p class="mt-2 text-lg font-semibold tabular-nums text-slate-950">{{ formatCreditValue(externalAiUsage?.creditUsed ?? 0) }}</p>
             </div>
           </div>
 
@@ -125,13 +143,13 @@
                 <div>
                   <p class="text-base font-semibold text-slate-950">手机号已完善，额度已发放</p>
                   <p class="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
-                    悟空云 AI 已完成手机号验证，当前无需继续配置密钥；后续购买额度开放后会在这里提供入口。
+                    悟空云 AI 已完成手机号验证，当前无需继续配置密钥；需要更多额度时可直接购买。
                   </p>
                 </div>
               </div>
               <div class="flex shrink-0 flex-wrap gap-2">
                 <el-tag type="success" effect="dark">已领取额度</el-tag>
-                <el-tag type="info" effect="plain">购买额度待开放</el-tag>
+                <el-tag type="primary" effect="plain">可购买额度</el-tag>
               </div>
             </div>
           </div>
@@ -430,9 +448,14 @@
       <div class="space-y-3 text-sm text-slate-600">
         <p>当前 CRM 默认要求主对话模型支持工具调用，否则无法正常驱动客户、任务、跟进等内置工具。</p>
         <p>悟空云 AI 的密钥由系统托管，不支持手动填写；其它服务商仍可按 OpenAI 兼容协议配置。</p>
-        <p>悟空云 AI 当前可通过手机号验证领取更多额度，购买额度能力后续开放。</p>
+        <p>悟空云 AI 当前可通过手机号验证领取更多额度，也可通过额度购买补充使用量。</p>
       </div>
     </el-card>
+
+    <ExternalAiPurchaseDialog
+      v-model="externalAiPurchaseDialogVisible"
+      @paid="handleExternalAiPurchasePaid"
+    />
   </div>
 </template>
 
@@ -446,6 +469,7 @@ import {
   externalAiCompleteMobile,
   externalAiGetCaptcha,
   externalAiSendSmsCode,
+  getExternalAiUsage,
   getAiConfigDetail,
   testAiConnection,
   updateAiConfig
@@ -456,8 +480,10 @@ import type {
   AiConnectionTestResult,
   AiModelCapabilities,
   AiProvider,
-  AiProviderPreset
+  AiProviderPreset,
+  ExternalAiUsage
 } from '@/types/systemConfig'
+import ExternalAiPurchaseDialog from '@/components/common/ExternalAiPurchaseDialog.vue'
 import { AI_PROVIDER_PRESETS } from '../constants'
 
 type AiConfigFormState = AiConfigUpdateBO & {
@@ -507,6 +533,9 @@ const externalAiSmsSending = ref(false)
 const externalAiRegistering = ref(false)
 const externalAiSavedKeyPrefix = ref('')
 const externalAiMobileCompleted = ref(false)
+const externalAiUsageLoading = ref(false)
+const externalAiPurchaseDialogVisible = ref(false)
+const externalAiUsage = ref<ExternalAiUsage | null>(null)
 
 const externalAiForm = reactive({
   mobile: '',
@@ -701,6 +730,9 @@ function handleProviderChange(provider: AiProvider) {
   applyProviderDraft(provider)
   if (provider !== 'wukong_external') {
     resetExternalAiCaptchaState()
+    externalAiUsage.value = null
+  } else {
+    loadExternalAiUsage()
   }
 }
 
@@ -766,6 +798,11 @@ async function loadAiConfig() {
 
     providerDrafts.value = nextDrafts
     applyProviderDraft(currentProvider)
+    if (currentProvider === WUKONG_EXTERNAL_PROVIDER) {
+      await loadExternalAiUsage()
+    } else {
+      externalAiUsage.value = null
+    }
   } catch {
     // Error handled by interceptor
   }
@@ -1034,11 +1071,40 @@ async function handleExternalAiCompleteMobile() {
     resetExternalAiCaptchaState()
     ElMessage.success('手机号已完善，更多额度已发放')
     await loadAiConfig()
+    await loadExternalAiUsage()
   } catch {
     // Error handled by interceptor
   } finally {
     externalAiRegistering.value = false
   }
+}
+
+async function loadExternalAiUsage() {
+  externalAiUsageLoading.value = true
+  try {
+    externalAiUsage.value = await getExternalAiUsage(20)
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    externalAiUsageLoading.value = false
+  }
+}
+
+function openExternalAiPurchaseDialog() {
+  externalAiPurchaseDialogVisible.value = true
+}
+
+async function handleExternalAiPurchasePaid() {
+  await loadExternalAiUsage()
+  await loadAiConfig()
+}
+
+function formatCreditValue(value: number | null | undefined): string {
+  const safeValue = Math.max(Number(value || 0), 0)
+  if (safeValue >= 10000) {
+    return `${(safeValue / 10000).toFixed(safeValue % 10000 === 0 ? 0 : 1)}万`
+  }
+  return `${safeValue}`
 }
 
 function formatTime(time: string | undefined): string {

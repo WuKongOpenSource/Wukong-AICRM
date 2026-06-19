@@ -111,7 +111,7 @@ services:
       - "${DOCREADER_PORT:-50051}:50051"
     environment:
       - MINIO_ENDPOINT=minio:9000
-      - MINIO_PUBLIC_ENDPOINT=http://localhost:${MINIO_PORT:-9000}
+      - MINIO_PUBLIC_ENDPOINT=http://${HOST_IP}:${MINIO_PORT:-9000}
       - MINERU_ENDPOINT=${MINERU_ENDPOINT:-}
       - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-}
     healthcheck:

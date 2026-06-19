@@ -8,6 +8,7 @@ import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.ExternalAiCaptchaProxyBO;
 import com.kakarote.ai_crm.entity.BO.ExternalAiCompleteMobileBO;
+import com.kakarote.ai_crm.entity.BO.ExternalAiPurchaseCreateBO;
 import com.kakarote.ai_crm.entity.BO.ExternalAiRegisterAndSaveBO;
 import com.kakarote.ai_crm.entity.BO.ExternalAiSmsCodeBO;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
@@ -130,6 +131,43 @@ public class SystemConfigController {
     public Result<ExternalAiRegisterAndSaveVO> externalAiCompleteMobile(
             @Valid @RequestBody ExternalAiCompleteMobileBO request) {
         return Result.ok(externalAiProviderRegistrationService.completeMobile(request));
+    }
+
+    @GetMapping("/ai/external-api/purchase/options")
+    @Operation(summary = "Proxy External AI purchase options")
+    @RequirePermission("config:ai")
+    public Result<Object> externalAiPurchaseOptions() {
+        return Result.ok(externalAiProviderRegistrationService.getExternalApiPurchaseOptions());
+    }
+
+    @PostMapping("/ai/external-api/purchase/orders")
+    @Operation(summary = "Proxy External AI purchase order creation")
+    @RequirePermission("config:ai")
+    public Result<Object> externalAiCreatePurchaseOrder(@Valid @RequestBody ExternalAiPurchaseCreateBO request) {
+        return Result.ok(externalAiProviderRegistrationService.createExternalApiPurchaseOrder(request));
+    }
+
+    @GetMapping("/ai/external-api/purchase/orders/{orderNo}")
+    @Operation(summary = "Proxy External AI purchase order query")
+    @RequirePermission("config:ai")
+    public Result<Object> externalAiPurchaseOrder(@PathVariable String orderNo) {
+        return Result.ok(externalAiProviderRegistrationService.getExternalApiPurchaseOrder(orderNo));
+    }
+
+    @GetMapping("/ai/external-api/purchase/orders")
+    @Operation(summary = "Proxy External AI purchase order list")
+    @RequirePermission("config:ai")
+    public Result<Object> externalAiPurchaseOrders(
+            @RequestParam(name = "limit", defaultValue = "10") Integer limit) {
+        return Result.ok(externalAiProviderRegistrationService.listExternalApiPurchaseOrders(limit));
+    }
+
+    @GetMapping("/ai/external-api/usage")
+    @Operation(summary = "Proxy External AI usage")
+    @RequirePermission("config:ai")
+    public Result<Object> externalAiUsage(
+            @RequestParam(name = "limit", defaultValue = "20") Integer limit) {
+        return Result.ok(externalAiProviderRegistrationService.getExternalApiUsage(limit));
     }
 
     @GetMapping("/byType/{type}")

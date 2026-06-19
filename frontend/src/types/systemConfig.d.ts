@@ -122,6 +122,92 @@ export interface ExternalAiRegisterAndSaveResult {
   apiKeyConfigured: boolean
 }
 
+export type ExternalAiPaymentChannel = 'wechat' | 'alipay'
+
+export type ExternalAiPurchaseOrderStatus = 'PENDING' | 'PAID' | 'FAILED' | 'CLOSED' | 'EXPIRED'
+
+export interface ExternalAiPurchasePlan {
+  id: string
+  name: string
+  description?: string
+  creditAmount: number
+  priceFen: number
+}
+
+export interface ExternalAiPurchaseChannel {
+  code: ExternalAiPaymentChannel
+  label: string
+  enabled: boolean
+  unavailableReason?: string | null
+}
+
+export interface ExternalAiPurchaseOptions {
+  enabled: boolean
+  orderExpireMinutes: number
+  giftCreditRemaining: number
+  purchasedCreditRemaining: number
+  reservedCreditUsed: number
+  creditRemaining: number
+  plans: ExternalAiPurchasePlan[]
+  channels: ExternalAiPurchaseChannel[]
+}
+
+export interface ExternalAiPurchaseOrder {
+  orderNo: string
+  planId: string
+  planName: string
+  creditAmount: number
+  amountFen: number
+  amountDisplay: string
+  paymentChannel: ExternalAiPaymentChannel
+  paymentChannelLabel: string
+  status: ExternalAiPurchaseOrderStatus
+  paymentMode?: 'qrcode' | 'page' | null
+  paymentFormHtml?: string | null
+  qrCodeContent?: string | null
+  qrCodeImage?: string | null
+  expireTime?: string
+  paidTime?: string
+  createTime?: string
+}
+
+export interface ExternalAiUsageRecord {
+  recordId: string | number
+  requestId?: string | null
+  modelProvider: string
+  modelName: string
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+  reservedCredits: number
+  creditsUsed: number
+  balanceBefore: number
+  balanceAfter: number
+  status: string
+  errorMessage?: string | null
+  createTime?: string
+}
+
+export interface ExternalAiUsage {
+  giftCreditTotal: number
+  giftCreditUsed: number
+  giftCreditRemaining: number
+  purchasedCreditTotal: number
+  purchasedCreditUsed: number
+  purchasedCreditRemaining: number
+  reservedCreditUsed: number
+  creditTotal: number
+  creditUsed: number
+  creditRemaining: number
+  recentUsage: ExternalAiUsageRecord[]
+  recentOrders: ExternalAiPurchaseOrder[]
+}
+
+export interface ExternalAiPurchaseCreateParams {
+  planId: string
+  paymentChannel: ExternalAiPaymentChannel
+}
+
 export interface MinioConsoleConfig {
   enabled: boolean
   consoleUrl: string
