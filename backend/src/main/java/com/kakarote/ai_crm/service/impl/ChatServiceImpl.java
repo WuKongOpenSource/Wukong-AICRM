@@ -32,6 +32,7 @@ import com.kakarote.ai_crm.entity.PO.ProjectTask;
 import com.kakarote.ai_crm.entity.PO.Relation;
 import com.kakarote.ai_crm.entity.VO.ChatAppOptionVO;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
+import com.kakarote.ai_crm.entity.VO.ChatStreamEventVO;
 import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
 import com.kakarote.ai_crm.mapper.ChatMessageMapper;
 import com.kakarote.ai_crm.mapper.ChatSessionMapper;
@@ -574,7 +575,7 @@ public class ChatServiceImpl implements IChatService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Flux<String> streamChat(ChatSendBO sendBO) {
+    public Flux<ChatStreamEventVO> streamChat(ChatSendBO sendBO) {
         Long sessionId = sendBO.getSessionId();
         String content = sendBO.getContent();
         List<ChatSendBO.AttachmentDTO> attachments = sendBO.getAttachments();
@@ -605,7 +606,7 @@ public class ChatServiceImpl implements IChatService {
             saveMessage(sessionId, "assistant", routedKnowledgeResponse);
             updateSessionTime(sessionId);
             AiContextHolder.clear();
-            return Flux.just(routedKnowledgeResponse);
+            return Flux.just(ChatStreamEventVO.message(routedKnowledgeResponse));
         }
 
         List<Message> history = buildMessageHistory(sessionId, messageId);
@@ -651,7 +652,7 @@ public class ChatServiceImpl implements IChatService {
         if (unavailableTip != null) {
             saveMessage(sessionId, "assistant", unavailableTip);
             AiContextHolder.clear();
-            return Flux.just(unavailableTip);
+            return Flux.just(ChatStreamEventVO.message(unavailableTip));
         }
 
         log.debug("开始 AI 对话，启用工具调用...");
@@ -738,19 +739,22 @@ public class ChatServiceImpl implements IChatService {
                 }
                 return null;
             })
+            .map(ChatStreamEventVO::message)
             .concatWith(Mono.defer(() -> {
                 AiToolExecutionRecorder.ToolExecution failure = toolFailureRef.get();
-                return failure == null ? Mono.empty() : Mono.just(buildToolFailureReply(failure));
+                return failure == null ? Mono.empty() : Mono.just(ChatStreamEventVO.message(buildToolFailureReply(failure)));
             }))
             .doOnComplete(finalizeSuccessfulStream)
             .onErrorResume(error -> {
                 streamFailed.set(true);
                 logAiChatError(error);
-                String errorMsg = resolveToolFailureReply(sessionId, resolveAiChatErrorMessage(error, runtimeConfig));
-                saveMessage(sessionId, "assistant", errorMsg);
+                ChatStreamEventVO errorEvent = resolveChatStreamErrorEvent(error, runtimeConfig, sessionId);
+                if (StrUtil.isNotBlank(errorEvent.persistedMessage())) {
+                    saveMessage(sessionId, "assistant", errorEvent.persistedMessage());
+                }
                 updateSessionTime(sessionId);
                 AiContextHolder.clear();
-                return Flux.just(errorMsg);
+                return Flux.just(errorEvent);
             })
             .doFinally(signalType -> {
                 if (signalType == SignalType.CANCEL && !streamFailed.get() && fullResponse.length() > 0) {
@@ -1568,6 +1572,22 @@ public class ChatServiceImpl implements IChatService {
         log.error("AI 对话错误: {}", error.getMessage(), error);
     }
 
+    private ChatStreamEventVO resolveChatStreamErrorEvent(Throwable error,
+                                                          DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig,
+                                                          Long sessionId) {
+        ProviderError providerError = extractProviderError(error);
+        if (isWukongExternalRuntime(runtimeConfig) && isInsufficientQuota(providerError)) {
+            String message = StrUtil.blankToDefault(providerError.message(), "额度不足，请补充额度后继续使用。");
+            return ChatStreamEventVO.quotaExhausted(
+                    buildQuotaExhaustedPayload(message),
+                    "额度不足，请补充额度后继续使用。"
+            );
+        }
+
+        String errorMsg = resolveToolFailureReply(sessionId, resolveAiChatErrorMessage(error, runtimeConfig));
+        return ChatStreamEventVO.message(errorMsg);
+    }
+
     private String resolveAiChatErrorMessage(Throwable error,
                                              DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig) {
         WebClientResponseException exception = findWebClientResponseException(error);
@@ -1604,8 +1624,20 @@ public class ChatServiceImpl implements IChatService {
     }
 
     private String extractProviderErrorMessage(String responseBody) {
+        return extractProviderError(responseBody).message();
+    }
+
+    private ProviderError extractProviderError(Throwable error) {
+        WebClientResponseException exception = findWebClientResponseException(error);
+        if (exception == null) {
+            return ProviderError.empty();
+        }
+        return extractProviderError(exception.getResponseBodyAsString());
+    }
+
+    private ProviderError extractProviderError(String responseBody) {
         if (StrUtil.isBlank(responseBody)) {
-            return null;
+            return ProviderError.empty();
         }
         try {
             JsonNode root = objectMapper.readTree(responseBody);
@@ -1614,9 +1646,48 @@ public class ChatServiceImpl implements IChatService {
                     textAt(root, "/message"),
                     textAt(root, "/error")
             );
-            return sanitizeProviderErrorMessage(message);
+            String type = firstNonBlank(
+                    textAt(root, "/error/type"),
+                    textAt(root, "/type")
+            );
+            String code = firstNonBlank(
+                    textAt(root, "/error/code"),
+                    textAt(root, "/code")
+            );
+            return new ProviderError(
+                    sanitizeProviderErrorMessage(message),
+                    sanitizeProviderErrorMessage(type),
+                    sanitizeProviderErrorMessage(code)
+            );
         } catch (Exception ignored) {
-            return sanitizeProviderErrorMessage(responseBody);
+            return new ProviderError(sanitizeProviderErrorMessage(responseBody), null, null);
+        }
+    }
+
+    private boolean isWukongExternalRuntime(DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig) {
+        if (runtimeConfig == null) {
+            return false;
+        }
+        return "wukong_external".equalsIgnoreCase(StrUtil.trim(runtimeConfig.providerCode()))
+                || StrUtil.containsIgnoreCase(runtimeConfig.apiUrl(), "external-api");
+    }
+
+    private boolean isInsufficientQuota(ProviderError providerError) {
+        if (providerError == null) {
+            return false;
+        }
+        return "insufficient_quota".equalsIgnoreCase(StrUtil.trim(providerError.code()))
+                || "insufficient_quota".equalsIgnoreCase(StrUtil.trim(providerError.type()));
+    }
+
+    private String buildQuotaExhaustedPayload(String message) {
+        try {
+            return objectMapper.writeValueAsString(Map.of(
+                    "code", "insufficient_quota",
+                    "message", StrUtil.blankToDefault(message, "额度不足，请补充额度后继续使用。")
+            ));
+        } catch (Exception ignored) {
+            return "{\"code\":\"insufficient_quota\",\"message\":\"额度不足，请补充额度后继续使用。\"}";
         }
     }
 
@@ -1828,5 +1899,11 @@ public class ChatServiceImpl implements IChatService {
     }
 
     private record TokenUsageSnapshot(int promptTokens, int completionTokens, int totalTokens) {
+    }
+
+    private record ProviderError(String message, String type, String code) {
+        private static ProviderError empty() {
+            return new ProviderError(null, null, null);
+        }
     }
 }

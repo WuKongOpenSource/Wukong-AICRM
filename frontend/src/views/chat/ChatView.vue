@@ -1588,6 +1588,23 @@
       @manage-quota="handleOpenExternalAiQuotaSettings"
       @save="handleSaveApiKey"
     />
+    <ExternalAiQuotaExhaustedDialog
+      v-model="externalAiQuotaDialogVisible"
+      :mobile-completed="isWukongExternalMobileCompleted"
+      :can-configure="canManageAiConfig"
+      @complete-mobile="openExternalAiMobileCompletionDialog"
+      @purchase="openExternalAiPurchaseDialog"
+      @configure="handleConfigureCustomModel"
+    />
+    <ExternalAiMobileCompletionDialog
+      v-model="externalAiMobileCompletionDialogVisible"
+      :api-url="wukongExternalApiUrl"
+      @completed="handleExternalAiMobileCompleted"
+    />
+    <ExternalAiPurchaseDialog
+      v-model="externalAiPurchaseDialogVisible"
+      @paid="handleExternalAiPurchasePaid"
+    />
     <ChatKnowledgePickerModal
       v-model="chatKnowledgePickerVisible"
       :remaining-slots="Math.max(0, MAX_FILE_COUNT - selectedFiles.length - selectedKnowledgeItems.length)"
@@ -1626,12 +1643,15 @@ import { useResponsive } from '@/composables/useResponsive'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { transcribeFollowUpAudio } from '@/api/followup'
-import { getAiConfig, getAiConfigDetail, updateAiConfig } from '@/api/systemConfig'
+import { getAiConfig, getAiConfigDetail, getExternalAiUsage, updateAiConfig } from '@/api/systemConfig'
 import { addCustomerTag, getCustomerDetail, removeCustomerTag, updateCustomerStage } from '@/api/customer'
 import { getAddressBookDetail } from '@/api/addressBook'
 import { getRelationDetail } from '@/api/relation'
 import { getProductDetail } from '@/api/product'
 import ApiKeySetupModal from '@/components/common/ApiKeySetupModal.vue'
+import ExternalAiMobileCompletionDialog from '@/components/common/ExternalAiMobileCompletionDialog.vue'
+import ExternalAiPurchaseDialog from '@/components/common/ExternalAiPurchaseDialog.vue'
+import ExternalAiQuotaExhaustedDialog from '@/components/common/ExternalAiQuotaExhaustedDialog.vue'
 import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
 import CustomerBasicInfoDrawer from '@/views/customer/components/CustomerBasicInfoDrawer.vue'
 import CustomerDetailView from '@/views/customer/CustomerDetailView.vue'
@@ -1679,7 +1699,7 @@ import type { ProductVO } from '@/types/product'
 import type { RelationDetailVO } from '@/types/relation'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, ChatModelOption, Knowledge, Task } from '@/types/common'
 import type { Contact, CustomerDetailVO, CustomerTag } from '@/types/customer'
-import type { AiConfig, AiConfigUpdateBO, AiProvider, AiProviderPreset } from '@/types/systemConfig'
+import type { AiConfig, AiConfigUpdateBO, AiProvider, AiProviderPreset, ExternalAiUsage } from '@/types/systemConfig'
 import dashscopeBrandUrl from '@/assets/model-provider-brands/dashscope.svg?url'
 import openaiBrandUrl from '@/assets/model-provider-brands/openai.svg?url'
 import deepseekBrandUrl from '@/assets/model-provider-brands/deepseek.svg?url'
@@ -1751,6 +1771,11 @@ const currentView = ref<'chat' | 'notifications'>('chat')
 const userAvatarLoadFailed = ref(false)
 const aiConfig = ref<AiConfig | null>(null)
 const aiConfigLoaded = ref(false)
+const externalAiUsage = ref<ExternalAiUsage | null>(null)
+const externalAiQuotaDialogVisible = ref(false)
+const externalAiPurchaseDialogVisible = ref(false)
+const externalAiMobileCompletionDialogVisible = ref(false)
+const externalAiEntryQuotaPrompted = ref(false)
 const isApiKeyModalOpen = ref(false)
 const apiKeySetupInitialConfig = ref<Partial<AiConfigUpdateBO> | null>(null)
 const apiKeySetupProviderOptions = ref<AiProviderPreset[]>([])
@@ -1799,6 +1824,7 @@ let lastChatComposerWidth = 0
 let mobileKeyboardInsetTimer: ReturnType<typeof setTimeout> | null = null
 let removeNativeKeyboardInsetListeners: (() => void) | null = null
 let removeChatObjectPanelCloseListener: (() => void) | null = null
+let removeAiQuotaExhaustedListener: (() => void) | null = null
 
 const CHAT_CONTEXT_QUERY_KEYS = ['sessionId', 'customerId', 'employeeId', 'relationId', 'productId'] as const
 type ChatContextQueryKey = (typeof CHAT_CONTEXT_QUERY_KEYS)[number]
@@ -1921,6 +1947,18 @@ const modelOptionGroups = computed(() => {
 })
 
 const canManageAiConfig = computed(() => userStore.hasPermission('config:ai'))
+const isWukongExternalActive = computed(() => aiConfig.value?.provider === WUKONG_EXTERNAL_PROVIDER)
+const isWukongExternalMobileCompleted = computed(() => Boolean(
+  aiConfig.value?.wukongExternalMobileCompleted ||
+  aiConfig.value?.availableProviders?.some((item) => (
+    item.value === WUKONG_EXTERNAL_PROVIDER && item.mobileCompleted
+  ))
+))
+const wukongExternalApiUrl = computed(() => (
+  isWukongExternalActive.value
+    ? aiConfig.value?.apiUrl || WUKONG_EXTERNAL_DEFAULT_API_URL
+    : WUKONG_EXTERNAL_DEFAULT_API_URL
+))
 const composerModelLabel = computed(() => {
   if (chatStore.modelOptionsLoading) return '加载模型...'
   const model = chatStore.selectedModel
@@ -2204,6 +2242,10 @@ onMounted(async () => {
     APP_EVENT.CUSTOMER_DETAIL_REFRESH,
     handleSelectedCustomerDetailRefresh
   )
+  removeAiQuotaExhaustedListener = appEvents.on(
+    APP_EVENT.AI_QUOTA_EXHAUSTED,
+    handleAiQuotaExhausted
+  )
   await Promise.all([
     chatStore.fetchAppOptions(),
     chatStore.fetchModelOptions(),
@@ -2214,6 +2256,7 @@ onMounted(async () => {
     loadAiConfig()
   ])
   await applyChatRouteQuery()
+  await checkExternalAiQuotaOnEntry()
   await nextTick()
   updateCustomerPanelContainerWidth()
   updateMessagesScrollbarOffset()
@@ -2243,6 +2286,8 @@ onBeforeUnmount(() => {
   removeChatObjectPanelCloseListener = null
   offSelectedCustomerDetailRefresh?.()
   offSelectedCustomerDetailRefresh = null
+  removeAiQuotaExhaustedListener?.()
+  removeAiQuotaExhaustedListener = null
   customerPanelResizeObserver?.disconnect()
   customerPanelResizeObserver = null
   chatMainAreaResizeObserver?.disconnect()
@@ -2744,6 +2789,7 @@ function normalizeAiConfig(config?: Partial<AiConfig> | Partial<AiConfigUpdateBO
     mode: (config as Partial<AiConfig> | null)?.mode || 'custom',
     customConfigSaved: (config as Partial<AiConfig> | null)?.customConfigSaved ?? false,
     ready: (config as Partial<AiConfig> | null)?.ready ?? Boolean(config?.apiKey?.trim()),
+    wukongExternalMobileCompleted: (config as Partial<AiConfig> | null)?.wukongExternalMobileCompleted ?? false,
     updateTime: config && 'updateTime' in config ? config.updateTime : undefined
   }
 }
@@ -2765,6 +2811,64 @@ async function loadAiConfig(force = false): Promise<AiConfig | null> {
   }
 
   return aiConfig.value
+}
+
+async function refreshExternalAiUsage(): Promise<ExternalAiUsage | null> {
+  if (!canManageAiConfig.value || !isWukongExternalActive.value) {
+    externalAiUsage.value = null
+    return null
+  }
+
+  try {
+    externalAiUsage.value = await getExternalAiUsage(1)
+  } catch {
+    externalAiUsage.value = null
+  }
+  return externalAiUsage.value
+}
+
+async function checkExternalAiQuotaOnEntry() {
+  if (externalAiEntryQuotaPrompted.value) return
+  if (!canManageAiConfig.value || !isWukongExternalActive.value) return
+
+  externalAiEntryQuotaPrompted.value = true
+  const usage = await refreshExternalAiUsage()
+  if ((usage?.creditRemaining ?? 0) <= 0) {
+    externalAiQuotaDialogVisible.value = true
+  }
+}
+
+function handleAiQuotaExhausted() {
+  externalAiQuotaDialogVisible.value = true
+  void loadAiConfig(true)
+  void refreshExternalAiUsage()
+}
+
+function openExternalAiMobileCompletionDialog() {
+  externalAiQuotaDialogVisible.value = false
+  externalAiMobileCompletionDialogVisible.value = true
+}
+
+function openExternalAiPurchaseDialog() {
+  externalAiQuotaDialogVisible.value = false
+  externalAiPurchaseDialogVisible.value = true
+}
+
+async function handleExternalAiMobileCompleted() {
+  externalAiMobileCompletionDialogVisible.value = false
+  await loadAiConfig(true)
+  await refreshExternalAiUsage()
+}
+
+async function handleExternalAiPurchasePaid() {
+  externalAiPurchaseDialogVisible.value = false
+  await refreshExternalAiUsage()
+  await loadAiConfig(true)
+}
+
+function handleConfigureCustomModel() {
+  externalAiQuotaDialogVisible.value = false
+  void router.push({ path: '/settings/system/api' })
 }
 
 async function ensureAiAvailable(): Promise<boolean> {

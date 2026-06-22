@@ -25,6 +25,7 @@ export const APP_EVENT = {
   RELATION_SIDEBAR_REFRESH: 'relation:sidebar:refresh',
   CHAT_COMPOSER_NARROW_CHANGE: 'chat:composer:narrow-change',
   CHAT_OBJECT_PANEL_CLOSE: 'chat:object-panel:close',
+  AI_QUOTA_EXHAUSTED: 'ai:quota-exhausted',
   MOBILE_MAIN_MENU_OPEN: 'mobile:main-menu:open',
   MOBILE_MAIN_MENU_DRAG: 'mobile:main-menu:drag',
 } as const

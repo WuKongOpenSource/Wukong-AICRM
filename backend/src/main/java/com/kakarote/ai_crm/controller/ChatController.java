@@ -7,6 +7,7 @@ import com.kakarote.ai_crm.entity.BO.SessionPinBO;
 import com.kakarote.ai_crm.entity.VO.AiConfigVO;
 import com.kakarote.ai_crm.entity.VO.ChatAppOptionVO;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
+import com.kakarote.ai_crm.entity.VO.ChatStreamEventVO;
 import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
 import com.kakarote.ai_crm.service.IChatService;
 import com.kakarote.ai_crm.service.ISystemConfigService;
@@ -136,9 +137,10 @@ public class ChatController {
     @Operation(summary = "发送消息（流式响应，支持附件）")
     public Flux<ServerSentEvent<String>> send(@RequestBody ChatSendBO sendBO) {
         return chatService.streamChat(sendBO)
-            .filter(chunk -> chunk != null && !chunk.isEmpty())
-            .map(chunk -> ServerSentEvent.<String>builder()
-                .data(chunk)
+            .filter(event -> event != null && event.data() != null && !event.data().isEmpty())
+            .map(event -> ServerSentEvent.<String>builder()
+                .event(resolveStreamEventName(event))
+                .data(event.data())
                 .build());
     }
 
@@ -147,5 +149,11 @@ public class ChatController {
     public Result<String> sendSync(@RequestBody ChatSendBO sendBO) {
         String response = chatService.chat(sendBO);
         return Result.ok(response);
+    }
+
+    private String resolveStreamEventName(ChatStreamEventVO event) {
+        return event.event() == null || event.event().isBlank()
+                ? ChatStreamEventVO.EVENT_MESSAGE
+                : event.event();
     }
 }

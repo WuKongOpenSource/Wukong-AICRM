@@ -1,5 +1,12 @@
 import { post, get, getToken, getApiBaseUrl } from '@/utils/request'
 import type { ChatSession, ChatMessage, ChatAttachmentDTO, ChatModelOption, ChatAppOption } from '@/types/common'
+import {
+  createQuotaExhaustedError,
+  parseChatSSEEvent,
+  parseHttpQuotaErrorPayload,
+  parseMaybeJson,
+  parseQuotaPayloadFromSSE
+} from '@/utils/chatStream'
 
 /**
  * Create chat session
@@ -120,7 +127,7 @@ export async function sendMessageStream(
     })
 
     if (!response.ok) {
-      throw new Error(`请求失败，HTTP 状态码：${response.status}`)
+      throw await resolveStreamHttpError(response)
     }
 
     reader = response.body?.getReader() ?? null
@@ -138,10 +145,7 @@ export async function sendMessageStream(
       if (done) {
         // Process any remaining buffer content
         if (buffer.trim()) {
-          const parsedContent = parseSSEEvent(buffer)
-          if (parsedContent !== null) {
-            onChunk(parsedContent)
-          }
+          handleParsedSSEEvent(buffer, onChunk)
         }
         break
       }
@@ -155,10 +159,7 @@ export async function sendMessageStream(
       buffer = events.pop() || ''
 
       for (const event of events) {
-        const parsedContent = parseSSEEvent(event)
-        if (parsedContent !== null) {
-          onChunk(parsedContent)
-        }
+        handleParsedSSEEvent(event, onChunk)
       }
     }
 
@@ -176,26 +177,42 @@ export async function sendMessageStream(
   }
 }
 
-/**
- * Parse a complete SSE event
- * An event may contain multiple data: lines (for multiline content)
- * These should be joined with newlines according to SSE spec
- */
-function parseSSEEvent(event: string): string | null {
-  const lines = event.split(/\r?\n/)
-  const dataLines: string[] = []
+function handleParsedSSEEvent(event: string, onChunk: (text: string) => void) {
+  const parsedEvent = parseChatSSEEvent(event)
+  if (!parsedEvent) return
 
-  for (const line of lines) {
-    if (line.startsWith('data:')) {
-      const content = line.slice(5)
-      // Per SSE spec, strip at most one leading space after "data:"
-      dataLines.push(content.startsWith(' ') ? content.slice(1) : content)
-    }
+  const quotaPayload = parseQuotaPayloadFromSSE(parsedEvent)
+  if (quotaPayload) {
+    throw createQuotaExhaustedError(quotaPayload)
   }
 
-  if (dataLines.length === 0) return null
-  // Join multiple data lines with newline (SSE spec for multiline data)
-  return dataLines.join('\n')
+  onChunk(parsedEvent.data)
+}
+
+async function resolveStreamHttpError(response: Response): Promise<Error> {
+  const responseText = await response.text().catch(() => '')
+  const parsedBody = parseMaybeJson(responseText)
+  const quotaPayload = parseHttpQuotaErrorPayload(parsedBody ?? responseText)
+  if (quotaPayload) {
+    return createQuotaExhaustedError(quotaPayload)
+  }
+
+  return new Error(resolveHttpErrorMessage(response.status, parsedBody, responseText))
+}
+
+function resolveHttpErrorMessage(status: number, parsedBody: unknown, responseText: string): string {
+  if (parsedBody && typeof parsedBody === 'object') {
+    const record = parsedBody as Record<string, unknown>
+    const error = record.error
+    if (error && typeof error === 'object' && !Array.isArray(error)) {
+      const errorRecord = error as Record<string, unknown>
+      if (typeof errorRecord.message === 'string' && errorRecord.message) return errorRecord.message
+    }
+    if (typeof record.message === 'string' && record.message) return record.message
+    if (typeof record.msg === 'string' && record.msg) return record.msg
+  }
+  if (responseText.trim()) return responseText.trim()
+  return `请求失败，HTTP 状态码：${status}`
 }
 
 /**

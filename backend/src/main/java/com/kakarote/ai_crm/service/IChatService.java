@@ -5,6 +5,7 @@ import com.kakarote.ai_crm.entity.BO.SessionCreateBO;
 import com.kakarote.ai_crm.entity.BO.SessionPinBO;
 import com.kakarote.ai_crm.entity.VO.ChatAppOptionVO;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
+import com.kakarote.ai_crm.entity.VO.ChatStreamEventVO;
 import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
 import reactor.core.publisher.Flux;
 
@@ -42,7 +43,7 @@ public interface IChatService {
     /**
      * 发送消息（流式响应）
      */
-    Flux<String> streamChat(ChatSendBO sendBO);
+    Flux<ChatStreamEventVO> streamChat(ChatSendBO sendBO);
 
     /**
      * 发送消息（非流式响应）

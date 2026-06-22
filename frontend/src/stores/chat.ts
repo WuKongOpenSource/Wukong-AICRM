@@ -17,6 +17,8 @@ import type { AddressBookEmployee } from '@/types/addressBook'
 import type { RelationVO } from '@/types/relation'
 import type { ProjectEntity, ProjectTask } from '@/types/project'
 import type { ProductVO } from '@/types/product'
+import { isChatQuotaExhaustedError } from '@/utils/chatStream'
+import { appEvents, APP_EVENT } from '@/utils/events'
 
 interface LocalMessage {
   id: string
@@ -689,6 +691,19 @@ export const useChatStore = defineStore('chat', () => {
           console.error('Stream error:', error)
           clearStreamingThinkingTimer(streamingTasks.value[sessionId])
           const assistantMessage = ensureStreamingAssistantMessage(sessionId, assistantMessageId)
+          if (isChatQuotaExhaustedError(error)) {
+            const message = error.message || '额度不足，请补充额度后继续使用。'
+            assistantMessage.content = message
+            assistantMessage.isThinking = false
+            assistantMessage.isStreaming = false
+            appEvents.emit(APP_EVENT.AI_QUOTA_EXHAUSTED, {
+              sessionId,
+              code: error.code,
+              type: error.type,
+              message
+            })
+            return
+          }
           if (!assistantMessage.content) {
             assistantMessage.content = '抱歉，发生错误，请重试。'
           }
