@@ -117,24 +117,24 @@ CREATE INDEX IF NOT EXISTS idx_finance_invoice_date ON crm_finance_invoice(invoi
 CREATE INDEX IF NOT EXISTS idx_finance_expense_date ON crm_finance_expense(expense_date);
 
 INSERT INTO manager_menu (menu_id, parent_id, realm, realm_name, type) VALUES
-    (2600, 0, 'finance', '财务管理', 3),
-    (2601, 2600, 'finance:view', '查看', 5),
-    (2602, 2600, 'finance:create', '新建', 5),
-    (2603, 2600, 'finance:edit', '编辑', 5),
-    (2604, 2600, 'finance:delete', '删除', 5),
-    (2605, 2600, 'finance:export', '导出', 5),
-    (2606, 2600, 'finance:ai_write', 'AI写入', 5)
+    (2700, 0, 'finance', '财务管理', 3),
+    (2701, 2700, 'finance:view', '查看', 5),
+    (2702, 2700, 'finance:create', '新建', 5),
+    (2703, 2700, 'finance:edit', '编辑', 5),
+    (2704, 2700, 'finance:delete', '删除', 5),
+    (2705, 2700, 'finance:export', '导出', 5),
+    (2706, 2700, 'finance:ai_write', 'AI写入', 5)
 ON CONFLICT (menu_id) DO NOTHING;
 
 INSERT INTO manager_role_menu (id, role_id, menu_id, data_scope, create_user_id, create_time)
-SELECT 2600000000000 + r.role_id + m.menu_id,
+SELECT 2700000000000 + r.role_id + m.menu_id,
        r.role_id,
        m.menu_id,
        5,
        1,
        CURRENT_TIMESTAMP
 FROM manager_role r
-JOIN manager_menu m ON m.menu_id BETWEEN 2600 AND 2606
+JOIN manager_menu m ON m.menu_id BETWEEN 2700 AND 2706
 WHERE r.realm = 'super_admin'
   AND NOT EXISTS (
       SELECT 1
