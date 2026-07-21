@@ -1,7 +1,17 @@
 // Custom Field related types
 
 export type FieldType = 'text' | 'textarea' | 'number' | 'date' | 'datetime' | 'select' | 'multiselect' | 'checkbox'
-export type EntityType = 'customer' | 'contact' | 'relation' | 'product' | 'candidate'
+export type EntityType =
+  | 'customer'
+  | 'contact'
+  | 'relation'
+  | 'product'
+  | 'candidate'
+  | 'finance_contract'
+  | 'finance_receivable'
+  | 'finance_payment'
+  | 'finance_invoice'
+  | 'finance_expense'
 export type FieldSource = 'system' | 'custom'
 
 export interface FieldOption {
@@ -111,5 +121,10 @@ export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
   contact: '联系人',
   relation: '关系',
   product: '产品',
-  candidate: '候选人'
+  candidate: '候选人',
+  finance_contract: '财务合同',
+  finance_receivable: '财务应收',
+  finance_payment: '财务回款',
+  finance_invoice: '财务发票',
+  finance_expense: '财务费用'
 }

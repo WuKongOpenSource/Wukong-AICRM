@@ -154,6 +154,15 @@
           <span class="material-symbols-outlined wk-plus-button-icon">person_add</span>
           <span>新增客户</span>
         </button>
+        <button
+          v-if="!isMobile && canViewFinance"
+          class="h-10 px-4 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold shadow-sm hover:border-primary/30 hover:bg-primary/5 hover:text-primary transition-all flex items-center gap-2"
+          type="button"
+          @click="navigateToFinance"
+        >
+          <span class="material-symbols-outlined text-[20px]">payments</span>
+          <span>财务</span>
+        </button>
         <el-dropdown
           v-if="!isMobile"
           trigger="click"
@@ -1175,6 +1184,7 @@ function getMobileLevelText(row: CustomerListVO): string {
 // Computed
 const canEditCustomer = computed(() => userStore.hasPermission('customer:edit'))
 const canChangeStage = computed(() => userStore.hasPermission('customer:change_stage'))
+const canViewFinance = computed(() => userStore.hasPermission('finance:view'))
 
 const closedCount = computed(() => {
   return customerStore.customerList.filter(c => c.stage === 'closed').length
@@ -1226,6 +1236,10 @@ function getFieldMinWidth(field: CustomField): number {
   }
 
   return widthMap[field.fieldName] || 140
+}
+
+function navigateToFinance() {
+  router.push({ path: '/finance' })
 }
 
 function getListFieldRawValue(field: CustomField, row: CustomerListVO): unknown {

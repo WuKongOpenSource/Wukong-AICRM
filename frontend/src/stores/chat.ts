@@ -73,6 +73,7 @@ export const useChatStore = defineStore('chat', () => {
   const RELATION_APP_CODE = 'relation'
   const PRODUCT_APP_CODE = 'product'
   const HR_APP_CODE = 'hr'
+  const FINANCE_APP_CODE = 'finance'
   const STREAM_IDLE_THINKING_DELAY_MS = 3000
 
   function loadSessionAppCodeBySessionId(): Record<string, string> {
@@ -81,7 +82,7 @@ export const useChatStore = defineStore('chat', () => {
       if (!raw) return {}
       const parsed = JSON.parse(raw) as Record<string, unknown>
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
-      const allowed = new Set([GENERAL_APP_CODE, CRM_APP_CODE, PROJECT_APP_CODE, KNOWLEDGE_APP_CODE, ADDRESS_BOOK_APP_CODE, RELATION_APP_CODE, PRODUCT_APP_CODE, HR_APP_CODE])
+      const allowed = new Set([GENERAL_APP_CODE, CRM_APP_CODE, PROJECT_APP_CODE, KNOWLEDGE_APP_CODE, ADDRESS_BOOK_APP_CODE, RELATION_APP_CODE, PRODUCT_APP_CODE, HR_APP_CODE, FINANCE_APP_CODE])
       const out: Record<string, string> = {}
       for (const [k, v] of Object.entries(parsed)) {
         if (typeof v === 'string' && k.length > 0) {
@@ -1109,7 +1110,7 @@ export const useChatStore = defineStore('chat', () => {
     const code = (appCode || GENERAL_APP_CODE).trim().toLowerCase()
     const knownCodes = appOptions.value.map(option => option.code)
     if (knownCodes.length === 0) {
-      return [GENERAL_APP_CODE, CRM_APP_CODE, PROJECT_APP_CODE, KNOWLEDGE_APP_CODE, ADDRESS_BOOK_APP_CODE, RELATION_APP_CODE, PRODUCT_APP_CODE, HR_APP_CODE].includes(code) ? code : GENERAL_APP_CODE
+      return [GENERAL_APP_CODE, CRM_APP_CODE, PROJECT_APP_CODE, KNOWLEDGE_APP_CODE, ADDRESS_BOOK_APP_CODE, RELATION_APP_CODE, PRODUCT_APP_CODE, HR_APP_CODE, FINANCE_APP_CODE].includes(code) ? code : GENERAL_APP_CODE
     }
     return knownCodes.includes(code) ? code : GENERAL_APP_CODE
   }

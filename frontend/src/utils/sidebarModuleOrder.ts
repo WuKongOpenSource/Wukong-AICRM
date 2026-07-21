@@ -1,4 +1,4 @@
-export const SIDEBAR_MODULE_KEYS = ['recent', 'customer', 'candidate', 'product', 'project', 'relation', 'addressBook'] as const
+export const SIDEBAR_MODULE_KEYS = ['recent', 'customer', 'candidate', 'product', 'finance', 'project', 'relation', 'addressBook'] as const
 
 export type SidebarModuleKey = (typeof SIDEBAR_MODULE_KEYS)[number]
 
@@ -7,6 +7,7 @@ export const DEFAULT_SIDEBAR_MODULE_ORDER: SidebarModuleKey[] = [
   'customer',
   'candidate',
   'product',
+  'finance',
   'project',
   'relation',
   'addressBook'

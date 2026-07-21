@@ -8,6 +8,7 @@
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <el-button v-if="canCreate" type="primary" :icon="Plus" @click="openCreateDialog">新建产品</el-button>
+          <el-button v-if="canViewFinance" :icon="Money" @click="navigateToFinance">财务</el-button>
           <el-dropdown v-if="showHeaderMoreActions" trigger="click" @command="handleHeaderMoreCommand">
             <el-button :icon="MoreFilled" aria-label="更多操作" title="更多操作" />
             <template #dropdown>
@@ -530,7 +531,7 @@
 import { computed, defineComponent, h, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules, type UploadFile } from 'element-plus'
-import { ChatDotRound, Download, Edit, FolderAdd, MoreFilled, Plus, Search, Switch, Upload } from '@element-plus/icons-vue'
+import { ChatDotRound, Download, Edit, FolderAdd, Money, MoreFilled, Plus, Search, Switch, Upload } from '@element-plus/icons-vue'
 import { queryUserList } from '@/api/auth'
 import { getFormFieldsByEntity } from '@/api/customField'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
@@ -681,6 +682,7 @@ const canImport = computed(() => userStore.hasPermission('product:import'))
 const canExport = computed(() => userStore.hasPermission('product:export'))
 const canSettings = computed(() => userStore.hasPermission('product:settings'))
 const canManageCategory = computed(() => userStore.hasPermission('product:category_manage'))
+const canViewFinance = computed(() => userStore.hasPermission('finance:view'))
 const showHeaderMoreActions = computed(() => canImport.value || canExport.value)
 
 const formRules = computed<FormRules>(() => ({
@@ -1189,6 +1191,10 @@ async function openProductChat(product: ProductVO) {
     productName: product.productName
   })
   await router.push({ path: '/chat', query: { productId: String(product.productId) } })
+}
+
+function navigateToFinance() {
+  router.push({ path: '/finance' })
 }
 
 async function maybeOpenProductFromQuery() {

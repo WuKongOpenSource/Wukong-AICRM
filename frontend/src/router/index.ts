@@ -92,6 +92,18 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '产品管理', icon: 'inventory_2', permission: 'product:view' }
       },
       {
+        path: 'finance',
+        name: 'Finance',
+        component: () => import('@/views/finance/FinanceView.vue'),
+        meta: { title: '财务', icon: 'payments', permission: 'finance:view' }
+      },
+      {
+        path: 'finance/:type(contract|receivable|payment|invoice|expense)/:id',
+        name: 'FinanceDetail',
+        component: () => import('@/views/finance/FinanceDetailView.vue'),
+        meta: { title: '财务详情', hidden: true, permission: 'finance:view' }
+      },
+      {
         path: 'project',
         name: 'ProjectList',
         component: () => import('@/views/project/ProjectListView.vue'),

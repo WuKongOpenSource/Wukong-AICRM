@@ -19,6 +19,7 @@ public class ChatApplicationRegistry {
     public static final String TOOL_GROUP_TASK_SCHEDULE = "task_schedule";
     public static final String TOOL_GROUP_MAIL = "mail";
     public static final String TOOL_GROUP_PRODUCT = "product";
+    public static final String TOOL_GROUP_FINANCE = "finance";
     public static final String TOOL_GROUP_PROJECT = "project";
     public static final String TOOL_GROUP_RELATION = "relation";
     public static final String TOOL_GROUP_CANDIDATE = "candidate";
@@ -51,15 +52,18 @@ public class ChatApplicationRegistry {
                 ChatApplicationCodes.CRM,
                 "CRM管理",
                 "customer",
-                "管理客户、联系人、任务、日程、跟进记录，并可参考客户相关知识库内容。",
+                "管理客户、联系人、任务、日程、跟进记录和财务记录，并可参考客户相关知识库内容。",
                 """
-                当前应用是 CRM 管理。你可以围绕客户、联系人、任务、日程、跟进记录和客户相关知识库内容提供帮助。
+                当前应用是 CRM 管理。你可以围绕客户、联系人、任务、日程、跟进记录、财务记录和客户相关知识库内容提供帮助。
+                当用户明确提到回款、收款、开票、合同、应收、费用、报销等财务事项时，必须调用 FinanceTools 创建或查询正式财务数据。
+                创建正式财务记录时，金额、客户或项目、业务类型缺失必须先追问，不要猜测。
+                回款优先匹配同客户最早未结清应收；无法匹配时仍可创建未关联回款，并在备注里说明。
                 只有在工具结果确认成功后，才能说数据已创建、更新或关联成功。
                 """,
                 false,
                 List.of(TOOL_GROUP_CUSTOMER, TOOL_GROUP_CONTACT, TOOL_GROUP_FOLLOW_UP,
                         TOOL_GROUP_TASK_SCHEDULE, TOOL_GROUP_MAIL, TOOL_GROUP_KNOWLEDGE,
-                        TOOL_GROUP_CRM_NOOP),
+                        TOOL_GROUP_FINANCE, TOOL_GROUP_CRM_NOOP),
                 List.of("把今天新增但还没跟进的客户列出来", "找出快丢单的客户", "筛选出高意向客户", "总结本周的销售情况")
         ));
         register(new ChatApplicationDefinition(
@@ -75,6 +79,21 @@ public class ChatApplicationRegistry {
                 false,
                 List.of(TOOL_GROUP_PRODUCT, TOOL_GROUP_KNOWLEDGE),
                 List.of("列出启用中的产品", "帮我新建一个产品", "更新这个产品的标准价", "停用当前产品")
+        ));
+        register(new ChatApplicationDefinition(
+                ChatApplicationCodes.FINANCE,
+                "财务",
+                "payments",
+                "管理合同、应收、回款、发票、费用，并分析公司现金流。",
+                """
+                当前应用是财务助手。你可以围绕合同、应收、回款、发票、费用和现金流提供帮助。
+                创建正式财务记录必须调用 FinanceTools。金额、客户或项目、业务类型缺失时必须先追问，不要猜测。
+                回款优先匹配同客户最早未结清应收；无法匹配时仍可创建未关联回款，并在备注里说明。
+                只有工具结果确认成功后，才能说财务数据已创建或入账成功。
+                """,
+                false,
+                List.of(TOOL_GROUP_FINANCE),
+                List.of("本月现金流怎么样", "给客户记录一笔回款", "创建一份合同和应收计划", "记录一笔项目费用")
         ));
         register(new ChatApplicationDefinition(
                 ChatApplicationCodes.PROJECT,
