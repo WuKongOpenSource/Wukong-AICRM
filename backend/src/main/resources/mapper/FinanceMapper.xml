@@ -21,7 +21,6 @@
         <if test="query.customerId != null">AND t.customer_id = #{query.customerId}</if>
         <if test="query.projectId != null">AND t.project_id = #{query.projectId}</if>
         <if test="query.ownerId != null">AND t.owner_id = #{query.ownerId}</if>
-        <if test="query.status != null and query.status != ''">AND t.status = #{query.status}</if>
     </sql>
 
     <insert id="insertContract">
@@ -74,6 +73,7 @@
         FROM crm_finance_contract t
         <include refid="commonJoins"/>
         WHERE <include refid="commonFilters"/>
+        <if test="query.status != null and query.status != ''">AND t.status = #{query.status}</if>
         <if test="query.startDate != null">AND t.sign_date &gt;= #{query.startDate}</if>
         <if test="query.endDate != null">AND t.sign_date &lt;= #{query.endDate}</if>
         ORDER BY t.sign_date DESC NULLS LAST, t.update_time DESC NULLS LAST, t.contract_id DESC
@@ -131,6 +131,10 @@
         SELECT * FROM crm_finance_receivable WHERE receivable_id = #{receivableId} AND del_flag = 0
     </select>
 
+    <select id="selectReceivableByIdForUpdate" resultType="com.kakarote.ai_crm.entity.PO.FinanceReceivable">
+        SELECT * FROM crm_finance_receivable WHERE receivable_id = #{receivableId} AND del_flag = 0 FOR UPDATE
+    </select>
+
     <select id="selectEarliestOpenReceivable" resultType="com.kakarote.ai_crm.entity.PO.FinanceReceivable">
         SELECT *
         FROM crm_finance_receivable
@@ -141,6 +145,19 @@
           <if test="contractId != null">AND contract_id = #{contractId}</if>
         ORDER BY due_date ASC NULLS LAST, create_time ASC
         LIMIT 1
+    </select>
+
+    <select id="selectEarliestOpenReceivableForUpdate" resultType="com.kakarote.ai_crm.entity.PO.FinanceReceivable">
+        SELECT *
+        FROM crm_finance_receivable
+        WHERE del_flag = 0
+          AND status IN ('pending', 'partial', 'overdue')
+          AND amount &gt; received_amount
+          <if test="customerId != null">AND customer_id = #{customerId}</if>
+          <if test="contractId != null">AND contract_id = #{contractId}</if>
+        ORDER BY due_date ASC NULLS LAST, create_time ASC
+        LIMIT 1
+        FOR UPDATE
     </select>
 
     <select id="queryReceivables" resultType="com.kakarote.ai_crm.entity.VO.FinanceRecordVO">
@@ -160,6 +177,7 @@
         LEFT JOIN crm_finance_contract fc ON t.contract_id = fc.contract_id
         <include refid="commonJoins"/>
         WHERE <include refid="commonFilters"/>
+        <if test="query.status != null and query.status != ''">AND t.status = #{query.status}</if>
         <if test="query.startDate != null">AND t.due_date &gt;= #{query.startDate}</if>
         <if test="query.endDate != null">AND t.due_date &lt;= #{query.endDate}</if>
         <if test="query.overdue != null and query.overdue">AND t.status IN ('pending', 'partial', 'overdue') AND t.due_date &lt; CURRENT_DATE</if>
@@ -285,6 +303,7 @@
         LEFT JOIN crm_finance_contract fc ON t.contract_id = fc.contract_id
         <include refid="commonJoins"/>
         WHERE <include refid="commonFilters"/>
+        <if test="query.status != null and query.status != ''">AND t.status = #{query.status}</if>
         <if test="query.startDate != null">AND t.invoice_date &gt;= #{query.startDate}</if>
         <if test="query.endDate != null">AND t.invoice_date &lt;= #{query.endDate}</if>
         ORDER BY t.invoice_date DESC NULLS LAST, t.create_time DESC NULLS LAST
@@ -343,6 +362,7 @@
         FROM crm_finance_expense t
         <include refid="commonJoins"/>
         WHERE <include refid="commonFilters"/>
+        <if test="query.status != null and query.status != ''">AND t.status = #{query.status}</if>
         <if test="query.startDate != null">AND t.expense_date &gt;= #{query.startDate}</if>
         <if test="query.endDate != null">AND t.expense_date &lt;= #{query.endDate}</if>
         ORDER BY t.expense_date DESC, t.create_time DESC NULLS LAST
@@ -376,6 +396,13 @@
         WHERE del_flag = 0
           <if test="startDate != null">AND payment_date &gt;= #{startDate}</if>
           <if test="endDate != null">AND payment_date &lt;= #{endDate}</if>
+    </select>
+
+    <select id="sumPaymentsByReceivableId" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(amount), 0)
+        FROM crm_finance_payment
+        WHERE del_flag = 0
+          AND receivable_id = #{receivableId}
     </select>
 
     <select id="sumExpenses" resultType="java.math.BigDecimal">

@@ -201,9 +201,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { getFinanceDashboard } from '@/api/finance'
 import { useChatStore } from '@/stores/chat'
+import { useUserStore } from '@/stores/user'
 import AiParseInsightSidebar from '@/components/crm/AiParseInsightSidebar.vue'
 import type { CustomerAiParseVO } from '@/api/customer'
 import type { FinanceDashboardVO, FinanceRecordVO } from '@/types/finance'
@@ -211,15 +212,21 @@ import type { FinanceDashboardVO, FinanceRecordVO } from '@/types/finance'
 const dashboard = ref<FinanceDashboardVO | null>(null)
 const loading = ref(false)
 const chatStore = useChatStore()
+const userStore = useUserStore()
 const metricMode = ref<'summary' | 'trend'>('summary')
 const analysisRunning = ref(false)
 const financeAnalysisReport = ref('')
 const financeAnalysisTime = ref('')
-const FINANCE_ANALYSIS_STORAGE_KEY = 'wk_ai_crm:finance_analysis_report:v1'
+const FINANCE_ANALYSIS_STORAGE_KEY_PREFIX = 'wk_ai_crm:finance_analysis_report:v1'
 const sectionIconBoxClass = 'inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-white shadow-sm'
 const sectionMaterialIconClass = 'material-symbols-outlined text-[17px] leading-none'
 
 const cashFlowClass = computed(() => Number(dashboard.value?.netCashFlow || 0) < 0 ? 'text-rose-600' : 'text-emerald-700')
+const financeAnalysisStorageKey = computed(() => {
+  const userId = String(userStore.userId || 'anonymous')
+  const sessionId = String(chatStore.currentSessionId || 'no-session')
+  return `${FINANCE_ANALYSIS_STORAGE_KEY_PREFIX}:${userId}:${sessionId}`
+})
 const financeAiParseResult = computed<CustomerAiParseVO | null>(() => {
   const report = financeAnalysisReport.value.trim()
   if (!report) return null
@@ -268,6 +275,10 @@ const insights = computed(() => {
 onMounted(() => {
   loadSavedFinanceAnalysis()
   void loadDashboard()
+})
+
+watch(financeAnalysisStorageKey, () => {
+  loadSavedFinanceAnalysis()
 })
 
 async function loadDashboard() {
@@ -321,8 +332,12 @@ function trendWidth(value: unknown) {
 
 function loadSavedFinanceAnalysis() {
   try {
-    const raw = localStorage.getItem(FINANCE_ANALYSIS_STORAGE_KEY)
-    if (!raw) return
+    const raw = localStorage.getItem(financeAnalysisStorageKey.value)
+    if (!raw) {
+      financeAnalysisReport.value = ''
+      financeAnalysisTime.value = ''
+      return
+    }
     const parsed = JSON.parse(raw) as { report?: unknown; time?: unknown }
     if (typeof parsed.report === 'string') financeAnalysisReport.value = parsed.report
     if (typeof parsed.time === 'string') financeAnalysisTime.value = parsed.time
@@ -333,7 +348,7 @@ function loadSavedFinanceAnalysis() {
 }
 
 function saveFinanceAnalysis() {
-  localStorage.setItem(FINANCE_ANALYSIS_STORAGE_KEY, JSON.stringify({
+  localStorage.setItem(financeAnalysisStorageKey.value, JSON.stringify({
     report: financeAnalysisReport.value,
     time: financeAnalysisTime.value
   }))

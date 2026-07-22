@@ -81,6 +81,9 @@ export interface FinanceContractBO {
   endDate?: string
   status?: string
   remark?: string
+  sourceType?: string
+  sourceText?: string
+  aiCreated?: boolean
   customFields?: Record<string, unknown>
 }
 
@@ -95,6 +98,9 @@ export interface FinanceReceivableBO {
   dueDate?: string
   status?: string
   remark?: string
+  sourceType?: string
+  sourceText?: string
+  aiCreated?: boolean
   customFields?: Record<string, unknown>
 }
 
@@ -109,6 +115,9 @@ export interface FinancePaymentBO {
   paymentDate?: string
   paymentMethod?: string
   remark?: string
+  sourceType?: string
+  sourceText?: string
+  aiCreated?: boolean
   customFields?: Record<string, unknown>
 }
 
@@ -126,6 +135,9 @@ export interface FinanceInvoiceBO {
   invoiceDate?: string
   status?: string
   remark?: string
+  sourceType?: string
+  sourceText?: string
+  aiCreated?: boolean
   customFields?: Record<string, unknown>
 }
 
@@ -139,5 +151,8 @@ export interface FinanceExpenseBO {
   expenseDate?: string
   status?: string
   remark?: string
+  sourceType?: string
+  sourceText?: string
+  aiCreated?: boolean
   customFields?: Record<string, unknown>
 }

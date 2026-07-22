@@ -207,11 +207,7 @@ public class FinanceServiceImpl implements IFinanceService {
         saveCustomFields("finance_payment", payment.getPaymentId(), bo.getCustomFields());
 
         if (receivable != null) {
-            BigDecimal nextReceived = nvl(receivable.getReceivedAmount()).add(payment.getAmount());
-            receivable.setReceivedAmount(nextReceived.min(receivable.getAmount()));
-            refreshReceivableStatus(receivable);
-            receivable.setUpdateUserId(currentUserId());
-            financeMapper.updateReceivable(receivable);
+            recalculateReceivablePayment(receivable);
         }
         return payment.getPaymentId();
     }
@@ -221,15 +217,31 @@ public class FinanceServiceImpl implements IFinanceService {
     public void updatePayment(FinancePaymentBO bo) {
         FinancePayment payment = financeMapper.selectPaymentById(requireId(bo.getPaymentId(), "回款ID不能为空"));
         ensureFound(payment, "回款不存在");
-        applyPayment(payment, bo, null);
+        Long oldReceivableId = payment.getReceivableId();
+        FinanceReceivable oldReceivable = oldReceivableId == null ? null : financeMapper.selectReceivableByIdForUpdate(oldReceivableId);
+        FinanceReceivable receivable = bo.getReceivableId() == null ? null : resolveReceivableForPayment(bo);
+        applyPayment(payment, bo, receivable);
         payment.setUpdateUserId(currentUserId());
         financeMapper.updatePayment(payment);
         saveCustomFields("finance_payment", payment.getPaymentId(), bo.getCustomFields());
+        if (oldReceivable != null) {
+            recalculateReceivablePayment(oldReceivable);
+        }
+        if (receivable != null && !Objects.equals(oldReceivableId, receivable.getReceivableId())) {
+            recalculateReceivablePayment(receivable);
+        }
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deletePayment(Long paymentId) {
+        FinancePayment payment = financeMapper.selectPaymentById(requireId(paymentId, "回款ID不能为空"));
+        ensureFound(payment, "回款不存在");
+        FinanceReceivable receivable = payment.getReceivableId() == null ? null : financeMapper.selectReceivableByIdForUpdate(payment.getReceivableId());
         financeMapper.softDelete("crm_finance_payment", "payment_id", paymentId, currentUserId());
+        if (receivable != null) {
+            recalculateReceivablePayment(receivable);
+        }
     }
 
     @Override
@@ -376,7 +388,7 @@ public class FinanceServiceImpl implements IFinanceService {
         record.setContractName(requireText(bo.getContractName(), "合同名称不能为空"));
         record.setCustomerId(bo.getCustomerId());
         record.setProjectId(bo.getProjectId());
-        record.setOwnerId(resolveOwnerId(bo.getOwnerId()));
+        record.setOwnerId(resolveOwnerId(bo.getOwnerId(), record.getOwnerId()));
         record.setAmount(requireAmount(bo.getAmount(), "合同金额不能为空"));
         record.setSignDate(bo.getSignDate());
         record.setStartDate(bo.getStartDate());
@@ -390,30 +402,30 @@ public class FinanceServiceImpl implements IFinanceService {
         record.setContractId(bo.getContractId());
         record.setCustomerId(bo.getCustomerId());
         record.setProjectId(bo.getProjectId());
-        record.setOwnerId(resolveOwnerId(bo.getOwnerId()));
+        record.setOwnerId(resolveOwnerId(bo.getOwnerId(), record.getOwnerId()));
         record.setTitle(requireText(bo.getTitle(), "应收标题不能为空"));
         record.setAmount(requireAmount(bo.getAmount(), "应收金额不能为空"));
         record.setDueDate(bo.getDueDate());
         record.setStatus(StrUtil.blankToDefault(trim(bo.getStatus()), STATUS_PENDING));
         record.setRemark(trim(bo.getRemark()));
-        record.setSourceType(resolveSourceType(bo.getSourceType(), bo.getAiCreated()));
-        record.setSourceText(trim(bo.getSourceText()));
-        record.setAiCreated(Boolean.TRUE.equals(bo.getAiCreated()));
+        record.setSourceType(resolveSourceType(bo.getSourceType(), bo.getAiCreated(), record.getSourceType()));
+        record.setSourceText(resolveSourceText(bo.getSourceText(), record.getSourceText()));
+        record.setAiCreated(resolveAiCreated(bo.getAiCreated(), record.getAiCreated()));
     }
 
     private void applyPayment(FinancePayment record, FinancePaymentBO bo, FinanceReceivable receivable) {
         record.setReceivableId(receivable != null ? receivable.getReceivableId() : bo.getReceivableId());
-        record.setContractId(firstNonNull(bo.getContractId(), receivable == null ? null : receivable.getContractId()));
-        record.setCustomerId(firstNonNull(bo.getCustomerId(), receivable == null ? null : receivable.getCustomerId()));
-        record.setProjectId(firstNonNull(bo.getProjectId(), receivable == null ? null : receivable.getProjectId()));
-        record.setOwnerId(resolveOwnerId(firstNonNull(bo.getOwnerId(), receivable == null ? null : receivable.getOwnerId())));
+        record.setContractId(receivable == null ? bo.getContractId() : receivable.getContractId());
+        record.setCustomerId(receivable == null ? bo.getCustomerId() : receivable.getCustomerId());
+        record.setProjectId(receivable == null ? bo.getProjectId() : receivable.getProjectId());
+        record.setOwnerId(resolveOwnerId(receivable == null ? bo.getOwnerId() : receivable.getOwnerId(), record.getOwnerId()));
         record.setAmount(requireAmount(bo.getAmount(), "回款金额不能为空"));
         record.setPaymentDate(bo.getPaymentDate() == null ? new Date() : bo.getPaymentDate());
         record.setPaymentMethod(trim(bo.getPaymentMethod()));
         record.setRemark(trim(bo.getRemark()));
-        record.setSourceType(resolveSourceType(bo.getSourceType(), bo.getAiCreated()));
-        record.setSourceText(trim(bo.getSourceText()));
-        record.setAiCreated(Boolean.TRUE.equals(bo.getAiCreated()));
+        record.setSourceType(resolveSourceType(bo.getSourceType(), bo.getAiCreated(), record.getSourceType()));
+        record.setSourceText(resolveSourceText(bo.getSourceText(), record.getSourceText()));
+        record.setAiCreated(resolveAiCreated(bo.getAiCreated(), record.getAiCreated()));
     }
 
     private void applyInvoice(FinanceInvoice record, FinanceInvoiceBO bo) {
@@ -421,7 +433,7 @@ public class FinanceServiceImpl implements IFinanceService {
         record.setReceivableId(bo.getReceivableId());
         record.setCustomerId(bo.getCustomerId());
         record.setProjectId(bo.getProjectId());
-        record.setOwnerId(resolveOwnerId(bo.getOwnerId()));
+        record.setOwnerId(resolveOwnerId(bo.getOwnerId(), record.getOwnerId()));
         record.setInvoiceNo(trim(bo.getInvoiceNo()));
         record.setTitle(requireText(bo.getTitle(), "发票抬头不能为空"));
         record.setTaxNo(trim(bo.getTaxNo()));
@@ -429,36 +441,52 @@ public class FinanceServiceImpl implements IFinanceService {
         record.setInvoiceDate(bo.getInvoiceDate() == null ? new Date() : bo.getInvoiceDate());
         record.setStatus(StrUtil.blankToDefault(trim(bo.getStatus()), STATUS_ISSUED));
         record.setRemark(trim(bo.getRemark()));
-        record.setSourceType(resolveSourceType(bo.getSourceType(), bo.getAiCreated()));
-        record.setSourceText(trim(bo.getSourceText()));
-        record.setAiCreated(Boolean.TRUE.equals(bo.getAiCreated()));
+        record.setSourceType(resolveSourceType(bo.getSourceType(), bo.getAiCreated(), record.getSourceType()));
+        record.setSourceText(resolveSourceText(bo.getSourceText(), record.getSourceText()));
+        record.setAiCreated(resolveAiCreated(bo.getAiCreated(), record.getAiCreated()));
     }
 
     private void applyExpense(FinanceExpense record, FinanceExpenseBO bo) {
         record.setCustomerId(bo.getCustomerId());
         record.setProjectId(bo.getProjectId());
-        record.setOwnerId(resolveOwnerId(bo.getOwnerId()));
+        record.setOwnerId(resolveOwnerId(bo.getOwnerId(), record.getOwnerId()));
         record.setExpenseType(requireText(bo.getExpenseType(), "费用类型不能为空"));
         record.setAmount(requireAmount(bo.getAmount(), "费用金额不能为空"));
         record.setExpenseDate(bo.getExpenseDate() == null ? new Date() : bo.getExpenseDate());
         record.setStatus(StrUtil.blankToDefault(trim(bo.getStatus()), STATUS_RECORDED));
         record.setRemark(trim(bo.getRemark()));
-        record.setSourceType(resolveSourceType(bo.getSourceType(), bo.getAiCreated()));
-        record.setSourceText(trim(bo.getSourceText()));
-        record.setAiCreated(Boolean.TRUE.equals(bo.getAiCreated()));
+        record.setSourceType(resolveSourceType(bo.getSourceType(), bo.getAiCreated(), record.getSourceType()));
+        record.setSourceText(resolveSourceText(bo.getSourceText(), record.getSourceText()));
+        record.setAiCreated(resolveAiCreated(bo.getAiCreated(), record.getAiCreated()));
     }
 
     private void applySource(FinanceContract record, String sourceType, String sourceText, Boolean aiCreated) {
-        record.setSourceType(resolveSourceType(sourceType, aiCreated));
-        record.setSourceText(trim(sourceText));
-        record.setAiCreated(Boolean.TRUE.equals(aiCreated));
+        record.setSourceType(resolveSourceType(sourceType, aiCreated, record.getSourceType()));
+        record.setSourceText(resolveSourceText(sourceText, record.getSourceText()));
+        record.setAiCreated(resolveAiCreated(aiCreated, record.getAiCreated()));
     }
 
     private FinanceReceivable resolveReceivableForPayment(FinancePaymentBO bo) {
         if (bo.getReceivableId() != null) {
-            return financeMapper.selectReceivableById(bo.getReceivableId());
+            FinanceReceivable receivable = financeMapper.selectReceivableByIdForUpdate(bo.getReceivableId());
+            ensureFound(receivable, "关联应收不存在");
+            return receivable;
         }
-        return financeMapper.selectEarliestOpenReceivable(bo.getCustomerId(), bo.getContractId());
+        if (bo.getCustomerId() == null && bo.getContractId() == null) {
+            return null;
+        }
+        return financeMapper.selectEarliestOpenReceivableForUpdate(bo.getCustomerId(), bo.getContractId());
+    }
+
+    private void recalculateReceivablePayment(FinanceReceivable receivable) {
+        if (receivable == null || receivable.getReceivableId() == null) {
+            return;
+        }
+        BigDecimal receivedAmount = nvl(financeMapper.sumPaymentsByReceivableId(receivable.getReceivableId()));
+        receivable.setReceivedAmount(receivedAmount.min(nvl(receivable.getAmount())));
+        refreshReceivableStatus(receivable);
+        receivable.setUpdateUserId(currentUserId());
+        financeMapper.updateReceivable(receivable);
     }
 
     private void refreshReceivableStatus(FinanceReceivable receivable) {
@@ -482,14 +510,33 @@ public class FinanceServiceImpl implements IFinanceService {
     }
 
     private Long resolveOwnerId(Long ownerId) {
-        return ownerId == null ? currentUserId() : ownerId;
+        return resolveOwnerId(ownerId, null);
     }
 
-    private String resolveSourceType(String sourceType, Boolean aiCreated) {
+    private Long resolveOwnerId(Long ownerId, Long currentOwnerId) {
+        if (ownerId != null) {
+            return ownerId;
+        }
+        return currentOwnerId == null ? currentUserId() : currentOwnerId;
+    }
+
+    private String resolveSourceType(String sourceType, Boolean aiCreated, String currentSourceType) {
         if (StrUtil.isNotBlank(sourceType)) {
             return sourceType.trim();
         }
+        if (currentSourceType != null && aiCreated == null) {
+            return currentSourceType;
+        }
         return Boolean.TRUE.equals(aiCreated) ? "ai" : SOURCE_MANUAL;
+    }
+
+    private String resolveSourceText(String sourceText, String currentSourceText) {
+        String text = trim(sourceText);
+        return text == null ? currentSourceText : text;
+    }
+
+    private Boolean resolveAiCreated(Boolean aiCreated, Boolean currentAiCreated) {
+        return aiCreated == null ? Boolean.TRUE.equals(currentAiCreated) : Boolean.TRUE.equals(aiCreated);
     }
 
     private BigDecimal nvl(BigDecimal value) {
@@ -526,10 +573,6 @@ public class FinanceServiceImpl implements IFinanceService {
 
     private String trim(String value) {
         return StrUtil.isBlank(value) ? null : value.trim();
-    }
-
-    private Long firstNonNull(Long first, Long second) {
-        return first == null ? second : first;
     }
 
     private Date toDate(LocalDate date) {

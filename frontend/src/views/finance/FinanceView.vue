@@ -430,6 +430,7 @@ const mobileDetailVisible = ref(false)
 const total = ref(0)
 const page = ref(1)
 const limit = ref(20)
+const EXPORT_PAGE_SIZE = 100
 const dateRange = ref<[string, string] | null>(null)
 const query = reactive({ keyword: '', status: '' })
 const dialogVisible = ref(false)
@@ -591,6 +592,7 @@ function goProject(projectId?: string) {
 
 function handleTabChange() {
   page.value = 1
+  query.status = ''
   selectedRecord.value = null
   void loadRecords()
   void loadCustomFields()
@@ -600,7 +602,7 @@ async function loadRecords() {
   loading.value = true
   try {
     const payload = {
-      ...query,
+      ...buildQueryPayload(),
       page: page.value,
       limit: limit.value,
       startDate: dateRange.value?.[0],
@@ -671,7 +673,7 @@ function resetForm(row?: FinanceRecordVO) {
 async function saveRecord() {
   saving.value = true
   try {
-    await saveByTab(activeTab.value, { ...form, customFields: { ...customForm } })
+    await saveByTab(activeTab.value, buildSavePayload())
     ElMessage.success('保存成功')
     dialogVisible.value = false
     await loadRecords()
@@ -718,14 +720,7 @@ async function handleExport() {
   if (exporting.value || !canExport.value) return
   exporting.value = true
   try {
-    const response = await queryByTab(activeTab.value, {
-      ...query,
-      page: 1,
-      limit: Math.max(total.value, records.value.length, 1000),
-      startDate: dateRange.value?.[0],
-      endDate: dateRange.value?.[1]
-    })
-    const exportRows = response.list || []
+    const exportRows = await fetchAllExportRows()
     downloadTextFile(
       buildFinanceCsv(exportRows),
       `财务${activeMeta.value.label}_${new Date().toISOString().slice(0, 10)}.csv`
@@ -842,6 +837,53 @@ function queryByTab(tab: FinanceListTab, payload: any) {
     case 'invoice': return queryFinanceInvoices(payload)
     case 'expense': return queryFinanceExpenses(payload)
   }
+}
+
+function buildQueryPayload() {
+  const payload: Record<string, any> = {
+    keyword: query.keyword || undefined,
+    startDate: dateRange.value?.[0],
+    endDate: dateRange.value?.[1]
+  }
+  if (activeMeta.value.statuses.length > 0 && query.status) {
+    payload.status = query.status
+  }
+  return payload
+}
+
+function buildSavePayload() {
+  const payload: Record<string, any> = {
+    ...form,
+    customFields: { ...customForm }
+  }
+  if (editingRecord.value) {
+    payload.ownerId = editingRecord.value.ownerId || payload.ownerId
+    payload.sourceType = editingRecord.value.sourceType
+    payload.sourceText = editingRecord.value.sourceText
+    payload.aiCreated = editingRecord.value.aiCreated
+  }
+  return payload
+}
+
+async function fetchAllExportRows() {
+  const rows: FinanceRecordVO[] = []
+  let currentPage = 1
+  let expectedTotal = Number(total.value || 0)
+
+  while (currentPage <= 1000) {
+    const response = await queryByTab(activeTab.value, {
+      ...buildQueryPayload(),
+      page: currentPage,
+      limit: EXPORT_PAGE_SIZE
+    })
+    const pageRows = response.list || []
+    rows.push(...pageRows)
+    expectedTotal = Math.max(expectedTotal, Number(response.totalRow || 0))
+    if (pageRows.length < EXPORT_PAGE_SIZE || rows.length >= expectedTotal) break
+    currentPage += 1
+  }
+
+  return expectedTotal > 0 ? rows.slice(0, expectedTotal) : rows
 }
 
 function saveByTab(tab: FinanceListTab, payload: any) {

@@ -15,6 +15,7 @@ import com.kakarote.ai_crm.entity.VO.FinanceDashboardVO;
 import com.kakarote.ai_crm.entity.VO.FinanceRecordVO;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.ProjectMapper;
+import com.kakarote.ai_crm.service.DataPermissionService;
 import com.kakarote.ai_crm.service.IFinanceService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
@@ -42,6 +43,9 @@ public class FinanceTools {
 
     @Autowired
     private ProjectMapper projectMapper;
+
+    @Autowired
+    private DataPermissionService dataPermissionService;
 
     @Tool(description = "查询财务现金流和应收概览。当用户询问本月收入、支出、现金流、未来应收或逾期应收时调用。")
     @AiToolPermission(value = "finance:view", action = "查询财务")
@@ -249,18 +253,37 @@ public class FinanceTools {
     private Customer resolveCustomer(String customerIdStr, String customerName) {
         Long customerId = parseLong(customerIdStr);
         if (customerId != null) {
-            return customerMapper.selectByIdIgnoreDataPermission(customerId);
+            return visibleCustomer(customerMapper.selectByIdIgnoreDataPermission(customerId));
         }
         String name = trim(customerName);
         if (name == null) {
             return null;
         }
-        List<Customer> exact = customerMapper.selectByExactCompanyNameIgnoreDataPermission(name);
-        if (!exact.isEmpty()) {
+        List<Customer> exact = visibleCustomers(customerMapper.selectByExactCompanyNameIgnoreDataPermission(name));
+        if (exact.size() == 1) {
             return exact.get(0);
         }
-        List<Customer> fuzzy = customerMapper.selectByCompanyNameLikeIgnoreDataPermission(name, 2);
+        List<Customer> fuzzy = visibleCustomers(customerMapper.selectByCompanyNameLikeIgnoreDataPermission(name, 5));
         return fuzzy.size() == 1 ? fuzzy.get(0) : null;
+    }
+
+    private List<Customer> visibleCustomers(List<Customer> customers) {
+        if (customers == null || customers.isEmpty()) {
+            return List.of();
+        }
+        return customers.stream()
+                .map(this::visibleCustomer)
+                .filter(customer -> customer != null)
+                .toList();
+    }
+
+    private Customer visibleCustomer(Customer customer) {
+        if (customer == null || customer.getOwnerId() == null) {
+            return null;
+        }
+        return dataPermissionService.hasUserDataAccessByPermission("customer:view", customer.getOwnerId())
+                ? customer
+                : null;
     }
 
     private Project resolveProject(String projectIdStr, String projectName) {

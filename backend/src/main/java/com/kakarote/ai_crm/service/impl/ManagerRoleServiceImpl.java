@@ -308,7 +308,8 @@ public class ManagerRoleServiceImpl extends ServiceImpl<ManagerRoleMapper, Manag
                         "knowledge",
                         "relation",
                         "addressBook",
-                        PRODUCT_MODULE_REALM
+                        PRODUCT_MODULE_REALM,
+                        "finance"
                 );
                 Set<String> actionRealmsWithoutDataScope = Set.of(
                         "product:category_manage",

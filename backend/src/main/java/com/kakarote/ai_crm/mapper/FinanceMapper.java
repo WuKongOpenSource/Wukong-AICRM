@@ -29,8 +29,11 @@ public interface FinanceMapper {
     void insertReceivable(FinanceReceivable record);
     void updateReceivable(FinanceReceivable record);
     FinanceReceivable selectReceivableById(@Param("receivableId") Long receivableId);
+    FinanceReceivable selectReceivableByIdForUpdate(@Param("receivableId") Long receivableId);
     FinanceReceivable selectEarliestOpenReceivable(@Param("customerId") Long customerId,
                                                    @Param("contractId") Long contractId);
+    FinanceReceivable selectEarliestOpenReceivableForUpdate(@Param("customerId") Long customerId,
+                                                            @Param("contractId") Long contractId);
     BasePage<FinanceRecordVO> queryReceivables(IPage<FinanceRecordVO> page, @Param("query") FinanceQueryBO query);
     FinanceRecordVO getReceivableDetail(@Param("receivableId") Long receivableId);
 
@@ -56,6 +59,7 @@ public interface FinanceMapper {
                     @Param("userId") Long userId);
 
     BigDecimal sumPayments(@Param("startDate") Date startDate, @Param("endDate") Date endDate);
+    BigDecimal sumPaymentsByReceivableId(@Param("receivableId") Long receivableId);
     BigDecimal sumExpenses(@Param("startDate") Date startDate, @Param("endDate") Date endDate);
     BigDecimal sumReceivablesDueBetween(@Param("startDate") Date startDate, @Param("endDate") Date endDate);
     BigDecimal sumOverdueReceivables(@Param("today") Date today);

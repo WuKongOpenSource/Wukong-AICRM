@@ -1044,6 +1044,7 @@ import { addRelationFromContact } from '@/api/relation'
 import { queryKnowledgeList } from '@/api/knowledge'
 import { queryFinanceContracts, queryFinanceExpenses, queryFinancePayments, queryFinanceReceivables } from '@/api/finance'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { PageResult } from '@/types/api'
 import type { Knowledge, Task, TaskStatus } from '@/types/common'
 import type { Contact, CustomerAiReportVO, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpAttachment, FollowUpTask, FollowUpUpdateBO } from '@/types/customer'
 import type { FinanceRecordVO } from '@/types/finance'
@@ -1915,18 +1916,17 @@ function resetCustomerFinance() {
 async function fetchCustomerFinance(customerId: string) {
   financeLoading.value = true
   try {
-    const query = { customerId, page: 1, limit: 100 }
     const [contracts, receivables, payments, expenses] = await Promise.all([
-      queryFinanceContracts(query),
-      queryFinanceReceivables(query),
-      queryFinancePayments(query),
-      queryFinanceExpenses(query)
+      fetchAllFinanceRecords(customerId, queryFinanceContracts),
+      fetchAllFinanceRecords(customerId, queryFinanceReceivables),
+      fetchAllFinanceRecords(customerId, queryFinancePayments),
+      fetchAllFinanceRecords(customerId, queryFinanceExpenses)
     ])
     customerFinanceRecords.value = {
-      contracts: contracts.list || [],
-      receivables: receivables.list || [],
-      payments: payments.list || [],
-      expenses: expenses.list || []
+      contracts,
+      receivables,
+      payments,
+      expenses
     }
   } catch (err) {
     console.error('Failed to fetch customer finance:', err)
@@ -1934,6 +1934,25 @@ async function fetchCustomerFinance(customerId: string) {
   } finally {
     financeLoading.value = false
   }
+}
+
+async function fetchAllFinanceRecords(
+  customerId: string,
+  request: (query: { customerId: string; page: number; limit: number }) => Promise<PageResult<FinanceRecordVO>>
+) {
+  const rows: FinanceRecordVO[] = []
+  const pageSize = 100
+  let currentPage = 1
+  let expectedTotal = 0
+  while (currentPage <= 1000) {
+    const response = await request({ customerId, page: currentPage, limit: pageSize })
+    const pageRows = response.list || []
+    rows.push(...pageRows)
+    expectedTotal = Math.max(expectedTotal, Number(response.totalRow || 0))
+    if (pageRows.length < pageSize || rows.length >= expectedTotal) break
+    currentPage += 1
+  }
+  return expectedTotal > 0 ? rows.slice(0, expectedTotal) : rows
 }
 
 function sumFinanceAmount(records: FinanceRecordVO[], key: keyof FinanceRecordVO) {
