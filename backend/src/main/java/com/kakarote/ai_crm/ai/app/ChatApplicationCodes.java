@@ -13,6 +13,7 @@ public final class ChatApplicationCodes {
     public static final String RELATION = "relation";
     public static final String PRODUCT = "product";
     public static final String HR = "hr";
+    public static final String FINANCE = "finance";
 
     private ChatApplicationCodes() {
     }

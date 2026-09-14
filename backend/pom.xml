@@ -23,6 +23,7 @@
         <lombok.version>1.18.34</lombok.version>
         <jwt.version>0.9.1</jwt.version>
         <spring-ai.version>1.1.6</spring-ai.version>
+        <skipFrontendDistCopy>false</skipFrontendDistCopy>
     </properties>
 
     <dependencyManagement>
@@ -232,6 +233,28 @@
     </repositories>
     <build>
         <plugins>
+            <plugin>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-frontend-dist</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.outputDirectory}/static</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/../frontend/dist</directory>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                            <skip>${skipFrontendDistCopy}</skip>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

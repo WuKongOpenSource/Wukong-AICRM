@@ -23,29 +23,42 @@ public class DynamicSchemaServiceImpl implements IDynamicSchemaService {
     /**
      * 实体类型 -> 表名映射
      */
-    private static final Map<String, String> TABLE_MAPPING = Map.of(
-            "customer", "crm_customer",
-            "contact", "crm_contact",
-            "relation", "crm_relation",
-            "product", "crm_product",
-            "candidate", "crm_candidate"
+    private static final Map<String, String> TABLE_MAPPING = Map.ofEntries(
+            Map.entry("customer", "crm_customer"),
+            Map.entry("contact", "crm_contact"),
+            Map.entry("relation", "crm_relation"),
+            Map.entry("product", "crm_product"),
+            Map.entry("candidate", "crm_candidate"),
+            Map.entry("finance_contract", "crm_finance_contract"),
+            Map.entry("finance_receivable", "crm_finance_receivable"),
+            Map.entry("finance_payment", "crm_finance_payment"),
+            Map.entry("finance_invoice", "crm_finance_invoice"),
+            Map.entry("finance_expense", "crm_finance_expense")
     );
 
     /**
      * 实体类型 -> 主键列名映射
      */
-    private static final Map<String, String> ID_COLUMN_MAPPING = Map.of(
-            "customer", "customer_id",
-            "contact", "contact_id",
-            "relation", "relation_id",
-            "product", "product_id",
-            "candidate", "candidate_id"
+    private static final Map<String, String> ID_COLUMN_MAPPING = Map.ofEntries(
+            Map.entry("customer", "customer_id"),
+            Map.entry("contact", "contact_id"),
+            Map.entry("relation", "relation_id"),
+            Map.entry("product", "product_id"),
+            Map.entry("candidate", "candidate_id"),
+            Map.entry("finance_contract", "contract_id"),
+            Map.entry("finance_receivable", "receivable_id"),
+            Map.entry("finance_payment", "payment_id"),
+            Map.entry("finance_invoice", "invoice_id"),
+            Map.entry("finance_expense", "expense_id")
     );
 
     /**
      * 支持的实体类型集合
      */
-    public static final Set<String> SUPPORTED_ENTITIES = Set.of("customer", "contact", "relation", "product", "candidate");
+    public static final Set<String> SUPPORTED_ENTITIES = Set.of(
+            "customer", "contact", "relation", "product", "candidate",
+            "finance_contract", "finance_receivable", "finance_payment", "finance_invoice", "finance_expense"
+    );
 
     /**
      * 允许的列名正则（防止 SQL 注入）

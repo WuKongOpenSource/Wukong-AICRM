@@ -1523,6 +1523,7 @@
         @change-stage="handleSelectedCandidateStageCommand"
         @updated="handleCandidateDetailUpdated"
       />
+      <FinanceChatInfoPanel v-else-if="isFinanceChatContext" />
       <div v-else class="flex flex-1 items-center justify-center px-6 text-center text-sm text-slate-400">
         暂无关联对象详情
       </div>
@@ -1619,6 +1620,7 @@
                 @change-stage="handleSelectedCandidateStageCommand"
                 @updated="handleCandidateDetailUpdated"
               />
+              <FinanceChatInfoPanel v-else-if="isFinanceChatContext" />
               <div v-else class="flex h-full flex-col items-center justify-center px-6 text-center">
                 <div class="mb-4 flex size-12 items-center justify-center rounded-2xl bg-[#f5f5f5] text-slate-400">
                   <span class="material-symbols-outlined text-[24px] leading-none">info</span>
@@ -1740,6 +1742,7 @@ import CustomerDetailView from '@/views/customer/CustomerDetailView.vue'
 import ScheduleFormDialog from '@/views/calendar/components/ScheduleFormDialog.vue'
 import TaskEditDialog from '@/views/task/components/TaskEditDialog.vue'
 import EmployeeChatInfoPanel from './components/EmployeeChatInfoPanel.vue'
+import FinanceChatInfoPanel from './components/FinanceChatInfoPanel.vue'
 import MobileChatTopHeader from './components/MobileChatTopHeader.vue'
 import ProductChatInfoPanel from './components/ProductChatInfoPanel.vue'
 import RelationChatInfoPanel from './components/RelationChatInfoPanel.vue'
@@ -1912,7 +1915,7 @@ let removeNativeKeyboardInsetListeners: (() => void) | null = null
 let removeChatObjectPanelCloseListener: (() => void) | null = null
 let removeAiQuotaExhaustedListener: (() => void) | null = null
 
-const CHAT_CONTEXT_QUERY_KEYS = ['sessionId', 'customerId', 'employeeId', 'relationId', 'productId', 'candidateId'] as const
+const CHAT_CONTEXT_QUERY_KEYS = ['sessionId', 'customerId', 'employeeId', 'relationId', 'productId', 'candidateId', 'appCode'] as const
 type ChatContextQueryKey = (typeof CHAT_CONTEXT_QUERY_KEYS)[number]
 
 const MAX_FILE_COUNT = MAX_CHAT_ATTACHMENT_COUNT
@@ -2104,6 +2107,9 @@ const currentObjectId = computed(() => {
   if (chatObjectKind.value === 'candidate') return String(session.candidateId || '')
   return ''
 })
+const isFinanceChatContext = computed(() =>
+  currentView.value === 'chat' && chatStore.selectedAppCode === 'finance'
+)
 const objectDialogDefaultRelation = computed(() => {
   if (chatObjectKind.value !== 'relation') return null
   const relation = relationDetail.value?.relation
@@ -2155,10 +2161,10 @@ const objectDialogDefaultParticipantUsers = computed(() => {
   }]
 })
 const isChatEmpty = computed(() => chatStore.messages.length === 0)
-const isObjectContextChat = computed(() => Boolean(chatObjectKind.value && currentObjectId.value))
+const isObjectContextChat = computed(() => Boolean(chatObjectKind.value && currentObjectId.value) || isFinanceChatContext.value)
 const isCenteredEmptyChat = computed(() => isChatEmpty.value && !isObjectContextChat.value)
 const showObjectPanelShell = computed(() =>
-  !isMobile.value && currentView.value === 'chat' && Boolean(chatObjectKind.value && currentObjectId.value)
+  !isMobile.value && currentView.value === 'chat' && (Boolean(chatObjectKind.value && currentObjectId.value) || isFinanceChatContext.value)
 )
 const customerPanelStyle = computed(() => ({
   width: `${customerPanelWidth.value}px`,
@@ -4219,6 +4225,15 @@ async function openRouteCandidateChat(candidateId: string) {
   }
 }
 
+async function openRouteAppChat(appCode: string) {
+  const code = appCode.trim().toLowerCase()
+  if (!code) return
+  const title = code === 'finance' ? '财务对话' : '新对话'
+  chatStore.clearMessages()
+  await chatStore.startNewSessionIfNeeded(title, undefined, undefined, code)
+  chatStore.setSelectedAppCode(code)
+}
+
 async function applyChatRouteQuery() {
   if (applyingChatRouteQuery) return
 
@@ -4228,8 +4243,9 @@ async function applyChatRouteQuery() {
   const relationId = getRouteQueryString('relationId')
   const productId = getRouteQueryString('productId')
   const candidateId = getRouteQueryString('candidateId')
+  const appCode = getRouteQueryString('appCode')
 
-  if (!sessionId && !customerId && !employeeId && !relationId && !productId && !candidateId) return
+  if (!sessionId && !customerId && !employeeId && !relationId && !productId && !candidateId && !appCode) return
 
   applyingChatRouteQuery = true
   try {
@@ -4259,6 +4275,8 @@ async function applyChatRouteQuery() {
       await openRouteProductChat(productId)
     } else if (candidateId) {
       await openRouteCandidateChat(candidateId)
+    } else if (appCode) {
+      await openRouteAppChat(appCode)
     }
 
     focusComposerWhenReady()

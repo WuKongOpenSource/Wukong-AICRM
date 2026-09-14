@@ -709,6 +709,45 @@
           </div>
 
           <div
+            v-if="!sidebarSortMode && showSidebarFinance"
+            class="wk-sidebar-finance-section space-y-1 pt-1"
+            :style="{ order: getSidebarModuleRenderOrder('finance') }"
+          >
+            <div
+              class="wk-customer-header-row group/finance-header flex w-full items-center gap-2 rounded-lg pl-3 pr-1 py-[6px] mt-[12px] mb-[0px] hover:!bg-[#f9f9f9]"
+              :class="isFinanceChatActive ? 'bg-[#f3f3f3]' : ''"
+            >
+              <button
+                type="button"
+                class="group flex min-w-0 flex-1 items-center gap-2 text-left"
+                aria-label="打开财务对话"
+                @click="handleSelectFinanceChat"
+              >
+                <span class="min-w-0 flex-1 truncate text-[14px] font-semibold uppercase tracking-tight text-[#0d0d0d]">
+                  财务
+                </span>
+                <span class="material-symbols-outlined inline-flex size-5 shrink-0 items-center justify-center text-[18px] leading-none text-[#c9c9c9]">
+                  chevron_right
+                </span>
+              </button>
+              <button
+                type="button"
+                class="wk-customer-header-action group/finance-action relative flex size-6 items-center justify-center rounded-md text-[#8f8f8f] transition-colors hover:text-[#0d0d0d]"
+                aria-label="查看财务列表"
+                @click.stop="navigateTo('/finance', { view: 'list' })"
+              >
+                <span class="material-symbols-outlined text-[18px] leading-none">format_list_bulleted</span>
+                <span
+                  class="pointer-events-none absolute right-0 top-full z-[200] mt-2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/finance-action:opacity-100"
+                  role="tooltip"
+                >
+                  查看财务列表
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <div
             v-if="!sidebarSortMode && showSidebarAddressBook"
             class="wk-sidebar-address-section space-y-1 pt-1"
             :style="{ order: getSidebarModuleRenderOrder('addressBook') }"
@@ -1598,6 +1637,29 @@
               </template>
             </div>
 
+            <div v-if="showSidebarFinance" class="pt-3">
+              <div class="flex items-center gap-3 px-3 pb-2.5">
+                <button
+                  type="button"
+                  class="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left text-[#0d0d0d] transition-colors active:bg-slate-100"
+                  :class="isFinanceChatActive ? 'bg-[#f3f3f3]' : ''"
+                  @click="handleMobileSelectFinanceChat"
+                >
+                  <span class="min-w-0 flex-1 text-[1rem] font-bold leading-7">财务</span>
+                  <span class="material-symbols-outlined text-[22px] leading-none text-[#c9c9c9]">chevron_right</span>
+                </button>
+                <button
+                  type="button"
+                  class="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors active:bg-slate-100 active:text-[#0d0d0d]"
+                  aria-label="移动端查看财务列表"
+                  title="查看财务列表"
+                  @click.stop="mobileNavigate('/finance', { view: 'list' })"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">format_list_bulleted</span>
+                </button>
+              </div>
+            </div>
+
             <div v-if="showSidebarAddressBook" class="pt-3">
               <p class="px-3 pb-2.5 text-[1rem] font-bold leading-7 text-[#0d0d0d]">通讯录</p>
               <div v-if="sidebarEmployeesLoading && sidebarEmployees.length === 0" class="flex justify-center py-6">
@@ -2053,13 +2115,6 @@
           <button class="flex size-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100">
             <span class="material-symbols-outlined">notifications</span>
           </button>
-          <button
-            @click="showCreateCustomer = true"
-            class="hidden md:flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm shadow-primary/20 transition-colors hover:bg-primary/90"
-          >
-            <span class="material-symbols-outlined wk-plus-button-icon">add</span>
-            新增客户
-          </button>
         </div>
         </template>
       </header>
@@ -2358,6 +2413,7 @@ const SIDEBAR_MODULE_LABELS: Record<SidebarModuleKey, string> = {
   customer: '客户',
   candidate: '候选人',
   product: '产品',
+  finance: '财务',
   project: '项目',
   relation: '关系',
   addressBook: '通讯录'
@@ -2368,6 +2424,7 @@ const SIDEBAR_MODULE_ICONS: Record<SidebarModuleKey, string> = {
   customer: 'business_center',
   candidate: 'badge',
   product: 'inventory_2',
+  finance: 'payments',
   project: 'folder',
   relation: 'account_tree',
   addressBook: 'contacts'
@@ -3234,6 +3291,12 @@ const sidebarProjects = computed<SidebarProjectItem[]>(() =>
 const showSidebarCustomers = computed(() => userStore.hasPermission('customer:view'))
 const showSidebarCandidates = computed(() => userStore.hasPermission('candidate:view'))
 const showSidebarProducts = computed(() => userStore.hasPermission('product:view'))
+const showSidebarFinance = computed(() => userStore.hasPermission('finance:view'))
+const isFinanceChatActive = computed(() => {
+  const raw = route.query.appCode
+  const appCode = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : ''
+  return route.path.startsWith('/chat') && appCode === 'finance'
+})
 const showSidebarAddressBook = computed(() => userStore.hasPermission('addressBook:list'))
 const showSidebarRelations = computed(() => true)
 
@@ -4675,6 +4738,19 @@ async function handleSelectProductChat(product: ProductVO) {
 async function handleMobileSelectProductChat(product: ProductVO) {
   closeMobileDrawer()
   await handleSelectProductChat(product)
+}
+
+async function handleSelectFinanceChat() {
+  selectedPrimaryKey.value = ''
+  await router.push({ path: '/chat', query: { appCode: 'finance' } })
+  if (!isMobile.value) {
+    chatStore.requestComposerFocus()
+  }
+}
+
+async function handleMobileSelectFinanceChat() {
+  closeMobileDrawer()
+  await handleSelectFinanceChat()
 }
 
 async function handleSelectEmployeeChat(employee: AddressBookEmployee) {

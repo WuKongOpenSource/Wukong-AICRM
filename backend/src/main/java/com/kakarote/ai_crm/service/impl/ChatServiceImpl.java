@@ -1433,6 +1433,10 @@ public class ChatServiceImpl implements IChatService {
 
     private ChatApplicationDefinition resolveChatApplication(ChatSendBO sendBO, ChatSession session) {
         String appCode = sendBO == null ? null : sendBO.getAppCode();
+        if (ChatApplicationCodes.GENERAL.equals(chatApplicationRegistry.normalize(appCode))
+                && isFinanceIntent(sendBO == null ? null : sendBO.getContent())) {
+            appCode = ChatApplicationCodes.FINANCE;
+        }
         if (StrUtil.isBlank(appCode) && Boolean.TRUE.equals(sendBO == null ? null : sendBO.getRagEnabled())) {
             appCode = ChatApplicationCodes.KNOWLEDGE;
         }
@@ -1469,6 +1473,23 @@ public class ChatServiceImpl implements IChatService {
             appCode = ChatApplicationCodes.PROJECT;
         }
         return chatApplicationRegistry.resolve(appCode);
+    }
+
+    private boolean isFinanceIntent(String content) {
+        if (StrUtil.isBlank(content)) {
+            return false;
+        }
+        String normalized = content.toLowerCase(Locale.ROOT);
+        return normalized.contains("回款")
+                || normalized.contains("收款")
+                || normalized.contains("付款")
+                || normalized.contains("开票")
+                || normalized.contains("发票")
+                || normalized.contains("合同")
+                || normalized.contains("应收")
+                || normalized.contains("费用")
+                || normalized.contains("报销")
+                || normalized.contains("现金流");
     }
 
     private ChatSession bindBusinessContextFromSendIfNeeded(ChatSendBO sendBO, ChatSession session,

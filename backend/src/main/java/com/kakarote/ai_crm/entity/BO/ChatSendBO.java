@@ -28,7 +28,7 @@ public class ChatSendBO {
     @Schema(description = "鏄惁鍚敤 RAG 妫€绱㈣矾鐢憋紝榛樿 false")
     private Boolean ragEnabled;
 
-    @Schema(description = "聊天应用编码: general/crm/knowledge/product")
+    @Schema(description = "聊天应用编码: general/crm/knowledge/product/finance")
     private String appCode;
 
     @Schema(description = "产品对话绑定的产品ID")

@@ -30,7 +30,8 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
             Map.entry("FollowUpMapper", "followup"),
             Map.entry("KnowledgeMapper", "knowledge"),
             Map.entry("RelationMapper", "relation"),
-            Map.entry("ProductMapper", "product")
+            Map.entry("ProductMapper", "product"),
+            Map.entry("FinanceMapper", "finance")
     );
 
     @Autowired
@@ -139,6 +140,11 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
             case "product" -> "crm_product".equals(tableName)
                     ? qualifiedColumn(table, "owner_id") + " IN (" + inClause + ")"
                     : null;
+            case "finance" -> tableName.startsWith("crm_finance_") && isPrimaryFinanceTable(table)
+                    ? "(" + qualifiedColumn(table, "owner_id") + " IN (" + inClause + ")"
+                    + " OR (" + qualifiedColumn(table, "owner_id") + " IS NULL AND "
+                    + qualifiedColumn(table, "create_user_id") + " IN (" + inClause + ")))"
+                    : null;
             default -> null;
         };
     }
@@ -167,6 +173,14 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
                     : null;
             default -> null;
         };
+    }
+
+    private boolean isPrimaryFinanceTable(Table table) {
+        Alias alias = table.getAlias();
+        if (alias == null || alias.getName() == null || alias.getName().isBlank()) {
+            return true;
+        }
+        return "t".equalsIgnoreCase(alias.getName());
     }
 
     private Long resolveCurrentUserId() {

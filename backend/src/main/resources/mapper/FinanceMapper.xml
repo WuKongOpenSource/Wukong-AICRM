@@ -1,0 +1,473 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.FinanceMapper">
+
+    <sql id="commonJoins">
+        LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
+        LEFT JOIN crm_project p ON t.project_id = p.project_id
+        LEFT JOIN manager_user u ON t.owner_id = u.user_id
+        LEFT JOIN manager_user cu ON t.create_user_id = cu.user_id
+    </sql>
+
+    <sql id="commonFilters">
+        t.del_flag = 0
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (
+                COALESCE(c.company_name, '') ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(p.name, '') ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(t.remark, '') ILIKE CONCAT('%', #{query.keyword}, '%')
+            )
+        </if>
+        <if test="query.customerId != null">AND t.customer_id = #{query.customerId}</if>
+        <if test="query.projectId != null">AND t.project_id = #{query.projectId}</if>
+        <if test="query.ownerId != null">AND t.owner_id = #{query.ownerId}</if>
+    </sql>
+
+    <insert id="insertContract">
+        INSERT INTO crm_finance_contract (
+            contract_id, contract_no, contract_name, customer_id, project_id, owner_id, amount,
+            sign_date, start_date, end_date, status, remark, source_type, source_text, ai_created,
+            del_flag, create_user_id, update_user_id, create_time, update_time
+        ) VALUES (
+            #{contractId}, #{contractNo}, #{contractName}, #{customerId}, #{projectId}, #{ownerId}, #{amount},
+            #{signDate}, #{startDate}, #{endDate}, #{status}, #{remark}, #{sourceType}, #{sourceText}, #{aiCreated},
+            #{delFlag}, #{createUserId}, #{updateUserId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+    </insert>
+
+    <update id="updateContract">
+        UPDATE crm_finance_contract
+        SET contract_no = #{contractNo},
+            contract_name = #{contractName},
+            customer_id = #{customerId},
+            project_id = #{projectId},
+            owner_id = #{ownerId},
+            amount = #{amount},
+            sign_date = #{signDate},
+            start_date = #{startDate},
+            end_date = #{endDate},
+            status = #{status},
+            remark = #{remark},
+            source_type = #{sourceType},
+            source_text = #{sourceText},
+            ai_created = #{aiCreated},
+            update_user_id = #{updateUserId},
+            update_time = CURRENT_TIMESTAMP
+        WHERE contract_id = #{contractId}
+          AND del_flag = 0
+    </update>
+
+    <select id="selectContractById" resultType="com.kakarote.ai_crm.entity.PO.FinanceContract">
+        SELECT * FROM crm_finance_contract WHERE contract_id = #{contractId} AND del_flag = 0
+    </select>
+
+    <select id="queryContracts" resultType="com.kakarote.ai_crm.entity.VO.FinanceRecordVO">
+        SELECT
+            t.contract_id AS id, t.contract_id, t.contract_no, t.contract_name,
+            t.customer_id, c.company_name AS customer_name,
+            t.project_id, p.name AS project_name,
+            t.owner_id, u.realname AS owner_name,
+            t.amount, t.sign_date, t.start_date, t.end_date, t.status, t.remark,
+            t.source_type, t.source_text, t.ai_created, t.create_user_id,
+            cu.realname AS create_user_name, t.create_time, t.update_time
+        FROM crm_finance_contract t
+        <include refid="commonJoins"/>
+        WHERE <include refid="commonFilters"/>
+        <if test="query.status != null and query.status != ''">AND t.status = #{query.status}</if>
+        <if test="query.startDate != null">AND t.sign_date &gt;= #{query.startDate}</if>
+        <if test="query.endDate != null">AND t.sign_date &lt;= #{query.endDate}</if>
+        ORDER BY t.sign_date DESC NULLS LAST, t.update_time DESC NULLS LAST, t.contract_id DESC
+    </select>
+
+    <select id="getContractDetail" resultType="com.kakarote.ai_crm.entity.VO.FinanceRecordVO">
+        SELECT
+            t.contract_id AS id, t.contract_id, t.contract_no, t.contract_name,
+            t.customer_id, c.company_name AS customer_name,
+            t.project_id, p.name AS project_name,
+            t.owner_id, u.realname AS owner_name,
+            t.amount, t.sign_date, t.start_date, t.end_date, t.status, t.remark,
+            t.source_type, t.source_text, t.ai_created, t.create_user_id,
+            cu.realname AS create_user_name, t.create_time, t.update_time
+        FROM crm_finance_contract t
+        <include refid="commonJoins"/>
+        WHERE t.del_flag = 0
+          AND t.contract_id = #{contractId}
+    </select>
+
+    <insert id="insertReceivable">
+        INSERT INTO crm_finance_receivable (
+            receivable_id, contract_id, customer_id, project_id, owner_id, title, amount,
+            received_amount, due_date, status, remark, source_type, source_text, ai_created,
+            del_flag, create_user_id, update_user_id, create_time, update_time
+        ) VALUES (
+            #{receivableId}, #{contractId}, #{customerId}, #{projectId}, #{ownerId}, #{title}, #{amount},
+            #{receivedAmount}, #{dueDate}, #{status}, #{remark}, #{sourceType}, #{sourceText}, #{aiCreated},
+            #{delFlag}, #{createUserId}, #{updateUserId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+    </insert>
+
+    <update id="updateReceivable">
+        UPDATE crm_finance_receivable
+        SET contract_id = #{contractId},
+            customer_id = #{customerId},
+            project_id = #{projectId},
+            owner_id = #{ownerId},
+            title = #{title},
+            amount = #{amount},
+            received_amount = #{receivedAmount},
+            due_date = #{dueDate},
+            status = #{status},
+            remark = #{remark},
+            source_type = #{sourceType},
+            source_text = #{sourceText},
+            ai_created = #{aiCreated},
+            update_user_id = #{updateUserId},
+            update_time = CURRENT_TIMESTAMP
+        WHERE receivable_id = #{receivableId}
+          AND del_flag = 0
+    </update>
+
+    <select id="selectReceivableById" resultType="com.kakarote.ai_crm.entity.PO.FinanceReceivable">
+        SELECT * FROM crm_finance_receivable WHERE receivable_id = #{receivableId} AND del_flag = 0
+    </select>
+
+    <select id="selectReceivableByIdForUpdate" resultType="com.kakarote.ai_crm.entity.PO.FinanceReceivable">
+        SELECT * FROM crm_finance_receivable WHERE receivable_id = #{receivableId} AND del_flag = 0 FOR UPDATE
+    </select>
+
+    <select id="selectEarliestOpenReceivable" resultType="com.kakarote.ai_crm.entity.PO.FinanceReceivable">
+        SELECT *
+        FROM crm_finance_receivable
+        WHERE del_flag = 0
+          AND status IN ('pending', 'partial', 'overdue')
+          AND amount &gt; received_amount
+          <if test="customerId != null">AND customer_id = #{customerId}</if>
+          <if test="contractId != null">AND contract_id = #{contractId}</if>
+        ORDER BY due_date ASC NULLS LAST, create_time ASC
+        LIMIT 1
+    </select>
+
+    <select id="selectEarliestOpenReceivableForUpdate" resultType="com.kakarote.ai_crm.entity.PO.FinanceReceivable">
+        SELECT *
+        FROM crm_finance_receivable
+        WHERE del_flag = 0
+          AND status IN ('pending', 'partial', 'overdue')
+          AND amount &gt; received_amount
+          <if test="customerId != null">AND customer_id = #{customerId}</if>
+          <if test="contractId != null">AND contract_id = #{contractId}</if>
+        ORDER BY due_date ASC NULLS LAST, create_time ASC
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
+    <select id="queryReceivables" resultType="com.kakarote.ai_crm.entity.VO.FinanceRecordVO">
+        SELECT
+            t.receivable_id AS id, t.receivable_id, t.contract_id, fc.contract_name, t.title,
+            t.customer_id, c.company_name AS customer_name,
+            t.project_id, p.name AS project_name,
+            t.owner_id, u.realname AS owner_name,
+            t.amount, t.received_amount, (t.amount - t.received_amount) AS unpaid_amount,
+            t.due_date,
+            CASE WHEN t.status IN ('pending', 'partial', 'overdue') AND t.due_date &lt; CURRENT_DATE
+                 THEN (CURRENT_DATE - t.due_date)::INT ELSE 0 END AS overdue_days,
+            CASE WHEN t.status IN ('pending', 'partial') AND t.due_date &lt; CURRENT_DATE THEN 'overdue' ELSE t.status END AS status,
+            t.remark, t.source_type, t.source_text, t.ai_created, t.create_user_id,
+            cu.realname AS create_user_name, t.create_time, t.update_time
+        FROM crm_finance_receivable t
+        LEFT JOIN crm_finance_contract fc ON t.contract_id = fc.contract_id
+        <include refid="commonJoins"/>
+        WHERE <include refid="commonFilters"/>
+        <if test="query.status != null and query.status != ''">AND t.status = #{query.status}</if>
+        <if test="query.startDate != null">AND t.due_date &gt;= #{query.startDate}</if>
+        <if test="query.endDate != null">AND t.due_date &lt;= #{query.endDate}</if>
+        <if test="query.overdue != null and query.overdue">AND t.status IN ('pending', 'partial', 'overdue') AND t.due_date &lt; CURRENT_DATE</if>
+        ORDER BY t.due_date ASC NULLS LAST, t.create_time DESC NULLS LAST
+    </select>
+
+    <select id="getReceivableDetail" resultType="com.kakarote.ai_crm.entity.VO.FinanceRecordVO">
+        SELECT
+            t.receivable_id AS id, t.receivable_id, t.contract_id, fc.contract_name, t.title,
+            t.customer_id, c.company_name AS customer_name,
+            t.project_id, p.name AS project_name,
+            t.owner_id, u.realname AS owner_name,
+            t.amount, t.received_amount, (t.amount - t.received_amount) AS unpaid_amount,
+            t.due_date,
+            CASE WHEN t.status IN ('pending', 'partial', 'overdue') AND t.due_date &lt; CURRENT_DATE
+                 THEN (CURRENT_DATE - t.due_date)::INT ELSE 0 END AS overdue_days,
+            CASE WHEN t.status IN ('pending', 'partial') AND t.due_date &lt; CURRENT_DATE THEN 'overdue' ELSE t.status END AS status,
+            t.remark, t.source_type, t.source_text, t.ai_created, t.create_user_id,
+            cu.realname AS create_user_name, t.create_time, t.update_time
+        FROM crm_finance_receivable t
+        LEFT JOIN crm_finance_contract fc ON t.contract_id = fc.contract_id
+        <include refid="commonJoins"/>
+        WHERE t.del_flag = 0
+          AND t.receivable_id = #{receivableId}
+    </select>
+
+    <insert id="insertPayment">
+        INSERT INTO crm_finance_payment (
+            payment_id, receivable_id, contract_id, customer_id, project_id, owner_id, amount,
+            payment_date, payment_method, remark, source_type, source_text, ai_created,
+            del_flag, create_user_id, update_user_id, create_time, update_time
+        ) VALUES (
+            #{paymentId}, #{receivableId}, #{contractId}, #{customerId}, #{projectId}, #{ownerId}, #{amount},
+            #{paymentDate}, #{paymentMethod}, #{remark}, #{sourceType}, #{sourceText}, #{aiCreated},
+            #{delFlag}, #{createUserId}, #{updateUserId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+    </insert>
+
+    <update id="updatePayment">
+        UPDATE crm_finance_payment
+        SET receivable_id = #{receivableId}, contract_id = #{contractId}, customer_id = #{customerId},
+            project_id = #{projectId}, owner_id = #{ownerId}, amount = #{amount}, payment_date = #{paymentDate},
+            payment_method = #{paymentMethod}, remark = #{remark}, source_type = #{sourceType},
+            source_text = #{sourceText}, ai_created = #{aiCreated}, update_user_id = #{updateUserId},
+            update_time = CURRENT_TIMESTAMP
+        WHERE payment_id = #{paymentId}
+          AND del_flag = 0
+    </update>
+
+    <select id="selectPaymentById" resultType="com.kakarote.ai_crm.entity.PO.FinancePayment">
+        SELECT * FROM crm_finance_payment WHERE payment_id = #{paymentId} AND del_flag = 0
+    </select>
+
+    <select id="queryPayments" resultType="com.kakarote.ai_crm.entity.VO.FinanceRecordVO">
+        SELECT
+            t.payment_id AS id, t.payment_id, t.receivable_id, t.contract_id, fc.contract_name,
+            t.customer_id, c.company_name AS customer_name,
+            t.project_id, p.name AS project_name,
+            t.owner_id, u.realname AS owner_name,
+            t.amount, t.payment_date, t.payment_method, t.remark, t.source_type, t.source_text,
+            t.ai_created, t.create_user_id, cu.realname AS create_user_name, t.create_time, t.update_time
+        FROM crm_finance_payment t
+        LEFT JOIN crm_finance_contract fc ON t.contract_id = fc.contract_id
+        <include refid="commonJoins"/>
+        WHERE <include refid="commonFilters"/>
+        <if test="query.startDate != null">AND t.payment_date &gt;= #{query.startDate}</if>
+        <if test="query.endDate != null">AND t.payment_date &lt;= #{query.endDate}</if>
+        ORDER BY t.payment_date DESC, t.create_time DESC NULLS LAST
+    </select>
+
+    <select id="getPaymentDetail" resultType="com.kakarote.ai_crm.entity.VO.FinanceRecordVO">
+        SELECT
+            t.payment_id AS id, t.payment_id, t.receivable_id, t.contract_id, fc.contract_name,
+            t.customer_id, c.company_name AS customer_name,
+            t.project_id, p.name AS project_name,
+            t.owner_id, u.realname AS owner_name,
+            t.amount, t.payment_date, t.payment_method, t.remark, t.source_type, t.source_text,
+            t.ai_created, t.create_user_id, cu.realname AS create_user_name, t.create_time, t.update_time
+        FROM crm_finance_payment t
+        LEFT JOIN crm_finance_contract fc ON t.contract_id = fc.contract_id
+        <include refid="commonJoins"/>
+        WHERE t.del_flag = 0
+          AND t.payment_id = #{paymentId}
+    </select>
+
+    <insert id="insertInvoice">
+        INSERT INTO crm_finance_invoice (
+            invoice_id, contract_id, receivable_id, customer_id, project_id, owner_id, invoice_no,
+            title, tax_no, amount, invoice_date, status, remark, source_type, source_text, ai_created,
+            del_flag, create_user_id, update_user_id, create_time, update_time
+        ) VALUES (
+            #{invoiceId}, #{contractId}, #{receivableId}, #{customerId}, #{projectId}, #{ownerId}, #{invoiceNo},
+            #{title}, #{taxNo}, #{amount}, #{invoiceDate}, #{status}, #{remark}, #{sourceType}, #{sourceText}, #{aiCreated},
+            #{delFlag}, #{createUserId}, #{updateUserId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+    </insert>
+
+    <update id="updateInvoice">
+        UPDATE crm_finance_invoice
+        SET contract_id = #{contractId}, receivable_id = #{receivableId}, customer_id = #{customerId},
+            project_id = #{projectId}, owner_id = #{ownerId}, invoice_no = #{invoiceNo}, title = #{title},
+            tax_no = #{taxNo}, amount = #{amount}, invoice_date = #{invoiceDate}, status = #{status},
+            remark = #{remark}, source_type = #{sourceType}, source_text = #{sourceText}, ai_created = #{aiCreated},
+            update_user_id = #{updateUserId}, update_time = CURRENT_TIMESTAMP
+        WHERE invoice_id = #{invoiceId}
+          AND del_flag = 0
+    </update>
+
+    <select id="selectInvoiceById" resultType="com.kakarote.ai_crm.entity.PO.FinanceInvoice">
+        SELECT * FROM crm_finance_invoice WHERE invoice_id = #{invoiceId} AND del_flag = 0
+    </select>
+
+    <select id="queryInvoices" resultType="com.kakarote.ai_crm.entity.VO.FinanceRecordVO">
+        SELECT
+            t.invoice_id AS id, t.invoice_id, t.contract_id, t.receivable_id, fc.contract_name,
+            t.invoice_no, t.title, t.tax_no,
+            t.customer_id, c.company_name AS customer_name,
+            t.project_id, p.name AS project_name,
+            t.owner_id, u.realname AS owner_name,
+            t.amount, t.invoice_date, t.status, t.remark, t.source_type, t.source_text,
+            t.ai_created, t.create_user_id, cu.realname AS create_user_name, t.create_time, t.update_time
+        FROM crm_finance_invoice t
+        LEFT JOIN crm_finance_contract fc ON t.contract_id = fc.contract_id
+        <include refid="commonJoins"/>
+        WHERE <include refid="commonFilters"/>
+        <if test="query.status != null and query.status != ''">AND t.status = #{query.status}</if>
+        <if test="query.startDate != null">AND t.invoice_date &gt;= #{query.startDate}</if>
+        <if test="query.endDate != null">AND t.invoice_date &lt;= #{query.endDate}</if>
+        ORDER BY t.invoice_date DESC NULLS LAST, t.create_time DESC NULLS LAST
+    </select>
+
+    <select id="getInvoiceDetail" resultType="com.kakarote.ai_crm.entity.VO.FinanceRecordVO">
+        SELECT
+            t.invoice_id AS id, t.invoice_id, t.contract_id, t.receivable_id, fc.contract_name,
+            t.invoice_no, t.title, t.tax_no,
+            t.customer_id, c.company_name AS customer_name,
+            t.project_id, p.name AS project_name,
+            t.owner_id, u.realname AS owner_name,
+            t.amount, t.invoice_date, t.status, t.remark, t.source_type, t.source_text,
+            t.ai_created, t.create_user_id, cu.realname AS create_user_name, t.create_time, t.update_time
+        FROM crm_finance_invoice t
+        LEFT JOIN crm_finance_contract fc ON t.contract_id = fc.contract_id
+        <include refid="commonJoins"/>
+        WHERE t.del_flag = 0
+          AND t.invoice_id = #{invoiceId}
+    </select>
+
+    <insert id="insertExpense">
+        INSERT INTO crm_finance_expense (
+            expense_id, customer_id, project_id, owner_id, expense_type, amount, expense_date,
+            status, remark, source_type, source_text, ai_created, del_flag, create_user_id,
+            update_user_id, create_time, update_time
+        ) VALUES (
+            #{expenseId}, #{customerId}, #{projectId}, #{ownerId}, #{expenseType}, #{amount}, #{expenseDate},
+            #{status}, #{remark}, #{sourceType}, #{sourceText}, #{aiCreated}, #{delFlag}, #{createUserId},
+            #{updateUserId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+    </insert>
+
+    <update id="updateExpense">
+        UPDATE crm_finance_expense
+        SET customer_id = #{customerId}, project_id = #{projectId}, owner_id = #{ownerId},
+            expense_type = #{expenseType}, amount = #{amount}, expense_date = #{expenseDate}, status = #{status},
+            remark = #{remark}, source_type = #{sourceType}, source_text = #{sourceText}, ai_created = #{aiCreated},
+            update_user_id = #{updateUserId}, update_time = CURRENT_TIMESTAMP
+        WHERE expense_id = #{expenseId}
+          AND del_flag = 0
+    </update>
+
+    <select id="selectExpenseById" resultType="com.kakarote.ai_crm.entity.PO.FinanceExpense">
+        SELECT * FROM crm_finance_expense WHERE expense_id = #{expenseId} AND del_flag = 0
+    </select>
+
+    <select id="queryExpenses" resultType="com.kakarote.ai_crm.entity.VO.FinanceRecordVO">
+        SELECT
+            t.expense_id AS id, t.expense_id, t.expense_type,
+            t.customer_id, c.company_name AS customer_name,
+            t.project_id, p.name AS project_name,
+            t.owner_id, u.realname AS owner_name,
+            t.amount, t.expense_date, t.status, t.remark, t.source_type, t.source_text,
+            t.ai_created, t.create_user_id, cu.realname AS create_user_name, t.create_time, t.update_time
+        FROM crm_finance_expense t
+        <include refid="commonJoins"/>
+        WHERE <include refid="commonFilters"/>
+        <if test="query.status != null and query.status != ''">AND t.status = #{query.status}</if>
+        <if test="query.startDate != null">AND t.expense_date &gt;= #{query.startDate}</if>
+        <if test="query.endDate != null">AND t.expense_date &lt;= #{query.endDate}</if>
+        ORDER BY t.expense_date DESC, t.create_time DESC NULLS LAST
+    </select>
+
+    <select id="getExpenseDetail" resultType="com.kakarote.ai_crm.entity.VO.FinanceRecordVO">
+        SELECT
+            t.expense_id AS id, t.expense_id, t.expense_type,
+            t.customer_id, c.company_name AS customer_name,
+            t.project_id, p.name AS project_name,
+            t.owner_id, u.realname AS owner_name,
+            t.amount, t.expense_date, t.status, t.remark, t.source_type, t.source_text,
+            t.ai_created, t.create_user_id, cu.realname AS create_user_name, t.create_time, t.update_time
+        FROM crm_finance_expense t
+        <include refid="commonJoins"/>
+        WHERE t.del_flag = 0
+          AND t.expense_id = #{expenseId}
+    </select>
+
+    <update id="softDelete">
+        UPDATE ${table}
+        SET del_flag = 1,
+            update_user_id = #{userId},
+            update_time = CURRENT_TIMESTAMP
+        WHERE ${idColumn} = #{id}
+    </update>
+
+    <select id="sumPayments" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(amount), 0)
+        FROM crm_finance_payment
+        WHERE del_flag = 0
+          <if test="startDate != null">AND payment_date &gt;= #{startDate}</if>
+          <if test="endDate != null">AND payment_date &lt;= #{endDate}</if>
+    </select>
+
+    <select id="sumPaymentsByReceivableId" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(amount), 0)
+        FROM crm_finance_payment
+        WHERE del_flag = 0
+          AND receivable_id = #{receivableId}
+    </select>
+
+    <select id="sumExpenses" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(amount), 0)
+        FROM crm_finance_expense
+        WHERE del_flag = 0
+          <if test="startDate != null">AND expense_date &gt;= #{startDate}</if>
+          <if test="endDate != null">AND expense_date &lt;= #{endDate}</if>
+    </select>
+
+    <select id="sumReceivablesDueBetween" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(amount - received_amount), 0)
+        FROM crm_finance_receivable
+        WHERE del_flag = 0
+          AND status IN ('pending', 'partial', 'overdue')
+          AND due_date &gt;= #{startDate}
+          AND due_date &lt;= #{endDate}
+    </select>
+
+    <select id="sumOverdueReceivables" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(amount - received_amount), 0)
+        FROM crm_finance_receivable
+        WHERE del_flag = 0
+          AND status IN ('pending', 'partial', 'overdue')
+          AND due_date &lt; #{today}
+    </select>
+
+    <select id="queryRecentRecords" resultType="com.kakarote.ai_crm.entity.VO.FinanceRecordVO">
+        SELECT * FROM (
+            SELECT payment_id AS id, '回款' AS title, amount, payment_date AS payment_date, customer_id, NULL::BIGINT AS project_id, create_time
+            FROM crm_finance_payment WHERE del_flag = 0
+            UNION ALL
+            SELECT expense_id AS id, expense_type AS title, amount, expense_date AS expense_date, customer_id, project_id, create_time
+            FROM crm_finance_expense WHERE del_flag = 0
+            UNION ALL
+            SELECT receivable_id AS id, title, amount - received_amount AS amount, due_date AS due_date, customer_id, project_id, create_time
+            FROM crm_finance_receivable WHERE del_flag = 0
+        ) t
+        ORDER BY create_time DESC NULLS LAST
+        LIMIT #{limit}
+    </select>
+
+    <select id="queryCashFlow" resultType="com.kakarote.ai_crm.entity.VO.FinanceDashboardVO$CashFlowPoint">
+        WITH months AS (
+            SELECT generate_series(date_trunc('month', #{startDate}::date), date_trunc('month', #{endDate}::date), interval '1 month') AS month_start
+        ),
+        income AS (
+            SELECT date_trunc('month', payment_date)::date AS month_start, SUM(amount) AS income
+            FROM crm_finance_payment
+            WHERE del_flag = 0 AND payment_date BETWEEN #{startDate} AND #{endDate}
+            GROUP BY date_trunc('month', payment_date)::date
+        ),
+        expense AS (
+            SELECT date_trunc('month', expense_date)::date AS month_start, SUM(amount) AS expense
+            FROM crm_finance_expense
+            WHERE del_flag = 0 AND expense_date BETWEEN #{startDate} AND #{endDate}
+            GROUP BY date_trunc('month', expense_date)::date
+        )
+        SELECT to_char(m.month_start, 'YYYY-MM') AS month,
+               COALESCE(i.income, 0) AS income,
+               COALESCE(e.expense, 0) AS expense,
+               COALESCE(i.income, 0) - COALESCE(e.expense, 0) AS net
+        FROM months m
+        LEFT JOIN income i ON i.month_start = m.month_start
+        LEFT JOIN expense e ON e.month_start = m.month_start
+        ORDER BY m.month_start
+    </select>
+</mapper>

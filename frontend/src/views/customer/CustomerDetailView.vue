@@ -836,18 +836,25 @@
               </div>
             </section> -->
 
-            <!-- Contracts Module (hidden) -->
-            <!-- <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <!-- Finance Module -->
+            <section v-if="canViewFinance" class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
               <div class="px-5 py-3 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
-                <h4 class="text-xs font-bold text-slate-700 flex items-center gap-2">
-                  <span class="material-symbols-outlined text-primary text-lg">assignment</span>
-                  合同管理
+                <h4 class="text-xs font-bold text-slate-700">
+                  财务概览
                 </h4>
               </div>
               <div class="p-4">
-                <p class="py-6 text-center text-xs text-slate-400">暂无合同记录</p>
+                <div v-if="financeLoading" class="flex justify-center py-6">
+                  <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+                </div>
+                <div v-else class="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3 xl:grid-cols-5">
+                  <div v-for="item in customerFinanceStats" :key="item.label" class="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
+                    <div class="text-slate-400">{{ item.label }}</div>
+                    <div class="mt-1 whitespace-normal break-words text-sm font-bold leading-5 text-slate-900">{{ item.value }}</div>
+                  </div>
+                </div>
               </div>
-            </section> -->
+            </section>
 
             <RelatedTasksModule
               :tasks="customerTasks"
@@ -1035,9 +1042,12 @@ import { addFollowUp, deleteFollowUp, queryFollowUpPageList, updateFollowUp } fr
 import { deleteContact, queryContactPageList, queryContactsByCustomer, setPrimaryContact } from '@/api/contact'
 import { addRelationFromContact } from '@/api/relation'
 import { queryKnowledgeList } from '@/api/knowledge'
+import { queryFinanceContracts, queryFinanceExpenses, queryFinancePayments, queryFinanceReceivables } from '@/api/finance'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { PageResult } from '@/types/api'
 import type { Knowledge, Task, TaskStatus } from '@/types/common'
 import type { Contact, CustomerAiReportVO, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpAttachment, FollowUpTask, FollowUpUpdateBO } from '@/types/customer'
+import type { FinanceRecordVO } from '@/types/finance'
 import { compactCustomerAiInsight } from '@/utils/customerAi'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
 import FollowUpUpsertDialog from '@/components/customer/FollowUpUpsertDialog.vue'
@@ -1149,6 +1159,18 @@ const schedulePage = ref(1)
 const schedulePageSize = computed(() => CUSTOMER_DETAIL_REQUEST_LIMIT)
 const scheduleLoading = ref(false)
 const customerKnowledgeList = ref<Knowledge[]>([])
+const financeLoading = ref(false)
+const customerFinanceRecords = ref<{
+  contracts: FinanceRecordVO[]
+  receivables: FinanceRecordVO[]
+  payments: FinanceRecordVO[]
+  expenses: FinanceRecordVO[]
+}>({
+  contracts: [],
+  receivables: [],
+  payments: [],
+  expenses: []
+})
 
 function parsePositivePageQuery(value: unknown): number | null {
   if (typeof value !== 'string') return null
@@ -1521,8 +1543,28 @@ const canEditSchedules = computed(() => userStore.hasPermission('schedule:edit')
 const canDeleteSchedules = computed(() => userStore.hasPermission('schedule:delete'))
 const canViewKnowledge = computed(() => userStore.hasPermission('knowledge:view'))
 const canUploadKnowledge = computed(() => userStore.hasPermission('knowledge:upload'))
+const canViewFinance = computed(() => userStore.hasPermission('finance:view'))
+const customerFinanceStats = computed(() => {
+  const contracts = customerFinanceRecords.value.contracts
+  const receivables = customerFinanceRecords.value.receivables
+  const payments = customerFinanceRecords.value.payments
+  const expenses = customerFinanceRecords.value.expenses
+  const contractAmount = sumFinanceAmount(contracts, 'amount')
+  const receivedAmount = sumFinanceAmount(payments, 'amount')
+  const receivableAmount = sumFinanceAmount(receivables, 'unpaidAmount')
+  const overdueAmount = sumFinanceAmount(receivables.filter(item => (item.overdueDays || 0) > 0 || item.status === 'overdue'), 'unpaidAmount')
+  const expenseAmount = sumFinanceAmount(expenses, 'amount')
+  return [
+    { label: '合同额', value: formatFinanceMoney(contractAmount) },
+    { label: '已收', value: formatFinanceMoney(receivedAmount) },
+    { label: '应收', value: formatFinanceMoney(receivableAmount) },
+    { label: '逾期', value: formatFinanceMoney(overdueAmount) },
+    { label: '费用', value: formatFinanceMoney(expenseAmount) }
+  ]
+})
 const visibleRelatedModuleCount = computed(() => [
   canViewContacts.value,
+  canViewFinance.value,
   canViewTasks.value,
   canViewSchedules.value,
   canViewKnowledge.value
@@ -1586,6 +1628,12 @@ async function refreshCustomerDetailModules(
     fetchTasks.push(fetchCustomerKnowledge(customerId))
   } else {
     customerKnowledgeList.value = []
+  }
+
+  if (canViewFinance.value) {
+    fetchTasks.push(fetchCustomerFinance(customerId))
+  } else {
+    resetCustomerFinance()
   }
 
   if (canViewSchedules.value) {
@@ -1854,6 +1902,65 @@ async function fetchCustomerKnowledge(customerId: string) {
   } finally {
     customerKnowledgeLoading.value = false
   }
+}
+
+function resetCustomerFinance() {
+  customerFinanceRecords.value = {
+    contracts: [],
+    receivables: [],
+    payments: [],
+    expenses: []
+  }
+}
+
+async function fetchCustomerFinance(customerId: string) {
+  financeLoading.value = true
+  try {
+    const [contracts, receivables, payments, expenses] = await Promise.all([
+      fetchAllFinanceRecords(customerId, queryFinanceContracts),
+      fetchAllFinanceRecords(customerId, queryFinanceReceivables),
+      fetchAllFinanceRecords(customerId, queryFinancePayments),
+      fetchAllFinanceRecords(customerId, queryFinanceExpenses)
+    ])
+    customerFinanceRecords.value = {
+      contracts,
+      receivables,
+      payments,
+      expenses
+    }
+  } catch (err) {
+    console.error('Failed to fetch customer finance:', err)
+    resetCustomerFinance()
+  } finally {
+    financeLoading.value = false
+  }
+}
+
+async function fetchAllFinanceRecords(
+  customerId: string,
+  request: (query: { customerId: string; page: number; limit: number }) => Promise<PageResult<FinanceRecordVO>>
+) {
+  const rows: FinanceRecordVO[] = []
+  const pageSize = 100
+  let currentPage = 1
+  let expectedTotal = 0
+  while (currentPage <= 1000) {
+    const response = await request({ customerId, page: currentPage, limit: pageSize })
+    const pageRows = response.list || []
+    rows.push(...pageRows)
+    expectedTotal = Math.max(expectedTotal, Number(response.totalRow || 0))
+    if (pageRows.length < pageSize || rows.length >= expectedTotal) break
+    currentPage += 1
+  }
+  return expectedTotal > 0 ? rows.slice(0, expectedTotal) : rows
+}
+
+function sumFinanceAmount(records: FinanceRecordVO[], key: keyof FinanceRecordVO) {
+  return records.reduce((sum, item) => sum + Number(item[key] || 0), 0)
+}
+
+function formatFinanceMoney(value: number) {
+  return value.toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })
 }
 
 function openCustomerKnowledgeUpload() {

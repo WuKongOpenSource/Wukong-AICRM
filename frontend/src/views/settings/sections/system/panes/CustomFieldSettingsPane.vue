@@ -16,6 +16,11 @@
       <el-tab-pane label="关系字段" name="relation" />
       <el-tab-pane label="产品字段" name="product" />
       <el-tab-pane label="候选人字段" name="candidate" />
+      <el-tab-pane label="合同字段" name="finance_contract" />
+      <el-tab-pane label="应收字段" name="finance_receivable" />
+      <el-tab-pane label="回款字段" name="finance_payment" />
+      <el-tab-pane label="发票字段" name="finance_invoice" />
+      <el-tab-pane label="费用字段" name="finance_expense" />
     </el-tabs>
 
     <div v-if="loadingFields" class="text-center py-8">
